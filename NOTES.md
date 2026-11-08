@@ -17277,3 +17277,82 @@ modes"; "Usually about 20 s for you" → "About 20 seconds" (and "About a minute
 external URL in the Horizon blocks; the intro skippable; effects off and reduced motion gate it; every rule
 scoped and Classic intact; everything pauses hidden; `?hz=` refused outside dev; the sky math; the mode
 names; the aerials; the Look. The scorecard is in the commit message.
+
+## 6b534 — Horizon, the owner's final round: the mode and the effort apart, every Apple aerial by the hour, the wordmark's slower reveal, asking from the home (per Patrick)
+
+Builds on the handoff commit (the WIP of 6b526's OVERRIDE 2: the GPU night, the tracer, the machine dies, the
+first-launch opening, Effects Full/Balanced) and finishes NORTHSTAR's OVERRIDE 3 for the home.
+
+**The opening (OVERRIDE 3, then the coordinator's slower reveal, copied from the reference).** The tagline is gone;
+the wordmark is alone. The handoff's lockup never showed: `#hz-intro-mark` kept its `hidden` attribute (the old
+`.hz.hz-intro #hz-intro-mark{display:flex}` that overrode it had been replaced), so `hzIntroKick` now unhides it.
+When the trace completes (`hz-litmark`): a light streak crosses it (2.8 s, cubic-bezier(.22,.8,.25,1)), one prism
+glint sweeps it (2.5 s, .55 s after), a prism glow cycles (9 s). It lingers: markout at 6.2 s (a 1.2 s fade), home
+at 6.8 s, the machines from 7.5 s, the end at 8.8 s. `#hz-cglow`'s breathing animation overrode its hidden opacity
+during the opening (a glass-shaped glow under nothing): stilled until home. First launch only, as before.
+
+**The mode and the effort are separate controls.** A picker pill shows the mode's name only (Flare, Zenith,
+Meridian, Odyssey where its tier exists; Max, Cloud only, a server's own mode or Advanced by their names) and
+opens a glass menu (`#hz-menu`, fixed over the sky so its blur is the page's, placed from the pill: up from the
+home's composer, down from the conversation's header): each mode, what it is for, the dies of the machines its
+real lineup uses (`tierInfo` from `/api/tiers`), the current one marked with a lit dot, a mode that can't answer
+greyed. Hovering or focusing a mode slides its models out under it (die and name; the machine in the tooltip) and
+lights those machines in the header. Arrows, Home/End, Escape, Tab. The lineup under the composer (OVERRIDE 2) is
+gone. The slider beside it is **Effort**: Low, Medium, High, Max over a real `<input type=range step=1>`, the level
+name beside it (Max shimmers), kept in `millen.effort`. The neon aurora follows both (`S.level(m,e)`: the mode's
+.2/.28/.5/.78 plus .04 a step). More modes stays the quiet icon beside them.
+
+**What Effort does (real, and deliberately narrow).** The page sends `effort` (`low|medium|high|max`) with every
+question under Horizon; `/api/chat` takes only those four words. It decides one thing today, the second pass of a
+single-model answer (Fast's draft-and-rewrite, and a server's first answer): `effort_polish(pref, effort)`: Low
+never, High and Max always (even with Polish off in Settings), Medium and an older client as Settings says. It does
+not yet touch councils, the final writer's reasoning level (6b518's FINAL_THINK) or the cloud's per-role effort
+(6b307): those belong to the quality branches, and High equals Max until the owner says what Max should add.
+
+**Backdrops: every Apple aerial, by the hour (per Patrick, via the coordinator).** `SKY_HZ_TAGS` gives each of the
+89 clips Apple's own type and time of day (space / city / land / sea; day / twilight / night, from the aerial
+catalog's timeOfDay, as the community manifest carries it), keyed by the unique start of its file name;
+`SKY_HZ_BLEND` turns that into the hours the page picks by and the blend (sea: night and day, rise 1.6, no trails;
+space at night .3/.56/.36; aurora .28/.62/.42; city at night "night dusk"; twilight "dusk dawn"; day "day"). The
+art director's sixteen (`SKY_HZ_PICKED`) keep his values. The page gets the table as `HZ_CLIPS`
+(`__SKY_HZ__`). Each open: `hzClipChoose` picks one that fits the hour bucket (night before 5 and from 20:30, dawn
+to 8, day to 17, dusk) and isn't one of the last three in the server's own history (hist.json, which the window's
+storage can't lose); a cached one plays at once; one that isn't is warmed for a later open while a cached fitting
+one plays now (fresh first, else the one seen longest ago; none: the sky alone), so the opening never waits on a
+download. The clip's own trail threshold (`hiT`), rise and speed drive the shaders; a new clip starts with clean
+trails and fades its footage in on `playing`; when the hour moves to another part of the day the next one
+crossfades in (checked with the sky every three minutes). Seen clips are posted to `/api/sky/seen`.
+
+**Asking from the home.** `hzBeforeSend` (in send, before the hero goes) keeps where the composer and the words
+were. On send: the composer glides from mid-page to the foot (FLIP, .9 s); the question arcs from where it was
+typed into its new row at the top of the chats (into the chats button while they're hidden), which pops on
+arrival; the row keeps a live die in the colour of the machine at work (from the RUN frames: the server's maker,
+this Mac, or a hollow ice die for the cloud) with its title shimmering, until the answer lands; when the saved
+title arrives the row renames itself with a fade (chats asked in the last two minutes). A MutationObserver on
+`#chat-list` keeps the live row through the list's own repaints, so it works with either `renderChats` (this
+branch's Recents, or hz-chat's Today/Yesterday groups). The live line, the comets and the glowing words are
+hz-chat's (6b528): the header chips now carry `.rig` and `data-machine` so its `machineChip` finds a server's
+chip; its local lookup (`.rig.mlx`) misses a PC's chip, to settle at integration. The Horizon dies are scoped
+(`.hz .hz-rig .die`, `.hz-mdl`, `.hz-opt`, `.hz-ldie`), never a bare `.hz .die`, so hz-chat's dies keep their look.
+
+**Header.** A server whose GPU maker isn't known is an ice die labelled with its own name, never assumed NVIDIA;
+the local chip is "This PC" on Windows. **Phone width:** the lockup steps aside for the lanes, and the mode and
+effort take their own row in the composer (measured: no horizontal scroll at 390 px).
+
+**Copy (old -> new), per the owner's copy rules.** Opening: "Your own AI. On your own machines." -> (none). Mode
+menu: Flare "A quick answer" -> "Fast answers"; Zenith "Thinks it through and checks itself" -> "Thinks it
+through"; Meridian "Goes deep, every model weighs in" -> "Every model weighs in"; Odyssey unchanged. Composer: the
+mode's description and the time hint ("About 20 seconds", "About a minute") -> (none); the slider's label "Effort"
+(was the mode's name) with Low / Medium / High / Max.
+
+**Verified** in Playwright's headless Chromium (Blink, rAF running) against a dev copy: the opening's frames, the
+menu with Meridian's eight models out, Effort at Max and Low, the compact header in a conversation, the arc, the
+live row through a repaint, the rename, 760 and 390 px. **Not verified:** WKWebView (the shipped app), and the
+footage itself (open-source Chromium plays no H.264, so the clips stayed black there); a real question was not
+sent (the engines lock).
+
+**Gauntlet.** The Horizon checks follow the new shape (menu, effort, the backdrop's GPU wiring, the scoped dies),
+and five are new, each with mutants: the 89-clip table (one entry each, the sixteen picks, underwater faint and
+trail-free); the chooser run in node (fits the hour, never one of the last three while a fresh one fits, plays from
+the cache and fetches the wanted one); `effort_polish`'s truth table; the mode menu; the opening's timings; asking
+from the home. The scorecard is in the commit message.

@@ -32368,6 +32368,170 @@ SKY_SOURCES = [
 SKY_DARK = [0, 3, 4, 6, 8, 11, 14, 16, 23, 25, 27, 31, 36, 42, 47, 52,
             56, 61, 65, 71, 75, 76, 83]
 
+# THE HORIZON'S BACKDROPS (6b534, per Patrick: "the whole Apple library"):
+# every clip above, with the hours it suits and how it blends into the
+# night. The hours are Apple's own, from its aerial catalog (each asset's
+# type, space / cityscape / landscape / underwater, and timeOfDay, day /
+# twilight / night), keyed by the start of each file's name, which is
+# unique; the gauntlet fails if a clip has no entry or a key matches two.
+# How a kind maps to the hours the page picks by (night, dawn, day, dusk):
+# space by night "night", by day "day dawn"; a city or a landscape at
+# night "night dusk", at twilight "dusk dawn", by day "day"; underwater
+# works by night or by day. The blends follow the art director's
+# reference (nightmock): underwater spreads faintly over the whole sky
+# with no light trails (rise 1.6, hi .97), space, aurora and city lights
+# rise from the foot with trails. Sixteen clips the art director looked at
+# carry his own values (SKY_HZ_PICKED), which win.
+SKY_HZ_TAGS = {
+    "SE_A016": ("sea", "day", "Seals"),
+    "comp_A114_C001": ("space", "day", "Southern California to Baja"),
+    "comp_GL_G002": ("land", "day", "The Greenland coast"),
+    "comp_GMT026": ("space", "night", "Korea and Japan at night"),
+    "PA_A001": ("sea", "night", "Palau jellyfish"),
+    "comp_LA_A008": ("city", "day", "A Los Angeles beach"),
+    "g201_WH_D004": ("sea", "day", "A humpback whale"),
+    "comp_L007": ("city", "day", "London from above"),
+    "comp_GMT312": ("space", "night", "Africa at night"),
+    "comp_CH_C002": ("land", "day", "Rice paddies in China"),
+    "comp_GL_G004": ("land", "twilight", "A Greenland glacier"),
+    "PA_A004": ("sea", "day", "Palau coral"),
+    "comp_LA_A005": ("city", "day", "A Los Angeles overpass"),
+    "comp_A009_C001": ("space", "day", "The Sahara and Italy"),
+    "DL_B002": ("sea", "day", "California dolphins"),
+    "comp_LA_A011": ("city", "night", "Downtown Los Angeles at night"),
+    "KP_A010": ("sea", "night", "Kelp"),
+    "comp_N013": ("city", "night", "New York at night"),
+    "comp_GMT329_113NC_396B_1105_ITALY": ("space", "night", "Italy to Asia"),
+    "g201_TH_803": ("sea", "day", "Tahiti waves"),
+    "comp_L012": ("city", "night", "London in the evening"),
+    "comp_A105_C002": ("space", "day", "The Caribbean"),
+    "comp_A013_C012": ("city", "day", "The Golden Gate Bridge"),
+    "RS_A008": ("sea", "day", "Red Sea coral"),
+    "comp_CH_C007_C004": ("land", "day", "Cliffs in China"),
+    "comp_GMT314": ("space", "night", "Aurora over North America"),
+    "comp_LA_A006_C008": ("city", "day", "LAX"),
+    "BO_A018": ("sea", "day", "Barracudas"),
+    "comp_DB_D011": ("city", "night", "Dubai at night"),
+    "comp_A001_C004": ("space", "day", "West Africa to the Alps"),
+    "comp_A083_C002": ("space", "night", "Iran and Afghanistan"),
+    "PA_A002": ("sea", "day", "Palau jellyfish"),
+    "comp_GMT308": ("space", "day", "The Caribbean by day"),
+    "comp_HK_B005": ("city", "night", "Hong Kong at night"),
+    "comp_GL_G010": ("land", "night", "Greenland in the evening"),
+    "comp_GMT306": ("space", "night", "California to Las Vegas"),
+    "MEX_A006": ("sea", "day", "Cownose rays"),
+    "comp_N008_C009": ("city", "day", "New York from above"),
+    "comp_A015_C018": ("city", "night", "The Bay Bridge at night"),
+    "g201_TH_804": ("sea", "day", "Tahiti waves"),
+    "comp_LA_A006_C004": ("city", "night", "The Hollywood hills"),
+    "comp_H004_C009": ("land", "twilight", "Clouds over Hawaii"),
+    "g201_CA_A016": ("sea", "day", "A California kelp forest"),
+    "comp_A108_C001": ("space", "day", "The Caribbean"),
+    "comp_GMT329_117NC": ("space", "night", "Ireland to Asia"),
+    "comp_DB_D008": ("city", "day", "Dubai from above"),
+    "comp_C003_C003": ("land", "twilight", "China in silhouette"),
+    "g201_AK_A003": ("sea", "night", "Alaskan jellyfish"),
+    "comp_H012_C009": ("land", "night", "The ocean off Hawaii"),
+    "comp_H005_C012": ("land", "day", "A Hawaiian valley"),
+    "comp_GMT329_113NC_396B_1105_CHINA": ("space", "night", "China"),
+    "comp_LA_A009": ("city", "night", "Griffith Park at sunset"),
+    "FK_U009": ("sea", "day", "Grey reef sharks"),
+    "comp_A050_C004": ("space", "day", "The Nile Delta"),
+    "comp_DB_D002": ("city", "twilight", "The Dubai skyline"),
+    "comp_CH_C007_C011": ("land", "day", "Mountains in China"),
+    "BO_A012": ("sea", "day", "Sea stars"),
+    "comp_A105_C003": ("space", "day", "New Zealand"),
+    "comp_LW_L001_C003": ("land", "day", "The Liwa horizon"),
+    "comp_HK_H004_C010": ("city", "day", "Hong Kong's horizon"),
+    "comp_A351_C001": ("space", "day", "South Africa to North Asia"),
+    "CR_A009": ("sea", "day", "Costa Rica dolphins"),
+    "comp_A001_C001": ("space", "night", "The Atlantic to Spain and France"),
+    "comp_A006_C003": ("city", "day", "San Francisco Bay"),
+    "comp_DB_D001_C001": ("city", "day", "Dubai Creek Harbour"),
+    "BO_A014_C023": ("sea", "day", "A school of jacks"),
+    "comp_N008_C003": ("city", "night", "The New York skyline"),
+    "comp_GMT110": ("space", "night", "Aurora over Antarctica"),
+    "comp_L010": ("city", "day", "The London skyline"),
+    "comp_1223LV": ("city", "twilight", "The Embarcadero"),
+    "comp_A103_C002": ("space", "day", "Africa and the Middle East"),
+    "PA_A010": ("sea", "day", "Palau jellyfish"),
+    "comp_N003": ("city", "day", "Midtown Manhattan"),
+    "comp_C001_C005": ("land", "day", "The Great Wall"),
+    "comp_A008_C007": ("city", "twilight", "San Francisco in morning fog"),
+    "comp_GMT307": ("space", "night", "Mexico City to New York"),
+    "BO_A014_C008": ("sea", "day", "Bumphead parrotfish"),
+    "comp_L004": ("city", "night", "The Thames at night"),
+    "comp_H004_C007": ("land", "night", "Clouds over Hawaii at night"),
+    "comp_HK_H004_C013": ("city", "day", "The Hong Kong skyline"),
+    "comp_H007_C003": ("land", "day", "The Hawaiian coast"),
+    "comp_DB_D001_C005": ("city", "day", "Dubai Creek"),
+    "comp_A012_C014": ("city", "twilight", "The San Francisco skyline"),
+    "AK_A004": ("sea", "day", "Alaskan jellyfish"),
+    "comp_HK_H004_C008": ("city", "day", "Hong Kong harbour"),
+    "comp_A007_C017": ("city", "night", "Fisherman's Wharf"),
+    "comp_LW_L001_C006": ("land", "day", "The Liwa dunes"),
+    "comp_GMT060": ("space", "night", "Australia"),
+    "comp_C004_C003": ("land", "day", "The Great Wall"),
+}
+# the art director's sixteen (nightmock/index.html CLIPS), by catalog key:
+# (when, foot, rise, hi, rate, title)
+SKY_HZ_PICKED = {
+    "comp_GMT026": ("night", .3, .56, .36, .7, "Korea and Japan at night"),
+    "comp_GMT314": ("night", .28, .62, .42, .7, "Aurora over North America"),
+    "comp_A015_C018": ("night dusk", .26, .52, .4, .6, "The Bay Bridge at night"),
+    "g201_WH_D004": ("night day", .22, 1.6, .97, .6, "A humpback whale"),
+    "FK_U009": ("night day", .2, 1.6, .97, .6, "Grey reef sharks"),
+    "comp_A050_C004": ("day dawn", .3, .66, .9, .7, "The Mediterranean from orbit"),
+    "comp_GL_G010": ("dusk dawn", .26, .58, .9, .6, "Greenland icebergs at sunset"),
+    "CR_A009": ("day", .2, 1.6, .97, .6, "Dolphins"),
+    "BO_A014_C023": ("night day", .2, 1.6, .97, .6, "A school of jacks"),
+    "PA_A004": ("day", .2, 1.6, .97, .6, "A coral reef"),
+    "comp_A007_C017": ("dawn", .24, .6, .9, .6, "San Francisco in morning fog"),
+    "comp_L007": ("day", .2, .55, .9, .6, "London from above"),
+    "comp_N008_C009": ("day", .2, .55, .9, .6, "Central Park from above"),
+    "g201_CA_A016": ("day dusk", .2, 1.6, .97, .6, "A kelp forest"),
+    "comp_A105_C003": ("dawn day dusk", .28, .66, .9, .7, "Sunrise from orbit"),
+    "comp_GMT110": ("night", .3, .62, .42, .7, "Aurora over Antarctica"),
+}
+# (kind, timeOfDay) -> (when, foot, rise, hi, rate)
+SKY_HZ_BLEND = {
+    ("sea", "day"): ("night day", .2, 1.6, .97, .6),
+    ("sea", "night"): ("night day", .2, 1.6, .97, .6),
+    ("space", "night"): ("night", .3, .56, .36, .7),
+    ("space", "day"): ("day dawn", .3, .66, .9, .7),
+    ("city", "night"): ("night dusk", .26, .52, .4, .6),
+    ("city", "twilight"): ("dusk dawn", .24, .58, .5, .6),
+    ("city", "day"): ("day", .2, .55, .9, .6),
+    ("land", "night"): ("night dusk", .26, .58, .5, .6),
+    ("land", "twilight"): ("dusk dawn", .26, .58, .9, .6),
+    ("land", "day"): ("day", .22, .58, .9, .6),
+}
+SKY_HZ_AURORA = (.28, .62, .42, .7)     # space at night over an aurora
+
+
+def sky_hz_key(url: str):
+    """The catalog key whose name starts this clip's file name, else None."""
+    name = url.rsplit("/", 1)[-1]
+    hits = [k for k in SKY_HZ_TAGS if name.startswith(k)]
+    return max(hits, key=len) if hits else None
+
+
+def sky_hz_clips() -> list:
+    """Every clip as the Horizon page picks and blends it (6b534): {i, when,
+    foot, rise, hi, rate, k (kind), t (title)}, in SKY_SOURCES order."""
+    out = []
+    for i, u in enumerate(SKY_SOURCES):
+        k = sky_hz_key(u)
+        kind, tod, title = SKY_HZ_TAGS.get(k, ("land", "day", ""))
+        when, foot, rise, hi, rate = SKY_HZ_BLEND[(kind, tod)]
+        if kind == "space" and tod == "night" and "AURORA" in u:
+            foot, rise, hi, rate = SKY_HZ_AURORA
+        if k in SKY_HZ_PICKED:
+            when, foot, rise, hi, rate, title = SKY_HZ_PICKED[k]
+        out.append({"i": i, "when": when, "foot": foot, "rise": rise, "hi": hi,
+                    "rate": rate, "k": kind, "t": title})
+    return out
+
 _sky_lock = threading.Lock()
 
 
@@ -32461,6 +32625,23 @@ def sky_is_night() -> bool:
 # Settings when its coordinates are already in the geocode cache, else the
 # time zone's reference city from the OS zone table (_zone_latlon). None
 # when neither is known, and the page then says nothing about the place.
+# EFFORT (6b534, per Patrick: the mode and the effort are separate controls,
+# like Claude and ChatGPT): the Horizon composer's slider sends Low, Medium,
+# High or Max with each question. For now it decides one real thing, the
+# second pass of a single-model answer (the draft-and-rewrite of Fast and of
+# a server's first answer): Low never, High and Max always (even with Polish
+# off in Settings), Medium and an older client as Settings says.
+EFFORT_LEVELS = ("low", "medium", "high", "max")
+
+
+def effort_polish(pref, effort) -> bool:
+    if effort == "low":
+        return False
+    if effort in ("high", "max"):
+        return True
+    return bool(pref)
+
+
 MODE_ALIASES = {"Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
                 "Odyssey": "Vera Rubin"}
 _HZ_PLACE_CACHE = {}
@@ -34113,6 +34294,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__HZ_SEEN__", json.dumps(hz_seen(self.ctx)))
                     .replace("__SKY_ORBIT__", json.dumps(
                         [i for i, u in enumerate(SKY_SOURCES) if "GMT" in u]))
+                    .replace("__SKY_HZ__", json.dumps(sky_hz_clips()))
                     .replace("__AGENT_ROWS__", build_agent_rows())
                     .replace("__CODE_ROWS__", build_code_rows())
                     .replace("__TIER_META__", json.dumps(
@@ -36275,6 +36457,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a tier resolves to its own line-up; otherwise honour explicit picks
         tier = req_json.get("tier") or ""
         req_tier = tier               # before a picture resets it (6b308)
+        # the effort the person set (6b534); anything else is no effort at all
+        _effort = req_json.get("effort")
+        _effort = _effort if _effort in EFFORT_LEVELS else None
         _answered.pop(threading.get_ident(), None)
         # a new question voids the last one's "who answered": the title
         # of a chat answered on this Mac must never go to the cloud. Per
@@ -38378,7 +38563,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 server_first_answer(
                     _srv_lbl, "", full_messages, memit, emit, status, step,
                     first_s=None,
-                    polish=(_so_revise if (user_prefs(user_base).get("polish", True)
+                    polish=(_so_revise if (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                                            and (not query or bookish)
                                            and _is_substantive(prompt)) else None))
             elif _srv_lbl:
@@ -38489,7 +38674,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # the server. A first word within 30 s (Fast) or 60 s
                     # pasted pages write once (6b423): a reviser shown 5000
                     # characters of eight pages can't check the rest
-                    _pol = (user_prefs(user_base).get("polish", True)
+                    _pol = (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                             and not images and (not query or bookish)
                             and not _links
                             and _is_substantive(prompt))
@@ -38516,7 +38701,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # message so the reviser can check names against data.
                 # a giant on Ollama writes once (6b314): the draft-and-
                 # rewrite pass doubles a few-words-a-second answer
-                polish = (user_prefs(user_base).get("polish", True)
+                polish = (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                           and not images and (not query or bookish)
                           and not _links          # (6b423) see _pol
                           and _is_substantive(prompt)
@@ -43299,10 +43484,8 @@ body.gen #chip-model{color:var(--accent)}
   .hz #hz-lanes{gap:16px}
   .hz .hz-rig b{display:none}
   .hz .hz-rig{padding:0 8px}
-  .hz #hz-lineup{left:0}
   .hz #main:has(#hero) #chat-inner{padding-top:120px}
-  .hz .hz-sl-desc,.hz .hz-sl-l2{display:none}
-  .hz .hz-sl{width:150px}
+  .hz .hz-sl{width:120px}
   .hz #main:has(#hero) #composer-wrap{padding:0 12px 24px}
   .hz #composer{padding:16px 12px 12px 18px}
   .hz #main:not(:has(#hero)) #composer{margin-left:auto}
@@ -43431,11 +43614,14 @@ __HZ_FONTS__
 .hz .hz-rig{position:relative;display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;border-radius:999px;font-family:var(--hz-font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--hz-ink-3);cursor:default;outline:0;transition:color .5s,background .3s}
 .hz .hz-rig:hover,.hz .hz-rig:focus-visible{background:rgba(255,255,255,.06);color:var(--hz-ink)}
 .hz .hz-rig b{font-weight:500}
-.hz .hz-rig.mlx,.hz .hz-mdl[data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz .hz-mdl[data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}
-.hz .hz-rig.amd,.hz .hz-mdl[data-v=amd]{--ac:#ed1c24;--ag:#ff4d55}.hz .hz-rig.intel,.hz .hz-mdl[data-v=intel]{--ac:#0071c5;--ag:#3d9df5}
-.hz .die{position:relative;width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#c9ccd2);
+/* a maker's colours, wherever a Horizon die stands for a machine (data-v on the die or its row) */
+.hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}
+.hz .hz-rig.amd,.hz [data-v=amd]{--ac:#ed1c24;--ag:#ff4d55}.hz .hz-rig.intel,.hz [data-v=intel]{--ac:#0071c5;--ag:#3d9df5}
+.hz .hz-rig.srv,.hz [data-v=srv],.hz [data-v=cloud]{--ac:#9fc0ff;--ag:#cfe0ff}
+.hz .hz-rig .die,.hz .hz-mdl .die,.hz .hz-opt .die,.hz .hz-ldie{position:relative;width:8px;height:8px;border-radius:2px;flex:0 0 auto;background:linear-gradient(135deg,rgba(255,255,255,.55),transparent 60%),var(--ac,#c9ccd2);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 0 10px -1px var(--ag,#e4e7ee);opacity:0;transform:scale(.4) rotate(-45deg);transition:opacity .5s var(--hz-ease-out),transform .7s var(--hz-ease-spring)}
-.hz .hz-rig.on .die,.hz .hz-mdl .die{opacity:1;transform:none}
+.hz .hz-rig.on .die,.hz .hz-mdl .die,.hz .hz-opt .die{opacity:1;transform:none}
+.hz .hz-mdl[data-v=cloud] .die,.hz .hz-opt .die[data-v=cloud],.hz .hz-ldie[data-v=cloud]{background:transparent;box-shadow:inset 0 0 0 1.2px #9fc0ff,0 0 8px rgba(159,192,255,.6)}
 .hz .hz-rig.on{color:var(--hz-ink-2)}
 .hz .hz-rig.asleep .die{background:transparent;box-shadow:inset 0 0 0 1.2px var(--ac)}
 .hz .hz-rig::after{content:"";position:absolute;left:12px;right:12px;bottom:4px;height:1px;background:linear-gradient(90deg,transparent,var(--ag),transparent);transform:scaleX(0);transition:transform .6s var(--hz-ease-out)}
@@ -43531,7 +43717,7 @@ __HZ_FONTS__
 .hz #hz-effort{display:flex;align-items:center;gap:14px;min-width:0}
 .hz #hz-effort[hidden]{display:none}
 .hz .hz-vh{position:absolute;left:-9999px}
-.hz .hz-sl{position:relative;width:196px;height:40px;flex:none;margin-left:6px;border-radius:999px;--hz-eff-u:.5}
+.hz .hz-sl{position:relative;width:150px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.3333}
 .hz .hz-sl:focus-within{box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
   background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
@@ -43552,20 +43738,41 @@ __HZ_FONTS__
   transform:translateX(var(--hz-eff-px,0px));transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
 .hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-halo{transition:none}
 .hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) scale(1.08);box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 18px rgba(159,192,255,1),0 3px 6px rgba(0,0,0,.45)}
-.hz .hz-sl.off .hz-sl-thumb{background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0) 0 55%,#dde7ff 58%)}
 .hz .hz-sl input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
 .hz .hz-sl input[type=range]:focus{outline:0}
-.hz .hz-sl-label{display:flex;flex-direction:column;gap:3px;min-width:0}
-.hz .hz-sl-l1{display:flex;align-items:baseline;gap:8px;white-space:nowrap}
-.hz .hz-sl-name{font-size:14px;font-weight:500;color:var(--hz-ink)}
-.hz .hz-sl-desc{font-size:13px;color:var(--hz-ink-2)}
-.hz .hz-sl-l2{display:flex;align-items:baseline;gap:14px;white-space:nowrap;font-size:12px;color:var(--hz-ink-2)}
-.hz .hz-sl-l2:empty{display:none}
+/* the picker: the mode's name only; a glass menu opens over the sky */
+.hz .hz-pick{display:flex;align-items:center;gap:7px;height:36px;padding:0 11px 0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
+  cursor:pointer;color:var(--hz-ink);font:inherit;flex:none;transition:background var(--hz-t-fast) ease}
+.hz .hz-pick:hover{background:rgba(255,255,255,.09)}
+.hz .hz-pick:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz .hz-pick b{font-size:14px;font-weight:500;white-space:nowrap}
+.hz .hz-pick svg{opacity:.7;transform:rotate(180deg);transition:transform .35s var(--hz-ease-out)}
+.hz .hz-pick[aria-expanded=true] svg{transform:none}
+.hz .hz-elevel{font-size:13px;color:var(--hz-ink-2);min-width:60px;white-space:nowrap}
+#hz-menu{display:none}
+.hz #hz-menu{display:block;position:fixed;left:0;top:0;width:min(340px,calc(100vw - 32px));padding:6px;border-radius:18px;z-index:40;
+  background:rgba(12,16,32,.8);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);
+  box-shadow:0 24px 70px rgba(0,0,0,.55);opacity:0;transform:translateY(8px) scale(.98);transform-origin:bottom left;pointer-events:none;visibility:hidden;
+  transition:opacity .2s,transform .35s var(--hz-ease-out),visibility 0s linear .35s}
+.hz #hz-menu.down{transform-origin:top left;transform:translateY(-8px) scale(.98)}
+.hz #hz-menu.open{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .2s,transform .35s var(--hz-ease-out)}
+.hz .hz-opt{display:grid;grid-template-columns:1fr auto;column-gap:12px;width:100%;padding:10px 12px;border:0;border-radius:12px;background:transparent;text-align:left;cursor:pointer;color:var(--hz-ink);font:inherit}
+.hz .hz-opt:hover,.hz .hz-opt:focus-visible,.hz .hz-opt.open{background:rgba(255,255,255,.07);outline:0}
+.hz .hz-opt.off{opacity:.45;cursor:default}
+.hz .hz-opt>b{font-size:14px;font-weight:500;display:flex;align-items:center;gap:8px}
+.hz .hz-opt[aria-checked=true]>b::after{content:"";width:6px;height:6px;border-radius:50%;background:#cfe0ff;box-shadow:0 0 8px #9fc0ff}
+.hz .hz-opt .d{grid-column:1;font-size:12.5px;color:var(--hz-ink-3);margin-top:2px}
+.hz .hz-opt .dies{grid-row:1/3;grid-column:2;display:flex;gap:4px;align-items:center}
+.hz .hz-opt .dies .die{width:7px;height:7px}
+.hz .hz-opt .ms{grid-column:1/3;display:flex;flex-wrap:wrap;gap:6px;max-height:0;overflow:hidden;transition:max-height .45s var(--hz-ease-out),margin .45s var(--hz-ease-out)}
+.hz .hz-opt.open .ms{max-height:140px;margin-top:10px}
+.hz .hz-opt .hz-mdl{height:26px}
+.hz .hz-opt .hz-mdl b{font-size:12.5px}
 /* the deepest modes shimmer and a light runs round the composer (Odyssey in full, Meridian softly) */
 @property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
-.hz .hz-sl-name.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
+.hz .hz-pick b.shim,.hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
-.hz .hz-sl-name.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
+.hz .hz-pick b.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
 @keyframes hzShim{to{background-position:300% 0}}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
@@ -43579,19 +43786,13 @@ __HZ_FONTS__
 .hz.hz-mer #composer::before{opacity:.35;animation-duration:7s}
 @keyframes hzRing{to{--hz-ang:360deg}}
 .hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
-/* what a mode runs: pills slide out from under the composer while you look */
-#hz-lineup{display:none}
-.hz #hz-lineup{position:absolute;left:74px;right:0;top:calc(100% + 14px);display:flex;flex-wrap:wrap;gap:8px;pointer-events:none;opacity:0;transform:translateY(-8px);
-  transition:opacity .35s var(--hz-ease-out),transform .5s var(--hz-ease-out);z-index:3}
-.hz #hz-lineup.show{opacity:1;transform:none}
+/* a model a mode runs: a pill with its machine's die (the machine in the tooltip) */
 .hz .hz-mdl{display:flex;align-items:center;gap:8px;height:32px;padding:0 12px 0 10px;border-radius:999px;white-space:nowrap;overflow:hidden;
-  background:rgba(10,14,30,.55);border:1px solid rgba(255,255,255,.1);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  max-width:0;padding-inline:0;border-width:0;margin-right:-8px;opacity:0;transform:translateX(-14px) scale(.94);
-  transition:max-width .5s var(--hz-ease-out),padding .5s var(--hz-ease-out),margin .5s var(--hz-ease-out),opacity .35s var(--hz-ease-out),transform .55s var(--hz-ease-spring)}
-.hz .hz-mdl.in{max-width:300px;padding-inline:10px 12px;border-width:1px;margin-right:0;opacity:1;transform:none}
+  background:rgba(10,14,30,.55);border:1px solid rgba(255,255,255,.1);
+  max-width:0;padding-inline:0;border-width:0;margin-right:-6px;opacity:0;transform:translateX(-14px) scale(.94);filter:blur(4px);
+  transition:max-width .5s var(--hz-ease-out),padding .5s var(--hz-ease-out),margin .5s var(--hz-ease-out),opacity .35s var(--hz-ease-out),transform .55s var(--hz-ease-spring),filter .4s var(--hz-ease-out)}
+.hz .hz-mdl.in{max-width:260px;padding-inline:10px 12px;border-width:1px;margin-right:0;opacity:1;transform:none;filter:none}
 .hz .hz-mdl b{font-size:13px;font-weight:500;color:var(--hz-ink)}
-.hz .hz-mdl em{font-style:normal;font-size:12px;color:var(--hz-ink-3)}
-.hz .hz-mdl[data-v=cloud] .die{background:transparent;box-shadow:inset 0 0 0 1.2px #9fc0ff,0 0 8px rgba(159,192,255,.6)}
 .hz #hz-effort.compact{gap:10px}
 .hz #hz-effort.compact .hz-sl{width:120px;height:28px;margin:0}
 .hz #hz-effort.compact .hz-sl-glow{top:11px;height:6px}
@@ -43600,8 +43801,9 @@ __HZ_FONTS__
 .hz #hz-effort.compact .hz-sl-halo{top:3px;width:22px;height:22px;margin-left:-11px}
 .hz #hz-effort.compact .hz-sl-thumbw{top:7px;height:14px}
 .hz #hz-effort.compact .hz-sl-thumb{width:14px;height:14px;margin-left:-7px}
-.hz #hz-effort.compact .hz-sl-desc,.hz #hz-effort.compact .hz-sl-l2{display:none}
-.hz #hz-effort.compact .hz-sl-name{font-size:13px;color:var(--hz-ink-2)}
+.hz #hz-effort.compact .hz-pick{height:30px;padding:0 9px 0 11px}
+.hz #hz-effort.compact .hz-pick b{font-size:13px}
+.hz #hz-effort.compact .hz-elevel{min-width:0;font-size:12.5px}
 /* ---- history rows under the composer */
 #hz-history{display:none}
 .hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;margin-top:34px;pointer-events:auto}
@@ -43621,7 +43823,7 @@ __HZ_FONTS__
 .hz #main:not(:has(#hero)) #crow{display:contents}
 .hz #main:not(:has(#hero)) #attach{order:-1}.hz #main:not(:has(#hero)) #input{order:0;flex:1 1 auto;min-width:0}
 .hz #main:not(:has(#hero)) #model-chip{order:2}.hz #main:not(:has(#hero)) #mic{order:3;margin-left:0}.hz #main:not(:has(#hero)) #send{order:4}
-.hz #main:not(:has(#hero)) #hz-effort:not(.compact),.hz #main:not(:has(#hero)) #hz-lineup{display:none}
+.hz #main:not(:has(#hero)) #hz-effort:not(.compact){display:none}
 @media (max-width:1100px){.hz #main:not(:has(#hero)) #composer{margin-left:auto}}
 /* ---- the opening: the lockup appears (its wing drawn line by line), its word is
    traced in light with one line beneath; the wash blooms; it lifts away; the
@@ -43629,7 +43831,7 @@ __HZ_FONTS__
 #hz-intro-mark{display:none}
 .hz #hz-intro-mark{display:flex;position:fixed;left:0;right:0;top:36vh;flex-direction:column;align-items:center;gap:22px;z-index:9;opacity:0;pointer-events:none}
 .hz #hz-intro-mark[hidden]{display:none}
-.hz #hz-intro-mark .vghost{font-size:clamp(26px,3.4vw,44px);opacity:1;overflow:visible;margin:0;display:inline-flex;align-items:center;gap:10px}
+.hz #hz-intro-mark .vghost{position:relative;font-size:clamp(26px,3.4vw,44px);opacity:1;overflow:visible;margin:0;display:inline-flex;align-items:center;gap:10px}
 .hz #hz-intro-mark .vghost svg{width:1.5em;height:1.23em;margin:0;filter:drop-shadow(0 0 10px rgba(159,192,255,.75)) drop-shadow(0 0 28px rgba(110,150,255,.45))}
 .hz #hz-intro-mark .hz-word{opacity:0;transition:opacity .6s var(--hz-ease-out);text-shadow:0 0 12px rgba(190,212,255,.75),0 0 40px rgba(159,168,255,.5),0 0 80px rgba(255,143,196,.22)}
 .hz #hz-intro-mark .hz-word.shown{opacity:1}
@@ -43637,32 +43839,71 @@ __HZ_FONTS__
 .hz.hz-markin #hz-intro-mark line{animation:hzDraw 1s var(--hz-ease-out) forwards}
 .hz.hz-markin #hz-intro-mark line:nth-child(2){animation-delay:.08s}.hz.hz-markin #hz-intro-mark line:nth-child(3){animation-delay:.16s}
 .hz.hz-markin #hz-intro-mark line:nth-child(4){animation-delay:.24s}.hz.hz-markin #hz-intro-mark line:nth-child(5){animation-delay:.32s}
+.hz #hz-intro-mark .hz-glint line,.hz.hz-markin #hz-intro-mark .hz-glint line{stroke-dasharray:none;stroke-dashoffset:0;opacity:1;animation:none}
 @keyframes hzDraw{0%{opacity:0;stroke-dashoffset:1}12%{opacity:1}100%{opacity:1;stroke-dashoffset:0}}
-.hz #hz-intro-mark .hz-tag{margin:0;font-size:18px;color:var(--hz-ink-2);opacity:0;transform:translateY(8px);transition:opacity 1.2s var(--hz-ease-out) .9s,transform 1.2s var(--hz-ease-out) .9s}
+.hz #hz-intro-mark .hz-flare{position:absolute;left:4%;right:4%;top:50%;height:2px;margin-top:-1px;border-radius:2px;opacity:0;transform:scaleX(0);pointer-events:none;
+  background:linear-gradient(90deg,transparent,rgba(159,168,255,.55) 22%,rgba(220,232,255,.95) 46%,#fff 50%,rgba(255,190,220,.95) 54%,rgba(127,240,214,.5) 78%,transparent);
+  filter:drop-shadow(0 0 6px rgba(159,192,255,.95)) drop-shadow(0 0 22px rgba(255,143,196,.55))}
+.hz.hz-litmark #hz-intro-mark .hz-flare{animation:hzFlare 2.8s cubic-bezier(.22,.8,.25,1) forwards}
+@keyframes hzFlare{0%{opacity:0;transform:scaleX(0)}14%{opacity:1}55%{opacity:.85;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1.12)}}
+.hz #hz-intro-mark .hz-glint{position:absolute;inset:0;display:inline-flex;align-items:center;gap:inherit;pointer-events:none;
+  filter:drop-shadow(0 0 5px #fff) drop-shadow(0 0 14px rgba(255,143,196,.9)) drop-shadow(0 0 26px rgba(159,168,255,.85))}
+.hz #hz-intro-mark .hz-glint .gm{display:inline-flex;align-items:center;gap:inherit;color:#fff;
+  -webkit-mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);
+  -webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:100% 0;mask-position:100% 0}
+.hz #hz-intro-mark .hz-glint svg{filter:none}
+.hz #hz-intro-mark .hz-glint svg g{stroke:#fff}
+.hz.hz-litmark #hz-intro-mark .hz-glint .gm{animation:hzGlint1 2.5s cubic-bezier(.45,0,.25,1) .55s both}
+@keyframes hzGlint1{from{-webkit-mask-position:100% 0;mask-position:100% 0}to{-webkit-mask-position:0 0;mask-position:0 0}}
+.hz.hz-litmark #hz-intro-mark .vghost{animation:hzPrism 9s ease-in-out infinite}
+@keyframes hzPrism{0%,100%{filter:drop-shadow(0 0 14px rgba(159,168,255,.7)) drop-shadow(0 0 42px rgba(255,143,196,.28))}
+  33%{filter:drop-shadow(0 0 14px rgba(127,240,214,.6)) drop-shadow(0 0 42px rgba(159,168,255,.3))}
+  66%{filter:drop-shadow(0 0 14px rgba(255,197,138,.55)) drop-shadow(0 0 42px rgba(127,240,214,.26))}}
 .hz.hz-markin #hz-intro-mark{opacity:1}
-.hz.hz-markin #hz-intro-mark .hz-tag{opacity:1;transform:none}
-.hz.hz-markout #hz-intro-mark{opacity:0;transform:translateY(-24px);transition:opacity .9s var(--hz-ease-out),transform .9s var(--hz-ease-out)}
+.hz.hz-markout #hz-intro-mark{opacity:0;transform:translateY(-24px);transition:opacity 1.2s var(--hz-ease-out),transform 1.2s var(--hz-ease-out)}
 /* the chrome waits for the home; the night itself is there from the first frame */
 .hz.hz-intro #sidebar,.hz.hz-intro #hz-top,.hz.hz-intro #hero,.hz.hz-intro #composer,.hz.hz-intro #hz-cglow,.hz.hz-intro #hz-history{opacity:0;transition:opacity 1.2s var(--hz-ease-out)}
 .hz.hz-intro #hz-aurw{opacity:0}
+.hz.hz-intro:not(.hz-home) #hz-cglow{animation:none}   /* its breathing would override the hidden glow */
 .hz.hz-intro.hz-markin #hz-aurw{opacity:.42}
 .hz.hz-home #sidebar,.hz.hz-home #hz-top,.hz.hz-home #hero,.hz.hz-home #composer,.hz.hz-home #hz-cglow,.hz.hz-home #hz-history{opacity:1;transition:opacity 1.2s var(--hz-ease-out)}
+/* ---- asking, from the home: the question arcs into the top of the chats; its row keeps a
+   live die (the working machine's colour) until the answer lands, and renames itself */
+.hz-ghost{position:fixed;left:0;top:0;z-index:30;pointer-events:none;font-size:17px;color:#fff;white-space:nowrap;transform-origin:0 50%;
+  text-shadow:0 0 18px rgba(159,192,255,.95),0 0 40px rgba(159,168,255,.5)}
+.hz .chat-item .hz-ldie{margin-left:6px;opacity:1;transform:none;animation:hzDie 1.2s ease-in-out infinite}
+.hz .chat-item.hz-live .ct{background:linear-gradient(90deg,var(--hz-ink) 30%,#fff 50%,var(--hz-ink) 70%);background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2s linear infinite}
+.hz .chat-item.hz-landed{animation:hzRowPop .9s var(--hz-ease-out)}
+.hz .chat-item.hz-renamed .ct{animation:hzFadeIn .5s var(--hz-ease-out)}
+.hz #hz-sb.ping{animation:hzRowPop .9s var(--hz-ease-out)}
+@keyframes hzRowPop{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(159,192,255,0)}35%{transform:scale(1.035);box-shadow:0 0 0 1px rgba(170,200,255,.55),0 0 26px rgba(159,192,255,.4)}100%{transform:none;box-shadow:0 0 0 0 rgba(159,192,255,0)}}
+@keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
 /* ---- stillness: effects off, reduced motion, hidden or long unfocused */
-.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-sl-name.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen{animation:none!important}
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-pick b.shim,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
 .hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
 .hz .novideo #composer::before{animation:none;opacity:0!important}
 .hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}
-.hz.hz-pause .hz-sl-name.shim{animation-play-state:paused}
+.hz.hz-pause .hz-pick b.shim,.hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
-  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint{animation:none!important}
+  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
   .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
-  .hz .hz-sl-name.shim{animation:none}
+  .hz .hz-pick b.shim,.hz .hz-elevel.shim{animation:none}
+  .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
   .hz #composer::before{animation:none;opacity:0!important}
   .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
 }
 /* ---- the Look and Effects rows in Settings > About, in the pane's own row style */
 #look-row,#fx-level-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 #fx-level-note{font-size:12px;color:#9aa6c6;margin:-4px 0 8px}
+/* ---- a phone-width window (6b534): the lockup steps aside for the lanes; the mode
+   and the effort take their own row in the composer */
+@media (max-width:600px){
+  .hz #hz-mark{display:none}
+  .hz #hz-lanes{gap:14px}
+  .hz #crow{row-gap:10px}
+  .hz #hz-effort:not(.compact){order:9;flex:1 1 100%;gap:10px}
+  .hz #hz-effort:not(.compact) .hz-sl{width:120px}
+}
 /* ============================================================ HORIZON end */
 
 </style>
@@ -43856,8 +44097,11 @@ __CODE_ROWS__
       </button>
     </div>
   </header>
-  <!-- the opening's lockup (6b526): its wing drawn line by line, its word traced in light, one line beneath -->
-  <div id="hz-intro-mark" aria-hidden="true" hidden><span class="vghost"><svg id="hz-vmark2" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg2)" stroke-width="2.4" stroke-linecap="round"><line pathLength="1" x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line pathLength="1" x1="7.5" y1="17.5" x2="20.4" y2="7"/><line pathLength="1" x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line pathLength="1" x1="16.1" y1="17.5" x2="20.4" y2="14"/><line pathLength="1" x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b class="hz-word">Concorde<b>AI</b></b></span><p class="hz-tag">Your own AI. On your own machines.</p></div>
+  <!-- the opening's lockup (6b526, 6b534): its wing drawn line by line, its word traced in light;
+       then a light streak, one prism glint and a slow prism glow. No tagline (OVERRIDE 3) -->
+  <div id="hz-intro-mark" aria-hidden="true" hidden><span class="vghost"><svg id="hz-vmark2" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg2" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg2)" stroke-width="2.4" stroke-linecap="round"><line pathLength="1" x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line pathLength="1" x1="7.5" y1="17.5" x2="20.4" y2="7"/><line pathLength="1" x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line pathLength="1" x1="16.1" y1="17.5" x2="20.4" y2="14"/><line pathLength="1" x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b class="hz-word">Concorde<b>AI</b></b><span class="hz-glint" aria-hidden="true"><span class="gm"><svg viewBox="2 2.3 19.6 16.4" aria-hidden="true"><g stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span></span></span><span class="hz-flare" aria-hidden="true"></span></div>
+  <!-- the mode menu (6b534): fixed over the sky, placed by the picker -->
+  <div id="hz-menu" role="menu" aria-label="Mode"></div>
   <div id="skyline" hidden>
     <video id="sky-color" muted loop playsinline></video>
   </div>
@@ -43914,9 +44158,10 @@ __CODE_ROWS__
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
       <div id="crow">
-      <!-- Horizon's effort slider (6b526): Flare, Zenith, Meridian; the real
-           range input is inside; the engine menu beside it keeps Max, Cloud
-           only, the servers and Advanced -->
+      <!-- Horizon's mode picker and effort slider (6b526, 6b534): the mode's
+           name opens a glass menu (#hz-menu); Effort is a real range input;
+           the engine menu beside them keeps Max, Cloud only, the servers and
+           Advanced -->
       <div id="hz-effort" hidden></div>
       <div id="model-chip" title="More modes">engine <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
@@ -43956,8 +44201,7 @@ __CODE_ROWS__
       </div>
       </div>
     </div>
-    <!-- Horizon (6b526): what a mode runs slides out here while you look; then recent chats as hairline rows -->
-    <div id="hz-lineup" aria-live="polite" aria-label="Models this mode uses"></div>
+    <!-- Horizon (6b526): recent chats as hairline rows under the composer -->
     <nav id="hz-history" aria-label="Recent chats" hidden></nav>
   </div>
 </main>
@@ -44548,8 +44792,9 @@ function hzMenuBrand(root){
   root.querySelectorAll(".engrow.mode .einfo").forEach(e=>{
     e.setAttribute("aria-label",String(e.getAttribute("aria-label")||"").replace(/^What (Fast|Thinking|Pro|Vera Rubin) uses$/,(m,k)=>"What "+modeName(k)+" uses"));});
 }
-const HZ_MODE_DESC={"Fast":"A quick answer","Thinking":"Thinks it through and checks itself",
-  "Pro":"Goes deep, every model weighs in","Vera Rubin":"Keeps going until you stop it",
+// what each mode is for, in the mode menu (OVERRIDE 3, 6b534)
+const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",
+  "Pro":"Every model weighs in","Vera Rubin":"Keeps going until you stop it",
   "Max":"Every model, everywhere"};
 /* THE API TOKEN (6b321, 0a 5.4). The cookie alone opens only this page;
    every /api call also carries X-Api-Token, which the window hands over
@@ -44716,7 +44961,7 @@ const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.voice","millen.speeds","millen.sky","millen.skyhist",
   "millen.skynext","millen.sbw",
   // the Horizon look's own (6b526): the look, the sidebar, the intro's day, its seed
-  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel"];
+  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"];
 let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();
@@ -47716,6 +47961,7 @@ async function send(){
     ||(sentDocs.length?"📄 (file)":""))
     +(sentDocs.length&&text?"":"")
     +(sentDocs.length?"\n📄 "+sentDocs.map(d=>d.name).join(", "):"");
+  if(hzReady)hzBeforeSend(text);   // Horizon: where the composer and the words were (6b534)
   messages.push({role:"user",content:shown});
   const uDiv=addMsg("user",shown);
   if(sentImages.length){
@@ -47811,7 +48057,9 @@ async function send(){
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           mode_comp:advGhostOnly?"":modeComp(),    // the mode's own compositor, "" for its default (6b442)
           // the Remote agent (6b249) carries the autonomy throttle
-          autonomy:agent==="Remote"?autonomy:undefined},turn)),
+          autonomy:agent==="Remote"?autonomy:undefined},turn,
+        // the Horizon composer's Effort (6b534): Low, Medium, High or Max
+        hzReady&&document.documentElement.classList.contains("hz")?{effort:hzEffortWire()}:{})),
     });
     // refused before anything was saved (a store it can't read answers
     // 503): the line is shown as the error it is, and the question leaves
@@ -54975,7 +55223,8 @@ input.focus();
 var hzReady=false;
 var hzS=null;
 const HZ_PLACE=__HZ_PLACE__,HZ_DEBUG=__HZ_DEBUG__,HZ_SEEN=__HZ_SEEN__;
-const HZ_SKY_ORBIT=__SKY_ORBIT__,HZ_SKY_DARK=new Set(JSON.parse('__SKY_DARK__'));
+// every Apple aerial the app knows, with the hours it suits and its blend (sky_hz_clips, 6b534)
+const HZ_CLIPS=__SKY_HZ__;
 // ---- the sky's arithmetic (standard low-precision formulas, J2000)
 function hzD(t){return t/86400000+2440587.5-2451545.0;}
 function hzGmst(t){const g=(18.697374558+24.06570982441908*hzD(t))%24;return g<0?g+24:g;}
@@ -55190,15 +55439,15 @@ function hzSkyBoot(){
   let gl=null;try{gl=cv.getContext("webgl",{alpha:false,antialias:false,premultipliedAlpha:false,powerPreference:"high-performance"});}catch(e){}
   if(!gl){document.documentElement.classList.add("hz-novfx");return;}   // no WebGL: the plain footage shows
   const HEAD="precision highp float;varying vec2 uv;uniform vec4 vmap;vec2 V(vec2 u){return u*vmap.xy+vmap.zw;}float L(vec3 c){return dot(c,vec3(.299,.587,.114));}";
-  const FEED=HEAD+"uniform sampler2D vid,prev;uniform vec2 vpx,tpx;uniform float decay,edecay;"
-    +"void main(){vec2 q=V(uv);vec3 c=texture2D(vid,q).rgb;float l=L(c);float hi=smoothstep(.36,.9,l);"
+  const FEED=HEAD+"uniform sampler2D vid,prev;uniform vec2 vpx,tpx;uniform float decay,edecay,hiT;"
+    +"void main(){vec2 q=V(uv);vec3 c=texture2D(vid,q).rgb;float l=L(c);float hi=smoothstep(hiT,hiT+.54,l);"
     +"float tl=L(texture2D(vid,q+vpx*vec2(-1.,1.)).rgb),tc=L(texture2D(vid,q+vpx*vec2(0.,1.)).rgb),tr=L(texture2D(vid,q+vpx*vec2(1.,1.)).rgb),"
     +"ml=L(texture2D(vid,q+vpx*vec2(-1.,0.)).rgb),mr=L(texture2D(vid,q+vpx*vec2(1.,0.)).rgb),"
     +"bl=L(texture2D(vid,q+vpx*vec2(-1.,-1.)).rgb),bc=L(texture2D(vid,q+vpx*vec2(0.,-1.)).rgb),br=L(texture2D(vid,q+vpx*vec2(1.,-1.)).rgb);"
     +"float e=smoothstep(.12,.42,length(vec2(-tl-2.*ml-bl+tr+2.*mr+br,-tl-2.*tc-tr+bl+2.*bc+br)));"
     +"vec4 p=texture2D(prev,uv)*.52+(texture2D(prev,uv+vec2(tpx.x,0.))+texture2D(prev,uv-vec2(tpx.x,0.))+texture2D(prev,uv+vec2(0.,tpx.y))+texture2D(prev,uv-vec2(0.,tpx.y)))*.12;"
     +"gl_FragColor=vec4(max(c*hi,p.rgb*decay-1.5/255.),max(e,p.a*edecay-2./255.));}";
-  const SHOW=HEAD+"uniform sampler2D vid,trail,bl1,bl2,stk,aur,stars;uniform vec2 px,res,mpos;uniform float time,boost,expo,warm,moon,mrad,dscale,foot,starsOn;uniform vec3 tint,skyTop,skyMid,skyLow;"
+  const SHOW=HEAD+"uniform sampler2D vid,trail,bl1,bl2,stk,aur,stars;uniform vec2 px,res,mpos;uniform float time,boost,expo,warm,moon,mrad,dscale,foot,rise,starsOn;uniform vec3 tint,skyTop,skyMid,skyLow;"
     +"float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}"
     +"float starLayer(vec2 p,float cell,float keep,float sz){vec2 c=floor(p/cell),f=p-c*cell;float h=hash(c);if(h<keep)return 0.;"
     +"vec2 o=(vec2(hash(c+1.7),hash(c+3.1))*.8+.1)*cell;float d=length(f-o);return ((h-keep)/(1.-keep))*exp(-d*d/(sz*sz));}"
@@ -55217,7 +55466,7 @@ function hzSkyBoot(){
     +"vec3 moonL=(mg.rgb*mg.a+vec3(.8,.86,1.)*shafts)*moon;"
     +"vec3 base=texture2D(vid,V(uv)).rgb;base=pow(base,vec3(1.12))*expo;float l=L(base);base=mix(vec3(l),base,.82)*tint;"
     +"vec4 tc=texture2D(trail,uv);vec3 g1=vec3(texture2D(bl1,uv+vec2(px.x*5.,0.)).r,texture2D(bl1,uv).g,texture2D(bl1,uv-vec2(px.x*5.,0.)).b),g2=texture2D(bl2,uv).rgb;float sk=L(texture2D(stk,uv).rgb);"
-    +"float wf=foot*(1.-smoothstep(0.,.56,uv.y)),wl=min(1.,foot*2.4)*(1.-smoothstep(0.,.6,uv.y));"
+    +"float wf=foot*(1.-smoothstep(0.,rise,uv.y)),wl=min(1.,foot*2.4)*(1.-smoothstep(0.,rise*1.07,uv.y));"
     +"vec3 earth=base*wf+(tc.rgb*.42+g1*1.15+g2*1.4+vec3(.55,.7,1.)*sk*.55)*boost*wl+vec3(.62,.76,1.)*tc.a*.1*wl;"
     +"vec3 col=screen(screen(screen(sky,earth),moonL),texture2D(aur,uv).rgb);"
     +"col+=vec3(1.,.62,.36)*warm*(1.-smoothstep(0.,.75,uv.y))*.07;"
@@ -55246,7 +55495,7 @@ function hzSkyBoot(){
   catch(e){document.documentElement.classList.add("hz-novfx");return;}
   const quad=hzQuad(gl),vtex=hzTex(gl),stex=hzTex(gl);
   const S={gl:gl,cv:cv,vid:vid,quad:quad,vtex:vtex,stex:stex,pF:pF,pS:pS,pA:pA,pB:pB,W:0,H:0,last:0,ready:false,
-    boost:1,boostTo:1,neon:.25,neonTo:.25,lvl:.25,busy:false,par:[0,0],parTo:[0,0],t0:performance.now(),raf:0};
+    boost:1,boostTo:1,neon:.25,neonTo:.25,lvl:.25,busy:false,par:[0,0],parTo:[0,0],t0:performance.now(),raf:0,footMul:0,footTo:0};
   S.size=function(){
     const d=hzFxLevel()==="full"?Math.min(devicePixelRatio||1,1.5):.75;
     S.W=Math.max(2,Math.round(innerWidth*d));S.H=Math.max(2,Math.round(innerHeight*d));cv.width=S.W;cv.height=S.H;
@@ -55286,7 +55535,7 @@ function hzSkyBoot(){
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);gl.uniform1i(pF.U.vid,0);
     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,S.A.t);gl.uniform1i(pF.U.prev,1);
     gl.uniform4fv(pF.U.vmap,m);gl.uniform2f(pF.U.vpx,1.2/(vid.videoWidth||1920),1.2/(vid.videoHeight||1080));gl.uniform2f(pF.U.tpx,1/S.W,1/S.H);
-    gl.uniform1f(pF.U.decay,full?.955:.88);gl.uniform1f(pF.U.edecay,full?.86:.5);
+    gl.uniform1f(pF.U.decay,full?.955:.88);gl.uniform1f(pF.U.edecay,full?.86:.5);gl.uniform1f(pF.U.hiT,hzS.clip?hzS.clip.hi:.36);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     hzBlur(gl,pB,quad,S.B.t,S.W,S.H,S.h1,2.4,0);hzBlur(gl,pB,quad,S.h1.t,S.h1.w,S.h1.h,S.v1,0,1.2);
     hzBlur(gl,pB,quad,S.v1.t,S.v1.w,S.v1.h,S.h2,2.4,0);hzBlur(gl,pB,quad,S.h2.t,S.h2.w,S.h2.h,S.v2,0,1.6);
@@ -55305,51 +55554,91 @@ function hzSkyBoot(){
     gl.uniform4fv(pS.U.vmap,m);gl.uniform2f(pS.U.px,1/S.W,1/S.H);gl.uniform2f(pS.U.res,S.W,S.H);gl.uniform1f(pS.U.time,t);
     const mg=hzMoonGeom(),hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255),lit=hzS.moon?hzS.moon.lit:.5;
     gl.uniform2f(pS.U.mpos,mg.x,mg.y);gl.uniform1f(pS.U.mrad,mg.r);gl.uniform1f(pS.U.moon,.08+.62*lit);gl.uniform1f(pS.U.dscale,S.W/innerWidth);
-    gl.uniform1f(pS.U.foot,hasVid?.3:0);gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);
+    S.footMul+=(S.footTo-S.footMul)*.045;
+    gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);gl.uniform1f(pS.U.rise,hzS.clip?hzS.clip.rise:.56);gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);
     gl.uniform3f(pS.U.skyTop,SK[1],SK[2],SK[3]);gl.uniform3f(pS.U.skyMid,SK[4],SK[5],SK[6]);gl.uniform3f(pS.U.skyLow,SK[7],SK[8],SK[9]);
     gl.uniform1f(pS.U.boost,S.boost);gl.uniform1f(pS.U.expo,G[4]*(.92+.16*lit));gl.uniform1f(pS.U.warm,G[5]);gl.uniform3f(pS.U.tint,G[1],G[2],G[3]);
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     const A=S.A;S.A=S.B;S.B=A;
   };
   S.setNeon=function(){S.neonTo=S.lvl+(S.busy?.28:0);};
-  S.effort=function(i){S.lvl=[.2,.28,.5,.78][Math.max(0,Math.min(3,i))]||.25;S.setNeon();};
+  // the neon follows the mode and the effort (the reference's level(m,e)), and the work
+  S.level=function(m,e){S.lvl=[.2,.28,.5,.78][Math.max(0,Math.min(3,m))]+Math.max(0,Math.min(3,e))*.04;S.setNeon();};
   S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};
+  // a new clip starts with clean trails
+  S.reset=function(){[S.A,S.B].forEach(T=>{gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});gl.bindFramebuffer(gl.FRAMEBUFFER,null);};
+  // one frame, for a still sky (reduced motion) whose footage just arrived
+  S.still=function(){if(S.raf)return;S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}};
   addEventListener("resize",()=>{S.size();});
-  S.effort(hzModeIndex(typeof tier==="string"?tier:""));
+  S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
 }
 function hzHourNow(){const d=new Date(hzNow());return d.getHours()+d.getMinutes()/60;}
 // the moonlight's place: the Moon's real side (waxing: right; waning: left), high
 function hzMoonGeom(){const R=Math.min(380,innerWidth*.35),wax=!hzS.moon||hzS.moon.waxing;return {x:wax?innerWidth*1.04-R:-innerWidth*.04+R,y:-innerHeight*.06+R,r:R*1.414};}
-// the footage: the app's own orbital night clips (KOREA_JAPAN_NIGHT first), from
-// its cache; one that isn't cached downloads in the background by the app's rule
-function hzClipPool(){
-  const pref=[3,25,8,75],all=[];
-  for(let i=0;i<SKY_N;i++)all.push(i);
-  const night=all.filter(i=>HZ_SKY_ORBIT.includes(i)&&HZ_SKY_DARK.has(i)&&!pref.includes(i));
-  return pref.filter(i=>i<SKY_N&&HZ_SKY_ORBIT.includes(i)).concat(night);
+// ---- the backdrop (6b534, per Patrick: the whole Apple library; OVERRIDE 3): one
+// of the app's own aerials (HZ_CLIPS: every clip, the hours Apple's catalog says
+// it suits, its blend) that fits the viewer's hour and isn't one of the last three
+// shown (the history the server keeps beside the clips), different on every open.
+// A clip on this Mac plays at once; one that isn't is fetched quietly for a later
+// open while a cached one that fits plays now, so the opening never waits on a
+// download. City, aurora and orbital clips rise from the foot with light trails;
+// underwater ones spread faintly over the whole sky with none. When the hour moves
+// into another part of the day, the next one crossfades in.
+function hzBucket(h){return h<5||h>=20.5?"night":h<8?"dawn":h<17?"day":"dusk";}
+// pure: the clip to play now and the one to fetch for later. cached: the indexes on
+// disk; hist: the indexes shown, newest first; rnd: a 0..1 generator
+function hzClipChoose(clips,bucket,cached,hist,rnd){
+  hist=hist||[];
+  const has=new Set(cached||[]),recent=hist.slice(0,3);
+  const fit=clips.filter(c=>c.when.split(" ").indexOf(bucket)>=0);
+  const fresh=fit.filter(c=>recent.indexOf(c.i)<0);
+  const one=a=>a.length?a[Math.min(a.length-1,Math.floor(rnd()*a.length))]:null;
+  const want=one(fresh)||one(fit);
+  if(!want)return {play:null,fetch:null};
+  if(has.has(want.i))return {play:want,fetch:null};
+  const age=c=>{const k=hist.indexOf(c.i);return k<0?1e9:k;};
+  const now=one(fresh.filter(c=>has.has(c.i)))||fit.filter(c=>has.has(c.i)).sort((a,b)=>age(b)-age(a))[0]||null;
+  return {play:now,fetch:want};
 }
-async function hzClipReady(pool,tag){
-  if(typeof api!=="function")return -1;
-  for(const i of pool){try{const st=await(await api("/api/sky/status?i="+i)).json();if(st.status==="ready")return i;}catch(e){return -1;}}
-  const i=pool[0];if(i==null)return -1;
-  for(let k=0;k<480&&hzS.mediaGen===tag;k++){
-    try{const st=await(await api("/api/sky/status?i="+i+"&warm=1")).json();
-      if(st.status==="ready")return i;if(st.status==="error")return -1;}catch(e){return -1;}
-    await new Promise(r=>setTimeout(r,1500));
-  }
-  return -1;
+async function hzClipPick(){
+  let cached=[],hist=[];
+  try{const sc=await(await api("/api/sky/cached")).json();cached=sc.cached||[];hist=sc.hist||[];}catch(e){}
+  return hzClipChoose(HZ_CLIPS.filter(c=>c.i<SKY_N),hzBucket(hzHourNow()),cached,hist,Math.random);
 }
 function hzMediaOK(){return document.documentElement.classList.contains("hz")&&!(typeof noVideo!=="undefined"&&noVideo);}
 async function hzVideoBoot(){
-  const v=$("#hz-vid");if(!v||!hzMediaOK()||v.dataset.i)return;
+  const v=$("#hz-vid");if(!v||!hzMediaOK()||v.dataset.i||typeof api!=="function")return;
   if(hzS.debug&&hzS.debug.media==="0")return;
   const tag=hzS.mediaGen;
-  const i=await hzClipReady(hzClipPool(),tag);
-  if(i<0||tag!==hzS.mediaGen)return;
-  v.dataset.i=String(i);v.src="/static/sky/"+i+".mov";
-  v.addEventListener("loadedmetadata",()=>{try{v.playbackRate=.7;}catch(e){}},{once:true});
-  v.addEventListener("loadeddata",()=>{document.documentElement.classList.add("hz-vid-on");hzMediaSync();},{once:true});
-  v.load();
+  let ch=null;
+  if(hzS.debug&&hzS.debug.clip!=null){const c=HZ_CLIPS.find(x=>x.i===+hzS.debug.clip);if(c)ch={play:c,fetch:null};}   // a dev copy may name one
+  if(!ch)ch=await hzClipPick();
+  if(tag!==hzS.mediaGen)return;
+  hzS.clipBucket=hzBucket(hzHourNow());
+  if(ch.fetch)api("/api/sky/status?i="+ch.fetch.i+"&warm=1").catch(()=>{});   // for a later open, never waited on
+  if(ch.play)hzClipLoad(ch.play);
+}
+function hzClipLoad(c){
+  const v=$("#hz-vid");if(!v)return;
+  hzS.clip=c;v.dataset.i=String(c.i);
+  const S=hzS.sky;if(S){S.footTo=0;S.footMul=0;S.reset();}
+  v.addEventListener("loadedmetadata",()=>{try{v.playbackRate=c.rate;}catch(e){}},{once:true});
+  v.addEventListener("loadeddata",()=>{document.documentElement.classList.add("hz-vid-on");
+    if(hzS.sky&&hzS.reduced){hzS.sky.footTo=hzS.sky.footMul=1;hzS.sky.still();}hzMediaSync();},{once:true});
+  v.addEventListener("playing",()=>{if(hzS.sky)hzS.sky.footTo=1;},{once:true});
+  v.src="/static/sky/"+c.i+".mov";v.load();
+  api("/api/sky/seen",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({i:c.i})}).catch(()=>{});
+}
+function hzClipCheck(){
+  if(!hzS.clip||!hzMediaOK())return;
+  const b=hzBucket(hzHourNow());if(b===hzS.clipBucket)return;
+  hzS.clipBucket=b;
+  if(hzS.clip.when.split(" ").indexOf(b)>=0)return;
+  const tag=hzS.mediaGen;
+  hzClipPick().then(ch=>{if(tag!==hzS.mediaGen||!ch.play||ch.play.i===hzS.clip.i)return;
+    if(ch.fetch)api("/api/sky/status?i="+ch.fetch.i+"&warm=1").catch(()=>{});
+    if(hzS.sky)hzS.sky.footTo=0;
+    setTimeout(()=>{if(tag===hzS.mediaGen)hzClipLoad(ch.play);},700);});
 }
 // the sky runs or rests with the window: hidden, long unfocused and effects off
 // rest it; reduced motion holds the footage on one frame and draws no trails
@@ -55372,7 +55661,7 @@ function hzSkyPaint(){
   if(!hzS)return;
   const day=Math.floor((hzNow()-new Date().getTimezoneOffset()*60000)/86400000);
   if(hzS.dayKey!==day){hzS.dayKey=day;hzS.seed=hzHash(day+":"+hzS.salt);hzS.rnd=hzRng(hzS.seed);hzSeedDay();}
-  hzMoonNow();hzDrawStars();hzDrawAuroras();
+  hzMoonNow();hzDrawStars();hzDrawAuroras();hzClipCheck();
   hzS.skyAt=performance.now();
   const g=$("#hz-moonglow");if(g){g.style.opacity=(0.08+0.62*(hzS.moon?hzS.moon.lit:.5)).toFixed(3);g.classList.toggle("left",!!(hzS.moon&&!hzS.moon.waxing));}
 }
@@ -55576,23 +55865,28 @@ function hzHistoryPaint(){
     +'<span class="w">'+esc_(hzWhen(c.ts))+'</span><span class="k">'+(typeof c.tokens==="number"&&c.tokens>0?hzK(c.tokens):"")+'</span></button>').join("");
 }
 // ---- the machines as dies in their makers' colours (this Mac, each paired
-// server by ITS name, never an assumed one); a hover card; the one working pulses
+// server by ITS name, never an assumed one; a server whose maker isn't known is
+// an ice die); a hover card; the one working pulses. data-machine and .rig let
+// the conversation's comets find a server's chip (6b528)
 function hzVendor(v){v=String(v||"").toLowerCase();return v.indexOf("nvidia")>=0||v==="cuda"?"nvidia":v.indexOf("amd")>=0||v==="rocm"?"amd":v.indexOf("intel")>=0?"intel":v.indexOf("mlx")>=0||v.indexOf("apple")>=0||v.indexOf("metal")>=0?"mlx":"";}
+function hzIsPC(){return typeof IS_PC!=="undefined"&&!!IS_PC;}
+function hzLocalName(){return hzIsPC()?"This PC":"This Mac";}
+function hzLocalV(){return hzVendor(hzS.accel||(hzIsPC()?"":"mlx"))||(hzIsPC()?"srv":"mlx");}
+function hzSrvV(name){const s=typeof srvList!=="undefined"?srvList.find(x=>x.name===name):null;return hzVendor(s&&s.gpu&&s.gpu.vendor)||"srv";}
 function hzMachines(){
   const esc_=typeof esc==="function"?esc:(s=>String(s));
   const out=[];
-  const localV=hzVendor(hzS.accel||(typeof IS_PC!=="undefined"&&IS_PC?"":"mlx"))||"mlx";
-  out.push({id:"local",v:localV,name:"This Mac",hw:typeof CHIP_NAME==="string"?CHIP_NAME:"",st:hzS.gen&&hzS.genLocal?"Thinking":"Ready",working:!!(hzS.gen&&hzS.genLocal),asleep:false});
+  out.push({id:"local",v:hzLocalV(),name:hzLocalName(),hw:typeof CHIP_NAME==="string"?CHIP_NAME:"",st:hzS.gen&&hzS.genLocal?"Thinking":"Ready",working:!!(hzS.gen&&hzS.genLocal),asleep:false});
   const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
   srvs.forEach(s=>{const g=s.gpu||{},ok=!!(s.only&&s.only.ok),asleep=typeof srvAsleep==="function"&&srvAsleep(s);
-    out.push({id:s.id,v:hzVendor(g.vendor)||"nvidia",name:s.name,hw:[g.name||"",g.vram_bytes?Math.round(g.vram_bytes/1073741824)+" GB":""].filter(Boolean).join(", "),
+    out.push({id:s.id,v:hzVendor(g.vendor)||"srv",name:s.name,hw:[g.name||"",g.vram_bytes?Math.round(g.vram_bytes/1073741824)+" GB":""].filter(Boolean).join(", "),
       st:hzS.gen&&hzS.srvWorking===s.name?"Thinking":ok?"Ready":asleep?"Asleep":"Offline",working:!!(hzS.gen&&hzS.srvWorking===s.name),asleep:!ok});});
-  return out.map(m=>({...m,label:{mlx:"MLX",nvidia:"NVIDIA",amd:"AMD",intel:"Intel"}[m.v]||m.v.toUpperCase(),esc:esc_}));
+  return out.map(m=>({...m,label:{mlx:"MLX",nvidia:"NVIDIA",amd:"AMD",intel:"Intel"}[m.v]||m.name,esc:esc_}));
 }
 function hzMachinesPaint(){
   const el=$("#hz-machines");if(!el)return;
   const ms=hzMachines();
-  el.innerHTML=ms.map(m=>'<div class="hz-rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'">'
+  el.innerHTML=ms.map(m=>'<div class="hz-rig rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'" data-machine="'+m.esc(m.name)+'">'
     +'<i class="die"></i><b>'+m.esc(m.label)+'</b><span class="tip"><strong>'+m.esc(m.name)+'</strong>'+(m.hw?'<span>'+m.esc(m.hw)+'</span>':'')+'<span class="st">'+m.esc(m.st)+'</span></span></div>').join("");
   if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
 }
@@ -55605,10 +55899,28 @@ function hzTitlePaint(){
   const c=(typeof chats!=="undefined"&&typeof curChat!=="undefined")?chats.find(x=>x.id===curChat):null;
   t.textContent=c&&c.title?c.title:"";
 }
-// ---- the effort slider: Flare, Zenith, Meridian (Odyssey where its tier
-// exists) over a real range input; it drives the real tier; hovering or dragging
-// slides out what the mode runs, from /api/tiers, as maker-coloured pills
+// ---- the mode and the effort, apart (OVERRIDE 3, as Claude and ChatGPT keep them).
+// The picker shows the mode's name only and opens a glass menu: each mode, what it
+// is for, the dies of the machines it uses right now (/api/tiers), the current one
+// marked by a lit dot. Hovering or focusing a mode slides its real models out under
+// it (each with its machine's die; the machine in the tooltip) and lights those
+// machines in the header. Beside it, Effort: Low, Medium, High, Max over a real
+// range input, sent with every question (effort_polish on the server); Max
+// shimmers. The neon aurora follows both. Max, Cloud only, the servers and
+// Advanced stay in the engine menu (the More modes button).
 function hzModes(){return ["Fast","Thinking","Pro","Vera Rubin"].filter(n=>TIER_META[n]);}
+const HZ_EFFORT=["Low","Medium","High","Max"],HZ_EFFORT_KEY=["low","medium","high","max"];
+function hzEffort(){
+  if(hzS&&hzS.effort!=null)return hzS.effort;
+  let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-3]$/.test(s))v=+s;}catch(e){}
+  return v;
+}
+function hzEffortWire(){return HZ_EFFORT_KEY[hzEffort()];}    // what a question carries
+function hzEffortSet(i){
+  i=Math.max(0,Math.min(3,Math.round(+i||0)));hzS.effort=i;
+  try{localStorage.setItem("millen.effort",String(i));}catch(e){}
+  hzEffortPaint();
+}
 function hzModeIndex(t){
   const ms=hzModes(),i=ms.indexOf(t);if(i>=0)return i;
   const s=String(t||"").toLowerCase();
@@ -55624,110 +55936,137 @@ function hzOffLabel(t){
   if(typeof advOn!=="undefined"&&advOn)return "Your own council";
   return "Your pick";
 }
-function hzHint(name){
-  let sp={};try{sp=JSON.parse(localStorage.getItem("millen.speeds")||"{}");}catch(e){}
-  const s=+sp[name];if(!(s>0))return "";
-  if(s<60)return "About "+Math.max(5,Math.round(s/5)*5)+" seconds";
-  const m=Math.round(s/60);return m===1?"About a minute":"About "+m+" minutes";
-}
 function hzModesPaint(){
   const host=$("#hz-effort");if(!host)return;
-  const ms=hzModes();if(ms.length<2){host.hidden=true;return;}
+  const ms=hzModes();if(!ms.length){host.hidden=true;return;}
   host.hidden=false;
-  let sl=host.querySelector(".hz-sl");
-  if(!sl||+sl.dataset.n!==ms.length){
-    host.innerHTML='<div class="hz-sl" data-n="'+ms.length+'"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
-      +ms.map((m,i)=>'<i class="hz-sl-dot'+(i===ms.length-1&&m==="Vera Rubin"?" last":"")+'" style="--hz-u:'+(i/(ms.length-1)).toFixed(4)+'"></i>').join("")
+  if(!host.querySelector(".hz-pick")){
+    host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
+      +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
+      +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
+      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===3?" last":"")+'" style="--hz-u:'+(i/3).toFixed(4)+'"></i>').join("")
       +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
-      +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+(ms.length-1)+'" step="0.01" value="1"></label></div>'
-      +'<div class="hz-sl-label"><span class="hz-sl-l1"><span class="hz-sl-name"></span><span class="hz-sl-desc"></span></span><span class="hz-sl-l2"></span></div>';
-    sl=host.querySelector(".hz-sl");hzSliderWire(host);
+      +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="3" step="1" value="1"></label></div>'
+      +'<span class="hz-elevel" aria-hidden="true"></span>';
+    hzControlsWire(host);
   }
-  const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0,i=hzModeIndex(t);
-  sl.classList.toggle("off",!on);
-  hzSliderShow(host,i,on?ms[i]:"",true);
-  const root=document.documentElement,nm=host.querySelector(".hz-sl-name");
-  root.classList.toggle("hz-ody",t==="Vera Rubin");root.classList.toggle("hz-mer",t==="Pro");
+  const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0;
+  const nm=host.querySelector(".hz-pick b");
+  nm.textContent=on?modeName(t):hzOffLabel(t);
   nm.classList.toggle("shim",t==="Vera Rubin"||t==="Pro");nm.classList.toggle("soft",t==="Pro");
-  if(!on){nm.textContent=hzOffLabel(t);host.querySelector(".hz-sl-desc").textContent=t==="Max"?HZ_MODE_DESC.Max:"";host.querySelector(".hz-sl-l2").textContent="";}
-  if(hzS.sky)hzS.sky.effort(i);
+  host.querySelector(".hz-pick").setAttribute("aria-label","Mode, "+nm.textContent);
+  const root=document.documentElement;root.classList.toggle("hz-ody",t==="Vera Rubin");root.classList.toggle("hz-mer",t==="Pro");
+  hzEffortPaint();
+  const menu=$("#hz-menu");if(menu&&menu.classList.contains("open"))hzMenuBuild();
 }
-function hzSliderShow(host,i,name,settle){
-  const ms=hzModes(),sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),n=ms.length;
-  const u=Math.max(0,Math.min(1,i/Math.max(1,n-1)));
-  const pad=9,width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:196);
+function hzEffortPaint(){
+  const host=$("#hz-effort"),sl=host&&host.querySelector(".hz-sl");if(!sl)return;
+  const inp=sl.querySelector("input"),i=hzEffort(),u=i/3,pad=9;
+  const width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:150);
   sl.style.setProperty("--hz-eff-u",u.toFixed(4));
   sl.style.setProperty("--hz-eff-px",(u*(width-pad*2)).toFixed(1)+"px");
-  sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k/(n-1)<=u+0.001));
-  if(settle){inp.value=String(Math.round(i));inp.setAttribute("aria-valuenow",String(Math.round(i)));}
-  const m=name||ms[Math.round(i)];
-  if(m){inp.setAttribute("aria-valuetext",modeName(m)+". "+(HZ_MODE_DESC[m]||""));
-    host.querySelector(".hz-sl-name").textContent=modeName(m);
-    host.querySelector(".hz-sl-desc").textContent=HZ_MODE_DESC[m]||"";
-    const hint=hzHint(m),l2=host.querySelector(".hz-sl-l2");
-    l2.innerHTML=hint?'<span>'+hint+'</span>':"";}
+  sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
+  if(+inp.value!==i)inp.value=String(i);
+  inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("shim",i===3);
+  if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
 }
-// what a mode runs, from the page's copy of /api/tiers (tierInfo): each seat is
-// a model on a machine; a server's seat carries its name before the separator
+function hzControlsWire(host){
+  const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),pick=host.querySelector(".hz-pick");
+  inp.addEventListener("input",()=>hzEffortSet(inp.value));
+  inp.addEventListener("pointerdown",()=>sl.classList.add("dragging"));
+  const up=()=>sl.classList.remove("dragging");
+  inp.addEventListener("pointerup",up);inp.addEventListener("pointercancel",up);inp.addEventListener("blur",up);
+  pick.addEventListener("click",e=>{e.stopPropagation();const m=$("#hz-menu");if(m&&m.classList.contains("open"))hzMenuClose(false);else hzMenuOpen();});
+  pick.addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();hzMenuOpen();}});
+}
+// what a mode runs, from the page's copy of /api/tiers (tierInfo): each seat is a
+// model on a machine; a server's seat carries its name before the separator
 function hzLineupOf(mode){
   const info=(typeof tierInfo!=="undefined"&&tierInfo[mode])||{},rows=[];
   const srvs=typeof srvList!=="undefined"?srvList.filter(s=>s.paired):[];
   const sep=typeof SRV_SEP!=="undefined"?SRV_SEP:" · ";
   (info.models||[]).forEach(m=>{
     const k=m.indexOf(sep);
-    if(k>=0){const nm=m.slice(0,k),s=srvs.find(x=>x.name===nm);rows.push({n:m.slice(k+sep.length),m:nm,v:hzVendor(s&&s.gpu&&s.gpu.vendor)||"nvidia",id:s?s.id:nm});}
+    if(k>=0){const nm=m.slice(0,k),s=srvs.find(x=>x.name===nm);rows.push({n:m.slice(k+sep.length),m:nm,v:hzVendor(s&&s.gpu&&s.gpu.vendor)||"srv",id:s?s.id:nm});}
     else if(typeof isCloudModel==="function"&&isCloudModel(m))rows.push({n:m,m:"Cloud",v:"cloud",id:"cloud"});
-    else rows.push({n:m,m:"This Mac",v:hzVendor(hzS.accel)||"mlx",id:"local"});
+    else rows.push({n:m,m:hzLocalName(),v:hzLocalV(),id:"local"});
   });
   return rows;
 }
-function hzLineupShow(on){
-  const host=$("#hz-effort"),lu=$("#hz-lineup");if(!host||!lu)return;
-  clearTimeout(hzS.lineT);
-  const inp=host.querySelector("input"),ms=hzModes(),i=Math.round(+(inp?inp.value:1)),mode=ms[i];
-  const rows=on&&mode&&!host.classList.contains("compact")?hzLineupOf(mode):[];
-  const esc_=typeof esc==="function"?esc:(s=>String(s));
-  // newcomers slide out one after another; leavers tuck back together
-  const have=new Map([...lu.querySelectorAll(".hz-mdl")].map(p=>[p.dataset.key,p]));
-  let k=0;
-  rows.forEach(r=>{const key=r.n+"@"+r.m;let p=have.get(key);
-    if(!p){p=document.createElement("span");p.className="hz-mdl";p.dataset.key=key;p.dataset.v=r.v;
-      p.innerHTML='<i class="die"></i><b></b><em></em>';p.querySelector("b").textContent=r.n;p.querySelector("em").textContent=r.m;lu.appendChild(p);void p.offsetWidth;}
-    have.delete(key);if(!p.classList.contains("in")){p.style.transitionDelay=(k++*70)+"ms";p.classList.add("in");}});
-  have.forEach(p=>{p.style.transitionDelay="0ms";p.classList.remove("in");setTimeout(()=>{if(!p.classList.contains("in"))p.remove();},600);});
-  lu.classList.toggle("show",!!rows.length);
-  lu.setAttribute("aria-label",mode?modeName(mode)+" uses "+rows.map(r=>r.n+" on "+r.m).join(", "):"");
-  hzS.inUse=new Set(rows.map(r=>r.id));
-  $$("#hz-machines .hz-rig").forEach(r=>r.classList.toggle("in-use",!!rows.length&&hzS.inUse.has(r.dataset.id)));
-  if(rows.length)hzS.lineT=setTimeout(()=>{if(!host.matches(":hover,:focus-within"))hzLineupShow(false);},2600);
-}
-function hzSliderWire(host){
-  const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input");
-  const pick=i=>{const ms=hzModes(),m=ms[Math.max(0,Math.min(ms.length-1,i))];
-    if(m&&m!==tier&&typeof setTier==="function"&&!(typeof tierOff!=="undefined"&&tierOff[m]))setTier(m);else hzModesPaint();};
-  inp.addEventListener("pointerdown",()=>{sl.classList.add("dragging");sl.classList.remove("off");hzLineupShow(true);});
-  inp.addEventListener("input",()=>{const v=+inp.value;hzSliderShow(host,v,hzModes()[Math.round(v)],false);if(hzS.sky)hzS.sky.effort(Math.round(v));hzLineupShow(true);});
-  const settle=()=>{if(!sl.classList.contains("dragging"))return;sl.classList.remove("dragging");
-    const i=Math.round(+inp.value);hzSliderShow(host,i,hzModes()[i],true);pick(i);};
-  inp.addEventListener("pointerup",settle);inp.addEventListener("pointercancel",settle);
-  inp.addEventListener("change",()=>{if(!sl.classList.contains("dragging")){const i=Math.round(+inp.value);hzSliderShow(host,i,hzModes()[i],true);pick(i);}});
-  inp.addEventListener("keydown",e=>{
-    const n=hzModes().length,cur=Math.round(+inp.value);let i=null;
-    if(e.key==="ArrowRight"||e.key==="ArrowUp"||e.key==="PageUp")i=cur+1;
-    else if(e.key==="ArrowLeft"||e.key==="ArrowDown"||e.key==="PageDown")i=cur-1;
-    else if(e.key==="Home")i=0;else if(e.key==="End")i=n-1;
-    if(i===null)return;e.preventDefault();pick(Math.max(0,Math.min(n-1,i)));hzLineupShow(true);
+function hzMenuBuild(){
+  const menu=$("#hz-menu");if(!menu)return;
+  const t=typeof tier==="string"?tier:"";
+  menu.innerHTML="";
+  hzModes().forEach(m=>{
+    const rows=hzLineupOf(m),off=!!(typeof tierOff!=="undefined"&&tierOff[m]),o=document.createElement("button");
+    o.type="button";o.className="hz-opt"+(off?" off":"");o.setAttribute("role","menuitemradio");o.dataset.t=m;
+    o.setAttribute("aria-checked",String(m===t));if(off)o.setAttribute("aria-disabled","true");
+    const b=document.createElement("b");b.textContent=modeName(m);
+    const d=document.createElement("span");d.className="d";d.textContent=HZ_MODE_DESC[m]||"";
+    const dies=document.createElement("span");dies.className="dies";dies.setAttribute("aria-hidden","true");
+    [...new Set(rows.map(r=>r.v))].forEach(v=>{const x=document.createElement("i");x.className="die";x.dataset.v=v;dies.appendChild(x);});
+    const ms=document.createElement("span");ms.className="ms";
+    rows.forEach(r=>{const p=document.createElement("span");p.className="hz-mdl";p.dataset.v=r.v;p.title=r.m;
+      const x=document.createElement("i");x.className="die";const nb=document.createElement("b");nb.textContent=r.n;p.append(x,nb);ms.appendChild(p);});
+    o.setAttribute("aria-label",modeName(m)+". "+(HZ_MODE_DESC[m]||"")+(rows.length?" Uses "+rows.map(r=>r.n+" on "+r.m).join(", ")+".":""));
+    o.append(b,dies,d,ms);menu.appendChild(o);
   });
-  host.addEventListener("pointerenter",()=>hzLineupShow(true));
-  host.addEventListener("pointerleave",()=>{clearTimeout(hzS.lineT);hzS.lineT=setTimeout(()=>{if(!host.matches(":focus-within"))hzLineupShow(false);},900);});
-  inp.addEventListener("focus",()=>hzLineupShow(true));
-  inp.addEventListener("blur",()=>hzLineupShow(false));
+}
+// a mode looked at: its models slide out one after another, its machines light up
+function hzMenuHover(o){
+  const menu=$("#hz-menu");if(!menu||o.classList.contains("open"))return;
+  menu.querySelectorAll(".hz-opt").forEach(x=>{const on=x===o;x.classList.toggle("open",on);
+    x.querySelectorAll(".hz-mdl").forEach((p,k)=>{p.style.transitionDelay=on?(80+k*70)+"ms":"0ms";p.classList.toggle("in",on);});});
+  hzInUse(o.dataset.t?hzLineupOf(o.dataset.t):[]);
+}
+function hzInUse(rows){
+  hzS.inUse=new Set(rows.map(r=>r.id));
+  $$("#hz-machines .hz-rig").forEach(r=>r.classList.toggle("in-use",hzS.inUse.has(r.dataset.id)));
+}
+function hzMenuOpen(){
+  const menu=$("#hz-menu"),pick=$("#hz-effort .hz-pick");if(!menu||!pick)return;
+  hzMenuBuild();
+  const r=pick.getBoundingClientRect(),down=r.top<innerHeight/2,w=Math.min(340,innerWidth-32);
+  menu.classList.toggle("down",down);
+  menu.style.left=Math.max(16,Math.min(r.left-6,innerWidth-w-16)).toFixed(0)+"px";
+  if(down){menu.style.top=(r.bottom+10).toFixed(0)+"px";menu.style.bottom="auto";}
+  else{menu.style.top="auto";menu.style.bottom=(innerHeight-r.top+12).toFixed(0)+"px";}
+  menu.classList.add("open");pick.setAttribute("aria-expanded","true");
+  const cur=menu.querySelector('.hz-opt[aria-checked="true"]')||menu.querySelector(".hz-opt");
+  if(cur){hzMenuHover(cur);cur.focus({preventScroll:true});}
+}
+function hzMenuClose(refocus){
+  const menu=$("#hz-menu"),pick=$("#hz-effort .hz-pick");if(!menu)return;
+  const was=menu.classList.contains("open");
+  menu.classList.remove("open");if(pick)pick.setAttribute("aria-expanded","false");
+  menu.querySelectorAll(".hz-opt").forEach(x=>{x.classList.remove("open");x.querySelectorAll(".hz-mdl").forEach(p=>{p.style.transitionDelay="0ms";p.classList.remove("in");});});
+  if(hzS.inUse&&hzS.inUse.size)hzInUse([]);
+  if(was&&refocus&&pick)pick.focus({preventScroll:true});
+}
+function hzMenuWire(){
+  const menu=$("#hz-menu");if(!menu)return;
+  menu.addEventListener("pointerover",e=>{const o=e.target.closest(".hz-opt");if(o)hzMenuHover(o);});
+  menu.addEventListener("focusin",e=>{const o=e.target.closest(".hz-opt");if(o)hzMenuHover(o);});
+  menu.addEventListener("click",e=>{const o=e.target.closest(".hz-opt");if(!o)return;e.stopPropagation();
+    if(o.classList.contains("off"))return;
+    const m=o.dataset.t;hzMenuClose(true);
+    if(m&&m!==tier&&typeof setTier==="function")setTier(m);});
+  menu.addEventListener("keydown",e=>{
+    const os=[...menu.querySelectorAll(".hz-opt")],i=os.indexOf(document.activeElement);if(!os.length)return;
+    if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();os[i<0?0:(i+(e.key==="ArrowDown"?1:os.length-1))%os.length].focus();}
+    else if(e.key==="Home"){e.preventDefault();os[0].focus();}
+    else if(e.key==="End"){e.preventDefault();os[os.length-1].focus();}
+    else if(e.key==="Tab")hzMenuClose(false);});
+  document.addEventListener("click",e=>{if(menu.classList.contains("open")&&!menu.contains(e.target))hzMenuClose(false);});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&menu.classList.contains("open")){e.stopPropagation();hzMenuClose(true);}},true);
+  addEventListener("resize",()=>{if(menu.classList.contains("open"))hzMenuClose(false);});
 }
 function hzPlaceEffort(){
   const eff=$("#hz-effort"),slot=$("#hz-effort-slot"),crow=$("#crow");if(!eff||!slot||!crow)return;
   const home=!!$("#hero");
-  if(home&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");hzModesPaint();}
-  else if(!home&&eff.parentElement!==slot){slot.appendChild(eff);eff.classList.add("compact");hzLineupShow(false);hzModesPaint();}
+  if(home&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");hzMenuClose(false);hzModesPaint();}
+  else if(!home&&eff.parentElement!==slot){slot.appendChild(eff);eff.classList.add("compact");hzMenuClose(false);hzModesPaint();}
 }
 // ---- the header's first button and the sidebar: closed on the home unless
 // opened, open in a conversation unless hidden; the drawer under 760px
@@ -55752,15 +56091,83 @@ function hzGlowFit(){
   g.style.width=(r.width-48).toFixed(0)+"px";g.style.height=(r.height-4).toFixed(0)+"px";
 }
 // ---- the send: two ice rings from the button; the night brightens while it
-// thinks (longer trails, the neon aurora up), the machine at work pulses
+// thinks (longer trails, the neon aurora up), the machine at work pulses.
+// Asking, as the home sees it (OVERRIDE 3): the question arcs from the composer
+// into the top of the chats (into the chats button while they're closed); its row
+// keeps a live die in the colour of the machine at work (from the RUN frames) until
+// the answer lands, and renames itself when the saved title arrives; the composer
+// glides from mid-page to the foot. The live line, the comets and the glowing words
+// are the conversation's (hz-chat, 6b528).
+function hzBeforeSend(text){
+  if(!hzReady||!document.documentElement.classList.contains("hz"))return;
+  const c=$("#composer"),i=$("#input");
+  hzS.sendFrom={home:!!$("#hero"),comp:c?c.getBoundingClientRect():null,inp:i?i.getBoundingClientRect():null,text:String(text||"").trim()};
+}
 function hzOnSend(){
   if(!hzReady||!document.documentElement.classList.contains("hz"))return;
   hzS.gen=true;hzS.genLocal=true;hzS.srvWorking="";hzS.stage="";hzS.genT0=performance.now();
+  hzS.liveChat=typeof genChat!=="undefined"?genChat:null;hzS.liveV=hzLocalV();
+  if(hzS.liveChat)hzS.watch.add(hzS.liveChat);
   document.documentElement.classList.add("hz-busy");
-  hzLineupShow(false);
+  hzMenuClose(false);
   if(hzS.sky)hzS.sky.setBusy(true);
-  hzMachinesPaint();
-  if(hzMotionOK())hzBoom();
+  hzMachinesPaint();hzSideLive();
+  const from=hzS.sendFrom;hzS.sendFrom=null;
+  if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}
+  if(from&&from.home)hzArc(from,hzS.liveChat);
+}
+function hzGlide(from){
+  const c=$("#composer");if(!c||!from)return;
+  const to=c.getBoundingClientRect(),dx=from.left-to.left,dy=from.top-to.top;
+  if(Math.abs(dx)<4&&Math.abs(dy)<4)return;
+  c.style.transition="none";c.style.transform="translate("+dx.toFixed(1)+"px,"+dy.toFixed(1)+"px)";void c.offsetWidth;
+  c.style.transition="transform .9s var(--hz-ease-out)";c.style.transform="";
+  let over=false;const done=()=>{if(over)return;over=true;c.style.transition="";c.removeEventListener("transitionend",done);hzGlowFit();};
+  c.addEventListener("transitionend",done);setTimeout(done,1200);
+}
+// the question's arc: from where it was typed to its row (or to the chats button)
+function hzArc(from,chatId){
+  const text=from.text;if(!text)return;
+  const list=$("#chat-list"),sb=$("#sidebar"),btn=$("#hz-sb");
+  const row=list&&chatId?[...list.querySelectorAll(".chat-item")].find(r=>r.dataset.id===chatId):null;
+  const open=!!(row&&sb&&getComputedStyle(sb).display!=="none"&&row.getBoundingClientRect().width>0);
+  const ping=el=>{if(!el||!el.isConnected)return;const k=el===btn?"ping":"hz-landed";el.classList.remove(k);void el.offsetWidth;el.classList.add(k);setTimeout(()=>el.classList.remove(k),1000);};
+  const land=()=>ping(open?row:btn);
+  const a=from.inp||from.comp;
+  if(!hzMotionOK()||!a||!document.body.animate){land();return;}
+  let tgt=null;
+  if(open){const rr=row.getBoundingClientRect();tgt={x:rr.left+10,y:rr.top+rr.height/2};}
+  else if(btn){const br=btn.getBoundingClientRect();if(br.width)tgt={x:br.left+br.width/2-4,y:br.top+br.height/2};}
+  if(!tgt)return;
+  const g=document.createElement("div");g.className="hz-ghost";g.setAttribute("aria-hidden","true");
+  g.textContent=text.length>46?text.slice(0,44)+"…":text;document.body.appendChild(g);
+  g.style.left=(a.left+2).toFixed(0)+"px";g.style.top=(a.top+2).toFixed(0)+"px";
+  const gr=g.getBoundingClientRect(),dx=tgt.x-gr.left,dy=tgt.y-(gr.top+gr.height/2),k=open?13.5/17:.2;
+  g.animate([{transform:"translate(0,0) scale(1)",opacity:1},
+    {transform:"translate("+(dx*.42).toFixed(1)+"px,"+(dy*.42-46).toFixed(1)+"px) scale(.96)",opacity:1,offset:.42},
+    {transform:"translate("+(dx*.92).toFixed(1)+"px,"+(dy*.97).toFixed(1)+"px) scale("+(k*1.02).toFixed(3)+")",opacity:.9,offset:.86},
+    {transform:"translate("+dx.toFixed(1)+"px,"+dy.toFixed(1)+"px) scale("+k.toFixed(3)+")",opacity:0}],
+    {duration:820,easing:"cubic-bezier(.3,.7,.2,1)",fill:"forwards"}).onfinish=()=>{g.remove();land();};
+}
+// the answering chat's row: a live die in the working machine's colour, the title
+// shimmering, until the answer lands (kept through the list's own repaints)
+function hzSideLive(){
+  const list=$("#chat-list");if(!list)return;
+  const id=hzS.gen?hzS.liveChat:null;
+  list.querySelectorAll(".chat-item.hz-live").forEach(r=>{if(r.dataset.id!==id){r.classList.remove("hz-live");const d=r.querySelector(".hz-ldie");if(d)d.remove();}});
+  if(!id)return;
+  const row=[...list.querySelectorAll(".chat-item")].find(r=>r.dataset.id===id);if(!row)return;
+  row.classList.add("hz-live");
+  let d=row.querySelector(".hz-ldie");
+  if(!d){d=document.createElement("i");d.className="hz-ldie";d.setAttribute("aria-hidden","true");const ct=row.querySelector(".ct");if(ct)ct.after(d);else row.appendChild(d);}
+  d.dataset.v=hzS.liveV||hzLocalV();
+}
+// a row whose saved title arrived renames itself (chats asked in the last two minutes)
+function hzRenameCheck(){
+  const list=$("#chat-list");if(!list)return;
+  list.querySelectorAll(".chat-item").forEach(r=>{const id=r.dataset.id,ct=r.querySelector(".ct");if(!id||!ct)return;
+    const t=ct.textContent,was=hzS.titles.get(id);hzS.titles.set(id,t);
+    if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK()){r.classList.remove("hz-renamed");void r.offsetWidth;r.classList.add("hz-renamed");}});
 }
 function hzBoom(){
   const b=$("#send");if(!b)return;const r=b.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
@@ -55777,11 +56184,11 @@ function hzBoom(){
 function hzTele(kind,v){
   if(!hzReady||!hzS.gen)return;
   if(kind==="run"&&v){
-    if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;}
-    else if(v.w==="local"){hzS.genLocal=true;hzS.srvWorking="";}
-    else if(v.w==="mix"){hzS.genLocal=true;}
-    else if(v.w==="cloud"){hzS.genLocal=false;}
-    hzMachinesPaint();hzPulse();
+    if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;hzS.liveV=hzSrvV(hzS.srvWorking);}
+    else if(v.w==="local"){hzS.genLocal=true;hzS.srvWorking="";hzS.liveV=hzLocalV();}
+    else if(v.w==="mix"){hzS.genLocal=true;hzS.liveV=hzLocalV();}
+    else if(v.w==="cloud"){hzS.genLocal=false;hzS.liveV="cloud";}
+    hzMachinesPaint();hzSideLive();hzPulse();
   }else if(kind==="status"){if(v!==hzS.stage){hzS.stage=v;hzPulse();}}
   else if(kind==="step"||kind==="draft")hzPulse();
 }
@@ -55795,7 +56202,8 @@ function hzOnLand(aborted){
   hzS.gen=false;hzS.srvWorking="";hzS.genLocal=false;
   document.documentElement.classList.remove("hz-busy");
   if(hzS.sky)hzS.sky.setBusy(false);
-  hzMachinesPaint();
+  hzMachinesPaint();hzSideLive();
+  const id=hzS.liveChat;if(id)setTimeout(()=>hzS.watch.delete(id),120000);
 }
 // ---- stillness: effects off, reduced motion, hidden, or a minute unfocused
 function hzMotionOK(){
@@ -55808,10 +56216,11 @@ function hzPauseSync(){
   hzMediaSync();
   if(!pause&&hzS&&performance.now()-(hzS.skyAt||0)>120000)hzSkyPaint();
 }
-// ---- the opening, once per launch (sessionStorage), never with effects off
-// or reduced motion: the night fades up; the lockup appears and its word is
-// traced in light with one line under it; the wash blooms; the lockup lifts
-// away; the home fades in and the greeting is traced; the machines light up.
+// ---- the opening, on the first launch only (seen_opening) and never with effects
+// off or reduced motion: the night fades up; the lockup appears, its wing drawn
+// line by line and its word traced in light; a light streak crosses it, a prism
+// glint sweeps it once and a prism glow cycles; the wash blooms; the lockup lingers
+// and lifts away; the home fades in and the greeting is traced; the machines light up.
 // Any key, click, wheel or touch skips it; the key lands in the composer.
 function hzIntroKick(){
   const root=document.documentElement;
@@ -55826,12 +56235,14 @@ function hzIntroKick(){
   ["keydown","pointerdown","wheel","touchstart"].forEach(k=>addEventListener(k,skip,{capture:true,passive:true}));
   const at=(ms,fn)=>{if(frozen&&ms>dbg.intro*1000)return;hzS.introTimers.push(setTimeout(fn,ms));};
   const mark=$("#hz-intro-mark"),word=mark&&mark.querySelector(".hz-word");
-  at(300,()=>{root.classList.add("hz-markin");if(word)hzTraceIn(word,{margin:40,speed:520,spread:.7}).then(()=>word&&word.classList.add("shown"));});
+  if(mark)mark.hidden=false;      // the lockup's stage (hidden again by hzIntroEnd)
+  // traced; then the streak (2.8 s), the glint (2.5 s, .55 s after the trace) and the prism glow (9 s)
+  at(300,()=>{root.classList.add("hz-markin");if(word)hzTraceIn(word,{margin:40,speed:520,spread:.7}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");root.classList.add("hz-litmark");});});
   at(1500,()=>{const w=$("#hz-wash");if(w){w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");}});
-  at(4700,()=>root.classList.add("hz-markout"));
-  at(5200,()=>{root.classList.add("hz-home");const g=$("#hero .greet");if(g){root.classList.remove("hz-intro");hzHeadlineShow(g);}});
-  at(5900,()=>{hzS.rigsOn=true;$$("#hz-machines .hz-rig").forEach((r,i)=>setTimeout(()=>r.classList.add("on"),i*170));});
-  at(7200,()=>hzIntroEnd(false));
+  at(6200,()=>root.classList.add("hz-markout"));
+  at(6800,()=>{root.classList.add("hz-home");const g=$("#hero .greet");if(g){root.classList.remove("hz-intro");hzHeadlineShow(g);}});
+  at(7500,()=>{hzS.rigsOn=true;$$("#hz-machines .hz-rig").forEach((r,i)=>setTimeout(()=>r.classList.add("on"),i*170));});
+  at(8800,()=>hzIntroEnd(false));
 }
 function hzIntroEnd(skipped){
   const root=document.documentElement;
@@ -55839,7 +56250,7 @@ function hzIntroEnd(skipped){
   if(hzS&&hzS.introSkip){["keydown","pointerdown","wheel","touchstart"].forEach(k=>removeEventListener(k,hzS.introSkip,{capture:true}));hzS.introSkip=null;}
   if(skipped)hzTraceKill();
   const mark=$("#hz-intro-mark");if(mark){mark.hidden=true;const w=mark.querySelector(".hz-word");if(w)w.classList.add("shown");}
-  root.classList.remove("hz-intro","hz-markin","hz-markout");root.classList.add("hz-ready","hz-home");
+  root.classList.remove("hz-intro","hz-markin","hz-markout","hz-litmark");root.classList.add("hz-ready","hz-home");
   if(hzS&&hzS.intro&&typeof prefSet==="function"&&!(hzS.debug&&hzS.debug.intro!=null))prefSet({seen_opening:true});   // the full opening plays on the first launch only
   if(hzS){hzS.intro=false;hzS.rigsOn=true;hzS.freezeAt=null;}
   const g=$("#hero .greet");if(g){if(skipped){hzTraceKill();g.classList.add("shown");}else hzHeadlineShow(g);}
@@ -55899,7 +56310,8 @@ function hzDebugApply(){
   if(d.fx==="0")document.body.classList.add("novideo");
   if(d.time||d.place)hzSkyPaint();
   if(d.state==="typing"){const i=$("#input");if(i){i.value=d.text||"Which of my two job offers makes more sense if I want to move abroad next year?";i.dispatchEvent(new Event("input"));}}
-  if(d.state==="lineup"){setTimeout(()=>hzLineupShow(true),600);}
+  if(d.effort!=null&&/^[0-3]$/.test(d.effort)){hzS.effort=+d.effort;hzEffortPaint();}
+  if(d.state==="menu"){setTimeout(hzMenuOpen,600);}
   if(d.state==="thinking"||d.state==="boom"||d.state==="landed"){
     const hero=$("#hero");if(hero)hero.remove();
     if(typeof addMsg==="function"){addMsg("user",d.text||"Which of my two job offers makes more sense if I want to move abroad next year?");
@@ -55922,7 +56334,8 @@ function hzInit(){
   let salt="";try{salt=localStorage.getItem("millen.hz.salt")||"";if(!salt){salt=String(Math.random()).slice(2,10);localStorage.setItem("millen.hz.salt",salt);}}catch(e){}
   hzS={gen:false,genLocal:false,srvWorking:"",intro:false,blurred:false,introTimers:[],tracers:new Set(),salt:salt,
     reduced:!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
-    debug:hzDebugParse(HZ_DEBUG),gpu:null,mem:null,seed:1,rnd:hzRng(1),dayKey:-1,skyAt:0,accel:"",inUse:new Set()};
+    debug:hzDebugParse(HZ_DEBUG),gpu:null,mem:null,seed:1,rnd:hzRng(1),dayKey:-1,skyAt:0,accel:"",inUse:new Set(),
+    effort:null,clip:null,liveChat:null,liveV:"",watch:new Set(),titles:new Map(),sendFrom:null};
   if(hzS.debug&&hzS.debug.intro!=null&&root.classList.contains("hz"))root.classList.add("hz-intro");
   hzReady=true;
   try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}
@@ -55940,6 +56353,9 @@ function hzInit(){
   const sel=$("#look-sel");
   if(sel){try{sel.value=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
     sel.addEventListener("change",()=>setLook(sel.value));}
+  hzMenuWire();
+  const clist=$("#chat-list");
+  if(clist&&window.MutationObserver)new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});
   const fsel=$("#fx-level");
   if(fsel){fsel.value=hzFxLevel();fsel.addEventListener("change",()=>setFxLevel(fsel.value));}
   const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything";
