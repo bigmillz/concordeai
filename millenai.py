@@ -658,7 +658,8 @@ _KNOWN_ENV = frozenset((
     "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF",
     # a dev copy's release feed (6b537): the updater proven against a local
     # stand-in for api.github.com; honoured only when DEV_HOME is set
-    "MILLENAI_UPDATE_API"))
+    "MILLENAI_UPDATE_API",
+    "MILLENAI_Q3_OFF"))      # 6b523: shape, estimate, followup, vendor, polish
 
 
 def _dev_home(env, real):
@@ -23790,6 +23791,15 @@ def fresh_ablate() -> set:
     return {w.strip().lower() for w in os.environ.get("MILLENAI_FRESH_OFF", "").split(",") if w.strip()}
 
 
+def quality_ablate() -> set:
+    """The 6b523 fixes a DEV copy runs without (MILLENAI_Q3_OFF, comma-
+    separated: shape, estimate, followup, vendor, polish), for the bench's
+    ablations; the shipped app always runs them all."""
+    if not DEV_HOME:
+        return set()
+    return {w.strip().lower() for w in os.environ.get("MILLENAI_Q3_OFF", "").split(",") if w.strip()}
+
+
 def _ddg_news(query: str, limit: int = GROUND_PER_QUERY, timelimit=FRESH_NEWS_LIMIT) -> list:
     """The news engine's dated hits for a query (6b520), as text-search
     rows with a 'date'. Never raises."""
@@ -24027,10 +24037,15 @@ def plan_queries(question: str, today=None, planned=(), limit: int = GROUND_QUER
         if (len(t) < 3 or (not ents and lead[1])) and terms is not lead[0]:
             # "What is Claude using" names Claude and nothing else: the
             # topic is upstream, in the richest sub-question (its names
-            # first, then its nouns, never its qualifiers)
+            # first, then its nouns, never its qualifiers). The lead's
+            # names always ride along (6b523: "safe walkable near beach
+            # fast internet", six words with no name, searched the world
+            # and seated a Da Nang listing and a speed test); its other
+            # words only while the query is short.
             for w in lead[1] + [x for x in lead[0] if x not in lead[1]
                                 and x.lower() not in _GQ_MODIFIERS]:
-                if w.lower() not in [x.lower() for x in t] and len(t) < 5:
+                if w.lower() not in [x.lower() for x in t] and (
+                        len(t) < 5 or (w in lead[1] and len(t) < 8)):
                     t.append(w)
         add(t)
     # the model's angles, when it answered in time
@@ -24943,6 +24958,11 @@ def _src_junk(row: dict) -> str:
         return "no url"
     if any(host == v or host.endswith("." + v) for v in _SRC_VIDEO_HOSTS):
         return "video"
+    if any(host.startswith(l) or ("." + l) in host for l in _SRC_LISTING_PAGES) \
+            and "vendor" not in quality_ablate():
+        return "listing"          # one unit's advert (6b523): never evidence
+    if re.match(r"/(?:aclick|aclk|pagead)\b", path) and "vendor" not in quality_ablate():
+        return "ad"               # an engine's paid link (6b523: bing.com/aclick "DigitalOcean Cloud")
     if any(s in host or s in (host + path) for s in _SRC_SOCIAL_HOSTS):
         return "social"
     # the farm first: "Unlimited Claude for free, no signup" is a farm
@@ -24956,9 +24976,26 @@ def _src_junk(row: dict) -> str:
     return ""
 
 
+# LISTINGS AND FORUM THREADS (6b523, per Patrick): on the bench a cozycozy
+# blurb chose the neighbourhood (q17), a TripAdvisor thread set the bag
+# limits (q21) and a phone-price aggregator priced the iPhone (q02). A
+# booking or listing site's page is an advert for one unit, a forum thread
+# is guesses: both rank down like a content farm. Only the grounded path
+# reads these; the places path keeps its own lists.
+_SRC_LISTING_HOSTS = ("airbnb.", "cozycozy.", "vrbo.", "booking.com",
+                      "hotels.com", "expedia.", "kayak.", "trivago.",
+                      "agoda.", "hostelworld.", "mobile57.", "gsmarena.com/compare",
+                      "pricebaba.", "91mobiles.", "smartprix.")
+_SRC_LISTING_PAGES = ("airbnb.", "vrbo.", "cozycozy.", "hostelworld.")
+_SRC_FORUM_RX = re.compile(
+    r"(?i)/showtopic|/forums?/|/threads?/|/discussion/|/community/questions?/|"
+    r"/comments/|/topic/\d|\bforum\.")
+
+
 def _src_quality(host: str, path: str = "") -> int:
     """+2 a reference or major outlet, +1 .gov/.edu, +1 docs; -2 a
-    content farm, a forum of guesses or directory spam."""
+    content farm, a forum of guesses, directory spam, a listing site's
+    advert or a forum thread (6b523)."""
     q = 0
     if any(host == g or host.endswith("." + g) for g in _SRC_GOOD_HOSTS):
         q = 2
@@ -24968,8 +25005,14 @@ def _src_quality(host: str, path: str = "") -> int:
         q += 1
     if any(d in host for d in _SRC_DEMOTE_HOSTS):
         q -= 2
+    elif "vendor" not in quality_ablate() and (
+            any(d in host or d in (host + path) for d in _SRC_LISTING_HOSTS)
+            or (q < 2 and _SRC_FORUM_RX.search(host + path))):
+        q -= 2          # a listing's advert, a thread of guesses (6b523)
     if len(path) > 90:
         q -= 1          # a whole headline for a slug is a content farm's habit
+    if not path.strip("/") and "vendor" not in quality_ablate():
+        q -= 2          # a site's front page (Delta's, Kayak's) holds no answer (6b523)
     return q
 
 
@@ -25049,6 +25092,20 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         in_host = 3 if own and topical else 0
         if topical >= 2 and any(host == h or host.endswith("." + h) for h in primary or ()):
             in_host = max(in_host, 3)          # the primary source itself, on the question (6b518)
+        # THE VENDOR'S OWN PAGE (6b523, per Patrick): a third-party "$2.50/hr"
+        # outranked DigitalOcean's own pricing docs (q03) and listicles priced
+        # the iPhone over Apple's page (q02). The maker's or seller's own page
+        # on the question is marked for the writer (evidence_pack) and takes a
+        # seat ahead of the fill, as each query's best does. Its own: the
+        # host's own label is the name (digitalocean.com, apple.com), or the
+        # name is in the host of a primary source the hints named for this
+        # question (voegol.com.br for GOL); a name merely inside a label
+        # (llm-stats.com for "LLM", spanish-fluency-club for "Spanish") is not.
+        label = host.split(".")[-3 if host.endswith((".co.uk", ".com.br", ".com.au", ".co.jp")) else -2].replace("-", "") \
+            if host.count(".") >= 1 else host
+        vendor = bool(own and topical and "vendor" not in quality_ablate() and (
+            any(e.replace(" ", "") == label for e in own)
+            or any(host == h or host.endswith("." + h) for h in primary or ())))
         qual = _src_quality(host, path)
         date = _src_date({"url": url, "body": body, "title": title, "date": r.get("date")})
         if date and date[:7] > time.strftime("%Y-%m", today):
@@ -25062,6 +25119,7 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         score = rel + in_host + qual + rec - (5 if rel == 0 and not in_host else 0)
         out.append({"title": title or host, "body": body, "url": url,
                     "host": host, "date": date, "score": score, "paras": [],
+                    "vendor": vendor,
                     "key": key, "tkey": tkey, "qs": {str(r.get("_q") or "")}})
         seen_keys.add(key)
         if tkey:
@@ -25082,12 +25140,19 @@ def rank_sources(rows: list, terms: list, entities: list, nowish: bool,
         q = str((r.get("_q") if isinstance(r, dict) else "") or "")
         if q and q not in queries:
             queries.append(q)
+    # a query's seat goes to a hit worth half the best (6b523: "clear
+    # accents cheap classes tourist bubble" seated an accent-reduction
+    # school and a tumbler at 9 and 6 against a best of 22)
+    floor = (max(s["score"] for s in out) * 0.5) if (out and "vendor" not in quality_ablate()) else 0
     for _round in range(per_query):
         for q in queries:
             for s in out:
-                if q in s["qs"] and s not in kept and s["score"] > 0:
+                if q in s["qs"] and s not in kept and s["score"] > max(0, floor):
                     take(s, seat=True)
                     break
+    for s in out:
+        if s.get("vendor") and s["score"] > 0:
+            take(s, seat=True)              # the vendor's own page (6b523)
     for s in out:
         if len(kept) >= limit:
             break
@@ -25265,6 +25330,8 @@ def evidence_pack(sources: list, terms: list, today=None,
                 n_pass += 1
             lines.append("")
             continue
+        if s.get("vendor"):
+            lines.append("    (THE VENDOR'S OWN SITE: the maker's or seller's own page)")
         if s.get("snippet_only"):
             lines.append("    (SNIPPET ONLY: the page refused a full read; this is the search engine's summary)")
         if s.get("paras") and _para_hits(s["paras"], terms):
@@ -25336,9 +25403,11 @@ GROUND_DATING = (
     "marked 'date unknown' it is 'undated'.\n"
     "- When two sources disagree on a current figure, give the one with the "
     "later date and say it is the newer.\n"
-    "- A source marked OFFICIAL DATA or THE VENDOR'S OWN FEED is the "
-    "agency's or the maker's own record: its figure and date beat any "
-    "article's.\n"
+    "- A source marked OFFICIAL DATA, THE VENDOR'S OWN FEED or THE VENDOR'S "
+    "OWN SITE is the agency's, the maker's or the seller's own record: its "
+    "price, figure and date beat any article's, listicle's or reseller's "
+    "(a third party's hourly rate never outranks the vendor's own price "
+    "list).\n"
     "- A source marked SNIPPET ONLY is a search engine's two-line summary of "
     "a page that refused a full read: a figure from it is 'reportedly' or "
     "'per <site>', never stated as checked.\n")
@@ -25346,6 +25415,58 @@ GROUND_STALE = (
     "- NOTHING RECENT: none of these sources is dated within the last {months} "
     "months (the newest is {newest}). Say so plainly in one clause, give "
     "what you found with its date, and never present it as today's.\n")
+# THE SHAPE OF A GROUNDED ANSWER (6b523, per Patrick). On this Mac's Fast
+# tier one model writes a searched answer in one pass and never sees the
+# answer brief (that rides the revise and final passes only), so the shape
+# rides the grounded turn, where the rules are read right before the
+# question. The bench's judges marked answers down for the same things on
+# every run: the question half-answered (one model's price of three, the
+# vote without the next meeting), five options where one pick was asked,
+# tables and headings on a chat answer, closing recaps the person forbade,
+# and the machinery showing ("the provided data", "the sources do not
+# provide"). Those are the rules.
+GROUND_SHAPE = (
+    "ANSWER SHAPE:\n"
+    "- The first sentence settles the question: the name, the figure or "
+    "the verdict, with no preamble, no restating of the question and no "
+    "title.\n"
+    "- Answer EVERY part the person asked, in their order. A part the "
+    "evidence covers gets the evidence's specifics in full: every price, "
+    "model, date, vote or figure that answers it, not one of them.\n"
+    "- Asked which to choose, name ONE pick and say why in a line; "
+    "alternatives get a line each at most. Asked for a list or a plan "
+    "(what to pack, which steps), write it out.\n"
+    "- Follow the person's standing instructions to the letter. Prose, "
+    "with bold on the few things that matter; no headings, and no table "
+    "unless several things are compared on several measures. No closing "
+    "summary, 'Bottom line' or offer to help: stop when the information "
+    "stops.\n"
+    "- 'The provided data', 'the available information', 'the sources do "
+    "not provide', 'the search results', 'I cannot pull live data' are "
+    "banned: say what you found, and for what you didn't find, say what "
+    "to check in one clause.\n")
+# ESTIMATE WHEN ASKED (6b523): the writer had the exchange rate and the
+# price per square metre and still wrote "the sources do not list a rent"
+# (q17.t2, three runs of four); asked for a two-week total it gave fares
+# alone (q19). A figure the person asked for is built, shown and dated.
+GROUND_ESTIMATE = (
+    "- ESTIMATE WHEN ASKED: when the person asks for a figure (a rent, a "
+    "total, a cost, a limit, a fare) and no source states it, you still "
+    "give one. Build it from the figures the evidence has (a rate, a price "
+    "per square metre, a cost per day, a fare) and the typical ranges you "
+    "know, show the arithmetic in one short line, mark it 'roughly' or "
+    "'typically' with its date, then say where to confirm it. 'I cannot "
+    "give an exact figure' or 'check the listings' alone is the one answer "
+    "that is never acceptable.\n")
+# A FOLLOW-UP THAT ADDS NOTHING NEW (6b523): "explain more" reuses the
+# earlier evidence (6b518) and the writer restated the earlier answer
+# (q01.t2, two runs of four). The turn says what a follow-up is for.
+GROUND_FOLLOWUP = (
+    "[This is a follow-up on your previous answer, with the same evidence. "
+    "Do not restate that answer: add the specifics it lacked (names, "
+    "figures, dates), go deeper on the mechanism, and correct plainly what "
+    "it got wrong or left vague. Where the evidence is thin, say so in one "
+    "clause and give what you reliably know, dated.]")
 
 
 def pack_dates(pack: str) -> dict:
@@ -25432,6 +25553,11 @@ def grounded_turn(query: str, pack: str, today=None, note: str = "") -> str:
             if not any(0 <= _src_months_ago(d, today) <= FRESH_STALE_MONTHS for d in ds):
                 rules += GROUND_STALE.format(months=FRESH_STALE_MONTHS,
                                              newest=max(ds) if ds else "undated")
+    q3 = quality_ablate()
+    if "estimate" not in q3:
+        rules += GROUND_ESTIMATE          # (6b523) a figure asked for is given
+    if "shape" not in q3:
+        rules += GROUND_SHAPE             # (6b523) the shape, read last
     figs = evidence_figures(pack, query)
     fig_block = ("\n\nKEY FIGURES IN THAT EVIDENCE (use the ones that answer "
                  "the question, each with its source number):\n"
@@ -36138,6 +36264,341 @@ def trim_recap(text: str) -> str:
     return "\n\n".join(paras[:-1]).rstrip()
 
 
+# ---- THE DETERMINISTIC POST-PASS (6b523, per Patrick): the writer's own
+# slips, fixed without a model. The bench's judges found three kinds that
+# no prompt rule removed: a sum or product stated with the wrong result
+# ("$1,350 + 11 x $106.40 = $2,519.40"), a reais figure converted to
+# dollars at a rate the answer or the evidence states and still 2.5x off
+# ("R$3,500-5,500 ($1,700-$2,700)"), and the machinery showing ("the
+# provided data does not list"). Each is a string the answer itself holds,
+# so it is re-computed or reworded here, in under a millisecond, and a
+# changed answer is re-sent after a RESET as the fact-check's is. Nothing
+# here invents: a result is replaced only by the arithmetic of the figures
+# the sentence states, a dollar figure only by the stated rate's quotient,
+# a leak only by plain words with the same meaning.
+_ANS_CUR = r"(?:US)?(?:R\$|\$|€|£)?\s?"
+_ANS_NUM = (r"(?:" + _ANS_CUR + r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|" + _ANS_CUR + r"\d+(?:\.\d+)?)")
+_ANS_OP = r"[×xX*·+−–\-÷/]"
+_ANS_OPS = {"×": "*", "x": "*", "X": "*", "*": "*", "·": "*", "+": "+",
+            "−": "-", "–": "-", "-": "-", "÷": "/", "/": "/"}
+_ANS_SP = r"[   ]*"
+_ANS_EXPR = _ANS_NUM + r"(?:" + _ANS_SP + _ANS_OP + _ANS_SP + _ANS_NUM + r"){1,4}"
+_ANS_EQ_RX = re.compile(
+    r"(?<![\d,.$\w])(?P<lhs>" + _ANS_EXPR + r")"                      # never from inside a number
+    r"(?P<chain>(?:" + _ANS_SP + r"=" + _ANS_SP + _ANS_EXPR + r")*)"    # "= A + D" middles of a chain
+    + _ANS_SP + r"(?P<eq>=|≈|≃|~|equals|comes to|totals?)" + _ANS_SP
+    + r"(?P<rhs>" + _ANS_NUM + r")"
+    r"(?!" + _ANS_SP + _ANS_OP + _ANS_SP + _ANS_CUR + r"\d)"           # not a chain's middle
+    r"(?![\d,.]*\s*(?:%|percent|per cent))")                          # a share: too many readings
+_ANS_YEAR_RX = re.compile(r"(?:19|20)\d\d")
+
+
+def _ans_num(tok: str):
+    """(value, currency prefix, digits as written) of one stated number."""
+    t = str(tok or "").strip()
+    m = re.match(r"(US)?(R\$|\$|€|£)?\s?", t)
+    cur = (m.group(1) or "") + (m.group(2) or "")
+    body = t[m.end():].strip()
+    try:
+        return float(body.replace(",", "")), cur, body
+    except ValueError:
+        return None, cur, body
+
+
+def _ans_fmt(v: float, like: str, cur: str = "") -> str:
+    """`v` written like the stated number: its decimals, its thousands
+    separator (or one when the value grew past 9,999), its currency."""
+    dec = len(like.split(".")[1]) if "." in like else 0
+    if dec == 0 and abs(v - round(v)) > 1e-9 and abs(v) < 100:
+        dec = 2 if abs(v) < 10 else 1
+    sep = "," if ("," in like or abs(v) >= 10000) else ""
+    out = ("{:" + sep + ".%df}" % dec).format(v)
+    return cur + out
+
+
+def _ans_calc(nums, ops):
+    """The value of nums[0] op nums[1] op ..., with the usual precedence;
+    None when it isn't a number."""
+    expr = repr(nums[0])
+    for op_, n_ in zip(ops, nums[1:]):
+        expr += op_ + repr(n_)
+    try:
+        v = float(eval(expr, {"__builtins__": {}}, {}))   # digits and operators only
+    except Exception:
+        return None
+    if v != v or v in (float("inf"), float("-inf")):
+        return None
+    return v
+
+
+def _ans_eval(expr_text: str):
+    """(value, [numbers], [ops], slack) of a stated expression, or (None,
+    [], [], 0) when a figure is a year or the text isn't digits and
+    operators. `slack` is how far the result may honestly sit from the
+    figures as written: each figure was rounded to its last digit (an
+    integer under 100 is a count, exact), and those roundings add in a
+    sum and compound in a product ("583 gallons x $3.40" may be $1,983,
+    from 583.33)."""
+    toks = re.findall(_ANS_NUM + "|" + _ANS_OP, expr_text)
+    nums, ops, bodies = [], [], []
+    for k in toks:
+        if k in _ANS_OPS:
+            ops.append(_ANS_OPS[k])
+            continue
+        v, _c, body = _ans_num(k)
+        if v is None or _ANS_YEAR_RX.fullmatch(body):
+            return None, [], [], 0
+        nums.append(v)
+        bodies.append(body)
+    if len(nums) < 2 or len(nums) != len(ops) + 1:
+        return None, [], [], 0
+    v = _ans_calc(nums, ops)
+    if v is None:
+        return None, [], [], 0
+    slack = 0.0
+    for i, (n_, b_) in enumerate(zip(nums, bodies)):
+        dec = len(b_.split(".")[1]) if "." in b_ else 0
+        half = 0.0 if (dec == 0 and abs(n_) < 100) else 0.5 * 10 ** (-dec)
+        if half:
+            v2 = _ans_calc(nums[:i] + [n_ + half] + nums[i + 1:], ops)
+            if v2 is not None:
+                slack += abs(v2 - v)       # what this figure's rounding moves the result
+    return v, nums, ops, slack
+
+
+def answer_arith_fixes(text: str) -> list:
+    """[(start, end, old, new, note)]: every equation the answer states
+    whose result is off by more than rounding (1.5% for '=', 5% for an
+    approximation), re-computed from the stated figures. A chain
+    ("$1,350 + 11 x $106.40 = $1,350 + $1,169.40 = $2,519.40") is judged
+    first against last, and a middle sum's one figure that the first
+    expression doesn't state is re-derived. Fenced code, a year, a
+    percentage result and a result ten times the stated one (a unit
+    misread) are left alone."""
+    t = str(text or "")
+    out = []
+    code = [(m.start(), m.end()) for m in re.finditer(r"```.*?```", t, re.S)]
+    for m in _ANS_EQ_RX.finditer(t):
+        if any(a <= m.start() < b for a, b in code):
+            continue
+        comp, nums, ops, slack = _ans_eval(m.group("lhs"))
+        if comp is None:
+            continue
+        rv, rcur, rbody = _ans_num(m.group("rhs"))
+        if rv is None or _ANS_YEAR_RX.fullmatch(rbody):
+            continue
+        dec = len(rbody.split(".")[1]) if "." in rbody else 0
+        unit = 0.5 * 10 ** (-dec)
+        # the rounding of the result, of the figures, and 5% more for an approximation
+        tol = unit * 1.01 + slack + (0.0 if m.group("eq") in ("=", "equals", "total", "totals")
+                                     else 0.05 * abs(comp))
+        if abs(comp - rv) <= tol:
+            continue
+        if abs(comp) > 10 * max(abs(rv), 1e-9) or abs(rv) > 10 * max(abs(comp), 1e-9):
+            continue
+        if (comp < 0) != (rv < 0):
+            continue              # a sign the writer didn't mean (a version, a range)
+        # "(flight $1,350 + 11 x $95 = $1,045)": the result is the tail's, the
+        # head is context. A part of the expression that gives the stated
+        # result means the equation was partial, not wrong.
+        if any(_ans_calc(nums[k:], ops[k:]) is not None
+               and abs(_ans_calc(nums[k:], ops[k:]) - rv) <= tol for k in range(1, len(nums) - 1)) \
+                or any(_ans_calc(nums[:k], ops[:k - 1]) is not None
+                       and abs(_ans_calc(nums[:k], ops[:k - 1]) - rv) <= tol for k in range(2, len(nums))):
+            continue
+        new = _ans_fmt(comp, rbody, rcur)
+        if new.replace(" ", "") == m.group("rhs").replace(" ", ""):
+            continue
+        out.append((m.start("rhs"), m.end("rhs"), m.group("rhs"), new,
+                    "%s %s %s → %s" % (re.sub(r"\s+", " ", m.group("lhs")), m.group("eq"),
+                                            m.group("rhs"), new)))
+        # a chain's middle sums: the one figure the first expression doesn't
+        # state is what the writer worked out wrong (11 x $106.40 as $1,169.40)
+        base = m.start("chain")
+        for cm in re.finditer(_ANS_SP + "=" + _ANS_SP + "(" + _ANS_EXPR + ")", m.group("chain") or ""):
+            seg = cm.group(1)
+            if re.search(r"[×xX*·−–\-÷/]", re.sub(_ANS_NUM, "", seg)):
+                continue                  # only a plain sum is re-derived
+            parts = [(k.start(1), k.end(1), k.group(1)) for k in re.finditer("(" + _ANS_NUM + ")", seg)]
+            vals = [_ans_num(x[2]) for x in parts]
+            if any(v[0] is None for v in vals):
+                continue
+            odd = [i for i, v in enumerate(vals) if not any(abs(v[0] - n_) < 1e-9 for n_ in nums)]
+            if len(odd) != 1:
+                continue
+            i = odd[0]
+            want = comp - sum(v[0] for j, v in enumerate(vals) if j != i)
+            if abs(want - vals[i][0]) <= tol or want <= 0:
+                continue
+            new_mid = _ans_fmt(want, vals[i][2], vals[i][1])
+            st_ = base + cm.start(1) + parts[i][0]
+            out.append((st_, st_ + len(parts[i][2]), parts[i][2], new_mid,
+                        "%s → %s (in the chain)" % (parts[i][2], new_mid)))
+    return out
+
+
+_ANS_RATE_RXS = (
+    re.compile(r"1 US dollar = (\d\.\d{1,4}) BRL"),                               # the FX block (6b520)
+    re.compile(r"(?:USD|US\$|\$)\s?1(?:\.00)?\s?(?:=|≈|~|buys|gets|to)\s?(?:R\$|BRL)?\s?(\d\.\d{1,4})\b"),
+    re.compile(r"R\$\s?(\d\.\d{1,4})\s?(?:per|/|to the|to|=|≈)\s?(?:US)?(?:\$|USD|dollar)"),
+    re.compile(r"(\d\.\d{1,4})\s?(?:BRL|reais|R\$)\s?(?:per|/|to the|to|=|≈)\s?(?:USD|US\$|\$|dollar)"),
+    re.compile(r"(?:at|rate of|around|about|roughly)\s(?:R\$|BRL)?\s?(\d\.\d{1,4})\s?(?:BRL|reais|R\$)?\s?(?:per|/|to the)\s?(?:USD|US\$|\$|dollar)"),
+)
+
+
+def answer_fx_rate(*texts) -> float:
+    """The one reais-per-dollar rate the texts state (the answer first, then
+    the evidence pack), or 0.0 when none or several differ."""
+    rates = set()
+    for t in texts:
+        for rx in _ANS_RATE_RXS:
+            for m in rx.finditer(str(t or "")):
+                try:
+                    v = float(m.group(1))
+                except ValueError:
+                    continue
+                if 3.0 <= v <= 8.0:
+                    rates.add(round(v, 2))
+        if rates:
+            break               # the answer's own rate wins over the pack's
+    return rates.pop() if len(rates) == 1 else 0.0
+
+
+_ANS_PLAIN = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
+_ANS_FX_RXS = (
+    # R$3,500-R$5,500 ($700-$1,100 ...)   and   R$3,800 (about $750)
+    re.compile(r"R\$\s?(?P<b1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?(?:R\$)?\s?(?P<b2>" + _ANS_PLAIN + r"))?"
+               r"(?P<mid>[^.\n;]{0,45}?(?:≈|~|about|roughly|around|or|=|\(|,\s)\s?(?:US)?)"
+               r"\$\s?(?P<u1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?\$?\s?(?P<u2>" + _ANS_PLAIN + r"))?"),
+    # $750 (R$3,800)
+    re.compile(r"(?<![R\w])\$\s?(?P<u1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?\$?\s?(?P<u2>" + _ANS_PLAIN + r"))?"
+               r"(?P<mid>[^.\n;]{0,45}?(?:≈|~|about|roughly|around|or|=|\())\s?"
+               r"R\$\s?(?P<b1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?(?:R\$)?\s?(?P<b2>" + _ANS_PLAIN + r"))?"),
+)
+
+
+def answer_fx_fixes(text: str, rate: float) -> list:
+    """[(start, end, old, new, note)]: each dollar figure given beside a
+    reais figure (a single or a range, either order) that isn't the reais
+    figure over `rate` within 6%, replaced by the quotient at the stated
+    figure's precision. Nothing without a rate; nothing under R$20 or $4
+    (a per-item price's rounding); nothing ten times off (a misread)."""
+    if not rate:
+        return []
+    t = str(text or "")
+    out = []
+    for rx in _ANS_FX_RXS:
+        for m in rx.finditer(t):
+            if "[" in m.group("mid") and "]" in m.group("mid"):
+                continue            # a citation sits between: not one figure
+            pairs = [("b1", "u1")]
+            if m.group("b2") and m.group("u2"):
+                pairs.append(("b2", "u2"))
+            elif bool(m.group("b2")) != bool(m.group("u2")):
+                continue            # a range against a single figure: not a conversion
+            for bk, uk in pairs:
+                brl = float(m.group(bk).replace(",", ""))
+                usd = float(m.group(uk).replace(",", ""))
+                if brl < 20 or usd < 4:
+                    continue
+                want = brl / rate
+                if abs(want - usd) <= max(1.0, 0.06 * want):
+                    continue
+                if want > 10 * usd or usd > 10 * want:
+                    continue
+                body = m.group(uk)
+                new = _ans_fmt(want, body if "." in body else "0")
+                if "." not in body:
+                    new = _ans_fmt(float(round(want)), body)
+                out.append((m.start(uk), m.end(uk), body, new,
+                            "R$%s at %s → $%s (said $%s)" % (m.group(bk), rate, new, body)))
+    return out
+
+
+# the machinery showing (6b523): each rewrite keeps the sentence's grammar
+_ANS_LEAK_RXS = (
+    (re.compile(r"\b[Tt]he (?:(?:provided|available|given|supplied|retrieved) )?(?:sources|snippets|search results|"
+                r"evidence|data|excerpts|results|material|information)(?: (?:provided|available|above|I (?:have|found|was given)))? "
+                r"(?:do(?:es)? not|don'?t|doesn'?t|did not|didn'?t) (?:provide|include|list|specify|mention|give|state|"
+                r"cover|contain|offer|show|name|address)\b"), "I didn't find"),
+    (re.compile(r"\b(is|was) not (?:provided|specified|listed|mentioned|included|given|stated|available) in the "
+                r"(?:provided |available |given )?(?:data|sources|evidence|snippets|results|search results|excerpts|material|information)\b"),
+     r"isn't in what I found"),
+    (re.compile(r"\b(are|were) not (?:provided|specified|listed|mentioned|included|given|stated|available) in the "
+                r"(?:provided |available |given )?(?:data|sources|evidence|snippets|results|search results|excerpts|material|information)\b"),
+     r"aren't in what I found"),
+    (re.compile(r"\b(in|from|per|based on|according to|In|From|Per|Based on|According to) the "
+                r"(?:provided |available |given |supplied )?"
+                r"(?:evidence|snippets?|search results|excerpts?|data provided|information provided|sources provided|"
+                r"sources above|evidence I have|data I have)\b"), r"\1 what I found"),
+    (re.compile(r"\b[Tt]he (?:provided|available|given|supplied|retrieved) (?:data|information|sources?|evidence|"
+                r"snippets?|search results|results|material|excerpts?)\b"), "what I found"),
+    (re.compile(r"\b[Tt]he (?:sources|snippets|search results|excerpts|evidence) (?:above|provided|I (?:have|found|was given))\b"),
+     "what I found"),
+    (re.compile(r"\bI (?:can(?:no|')t|am unable to|'m unable to) (?:pull|access|retrieve|fetch) (?:live|real-time|current) "
+                r"(?:data|prices|information|figures)\b"), "I don't have a live figure"),
+)
+
+
+def answer_scrub(text: str) -> tuple:
+    """(text, n): the pipeline's words reworded ('the provided data does not
+    list' -> 'I didn't find'), each in place, the sentence otherwise kept."""
+    t = str(text or "")
+    n = 0
+    for rx, rep in _ANS_LEAK_RXS:
+        t, k = rx.subn(rep, t)
+        n += k
+    if n:
+        t = re.sub(r"(^|[.!?]\s+|\n\s*)what I found", r"\1What I found", t)
+    return t, n
+
+
+def answer_polish(text: str, pack: str = "") -> tuple:
+    """(text, notes) for a finished single-writer answer (6b523): its
+    arithmetic re-computed, its reais-to-dollar figures checked against the
+    rate it or the evidence states, the pipeline's words reworded, a
+    leading markdown heading dropped, a closing recap trimmed. `notes`
+    says what changed, for the step card and the dev log; [] when nothing."""
+    t = str(text or "")
+    notes = []
+    if "polish" in quality_ablate():
+        return t, notes
+    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))
+    fixes.sort(key=lambda f: f[0])
+    kept, end = [], -1
+    for f in fixes:
+        if f[0] >= end:
+            kept.append(f)
+            end = f[1]
+    for st, en, _old, new, note in sorted(kept, key=lambda f: -f[0]):
+        t = t[:st] + new + t[en:]
+        notes.append(note)
+    t, n = answer_scrub(t)
+    if n:
+        notes.append("%d leak%s reworded" % (n, "" if n == 1 else "s"))
+    m = re.match(r"\s*#{1,4} [^\n]{1,100}\n+", t)
+    if m:
+        t = t[m.end():]
+        notes.append("heading dropped")
+    t2 = trim_recap(t)
+    if t2 != t:
+        t = t2
+        notes.append("recap trimmed")
+    return t, notes
+
+
+def shown_answer(chunks) -> str:
+    """The answer on screen: the text chunks after the last RESET frame."""
+    out = []
+    for c in chunks or []:
+        if isinstance(c, Ctl):
+            if str(c) == NUL + "RESET" + NUL:
+                out = []
+            continue
+        out.append(str(c))
+    return "".join(out)
+
+
 # ---- the fact-check
 VERIFY_BUDGET_S = 45.0       # longer than this and the answer ships as it is
 VERIFY_CLOUD_S = 30.0        # a cloud checker is quicker, or it isn't worth it
@@ -46112,7 +46573,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      "%d source%s%s" % (len(_ground.prior.sources),
                                         "" if len(_ground.prior.sources) == 1 else "s",
                                         "" if _ground.search else " \u00b7 nothing new to look up"))
-            _gturn = grounded_turn(query, _gpack, note=_oai_note)
+            _fu_note = (GROUND_FOLLOWUP if (_g_reuse and not _oai_note
+                                            and "followup" not in quality_ablate()) else "")
+            _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)
             if getattr(_tl_search, "photos", None) and _WANTS_IMAGES.search(prompt):
                 _gturn += ("\n\n[The interface is displaying %d relevant "
                            "photo(s) from the sources directly beneath your "
@@ -46569,6 +47032,32 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and not _links          # (6b423) see _pol
                           and _is_substantive(prompt)
                           and not slow_giant(lbl))
+                def _single_polish():
+                    """THE POST-PASS (6b523): the single writer's finished
+                    answer, its arithmetic re-computed, its conversions
+                    checked, the machinery's words reworded, a heading
+                    and a recap dropped; a changed answer is re-sent after
+                    a RESET as the fact-check's is (verify_pass). Never
+                    breaks an answer."""
+                    try:
+                        _shown = shown_answer(answer_buf)
+                        if len(_shown.strip()) < 40:
+                            return
+                        _pk = (full_messages[-1].get("content") or "") if (query or docs) else ""
+                        _new, _notes = answer_polish(_shown, _pk)
+                        if _notes and _new.strip() and _new != _shown:
+                            memit(Ctl(NUL + "RESET" + NUL))
+                            memit(_new)
+                            _nf = sum(1 for n_ in _notes if "\u2192" in n_)
+                            step("polish", "Sharpened", "done",
+                                 ("fixed %d figure%s" % (_nf, "" if _nf == 1 else "s")) if _nf
+                                 else "; ".join(_notes)[:70])
+                            if DEV_HOME:
+                                print("polish: %s" % " | ".join(_notes), file=sys.stderr, flush=True)
+                    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                        raise
+                    except Exception:
+                        pass
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
                     # TWO PASS, BOTH ON SCREEN (6b539, per Patrick: "faster
@@ -46635,6 +47124,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         _stream_guarded(lbl, full_messages, memit, status,
                                         None,
                                         "kept the part before it wandered")
+                    _single_polish()
                 else:
                     # the page draws the step, not the status line, while
                     # nothing has streamed: that is where a giant's cold
@@ -46650,6 +47140,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _stream_guarded(lbl, full_messages,
                                     memit, status, None,
                                     "kept the part before it wandered")
+                    _single_polish()
         except (BrokenPipeError, ConnectionResetError):
             pass  # user hit Stop — browser closed the connection
         except ServerError as exc:

@@ -37895,7 +37895,7 @@ check("the earlier turn's evidence is found by the person's words and reused wit
 check("the handler carries a follow-up's evidence, searches only what it adds, and passes the notes",
       "_g_prior = ground_prior(messages)" in _hs14 and "prior=_g_prior, search=not _g_reuse" in _hs14
       and "turn_key=_ground_key(prompt)" in _hs14 and "_g_reuse = not _fu_new" in _hs14
-      and "grounded_turn(query, _gpack, note=_oai_note)" in _hs14
+      and "grounded_turn(query, _gpack, note=_oai_note or _fu_note)" in _hs14   # 6b523: the follow-up note
       and "SC_HINT if self_contained_reasoning(strip_greeting(prompt))" in _hs14, "")
 # the critic, the corrections
 _c18 = {"re": re, "json": json, "time": time, "threading": threading, "os": os, "DEV_HOME": "",
@@ -41553,6 +41553,237 @@ check("shell-polish: the shell runs millenai.py through its bytecode cache: __ma
       "%r" % ([_cb_runs, _cb_pyc],))
 shutil.rmtree(_cb_dir, ignore_errors=True)
 # ==== native shell (6b532): end ====
+
+# ==== quality-3 (6b523) the writer's own slips, the shape, the vendor's page: begin ====
+# Round 3 of the answer push, measured on this Mac's Fast tier (one Gemma 4 26B writer, one pass, no critic
+# and no fact-check). The bench's judges kept finding the same failures: a sum or a reais-to-dollar conversion
+# stated wrong, the machinery showing ("the provided data does not list"), a figure the person asked for
+# refused ("check the listings"), one pick asked and five given, a listing's advert or a forum thread seated as
+# evidence, and a third party's price outranking the vendor's own. NOTES 6b523. The post-pass is deterministic
+# (no model): it re-computes the answer's own arithmetic from the figures the sentence states, checks each
+# dollar figure beside a reais figure against the one rate the answer or the evidence states, rewords the
+# leaks, drops a leading heading and a closing recap, and re-sends a changed answer after a RESET. The shape
+# and estimate rules ride the grounded turn; the vendor's own page is marked and seated; listing pages are
+# junk and forum threads and front pages rank down. Every rule has a mutant below that must break a check.
+print("== quality-3: the post-pass, the shape, the vendor's page (6b523) ==")
+
+
+def _names523(src, names, ns):
+    """Exec the named module-level nodes of `src` (any text, so a mutant works) into ns."""
+    tree = _ast.parse(src)
+    for n in tree.body:
+        nm = getattr(n, "name", None)
+        if nm is None and isinstance(n, _ast.Assign):
+            nm = next((getattr(t, "id", None) for t in n.targets), None)
+        if nm in names:
+            exec(_ast.get_source_segment(src, n), ns)
+    return ns
+
+
+_POLISH523 = {"_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
+              "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
+              "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
+              "answer_polish", "shown_answer", "_RECAP_RX", "trim_recap", "quality_ablate"}
+
+
+class _Ctl523(str):
+    pass
+
+
+def _c523_all(src):
+    out = {}
+    try:
+        p = _names523(src, _POLISH523, {"re": re, "os": os, "DEV_HOME": "", "Ctl": _Ctl523, "NUL": "\0"})
+        g = _ns520(src)
+    except Exception as e_:
+        return {"the sections run: %r" % (e_,): False}
+    P = lambda t, pk="": p["answer_polish"](t, pk)
+    # --- the arithmetic
+    w, n = P("Fuel: 583 \u00d7 $3.40 = $1,883 a year.")
+    out["a product stated wrong is re-computed from its own figures"] = (
+        w == "Fuel: 583 \u00d7 $3.40 = $1,982 a year." and len(n) == 1 and "\u2192" in n[0])
+    w, n = P("New separate cost: $1,350 + 11\u202f\u00d7\u202f$106.40 = $1,350 + $1,169.40 = $2,519.40. Package $2,400.")
+    out["a chain is judged first against last, and the middle sum's one worked-out figure is re-derived"] = (
+        w == "New separate cost: $1,350 + 11\u202f\u00d7\u202f$106.40 = $1,350 + $1,170.40 = $2,520.40. Package $2,400."
+        and len(n) == 2)
+    right = ("Separate: $1,350 + $1,045 = $2,395, so the package costs $5 more. "
+             "Separate: $1,350 + 11 \u00d7 $95 = $1,350 + $1,045 = $2,395. "
+             "583 \u00d7 $3.40 = $1,983; 14,000 / 24 = 583.33; 14,000 \u00f7 48 \u2248 292 gallons; "
+             "$5,000 / $991.66 = 5.04 years; $4.47 \u00d7 730 = $3,263 a month; that totals $12,345 + $5 = $12,350.")
+    out["right arithmetic, rounded inputs and an approximation are left alone"] = P(right) == (right, [])
+    partial = "comes out **$2,395** (flight\u202f$1,350\u202f+\u202f11\u202f\u00d7\u202f$95\u202f=\u202f$1,045), so"
+    out["a partial equation (the head is context), a year, a share, a sign flip and fenced code are left alone"] = (
+        P(partial) == (partial, []) and P("2023 - 2019 = 6 years.") == ("2023 - 2019 = 6 years.", [])
+        and P("2.27 / 3.49 = 65% of last year's.") == ("2.27 / 3.49 = 65% of last year's.", [])
+        and P("Python 3.12 - 3.9 = 0.3 is not") == ("Python 3.12 - 3.9 = 0.3 is not", [])
+        and P("```\n2 + 2 = 5\n```\nfine") == ("```\n2 + 2 = 5\n```\nfine", []))
+    # --- the conversions
+    fx = ("Expect R$3,500\u2013R$5,500 ($1,700\u2013$2,700 USD \u2014 based on Oct 23 rates) per month. "
+          "The rate is R$5.05 per dollar.")
+    w, n = P(fx)
+    out["a reais range converted wrong is fixed at the rate the answer states, both ends"] = (
+        "($693\u2013$1,089 USD" in w and len(n) == 2)
+    pk = "[1] Exchange rates \u2014 frankfurter.app \u2014 2026-10-23\n    1 US dollar = 5.0465 BRL; 1 BRL = $0.1982 (ECB reference rate, 2026-10-23)."
+    out["the evidence's rate serves when the answer states none; a right conversion and a reversed pair are handled"] = (
+        P("Budget R$4,000 (about $1,900) a month.", pk) == ("Budget R$4,000 (about $792) a month.",
+                                                            ["R$4,000 at 5.05 \u2192 $792 (said $1,900)"])
+        and P("Budget R$4,000 (about $1,900) a month.") == ("Budget R$4,000 (about $1,900) a month.", [])
+        and P("About R$3,800 (roughly $750 at R$5.05 to the dollar).") == ("About R$3,800 (roughly $750 at R$5.05 to the dollar).", [])
+        and P("About $900 (R$2,000) covers rent, at 5.05 BRL per USD.")[0] == "About $396 (R$2,000) covers rent, at 5.05 BRL per USD."
+        and p["answer_fx_rate"]("at 5.05 per dollar and later 5.40 BRL per USD") == 0.0)
+    # --- the leaks
+    w, n = P("The provided sources do not list specific rental prices. The specific retail prices are not listed in "
+             "the available data. Based on the evidence, Lagoa wins. The available evidence supports a modest benefit. "
+             "The data center stays.")
+    out["the machinery's words are reworded in place, grammar and case kept, 'the data center' untouched"] = (
+        w == "I didn't find specific rental prices. The specific retail prices aren't in what I found. Based on what I "
+             "found, Lagoa wins. What I found supports a modest benefit. The data center stays." and n == ["4 leaks reworded"])
+    # --- heading, recap, the knob
+    w, n = P("# Eggs\nEggs cost $2.27 as of Sept 2026.\n\nA year ago $3.49.\n\nThe bird-flu spike unwound.\n\n**Bottom line:** cheaper.")
+    out["a leading heading and a closing recap go; a clean answer returns unchanged with no notes"] = (
+        w == "Eggs cost $2.27 as of Sept 2026.\n\nA year ago $3.49.\n\nThe bird-flu spike unwound."
+        and n == ["heading dropped", "recap trimmed"] and P("Eggs cost $2.27.") == ("Eggs cost $2.27.", []))
+    _qa = p["quality_ablate"]
+    p["quality_ablate"] = lambda: {"polish"}          # the functions read their own namespace
+    off = P("Fuel: 583 \u00d7 $3.40 = $1,883.")
+    p["quality_ablate"] = _qa
+    os.environ["MILLENAI_Q3_OFF"] = "polish,shape"
+    shipped = (p["quality_ablate"](), g["quality_ablate"]())        # DEV_HOME is "" here: the shipped app
+    del os.environ["MILLENAI_Q3_OFF"]
+    out["the knob turns the post-pass off in a dev copy, and the shipped app never runs without it"] = (
+        off == ("Fuel: 583 \u00d7 $3.40 = $1,883.", [])
+        and shipped == (set(), set())
+        and '"MILLENAI_Q3_OFF"' in src and "MILLENAI_Q3_OFF" in src[src.index("def quality_ablate"):src.index("def quality_ablate") + 600])
+    sh = p["shown_answer"](["old ", _Ctl523("\0RESET\0"), "new ", _Ctl523("\0STEP:{}\0"), "text"])
+    out["the text on screen is what follows the last RESET, frames left out"] = sh == "new text"
+    # --- the grounded turn
+    gt = g["grounded_turn"]("What's a furnished one-bedroom in Lagoa per month, in reais and dollars?",
+                            "[1] Rents \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    rent R$59 per square metre a month",
+                            note=g["GROUND_FOLLOWUP"])
+    out["the grounded turn carries the estimate rule and the shape, after the dating rules and before the note"] = (
+        "- ESTIMATE WHEN ASKED:" in gt and "ANSWER SHAPE:" in gt and "name ONE pick" in gt
+        and "'The provided data'" in gt and "are banned" in gt
+        and gt.index("DATE EVERY CURRENT FIGURE") < gt.index("ESTIMATE WHEN ASKED") < gt.index("ANSWER SHAPE")
+        < gt.index("[This is a follow-up") < gt.index("PROMPT: What's a furnished")
+        and "Do not restate that answer" in gt)
+    _gqa = g["quality_ablate"]
+    g["quality_ablate"] = lambda: {"shape", "estimate"}
+    gt2 = g["grounded_turn"]("rent in Lagoa?", "[1] R \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    R$59")
+    g["quality_ablate"] = _gqa
+    out["the knob takes the shape and the estimate rule out of a dev copy's turn"] = (
+        "ANSWER SHAPE" not in gt2 and "ESTIMATE WHEN ASKED" not in gt2 and "GROUNDING RULES" in gt2)
+    out["the dating rule puts the vendor's own site with official data, over a reseller's figure"] = (
+        "THE VENDOR'S OWN SITE is the agency's, the maker's or the seller's own record" in g["GROUND_DATING"]
+        and "beat any article's, listicle's or reseller's" in g["GROUND_DATING"])
+    # --- the ranking
+    rows = [{"title": "Picky mom wants beach town - Tripadvisor", "href": "https://www.tripadvisor.com/ShowTopic-g1-i2-Picky.html",
+             "body": "beach safe walkable Florian\u00f3polis neighborhoods", "_q": "a"},
+            {"title": "Chic Studio near BEACH walkable SAFE - Airbnb", "href": "https://www.airbnb.com/rooms/123",
+             "body": "Florian\u00f3polis beach walkable safe neighborhoods", "_q": "a"},
+            {"title": "Florian\u00f3polis Neighborhoods Guide: Where to Live", "href": "https://floripaguru.com/neighborhoods",
+             "body": "Florian\u00f3polis neighborhoods safe walkable beach Lagoa Campeche", "_q": "a"},
+            {"title": "Search, compare & book trains, buses, flights - Omio", "href": "https://www.omio.com/",
+             "body": "flights Florian\u00f3polis", "_q": "b"},
+            {"title": "Clear Bubble Glass Tumblers | Durable Design", "href": "https://www.target.com/p/clear-bubble-glass",
+             "body": "clear bubble glass", "_q": "c"},
+            {"title": "Budget-Friendly Cloud Server Pricing | DigitalOcean", "href": "https://www.digitalocean.com/pricing/droplets",
+             "body": "DigitalOcean droplet pricing GPU server monthly", "_q": "d"},
+            {"title": "DigitalOcean GPU at $2.50/hr - CheapGPU", "href": "https://cheapgpu.example.com/digitalocean-gpu-pricing-2026",
+             "body": "DigitalOcean GPU server pricing per hour monthly cheapest", "_q": "d"},
+            {"title": "DigitalOcean server pricing: GPU droplets, a clear bubble guide - Hostreview", "href": "https://hostreview.example.com/digitalocean-pricing",
+             "body": "DigitalOcean server pricing GPU droplet monthly hourly compared safe walkable beach 2026", "_q": "d"},
+            {"title": "DigitalOcean server pricing explained: clear bubble pricing - Cloudwatch", "href": "https://cloudwatch.example.com/digitalocean-server-pricing",
+             "body": "DigitalOcean server pricing GPU droplet monthly hourly compared safe walkable beach 2026", "_q": "d"}]
+    terms = ["Florian\u00f3polis", "neighborhoods", "safe", "walkable", "beach", "DigitalOcean", "pricing", "server", "clear", "bubble"]
+    rk = g["rank_sources"](rows, terms, ["Florian\u00f3polis", "DigitalOcean"], True)
+    hosts = [s["host"] for s in rk]
+    do = next((s for s in rk if s["host"] == "digitalocean.com"), None)
+    out["a listing's page is junk, a forum thread and a front page rank down, a far-off query seats nothing"] = (
+        "airbnb.com" not in hosts and g["_src_junk"]({"url": "https://www.airbnb.com/rooms/1", "title": "t", "body": "b"}) == "listing"
+        and g["_src_junk"]({"url": "https://www.bing.com/aclick?ld=e8x&u=a1", "title": "DigitalOcean Cloud - Affordable Pricing", "body": "b"}) == "ad"
+        and g["_src_quality"]("www.tripadvisor.com", "/ShowTopic-g1") == -2 and g["_src_quality"]("www.omio.com", "/") == -2
+        and g["_src_quality"]("stackoverflow.com", "/questions/1") == 2 and g["_src_quality"]("www.airbnb.com", "/rooms/1") == -2
+        and hosts.index("floripaguru.com") < hosts.index("tripadvisor.com")
+        and not next(s for s in rk if s["host"] == "target.com").get("seat"))
+    out["the vendor's own page on the question is flagged and seated ahead of the fill; a reseller's isn't"] = (
+        do is not None and do.get("vendor") is True and do.get("seat") is True
+        and next(s for s in rk if s["host"] == "cheapgpu.example.com").get("vendor") is False)
+    pack, _np = g["evidence_pack"]([dict(do, paras=["Droplets start at $4 a month; the H200 GPU Droplet is $4.47 an hour."]),
+                                    {"title": "CheapGPU", "host": "cheapgpu.example.com", "url": "https://cheapgpu.example.com/x",
+                                     "body": "$2.50/hr", "paras": [], "snippet_only": True}], terms, _T520)
+    out["the pack marks the vendor's own site, before the passages, and a reseller's snippet stays marked snippet-only"] = (
+        "(THE VENDOR'S OWN SITE: the maker's or seller's own page)" in pack
+        and pack.index("THE VENDOR'S OWN SITE") < pack.index("Droplets start at $4")
+        and pack.index("THE VENDOR'S OWN SITE") < pack.index("SNIPPET ONLY"))
+    g["quality_ablate"] = lambda: {"vendor"}
+    rk3 = g["rank_sources"](rows, terms, ["Florian\u00f3polis", "DigitalOcean"], True)
+    j3 = g["_src_junk"]({"url": "https://www.airbnb.com/rooms/1", "title": "t", "body": "b"})
+    g["quality_ablate"] = _gqa
+    out["the knob restores the old ranking in a dev copy (no vendor flag, listings kept)"] = (
+        j3 == "" and "airbnb.com" in [s["host"] for s in rk3] and not any(s.get("vendor") for s in rk3))
+    # --- the handler's wiring, from the text
+    hs = src[src.index("def _single_polish():"):src.index("        except (BrokenPipeError, ConnectionResetError):\n            pass  # user hit Stop")]
+    out["the single writer's answer goes through the post-pass on both paths, and a changed one is re-sent after a RESET"] = (
+        hs.count("\n                    _single_polish()\n") == 2 and "_shown = shown_answer(answer_buf)" in hs
+        and "_new, _notes = answer_polish(_shown, _pk)" in hs
+        and 'memit(Ctl(NUL + "RESET" + NUL))\n                            memit(_new)' in hs
+        and 'step("polish", "Sharpened", "done",' in hs
+        and hs.index("_stream_guarded(lbl, full_messages,\n                                    memit, status, None,") < hs.rindex("_single_polish()"))
+    out["a follow-up with nothing new to look up tells the writer what a follow-up is for"] = (
+        '_fu_note = (GROUND_FOLLOWUP if (_g_reuse and not _oai_note\n' in src
+        and '"followup" not in quality_ablate()) else "")' in src
+        and "_gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)" in src)
+    return out
+
+
+for _n523, _o523 in _c523_all(_MILLENAI_SRC).items():
+    check("6b523 answers, round 3 \u2014 " + _n523, _o523, "")
+_C523_MUT = [
+    ("the arithmetic never re-computed", "    for m in _ANS_EQ_RX.finditer(t):\n        if any(a <= m.start() < b for a, b in code):",
+     "    for m in []:\n        if any(a <= m.start() < b for a, b in code):"),
+    ("a chain's middle figure left wrong", "            if len(odd) != 1:\n                continue\n            i = odd[0]",
+     "            if True:\n                continue\n            i = odd[0]"),
+    ("a partial equation 'corrected'", "        if any(_ans_calc(nums[k:], ops[k:]) is not None", "        if False and any(_ans_calc(nums[k:], ops[k:]) is not None"),
+    ("the figures' rounding not allowed for", "                slack += abs(v2 - v)       # what this figure's rounding moves the result", "                pass"),
+    ("a year taken for a figure", "        if v is None or _ANS_YEAR_RX.fullmatch(body):\n            return None, [], [], 0", "        if v is None:\n            return None, [], [], 0"),
+    ("a sign flip 'corrected'", "        if (comp < 0) != (rv < 0):\n            continue", "        pass"),
+    ("fenced code re-computed", "        if any(a <= m.start() < b for a, b in code):\n            continue\n        comp, nums, ops, slack", "        comp, nums, ops, slack"),
+    ("conversions never checked", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))", "    fixes = answer_arith_fixes(t)"),
+    ("the evidence's rate ignored", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t))"),
+    ("two differing rates taken as one", "    return rates.pop() if len(rates) == 1 else 0.0", "    return sorted(rates)[0] if rates else 0.0"),
+    ("the leaks kept", "    for rx, rep in _ANS_LEAK_RXS:\n        t, k = rx.subn(rep, t)\n        n += k", "    pass"),
+    ("a sentence left opening in lower case", '        t = re.sub(r"(^|[.!?]\\s+|\\n\\s*)what I found", r"\\1What I found", t)', "        pass"),
+    ("the heading kept", '    m = re.match(r"\\s*#{1,4} [^\\n]{1,100}\\n+", t)\n    if m:', '    m = None\n    if m:'),
+    ("the recap kept", "    t2 = trim_recap(t)\n    if t2 != t:\n        t = t2\n        notes.append(\"recap trimmed\")", "    pass"),
+    ("the post-pass knob honoured in the shipped app", "    if not DEV_HOME:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\"",
+     "    if False:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\""),
+    ("no estimate rule", '    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE', '    if False:\n        rules += GROUND_ESTIMATE'),
+    ("no shape", '    if "shape" not in q3:\n        rules += GROUND_SHAPE', '    if False:\n        rules += GROUND_SHAPE'),
+    ("the shape before the dating rules", '    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE          # (6b523) a figure asked for is given\n    if "shape" not in q3:\n        rules += GROUND_SHAPE             # (6b523) the shape, read last\n',
+     '    if "shape" not in q3:\n        rules = GROUND_SHAPE + rules\n    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE\n'),
+    ("the vendor's page not flagged", '        vendor = bool(own and topical and "vendor" not in quality_ablate() and (', "        vendor = bool(False and ("),
+    ("the vendor's page not seated", '        if s.get("vendor") and s["score"] > 0:\n            take(s, seat=True)              # the vendor\'s own page (6b523)', "        pass"),
+    ("the pack's vendor mark missing", '        if s.get("vendor"):\n            lines.append("    (THE VENDOR\'S OWN SITE: the maker\'s or seller\'s own page)")', "        pass"),
+    ("an engine's paid link kept as evidence", '        return "ad"               # an engine\'s paid link', '        pass                      # an engine\'s paid link'),
+    ("a listing's page kept as evidence", '        return "listing"          # one unit\'s advert (6b523): never evidence', '        pass'),
+    ("a forum thread ranked like a guide", "            or (q < 2 and _SRC_FORUM_RX.search(host + path))):", "            or False):"),
+    ("a front page ranked like a page", '    if not path.strip("/") and "vendor" not in quality_ablate():\n        q -= 2', "    pass"),
+    ("a far-off query still seats its best", '    floor = (max(s["score"] for s in out) * 0.5) if (out and "vendor" not in quality_ablate()) else 0', "    floor = 0"),
+    ("the post-pass not run after the one-pass stream", '                                    "kept the part before it wandered")\n                    _single_polish()\n        except (BrokenPipeError',
+     '                                    "kept the part before it wandered")\n        except (BrokenPipeError'),
+    ("the follow-up note never passed", "            _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)", "            _gturn = grounded_turn(query, _gpack, note=_oai_note)"),
+]
+_c523_caught = []
+for _mn, _ma, _mb in _C523_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c523_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c523_all(_ms).values()):
+        _c523_caught.append((_mn, "not caught"))
+check("6b523's rules each break a check when broken (%d mutants)" % len(_C523_MUT), not _c523_caught,
+      "%r" % _c523_caught)
+# ==== quality-3 (6b523): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

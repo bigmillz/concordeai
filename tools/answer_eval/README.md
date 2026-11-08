@@ -26,6 +26,7 @@ Files:
 - `blind_batches.py` — (6b520) blind batches by turn: every run's answer to one turn in front of one judge,
   run names replaced by codes; `split` writes the judgments back per run. `paired.py` — the paired table.
 - `run_bench.py --env MILLENAI_FRESH_OFF=tl,news` — a dev copy's measuring knob (one fix left out).
+- `run_bench.py --env MILLENAI_Q3_OFF=polish` — (6b523) the round-3 knob: shape, estimate, followup, vendor, polish.
 - `runs/<run>/` — one JSON record per turn, `summary.json`, `answers.md`,
   `devcopy.log`, `scores.md`.
 
