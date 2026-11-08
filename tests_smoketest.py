@@ -3208,7 +3208,9 @@ check("a bare retired tag means its :latest pull and nothing else",
 _soz = dict(_LH, ollama_url=lambda p: "http://127.0.0.1:1" + p,
             urllib=__import__("urllib.request"))
 _exec_names(_soz, {"stream_ollama", "GIANT_CTX", "GIANT_KEEP_ALIVE",
-                   "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
+                   "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF",
+                   # 6b533: Muse Glimmer's channels
+                   "MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MuseChannels", "muse_level", "_muse_hold", "_muse_could_head"})
 _so_seen = []
 class _FakeStream:
     def __init__(self, lines): self._l = lines
@@ -3606,7 +3608,7 @@ _pz2 = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"],
             fits_by_memory=lambda l: l == "Gemma 4 E2B" or not l.startswith("Gemma 4"))
 _exec_names(_pz2, {"GIANT_GB", "model_is_giant", "_family_of", "TIERS", "MODEL_SETS",
                    "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER",
-                   "VISION_MODEL", "model_sets"})
+                   "VISION_MODEL", "model_sets", "TRIAL_ROWS"})
 _pz2["model_fits_machine"] = lambda l: (not _pz2["model_is_giant"](l)
                                         or (_pcf["gi"] and _pcf.get("fit", True)))
 _pro = _pz2["model_sets"]()["light"]
@@ -4854,7 +4856,7 @@ _pref_stubs(_gz)
 _exec_names(_gz, {"GIANT_GB", "_giants", "giants_on", "model_is_giant",
                   "model_fits_machine", "fits_by_memory", "_family_of", "TIERS",
                   "MODEL_SETS", "QUICK_PAIR", "EVERYDAY_MAX_GB", "MERGE_PREFS",
-                  "CODE_LADDER", "VISION_MODEL", "model_sets"})
+                  "CODE_LADDER", "VISION_MODEL", "model_sets", "TRIAL_ROWS"})
 def _gz_set(nl, gi):
     _GP.update(no_limits=nl, include_giants=gi); _gz["_giants"]["v"] = None
 _big = [l for l, i in _gz["MODEL_INFO"].items() if i["mem"] > 128e9]
@@ -6066,7 +6068,7 @@ print("== the three model sets (6b405) ==")
 # 16, 48 and 128 GB) and a PC with a 24 GB card; then the status every
 # screen draws, the old names, the More-models card, the page; each rule
 # then broken in the source and shown caught.
-_S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_bytes",
+_S5_NAMES = {"GIANT_GB", "model_is_giant", "giant_fits_here", "machine_budget_bytes", "TRIAL_ROWS",
              "model_fits_machine", "fits_by_memory", "BASELINE_RAM", "_ram_part", "_mem_factor",
              "TIERS", "MODEL_SETS", "MODEL_SET_NAMES", "MODEL_SET_ALIASES", "QUICK_PAIR",
              "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_set_key",
@@ -6655,7 +6657,9 @@ def _uzns(**over):
                            "cloud_stream_conf", "_STREAM_USAGE_ASK",
                            "_stream_usage_off", "stream_ollama",
                            "stream_openai_compat", "GIANT_CTX", "GIANT_KEEP_ALIVE",
-                           "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
+                           "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF",
+                           # 6b533: Muse Glimmer's channels
+                           "MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MuseChannels", "muse_level", "_muse_hold", "_muse_could_head"})
     ns.update(usage_put=_urecs.append, _is_provider_error=lambda t: False,
               _cloud_budget_hit=lambda c: None, _mark_answered=lambda c: None,
               Ctl=str, NUL="\0", MLX_REPOS={"Gemma 4 26B": "mlx-community/g"},
@@ -8629,7 +8633,8 @@ _pl = dict(_LH, MODEL_INFO=_plat["windows"]["MODEL_INFO"], SUPPORTED=_plat["wind
            fits_by_memory=lambda l: _plat["windows"]["MODEL_INFO"][l]["mem"] <= 9e9,
            model_fits_machine=lambda l: _plat["windows"]["MODEL_INFO"][l]["mem"] <= 9e9)
 _exec_names(_pl, {"GIANT_GB", "model_is_giant", "_family_of", "TIERS", "MODEL_SETS", "QUICK_PAIR",
-                  "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_sets"})
+                  "EVERYDAY_MAX_GB", "MERGE_PREFS", "CODE_LADDER", "VISION_MODEL", "model_sets",
+                  "TRIAL_ROWS"})
 _plr = _pl["model_sets"]()
 check("plans count a shared download once; an abandoned council draft stops and writes nowhere else",
       "Qwen 3.5 9B" in _plr["recommended"] and "Qwen 3.5 Vision 9B" not in _plr["recommended"]
@@ -36009,7 +36014,9 @@ def _c94_rows(src):
             ns["CODE_LADDER"][:2] == _C94
             and all(ag["AGENTS"][a]["picks"][:2] == list(_C94) for a in ("Coding", "Workspace", "Remote"))),
         "the page describes both": all('  "%s":"' % l in src for l in _C94),
-        "Gemma 4 12B needs mlx-lm 0.32.0 for MLX": ns["MLX_REQUIRES"] == {"Gemma 4 12B": (0, 32, 0)}}
+        # 6b533: Muse Glimmer 30B asks for the pin, the version its module was checked in
+        "Gemma 4 12B needs mlx-lm 0.32.0 for MLX": ns["MLX_REQUIRES"] == {"Gemma 4 12B": (0, 32, 0),
+                                                                        "Muse Glimmer 30B": (0, 32, 2)}}
     return all(out.values()), {k: v for k, v in out.items() if not v}
 
 
@@ -37417,6 +37424,221 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
       and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
       and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
+
+# ==== muse (6b533) Muse Glimmer's channels and the trial row: begin ====
+print("== Muse Glimmer's channels and the trial row (6b533) ==")
+# Per Patrick: the app work before a fair retest. Muse Glimmer writes its
+# reasoning and its answer as channels (to=self / to=user) that mlx-lm 0.32.2
+# streams raw; MuseChannels turns them into the page's <think> block and the
+# answer, on the MLX route and on Ollama; the strength is low, or high for a
+# mode's drafts; the row is in the catalog but in no mode and no set. Run on
+# src's own code with stand-in engines (no network), then each rule broken in
+# the source and shown caught.
+_MU_NAMES = {"MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MUSE_LEVELS", "MuseChannels", "muse_level",
+             "_muse_hold", "_muse_could_head", "_THINK_RE", "strip_think"}
+# a Muse turn as mlx-lm 0.32.2 streams it (the 6b533 bench's q27, trimmed)
+_MU_THINK = "Compute: 11*95 = 1045. + 1350 = 2395.\n\nLead with the answer."
+_MU_ANS = "Separate is cheaper by $5.\n\nWith the 12% tax, the package is cheaper by $120.40."
+_MU_RAW = (" to=self<|message|>" + _MU_THINK + "<|eom|><|start|>assistant to=user<|message|>"
+           + _MU_ANS + "<|eot|>")
+_MU_WANT = "<think>" + _MU_THINK + "</think>" + _MU_ANS
+
+
+def _mu_ns(src):
+    ns = dict(_LH)
+    _s5_exec(src, ns, _MU_NAMES)
+    return ns
+
+
+def _mu_split(ns, raw, size):
+    m = ns["MuseChannels"]()
+    out = [m.feed(raw[i:i + size]) for i in range(0, len(raw), size)]
+    return "".join(out) + m.close()
+
+
+class _MuReq:
+    def __init__(self, url, data=None, headers=None):
+        self.url, self.data = url, data
+
+
+class _MuResp:
+    def __init__(self, lines):
+        self._l = [x.encode() for x in lines]
+
+    def __iter__(self):
+        return iter(self._l)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+def _mu_engines(src):
+    """stream_openai_compat and stream_ollama on src, with a stand-in
+    urllib whose answers come from `plan` and whose requests land in `sent`."""
+    ns = _mu_ns(src)
+    sent, plan = [], []
+
+    def urlopen(req, timeout=None):
+        sent.append(json.loads(req.data))
+        return _MuResp(plan.pop(0))
+    ns.update(urllib=_types.SimpleNamespace(request=_types.SimpleNamespace(Request=_MuReq, urlopen=urlopen),
+                                            error=__import__("urllib.error").error),
+              usage_note=lambda *a, **k: None, ollama_url=lambda p: "http://127.0.0.1:1" + p,
+              MLX_REPOS={"Muse Glimmer 30B": "mlx-community/Muse-Glimmer-30B-4bit",
+                         "Gemma 4 26B": "mlx-community/gemma-4-26b-a4b-it-4bit"})
+    _s5_exec(src, ns, {"stream_ollama", "stream_openai_compat", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                       "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
+    return ns, sent, plan
+
+
+def _mu_sse(raw, size):
+    return (["data: " + json.dumps({"choices": [{"delta": {"content": raw[i:i + size]}}]}) + "\n"
+             for i in range(0, len(raw), size)] + ["data: [DONE]\n"])
+
+
+def _mu_run(src, which=(0, 1, 2)):
+    """[(part, name, ok, detail)]: 0 the splitter, 1 the two routes and the
+    wiring, 2 the catalog row and the trial."""
+    out = []
+
+    def ck(part, name, ok, detail=""):
+        out.append((part, name, bool(ok), detail))
+    if 0 in which:
+        ns = _mu_ns(src)
+        got = {k: _mu_split(ns, _MU_RAW, k) for k in list(range(1, 41)) + [10 ** 6]}
+        ck(0, "a raw turn becomes <think>reasoning</think>answer at every cut, no control token left",
+           all(v == _MU_WANT for v in got.values()),
+           "%r" % sorted({k: v[:80] for k, v in got.items() if v != _MU_WANT}.items())[:3])
+        ck(0, "the answer alone survives strip_think", ns["strip_think"](got[7]) == _MU_ANS, "")
+        clean = ["Hello world", "a", "to be or not", "assistant mode on", "The answer is 5.\n\nDone.", ""]
+        ck(0, "a clean stream (Ollama's own parser) passes unchanged",
+           all(_mu_split(ns, t, k) == t for t in clean for k in (1, 3, 100)), "")
+        tool = (" to=self<|message|>plan<|eom|><|start|>assistant to=functions.x<|message|>"
+                "<atem:function_calls>..</atem:function_calls><|eom|><|start|>assistant to=user<|message|>final<|eot|>")
+        ck(0, "a tool channel is dropped; a cut-off reasoning closes its block; a half header or a stray token never shows",
+           _mu_split(ns, tool, 3) == "<think>plan</think>final"
+           and _mu_split(ns, " to=self<|message|>thinking long", 4) == "<think>thinking long</think>"
+           and _mu_split(ns, " to=se", 4) == "" and _mu_split(ns, "<|start|>assist", 3) == ""
+           and _mu_split(ns, " to=user<|message|>Hi<|begin_of_text|> there<|eot|>", 2) == "Hi there",
+           "%r" % [_mu_split(ns, tool, 3), _mu_split(ns, " to=se", 4)])
+        ck(0, "the strength: high where the app asks to think, else low; never off",
+           ns["muse_level"](True) == "high" and ns["muse_level"](False) == "low"
+           and {"high", "low"} <= set(ns["MUSE_LEVELS"]), "")
+    if 1 in which:
+        ns, sent, plan = _mu_engines(src)
+        res = {}
+        for key, label, think in (("mlx-low", "Muse Glimmer 30B", False), ("mlx-high", "Muse Glimmer 30B", True)):
+            plan.append(_mu_sse(_MU_RAW, 6))
+            o = []
+            ns["stream_openai_compat"](1, label, [{"role": "user", "content": "q"}], o.append, think)
+            res[key] = ("".join(o), sent[-1].get("chat_template_kwargs"))
+        plan.append(_mu_sse("Plain answer.", 4))
+        o = []
+        ns["stream_openai_compat"](1, "Gemma 4 26B", [{"role": "user", "content": "q"}], o.append)
+        res["mlx-gemma"] = ("".join(o), sent[-1].get("chat_template_kwargs"))
+        ck(1, "the MLX route: a Muse row's channels split, its strength sent (low / high); another row untouched",
+           res["mlx-low"] == (_MU_WANT, {"enable_thinking": False, "reasoning_strength": "low"})
+           and res["mlx-high"] == (_MU_WANT, {"enable_thinking": True, "reasoning_strength": "high"})
+           and res["mlx-gemma"] == ("Plain answer.", {"enable_thinking": False}), "%r" % res)
+        # Ollama 0.32.8+: its glimmer parser sends the reasoning as `thinking`
+        parsed = (['{"message":{"thinking":"%s"},"done":false}\n' % w for w in ("Compute ", "it.")]
+                  + ['{"message":{"content":"%s"},"done":false}\n' % w for w in ("The ", "answer.")]
+                  + ['{"message":{"content":""},"done":true}\n'])
+        raw = (['{"message":{"content":%s},"done":false}\n' % json.dumps(_MU_RAW[i:i + 5])
+                for i in range(0, len(_MU_RAW), 5)] + ['{"message":{"content":""},"done":true}\n'])
+        oll = {}
+        for key, label, lines, think in (("parsed", "Muse Glimmer 30B", parsed, False),
+                                         ("raw", "Muse Glimmer 30B", raw, True),
+                                         ("gemma", "Gemma 4 26B", parsed[2:], False)):
+            plan.append(lines)
+            o = []
+            ns["stream_ollama"]("t", [{"role": "user", "content": "q"}], o.append, label=label, thinking=think)
+            oll[key] = ("".join(o), sent[-1].get("think", "none"))
+        ck(1, "Ollama: the parser's reasoning goes in the block, a raw stream is split, `think` carries the "
+           "strength; another row untouched",
+           oll["parsed"] == ("<think>Compute it.</think>The answer.", "low")
+           and oll["raw"] == (_MU_WANT, "high") and oll["gemma"] == ("The answer.", "none"), "%r" % oll)
+        rm = src[src.index("def run_model("):src.index("def _stream_guarded(")]
+        rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
+        ck(1, "run_model hands the depth to Ollama; a mode's drafts ask a Muse row for high",
+           "> BIG_MODEL_BYTES, thinking=thinking)" in rm
+           and "stream_openai_compat(target, label, msgs, _tap, thinking)" in rm
+           and 'or _lbl.startswith("Muse")))' in rc, "")
+    if 2 in which:
+        m = _s5_mac(src, 48, mlxv=(0, 32, 2))
+        i = m["MODEL_INFO"].get("Muse Glimmer 30B") or {}
+        old = _s5_mac(src, 48, mlxv=(0, 31, 3))
+        ck(2, "the row: its repo, Ollama tag and size, port 8954, MLX on the pin and Ollama below it",
+           i.get("mlx") == "mlx-community/Muse-Glimmer-30B-4bit" and i.get("ollama") == "muse-glimmer:30b"
+           and i.get("port") == 8954 and i.get("mem") == int(18.5e9) and i.get("cat_gb") == 19.4
+           and i.get("group") == "big" and i.get("star") is False
+           and m["MODEL_ROUTES"]["Muse Glimmer 30B"] == ("mlx", 8954)
+           and old["MODEL_ROUTES"]["Muse Glimmer 30B"] == ("ollama", "muse-glimmer:30b")
+           and m["OLLAMA_BYTES"]["muse-glimmer:30b"] == 18_157_010_026
+           and m["OLLAMA_REQUIRES"]["muse-glimmer:30b"] == (0, 32, 8)
+           and m["MLX_MODEL_TYPES"]["Muse Glimmer 30B"] == "muse_glimmer"
+           and '  "Muse Glimmer 30B":"' in src
+           and sum(1 for c in m["CATALOG"] if c[6] == 8954) == 1, "%r" % i)
+        sets = {g: _s5_mac(src, g, mlxv=(0, 32, 2))["model_sets"]() for g in (48, 128)}
+        srv = m["model_sets"]({"vram": 24 << 30})
+        ck(2, "on trial: no mode names it and no set holds it, on a Mac or a server",
+           "Muse Glimmer 30B" in m["TRIAL_ROWS"]
+           and all("Muse Glimmer 30B" not in t.get("picks", []) for t in m["TIERS"].values())
+           and all("Muse Glimmer 30B" not in s[k] for s in sets.values()
+                   for k in ("light", "recommended", "everything"))
+           and "Muse Glimmer 30B" not in srv["everything"] and "Gemma 4 26B" in srv["everything"]
+           and "Qwen 3.6 35B MoE" in sets[48]["everything"], "%r" % srv["everything"])
+        t = _s5_mac(src, 48, mlxv=(0, 32, 2), disk=tuple(m["MODEL_INFO"]))
+        t.update(model_fits_memory=lambda l: True, slow_giant=lambda l: False)
+        _s5_exec(src, t, {"BLEND_EXCLUDE", "BLEND_MIN_MEM", "MERGE_RANK", "_tier_ready"})
+        pro, think = t["_tier_ready"]("Pro"), t["_tier_ready"]("Thinking")
+        ck(2, "downloaded, it still joins no mode (Pro, Thinking); every other model does",
+           "Muse Glimmer 30B" not in pro and "Muse Glimmer 30B" not in think
+           and "Qwen 3.8 27B" in pro and "Gemma 4 26B" in think, "%r" % pro)
+    return out
+
+
+_mu_res = _mu_run(_MILLENAI_SRC)
+for _p, _n, _o, _d in _mu_res:
+    check("Muse: " + _n, _o, _d)
+_MU_MUT = [
+    ("a cut marker not held back", "            keep = _muse_hold(self.buf)", "            keep = 0", [0]),
+    ("control tokens left in", '            text = text.replace(t, "")', "            text = text", [0]),
+    ("the reasoning shown as the answer", '        if rcpt == "self":', '        if rcpt == "never":', [0]),
+    ("a cut-off reasoning left open", "        if self.thinking:           # ran out of budget still reasoning",
+     "        if False:", [0]),
+    ("the strength turned around", 'return "high" if thinking else "low"', 'return "low" if thinking else "high"', [0, 1]),
+    ("the MLX route not split", "    muse = MuseChannels() if model_label in MUSE_ROWS else None", "    muse = None", [1]),
+    ("no strength sent to MLX", "               if model_label in MUSE_ROWS else {})),", "               if False else {})),", [1]),
+    ("Ollama's reasoning dropped", '                    think = msg.get("thinking") or ""', '                    think = ""', [1]),
+    ("Ollama not told the strength", '        extra["think"] = muse_level(thinking)', "        pass", [1]),
+    ("run_model loses the depth", "> BIG_MODEL_BYTES, thinking=thinking)", "> BIG_MODEL_BYTES)", [1]),
+    ("a mode's drafts at low", 'or _lbl.startswith("Muse")))', "or False))", [1]),
+    ("the trial row in Everything", "if SUPPORTED.get(l) and model_fits_machine(l) and l not in TRIAL_ROWS]",
+     "if SUPPORTED.get(l) and model_fits_machine(l)]", [2]),
+    ("a server offered the trial row", "            return l not in TRIAL_ROWS and bool(tag) and _srv_fits(",
+     "            return bool(tag) and _srv_fits(", [2]),
+    ("Pro seats the trial row", "            return usable(l) and l not in BLEND_EXCLUDE and l not in TRIAL_ROWS",
+     "            return usable(l) and l not in BLEND_EXCLUDE", [2]),
+]
+_mu_caught = []
+for _mn, _ma, _mb, _mw in _MU_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _mu_caught.append((_mn, "anchor missing"))
+        continue
+    try:
+        _mr = _mu_run(_ms, _mw)
+    except Exception as _e:          # the mutant broke the run outright: caught
+        _mr = [(0, "raised", False, repr(_e))]
+    if all(_o for _p, _n, _o, _d in _mr):
+        _mu_caught.append((_mn, "not caught"))
+check("6b533's rules each break a check when broken (%d mutants)" % len(_MU_MUT), not _mu_caught,
+      "%r" % _mu_caught)
+# ==== muse (6b533): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)

@@ -1245,6 +1245,15 @@ CATALOG = [
     ("GPT-OSS 20B",        "🌀", "20B",  "core", "mlx-community/gpt-oss-20b-MXFP4-Q4",             "gpt-oss:20b",       8914, 13.0, 12.0, False),
     ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
+    # 6b533, per Patrick: Meta's Muse Glimmer 30B on trial (TRIAL_ROWS: in the
+    # catalog, in no mode and no set yet). Dense, 27.9B text + 1.9B vision,
+    # 131,072 context, Apache 2.0, released 2026-08-10. It always reasons (low
+    # to xhigh, no off) in Meta's channel format, which MuseChannels turns into
+    # the app's <think> block and answer. The MLX repo is 19,443,248,945 bytes
+    # (sha 3e7677d7, 2026-08-10; mlx-lm 0.32.2 loads its text tower, 15.7 GB
+    # resident, 17.0 GB peak at a 32K prompt on an M4 Pro); mem is that peak
+    # plus 1.5 GB. Ollama's tag: 18,157,010,026 bytes, Ollama 0.32.8 or later.
+    ("Muse Glimmer 30B",   "🎇", "30B",  "big",  "mlx-community/Muse-Glimmer-30B-4bit",            "muse-glimmer:30b",  8954, 18.5, 19.4, False),
     # ---- THE CODERS (6b494, per Patrick: coding models for the Code lane, on
     # the Mac and on servers). Both checked 2026-10-21 against the HF API and
     # the Ollama registry; both MLX builds load on mlx-lm 0.31.3 (every weight
@@ -1296,6 +1305,8 @@ OLLAMA_BYTES = {
     "hermes3:8b": 4_661_227_243,
     "llama3.2:1b": 1_321_098_329,
     "ministral-3:14b": 9_082_537_546,
+    # 6b533: the registry manifest on 2026-11-08 (model + projector + params)
+    "muse-glimmer:30b": 18_157_010_026,
     "qwen3-coder:30b": 18_556_700_761,
     "qwen3-coder:480b": 290_058_836_445,
     "qwen3.5:9b": 6_594_474_711,
@@ -1317,6 +1328,9 @@ OLLAMA_REQUIRES = {
     "gemma4:12b": (0, 30, 9),
     "gemma4:26b": (0, 30, 9),
     "gemma4:e2b": (0, 30, 9),
+    # 6b533: the tag's config says "requires": "0.32.8" (its glimmer
+    # renderer and parser)
+    "muse-glimmer:30b": (0, 32, 8),
     # 6b494: neither the registry nor the library page gives one for the 30B;
     # it uses the 480B's renderer and parser ("qwen3-coder", in Ollama from
     # v0.12.0), so it takes the 480B's figure
@@ -1349,6 +1363,9 @@ MOE_ROWS = {"Gemma 4 26B", "GPT-OSS 20B", "Qwen 3.6 35B MoE", "GPT-OSS 120B",
 # at the next start, onto the weights already downloaded.
 MLX_REQUIRES = {
     "Gemma 4 12B": (0, 32, 0),
+    # 6b533: models/muse_glimmer.py, checked in 0.32.2 (the pin); not known
+    # for 0.32.0-0.32.1, so the row asks for the pin
+    "Muse Glimmer 30B": (0, 32, 2),
 }
 # each MLX build's config.json "model_type", from the hub on 2026-10-21
 # (6b497): the gauntlet checks every one loads on the engine the app
@@ -1360,7 +1377,18 @@ MLX_MODEL_TYPES = {
     "GPT-OSS 20B": "gpt_oss", "Qwen 3.8 27B": "qwen3_5", "Qwen 3.6 35B MoE": "qwen3_5_moe",
     "Devstral Small 2 24B": "mistral3", "Qwen 3 Coder 30B MoE": "qwen3_moe",
     "GPT-OSS 120B": "gpt_oss", "GLM 5.3": "glm_moe_dsa", "DeepSeek V3.2 671B": "deepseek_v32",
+    "Muse Glimmer 30B": "muse_glimmer",
 }
+
+# ROWS ON TRIAL (6b533, per Patrick: "add the row, no tier yet"). A trial row
+# is in the catalog (it downloads by hand, routes and answers when picked in
+# Advanced) but no mode picks it and no model set holds it, so no update card,
+# first run or server allow-list brings it in until a mode names it.
+TRIAL_ROWS = frozenset({"Muse Glimmer 30B"})
+# MUSE GLIMMER'S CHANNELS (6b533): rows whose engine writes Meta's channel
+# format (`to=self<|message|>…<|eom|><|start|>assistant to=user<|message|>…`)
+# and takes a reasoning strength, low to xhigh, instead of thinking on/off
+MUSE_ROWS = frozenset({"Muse Glimmer 30B"})
 
 
 def _mlx_lm_version():
@@ -4577,9 +4605,10 @@ def _tier_ready(name: str) -> list:
             # out of TEXT councils, and take_all was bypassing it, so
             # LLaVA spent an engine swap drafting on prose questions.
             # Images never come through here — they route to LLaVA
-            # directly before the tier resolves.
-            return usable(l) and l not in BLEND_EXCLUDE
-        return (usable(l) and l not in BLEND_EXCLUDE
+            # directly before the tier resolves. A row on trial joins no
+            # mode until one names it (TRIAL_ROWS, 6b533).
+            return usable(l) and l not in BLEND_EXCLUDE and l not in TRIAL_ROWS
+        return (usable(l) and l not in BLEND_EXCLUDE and l not in TRIAL_ROWS
                 and MODEL_MEM_BYTES.get(l, 0) >= BLEND_MIN_MEM)
 
     ready = [l for l in t["picks"] if usable(l)]
@@ -4822,22 +4851,23 @@ def model_sets(target=None) -> dict:
     "over": [...]}: catalog labels, each set inside the next, one per
     download (see above). "over" is what Everything holds beyond this
     computer's memory (No limits, the giants); a server's is empty."""
+    # a row on trial is in no set (TRIAL_ROWS, 6b533): nothing offers it
     if target is None:
         def fits(l):
             return (bool(SUPPORTED.get(l)) and not model_is_giant(l)
-                    and fits_by_memory(l))
+                    and fits_by_memory(l) and l not in TRIAL_ROWS)
 
         def key(l):
             return MODEL_ROUTES.get(l, (None, l))
         pool = [l for l in MODEL_INFO
-                if SUPPORTED.get(l) and model_fits_machine(l)]
+                if SUPPORTED.get(l) and model_fits_machine(l) and l not in TRIAL_ROWS]
     else:
         vram = (target or {}).get("vram")
         ram = (target or {}).get("ram") or 0
 
         def whole(l):
             tag = (MODEL_INFO.get(l) or {}).get("ollama")
-            return bool(tag) and _srv_fits(
+            return l not in TRIAL_ROWS and bool(tag) and _srv_fits(
                 {"placement": "gpu", "size": _set_tag_bytes(tag)}, vram, True)
 
         def spill(l):
@@ -25638,14 +25668,147 @@ def servers_autoclean(ctx) -> list:
 
 
 
+# MUSE GLIMMER'S CHANNELS (6b533, per Patrick: the app work before a fair
+# retest). Muse writes one turn as several messages, each behind a header:
+#     to=self<|message|>its reasoning<|eom|>
+#     <|start|>assistant to=user<|message|>the answer<|eot|>
+# (the generation prompt already opened the first "<|start|>assistant").
+# mlx-lm 0.32.2 has no response format for muse_glimmer (only muse_spark sets
+# one), so its server streams all of that as `content`, control tokens and
+# reasoning included; Ollama's own glimmer parser (0.32.8+) splits it into
+# `thinking` and `content`, but an older Ollama or a raw route would not.
+# MuseChannels turns the raw stream into the app's own shape as it arrives:
+# the to=self channel inside <think>…</think> (the collapsible block the page
+# draws, which strip_think drops before a merge), the to=user channel as
+# plain text, a tool channel dropped, every control token gone. A marker cut
+# between two chunks is held back until it is whole. Text that never had a
+# header (a clean stream) passes straight through.
+MUSE_TOKENS = ("<|start|>", "<|message|>", "<|eom|>", "<|eot|>",
+               "<|end_of_text|>", "<|begin_of_text|>")
+MUSE_ENDS = ("<|eom|>", "<|eot|>", "<|end_of_text|>")
+MUSE_LEVELS = ("low", "medium", "high", "xhigh")
+
+
+def muse_level(thinking: bool) -> str:
+    """The reasoning strength a Muse row is asked for: "high" where the app
+    asks a model to think (a deep mode's drafts), else "low" (Fast, and the
+    passes that review or rewrite). It has no off."""
+    return "high" if thinking else "low"
+
+
+def _muse_hold(text: str) -> int:
+    """How many trailing characters may be the start of a control token."""
+    n = 0
+    for t in MUSE_TOKENS:
+        for k in range(1, len(t)):
+            if text.endswith(t[:k]):
+                n = max(n, k)
+    return n
+
+
+def _muse_could_head(text: str) -> bool:
+    """Whether text can still be (the start of) a message header."""
+    t = text.lstrip()
+    for p in ("<|start|>", "assistant", "to="):
+        if p.startswith(t[:len(p)]):
+            return True
+    return False
+
+
+class MuseChannels:
+    """feed(raw chunk) -> text for the page; close() -> what is left."""
+
+    def __init__(self):
+        self.buf = ""
+        self.state = "head"         # head | self | user | tool
+        self.thinking = False       # a <think> is open in what was sent
+        self.saw_head = False
+
+    def _open(self, rcpt: str) -> str:
+        out = ""
+        if rcpt == "self":
+            self.state = "self"
+            if not self.thinking:
+                self.thinking = True
+                out = "<think>"
+        elif rcpt in ("user", "commentary", ""):
+            self.state = "user"
+            if self.thinking:
+                self.thinking = False
+                out = "</think>"
+        else:
+            self.state = "tool"     # a tool call: not for the page
+        return out
+
+    def _body(self, text: str) -> str:
+        for t in MUSE_TOKENS:
+            text = text.replace(t, "")
+        return text if self.state in ("self", "user") else ""
+
+    def feed(self, chunk: str) -> str:
+        self.buf += chunk or ""
+        out = []
+        while self.buf:
+            if self.state == "head":
+                i = self.buf.find("<|message|>")
+                if i >= 0 and "\n" not in self.buf[:i].strip():
+                    m = re.search(r"to=([^\s<]+)", self.buf[:i])
+                    self.buf = self.buf[i + len("<|message|>"):]
+                    self.saw_head = True
+                    out.append(self._open(m.group(1) if m else ""))
+                    continue
+                if _muse_could_head(self.buf) and len(self.buf) < 96 \
+                        and "\n" not in self.buf.strip():
+                    break           # wait for the rest of the header
+                # no header: a clean stream, or text after an end token
+                out.append(self._open(""))
+                continue
+            ends = [(self.buf.find(t), t) for t in MUSE_ENDS if t in self.buf]
+            if ends:
+                j, t = min(ends)
+                out.append(self._body(self.buf[:j]))
+                self.buf = self.buf[j + len(t):]
+                self.state = "head"
+                continue
+            keep = _muse_hold(self.buf)
+            out.append(self._body(self.buf[:len(self.buf) - keep]))
+            self.buf = self.buf[len(self.buf) - keep:]
+            break
+        return "".join(out)
+
+    def close(self) -> str:
+        out = []
+        if self.buf:
+            if self.state == "head":
+                # a header that never finished is a header, not an answer;
+                # anything else left is plain text
+                if not (_muse_could_head(self.buf) and "<|" in self.buf
+                        or self.buf.lstrip().startswith("to=")):
+                    out.append(self._open(""))
+                    out.append(self._body(self.buf))
+            else:
+                out.append(self._body(self.buf))
+            self.buf = ""
+        if self.thinking:           # ran out of budget still reasoning
+            self.thinking = False
+            out.append("</think>")
+        return "".join(out)
+
+
 def stream_ollama(tag: str, messages: list, emit,
                   giant: bool = False, big: bool = False,
-                  label: str = "") -> None:
+                  label: str = "", thinking: bool = False) -> None:
     """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive.
     `big` is any model over BIG_MODEL_BYTES, `giant` one over GIANT_GB;
-    label: the catalog name the usage ledger records (6b325)."""
+    label: the catalog name the usage ledger records (6b325); thinking: a
+    Muse row's strength (muse_level), its only use here (6b533)."""
     options = {"temperature": 0.75}
     extra = {}
+    muse = MuseChannels() if label in MUSE_ROWS else None
+    if muse is not None:
+        # Ollama's glimmer renderer reads `think` as the strength (6b533);
+        # its reasoning then arrives as message.thinking
+        extra["think"] = muse_level(thinking)
     if giant or big:
         # a fixed context (6b314, 6b315 for every big model): left alone,
         # Ollama sizes it from the GPU memory, and 47 GiB or more gets
@@ -25694,13 +25857,29 @@ def stream_ollama(tag: str, messages: list, emit,
                 obj = json.loads(line)
                 if "error" in obj:
                     raise RuntimeError(obj["error"])
-                chunk = obj.get("message", {}).get("content", "")
+                msg = obj.get("message") or {}
+                chunk = msg.get("content", "")
+                if muse is not None:
+                    # Ollama's parser hands the reasoning over apart; a raw
+                    # stream's channels are split here (6b533)
+                    think = msg.get("thinking") or ""
+                    if think:
+                        if not muse.thinking:
+                            muse.thinking = True
+                            emit("<think>")
+                        sent[0] += len(think)
+                        emit(think)
+                    chunk = muse.feed(chunk) if chunk else ""
                 if chunk:
                     sent[0] += len(chunk)
                     emit(chunk)
                 if obj.get("done"):
                     last = obj
                     break
+        if muse is not None:
+            tail = muse.close()
+            if tail:
+                emit(tail)
     finally:
         try:
             usage_note(label or tag, "local", messages, sent[0], last, t0)
@@ -25731,8 +25910,12 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
         # after 77 seconds. With it off the same question answers in ~5s.
         # The parser below still handles reasoning if a server sends it
         # anyway; we simply stop asking for it. Templates that don't know the
-        # flag ignore it, so this is safe to send to every model.
-        "chat_template_kwargs": {"enable_thinking": thinking},
+        # flag ignore it, so this is safe to send to every model. A Muse row
+        # has no off: it gets a strength instead (6b533)
+        "chat_template_kwargs": dict(
+            {"enable_thinking": thinking},
+            **({"reasoning_strength": muse_level(thinking)}
+               if model_label in MUSE_ROWS else {})),
         # the counts for the usage ledger (6b325), in a last chunk with
         # no choices; a server that doesn't know the flag ignores it
         "stream_options": {"include_usage": True},
@@ -25746,6 +25929,8 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
     in_think = False
     raw_body = []
     t0, sent, rep = time.time(), [0], None
+    # Muse's channels arrive as raw content here (6b533)
+    muse = MuseChannels() if model_label in MUSE_ROWS else None
     try:
         with urllib.request.urlopen(req, timeout=600) as resp:
             for raw_line in resp:
@@ -25781,6 +25966,13 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
                     sent[0] += len(think)
                     emit(think)
                 chunk = delta.get("content", "") or whole.get("content", "")
+                if chunk and muse is not None:
+                    emitted = True
+                    sent[0] += len(chunk)
+                    chunk = muse.feed(chunk)
+                    if chunk:
+                        emit(chunk)
+                    continue
                 if chunk:
                     if in_think:
                         in_think = False
@@ -25790,6 +25982,10 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
                     emit(chunk)
         if in_think:                      # ran out of budget still thinking
             emit("</think>")
+        if muse is not None:
+            tail = muse.close()
+            if tail:
+                emit(tail)
 
         if not emitted:
             # server didn't stream — try the body as one plain JSON completion
@@ -25803,6 +25999,8 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
                     "the server answered but sent no usable completion "
                     f"(first bytes: {''.join(raw_body)[:120]!r})"
                 )
+            if text and muse is not None:
+                text = muse.feed(text) + muse.close()
             if text:
                 sent[0] += len(text)
                 emit(text)
@@ -26004,7 +26202,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                 stream_ollama(target, msgs, _tap, label=label,
                               giant=model_is_giant(label),
                               big=MODEL_MEM_BYTES.get(label, 0)
-                              > BIG_MODEL_BYTES)
+                              > BIG_MODEL_BYTES, thinking=thinking)
             else:
                 # re-read (ensure may have moved the engine off a port
                 # another account holds) and check the listener afresh,
@@ -29217,8 +29415,12 @@ def run_council(labels: list, messages: list, emit, status,
                 # a mode's server seat gives up on a first word early
                 with server_first_deadline(srv_first_s if server_label(_lbl)
                                            else None):
+                    # a Muse row reasons at "high" in a mode's drafts
+                    # (6b533, muse_level); the review and merge passes ask
+                    # for "low"
                     run_model(_lbl, messages, _c,
-                              thinking=(reflect and _lbl.startswith("Qwen")))
+                              thinking=((reflect and _lbl.startswith("Qwen"))
+                                        or _lbl.startswith("Muse")))
             except _DraftAbandoned:
                 pass
             except Exception as exc:      # noqa: BLE001 — recorded below
@@ -44634,6 +44836,7 @@ const ADV_USE={
   "GPT-OSS 20B":"strong open reasoning",
   "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
+  "Muse Glimmer 30B":"careful reasoner \u2014 thinks before it answers, slower",
   "Devstral Small 2 24B":"agentic coder — the Code lane's first pick",
   "Qwen 3 Coder 30B MoE":"coder, fast for its size",
   "GPT-OSS 120B":"frontier-class open reasoning",
