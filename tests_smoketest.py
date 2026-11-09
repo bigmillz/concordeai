@@ -6194,9 +6194,11 @@ def _s5_pc(src, key):
     return z
 
 
-# the code ladder's first is a coder since 6b494: Devstral Small 2
-_S5_REC48 = ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Qwen 3.8 27B",
-             "Qwen 3.6 35B MoE", "Devstral Small 2 24B", "Qwen 3.5 Vision 9B"]
+# the code ladder's first is a coder since 6b494: Devstral Small 2. Muse
+# Glimmer 30B is a Thinking seat since 6b533 (Gamma's writer): it takes the
+# third seat's place, Qwen 3.6 35B MoE's, which stays in Everything
+_S5_REC48 = ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B", "Muse Glimmer 30B",
+             "Qwen 3.8 27B", "Devstral Small 2 24B", "Qwen 3.5 Vision 9B"]
 
 
 def _s5_rules(src):
@@ -6210,7 +6212,9 @@ def _s5_rules(src):
     gi512 = _s5_mac(src, 512, nl=True, gi=True)["model_sets"]()
     pc = _s5_pc(src, "xtx+64")["model_sets"]()
     out["48 GB Mac"] = (m[48]["light"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"]
-                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 15
+                        # 16 since 6b533: Muse Glimmer 30B joined, Qwen 3.6 35B MoE stayed
+                        and m[48]["recommended"] == _S5_REC48 and len(m[48]["everything"]) == 16
+                        and "Qwen 3.6 35B MoE" in m[48]["everything"]
                         # both coders fit 48 GB; Qwen 3 Coder joins in Everything
                         and m[48]["everything"][-1] == "Qwen 3 Coder 30B MoE"
                         and "GPT-OSS 120B" not in m[48]["everything"] and m[48]["over"] == [])
@@ -6224,8 +6228,10 @@ def _s5_rules(src):
     out["16 GB Mac"] = (m[16]["recommended"] == ["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Qwen 3.5 9B",
                                                  "DeepSeek R1 8B", "Qwen 3.5 Vision 9B"]
                         and len(m[16]["everything"]) == 9)
+    # 6b533: Muse Glimmer 30B joins (the third Thinking seat here); 17 in Everything
     out["128 GB Mac"] = (m[128]["recommended"][3] == "GPT-OSS 120B" and "Gemma 4 26B" in m[128]["recommended"]
-                         and len(m[128]["everything"]) == 16)
+                         and m[128]["recommended"][5] == "Muse Glimmer 30B"
+                         and len(m[128]["everything"]) == 17)
     out["giants: only Everything, only with both boxes"] = (
         {"GLM 5.3", "DeepSeek V3.2 671B"} <= set(gi512["everything"])
         and not {"GLM 5.3", "DeepSeek V3.2 671B"} & set(gi512["recommended"])
@@ -6289,10 +6295,11 @@ def _s5_status(src):
     b = _s5_mac(src, 48, disk={"Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B", "Gemma 4 26B"})
     s = b["model_sets_status"](set())
     out["48 GB, Light here"] = (s["light"]["state"] == "yours" and s["recommended"]["state"] == "download"
-                                and s["recommended"]["missing"] == ["Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+                                # 6b533: Muse Glimmer 30B (19.4 GB) in Qwen 3.6 35B MoE's place
+                                and s["recommended"]["missing"] == ["Muse Glimmer 30B", "Qwen 3.8 27B",
                                                                     "Devstral Small 2 24B",
                                                                     "Qwen 3.5 Vision 9B"]
-                                and s["recommended"]["dl_gb"] == round(16.1 + 18.5 + 15.1 + 6.6, 1)
+                                and s["recommended"]["dl_gb"] == round(19.4 + 16.1 + 15.1 + 6.6, 1)
                                 and s["every"] is False and s["mine"] == "light")
     c = _s5_mac(src, 48, disk=set(_S5_REC48), prefs={"model_set": "pro"})
     s = c["model_sets_status"](set())
@@ -32117,7 +32124,10 @@ def _s7_sets(src):
                      and t16["recommended"] == t16["light"] + ["gpt-oss:20b", "qwen3.5:9b", "deepseek-r1:8b"]
                      and t16["everything"] == t16["recommended"] + ["ministral-3:14b", "hermes3:8b"]),
            "8 GB: no Gemma fits whole": t8["light"] == ["gemma4:e2b", "llama3.2:1b", "qwen3.5:9b"],
-           "24 GB": t24["recommended"][3:6] == ["gemma4:26b", "qwen3.8:27b", "qwen3.6:35b"],
+           # 6b533: Muse Glimmer 30B fits a 24 GB card whole and is a Thinking seat
+           "24 GB": t24["recommended"][3:6] == ["gemma4:26b", "muse-glimmer:30b", "qwen3.8:27b"],
+           # never on a 16 GB card (18.2 GB + the gateway's margin)
+           "16 GB: no Muse": not any("muse-glimmer:30b" in v for v in t16.values()),
            "a giant only in Everything": ("qwen3-coder:480b" in t320["everything"]
                                           and "qwen3-coder:480b" not in t320["recommended"]),
            "no card size, no sets": ns["model_sets"]({"vram": None})["everything"] == [],
@@ -36203,7 +36213,8 @@ def _c96_sets(src):
     out = {"Everything: both, flagged": set(_C94) <= set(s["everything"]) and s["ram"] == list(_C94),
            "Light and Recommended on the card": not set(_C94) & set(s["light"] + s["recommended"]),
            "no other model spills": (s["everything"][:-2] == s0["everything"]
-                                     and not {"Gemma 4 26B", "Qwen 3.8 27B", "Qwen 3.6 35B MoE"} & set(s["everything"])),
+                                     and not {"Gemma 4 26B", "Qwen 3.8 27B", "Qwen 3.6 35B MoE",
+                                              "Muse Glimmer 30B"} & set(s["everything"])),
            "an old kit: none": s0["ram"] == [] and not set(_C94) & set(s0["everything"]),
            "too little memory: only what fits": s24["ram"] == [_C94[0]],
            "a card they fit whole: no flag": big["ram"] == [] and set(_C94) <= set(big["everything"]),
@@ -39047,16 +39058,20 @@ check("mutant: without the stash the card is cut in two again", _fcm.get("pres")
 # ==== hz-chat (6b528): end ====
 
 # ==== muse (6b533) Muse Glimmer's channels and the trial row: begin ====
-print("== Muse Glimmer's channels and the trial row (6b533) ==")
+print("== Muse Glimmer's channels and Gamma's writer (6b533) ==")
 # Per Patrick: the app work before a fair retest. Muse Glimmer writes its
 # reasoning and its answer as channels (to=self / to=user) that mlx-lm 0.32.2
 # streams raw; MuseChannels turns them into the page's <think> block and the
 # answer, on the MLX route and on Ollama; the strength is low, or high for a
-# mode's drafts; the row is in the catalog but in no mode and no set. Run on
-# src's own code with stand-in engines (no network), then each rule broken in
-# the source and shown caught.
+# mode's drafts; the row was on trial (in the catalog, in no mode and no set)
+# until Patrick promoted it to Gamma's writer, its strength following the
+# Effort slider (Low to High "low", Max and Ultra "high", none: a draft
+# "high"); the review and merge passes stay "low"; never on a card too small
+# for it. Run on src's own code with stand-in engines (no network), then each
+# rule broken in the source and shown caught.
 _MU_NAMES = {"MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MUSE_LEVELS", "MuseChannels", "muse_level",
-             "_muse_hold", "_muse_could_head", "_THINK_RE", "strip_think"}
+             "_muse_hold", "_muse_could_head", "_THINK_RE", "strip_think",
+             "SRV_RAM_ROWS"}
 # a Muse turn as mlx-lm 0.32.2 streams it (the 6b533 bench's q27, trimmed)
 _MU_THINK = "Compute: 11*95 = 1045. + 1350 = 2395.\n\nLead with the answer."
 _MU_ANS = "Separate is cheaper by $5.\n\nWith the 12% tax, the package is cheaper by $120.40."
@@ -39120,9 +39135,9 @@ def _mu_sse(raw, size):
              for i in range(0, len(raw), size)] + ["data: [DONE]\n"])
 
 
-def _mu_run(src, which=(0, 1, 2)):
+def _mu_run(src, which=(0, 1, 2, 3)):
     """[(part, name, ok, detail)]: 0 the splitter, 1 the two routes and the
-    wiring, 2 the catalog row and the trial."""
+    wiring, 2 the catalog row, the seat and the trial rule, 3 the card guard."""
     out = []
 
     def ck(part, name, ok, detail=""):
@@ -39181,13 +39196,16 @@ def _mu_run(src, which=(0, 1, 2)):
         ck(1, "Ollama: the parser's reasoning goes in the block, a raw stream is split, `think` carries the "
            "strength; another row untouched",
            oll["parsed"] == ("<think>Compute it.</think>The answer.", "low")
-           and oll["raw"] == (_MU_WANT, "high") and oll["gemma"] == ("The answer.", "none"), "%r" % oll)
+           and oll["raw"] == (_MU_WANT, "high")
+           and oll["gemma"] == ("The answer.", "none"), "%r" % oll)
         rm = src[src.index("def run_model("):src.index("def _stream_guarded(")]
         rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
-        ck(1, "run_model hands the depth to Ollama; a mode's drafts ask a Muse row for high",
+        ck(1, "run_model hands the depth on; a mode's drafts ask a Muse row for high; no other pass asks",
            "> BIG_MODEL_BYTES, thinking=thinking)" in rm
            and "stream_openai_compat(target, label, msgs, _tap, thinking)" in rm
-           and 'or _lbl.startswith("Muse")))' in rc, "")
+           and 'or _lbl.startswith("Muse")))' in rc
+           # the critic, peer and merge passes give no depth: a Muse row answers them at "low"
+           and rc.count("thinking=") == 1, "%d" % rc.count("thinking="))
     if 2 in which:
         m = _s5_mac(src, 48, mlxv=(0, 32, 2))
         i = m["MODEL_INFO"].get("Muse Glimmer 30B") or {}
@@ -39203,22 +39221,63 @@ def _mu_run(src, which=(0, 1, 2)):
            and m["MLX_MODEL_TYPES"]["Muse Glimmer 30B"] == "muse_glimmer"
            and '  "Muse Glimmer 30B":"' in src
            and sum(1 for c in m["CATALOG"] if c[6] == 8954) == 1, "%r" % i)
-        sets = {g: _s5_mac(src, g, mlxv=(0, 32, 2))["model_sets"]() for g in (48, 128)}
-        srv = m["model_sets"]({"vram": 24 << 30})
-        ck(2, "on trial: no mode names it and no set holds it, on a Mac or a server",
-           "Muse Glimmer 30B" in m["TRIAL_ROWS"]
-           and all("Muse Glimmer 30B" not in t.get("picks", []) for t in m["TIERS"].values())
-           and all("Muse Glimmer 30B" not in s[k] for s in sets.values()
-                   for k in ("light", "recommended", "everything"))
+        # PROMOTED (6b533, per Patrick): Gamma's writer, first after GPT-OSS 120B; not in Fast
+        seats = {}
+        for g in (16, 32, 48, 128):
+            t = _s5_mac(src, g, mlxv=(0, 32, 2), disk=tuple(m["MODEL_INFO"]))
+            _s5_exec(src, t, {"BLEND_EXCLUDE", "BLEND_MIN_MEM", "MERGE_RANK", "_tier_ready", "resolve_tier",
+                              "council_merger_last", "merge_pref_label"})
+            t.update(slow_giant=lambda l: False, model_fits_memory=t["fits_by_memory"])
+            seats[g] = (t["resolve_tier"]("Thinking"), t["resolve_tier"]("Fast"),
+                        t["council_merger_last"](t["resolve_tier"]("Thinking")))
+        rec = {g: _s5_mac(src, g, mlxv=(0, 32, 2))["model_sets"]()["recommended"] for g in (16, 48)}
+        ck(2, "promoted: Gamma's writer on a Mac that holds it (32 and 48 GB), after GPT-OSS 120B; never Fast",
+           not m["TRIAL_ROWS"] and m["TIERS"]["Thinking"]["picks"][:2] == ["GPT-OSS 120B", "Muse Glimmer 30B"]
+           and "Muse Glimmer 30B" not in m["TIERS"]["Fast"]["picks"]
+           and all(seats[g][0] == ["Muse Glimmer 30B", "Gemma 4 26B", "Qwen 3.8 27B"]
+                   and seats[g][2][0] == "Muse Glimmer 30B" and seats[g][1] == ["Gemma 4 26B"] for g in (32, 48))
+           and seats[128][0] == ["GPT-OSS 120B", "Muse Glimmer 30B", "Gemma 4 26B"]
+           and "Muse Glimmer 30B" not in seats[16][0] + seats[128][1]
+           and "Muse Glimmer 30B" in rec[48] and "Muse Glimmer 30B" not in rec[16],
+           "%r" % {g: seats[g][:2] for g in seats})
+        # THE TRIAL RULE stays (an empty set): a row put on it is in no set and no mode
+        tr = frozenset({"Muse Glimmer 30B"})
+        sets = {}
+        for g in (48, 128):
+            z = _s5_mac(src, g, mlxv=(0, 32, 2))
+            z["TRIAL_ROWS"] = tr
+            sets[g] = z["model_sets"]()
+        z = _s5_mac(src, 48, mlxv=(0, 32, 2))
+        z["TRIAL_ROWS"] = tr
+        srv = z["model_sets"]({"vram": 24 << 30})
+        ck(2, "a row on trial: no set holds it, on a Mac or a server",
+           all("Muse Glimmer 30B" not in s[k] for s in sets.values()
+               for k in ("light", "recommended", "everything"))
            and "Muse Glimmer 30B" not in srv["everything"] and "Gemma 4 26B" in srv["everything"]
            and "Qwen 3.6 35B MoE" in sets[48]["everything"], "%r" % srv["everything"])
         t = _s5_mac(src, 48, mlxv=(0, 32, 2), disk=tuple(m["MODEL_INFO"]))
-        t.update(model_fits_memory=lambda l: True, slow_giant=lambda l: False)
+        t.update(model_fits_memory=lambda l: True, slow_giant=lambda l: False, TRIAL_ROWS=tr)
         _s5_exec(src, t, {"BLEND_EXCLUDE", "BLEND_MIN_MEM", "MERGE_RANK", "_tier_ready"})
-        pro, think = t["_tier_ready"]("Pro"), t["_tier_ready"]("Thinking")
-        ck(2, "downloaded, it still joins no mode (Pro, Thinking); every other model does",
-           "Muse Glimmer 30B" not in pro and "Muse Glimmer 30B" not in think
-           and "Qwen 3.8 27B" in pro and "Gemma 4 26B" in think, "%r" % pro)
+        t["TRIAL_ROWS"] = tr
+        pro = t["_tier_ready"]("Pro")
+        ck(2, "a row on trial, downloaded, still joins no blend (Pro); every other model does",
+           "Muse Glimmer 30B" not in pro and "Qwen 3.8 27B" in pro and "Gemma 4 26B" in pro, "%r" % pro)
+    if 3 in which:
+        z = _s5_mac(src, 48, mlxv=(0, 32, 2))
+        _s5_exec(src, z, {"SRV_RAM_ROWS", "SRV_RAM_EXTRA_B"})
+        g16 = z["model_sets"]({"vram": 16 << 30, "ram": 64 << 30})
+        ti = z["model_sets"]({"vram": 16303 << 20, "ram": 64 << 30})      # an RTX 5070 Ti as reported
+        g24 = z["model_sets"]({"vram": 24 << 30, "ram": 64 << 30})
+        mu = {"name": "muse-glimmer:30b", "placement": "gpu", "size": 18_157_010_026}
+        ck(3, "the card guard: never on a 16 GB card (no set, no spill), whole on a 24 GB one",
+           not any("Muse Glimmer 30B" in s[k] for s in (g16, ti) for k in ("light", "recommended", "everything", "ram"))
+           and "Muse Glimmer 30B" in g24["recommended"] and "Muse Glimmer 30B" not in g24["ram"]
+           and "Muse Glimmer 30B" not in z["SRV_RAM_ROWS"]
+           and not z["_srv_fits"](mu, 16 << 30, True) and not z["_srv_fits"](mu, 16303 << 20, True)
+           and z["_srv_fits"](mu, 24 << 30, True)
+           and not z["_srv_fits"](dict(mu, placement="gpu+ram"), 48 << 30, True)
+           and not z["_srv_fits"](mu, None, True), "%r" % [g16["recommended"], g24["recommended"]])
+    return out
     return out
 
 
@@ -39238,6 +39297,16 @@ _MU_MUT = [
     ("Ollama not told the strength", '        extra["think"] = muse_level(thinking)', "        pass", [1]),
     ("run_model loses the depth", "> BIG_MODEL_BYTES, thinking=thinking)", "> BIG_MODEL_BYTES)", [1]),
     ("a mode's drafts at low", 'or _lbl.startswith("Muse")))', "or False))", [1]),
+    ("a critic asks for high", "_critic, critic_prompt(question, _texts, persona=_persona), parts.append))",
+     "_critic, critic_prompt(question, _texts, persona=_persona), parts.append, thinking=True))", [1]),
+    ("Muse not the writer", '"picks": ["GPT-OSS 120B", "Muse Glimmer 30B", "Gemma 4 26B", "Qwen 3.8 27B",',
+     '"picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B", "Muse Glimmer 30B",', [2]),
+    ("Muse in Fast", '        "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",\n          "Qwen 3.6 35B MoE"',
+     '        "picks": ["GPT-OSS 120B", "Muse Glimmer 30B", "Gemma 4 26B", "Qwen 3.8 27B",\n          "Qwen 3.6 35B MoE"', [2]),
+    ("still on trial", "TRIAL_ROWS = frozenset()", 'TRIAL_ROWS = frozenset({"Muse Glimmer 30B"})', [2]),
+    ("no card guard", "        return size * 1.05 + (5 << 28) <= vram", "        return True", [3]),
+    ("Muse may spill", 'SRV_RAM_ROWS = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE")',
+     'SRV_RAM_ROWS = ("Devstral Small 2 24B", "Qwen 3 Coder 30B MoE", "Muse Glimmer 30B")', [3]),
     ("the trial row in Everything", "if SUPPORTED.get(l) and model_fits_machine(l) and l not in TRIAL_ROWS]",
      "if SUPPORTED.get(l) and model_fits_machine(l)]", [2]),
     ("a server offered the trial row", "            return l not in TRIAL_ROWS and bool(tag) and _srv_fits(",

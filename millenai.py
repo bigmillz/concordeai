@@ -1253,8 +1253,8 @@ CATALOG = [
     ("GPT-OSS 20B",        "🌀", "20B",  "core", "mlx-community/gpt-oss-20b-MXFP4-Q4",             "gpt-oss:20b",       8914, 13.0, 12.0, False),
     ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
-    # 6b533, per Patrick: Meta's Muse Glimmer 30B on trial (TRIAL_ROWS: in the
-    # catalog, in no mode and no set yet). Dense, 27.9B text + 1.9B vision,
+    # 6b533, per Patrick: Meta's Muse Glimmer 30B, Gamma's writer since its
+    # fair retest (first of the Thinking picks after GPT-OSS 120B). Dense, 27.9B text + 1.9B vision,
     # 131,072 context, Apache 2.0, released 2026-08-10. It always reasons (low
     # to xhigh, no off) in Meta's channel format, which MuseChannels turns into
     # the app's <think> block and answer. The MLX repo is 19,443,248,945 bytes
@@ -1391,8 +1391,9 @@ MLX_MODEL_TYPES = {
 # ROWS ON TRIAL (6b533, per Patrick: "add the row, no tier yet"). A trial row
 # is in the catalog (it downloads by hand, routes and answers when picked in
 # Advanced) but no mode picks it and no model set holds it, so no update card,
-# first run or server allow-list brings it in until a mode names it.
-TRIAL_ROWS = frozenset({"Muse Glimmer 30B"})
+# first run or server allow-list brings it in until a mode names it. Empty
+# since Muse Glimmer 30B was promoted to Gamma's writer (6b533, per Patrick).
+TRIAL_ROWS = frozenset()
 # MUSE GLIMMER'S CHANNELS (6b533): rows whose engine writes Meta's channel
 # format (`to=self<|message|>…<|eom|><|start|>assistant to=user<|message|>…`)
 # and takes a reasoning strength, low to xhigh, instead of thinking on/off
@@ -4312,7 +4313,12 @@ TIERS = {
         # R1" ollama row — same brain, different label — so the
         # REASONING model couldn't seat in the REASONING tier and a
         # plain Nemo blended in instead (seen on this very machine).
-        "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",
+        # MUSE GLIMMER WRITES (6b533, per Patrick: "promote Muse to Gamma's
+        # writer"): first after GPT-OSS 120B, so on a Mac that holds it the
+        # craft's one writer is Muse (blind retest: 56.0/90 at high, 52.5 at
+        # low, against Gemma 4 26B 42.5 and Qwen 3.6 35B 45.5, all reasoning;
+        # about 2x a whole answer's time at low, 3.5x at high). Not in Fast.
+        "picks": ["GPT-OSS 120B", "Muse Glimmer 30B", "Gemma 4 26B", "Qwen 3.8 27B",
                   "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Qwen 3.5 9B",
                   "DeepSeek R1 8B", "Gemma 4 12B"],
         "count": 3,
