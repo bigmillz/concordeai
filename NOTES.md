@@ -19014,3 +19014,39 @@ second site now sweep every occurrence (docattach brought a second `network erro
 `testing the key…`, `send failed —` and `Sharpening it`). Re-matching every row's old text against the result
 found no other docattach string a row covers; its new strings keep their words. Prerelease (6b318) and the
 Cloud pane's disclosure sentence stay as before.
+
+## 6b539 — The first draft shows as it is written; idle engines stay while there is room (per Patrick)
+
+Two of 6b531's levers, decided for the 7.0 beta ("faster feels smarter"), branch beta-1.
+
+**The Fast draft streams, then the polish replaces it.** Alpha (tier key Fast) wrote its first pass in
+silence and streamed only the rewrite, so the first visible word waited for the whole draft (9-21 s warm
+on Gemma 4 26B, measured in 6b531). The draft now streams through memit as it is written; when it is
+done the steps say "Drafted the answer" and "Polishing", the byline says "<model> is polishing", a RESET
+goes out, and the polished answer streams. The page turns that RESET into a soft swap instead of an
+empty box: the shown prose holds, dimmed to 72%, with its height pinned, until the replacement has
+160 characters (or the stream ends, or 4 s pass), then a 160 ms fade out, the new text, a 280 ms fade
+in; with effects off (millen.video 0 / perf) or prefers-reduced-motion the swap is immediate and still
+keeps the height. If the polish raises or times out, a RESET and the whole draft are sent and the byline
+says "kept the first draft"; a draft that wandered is cleared with a RESET before the single-pass
+retake. Saved chats were already what follows the last RESET (turn_text, the page's streamText twin),
+so they keep only the final answer. The finished step reads "Polished" (was "Sharpened").
+Proof, with no model run: a windowless dev copy on 9886 with MILLENAI_TEST_HOOKS=local-record (the
+stand-in engine answers "LOCAL-ANSWER-<label>"), one Fast question; the raw stream in order: STEP draft
+run, STATUS "is writing a first draft", TEXT, STEP draft done, STEP polish run, STATUS "is polishing",
+RESET, TEXT, STEP "Answer written", STEP "Polished"; what follows the last RESET is the one answer.
+The served page's two scripts pass node --check; the pin checker shows only the known MEMORY USED.
+
+**Idle engines unload only when memory is needed.** The janitor stopped every MLX engine after a flat
+five idle minutes, and the next question paid the load again (26.9 s to the first word against 14.7 s
+warm, 6b531). It now asks `_engine_evict_why()` once a minute: never inside the first 20 idle seconds;
+then "memory short" when the room the OS would hand a wiring allocation (max(available, total - used),
+model_fits_memory's own reading) falls under 6 GB or 12% of the Mac's memory; "swapping" when swap in
+use is over 1 GB and grew 256 MB since the last look (the pressure the app must never cause); "idle N h"
+past six hours as the hard cap; and, without psutil, the old five minutes. The bench still holds the
+janitor off. A bigger model may take an idle engine's room: model_fits_memory adds the footprint of a
+resident engine idle more than 20 s to the available figure, since ensure_mlx_engine stops the others
+before it loads. Gauntlet: the rule's text is pinned, the rule runs under a fake psutil through floor /
+room / memory short / swap growth / cap / no reading, a mutant that keeps the engine at 3 GB free is
+caught, the two bench pins that named the old "> 300" lines now name the new ones, and the 6b462 pin
+on the drip's RESET line follows the new first line.

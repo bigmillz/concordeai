@@ -18283,7 +18283,7 @@ check("6b458: the picker's rows carry no description; only Max says 'all models'
 # touches the chat pane (switchLane/modeShow redraw the tabs, forms and sidebar only)
 _ls_bad = [n for n, ok in [
     ("the reveal is zeroed only for a RESET it has not seen",
-     "if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;}" in page
+     "if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;" in page       # (6b539: the hold follows on the next lines)
      and "streamEnded=false,dripCut=-1;" in page),
     ("the old every-chunk reset is gone", "if(cut>=0)dripShown=0;" not in page),
     ("modeShow leaves the message pane alone",
@@ -19587,7 +19587,7 @@ def _bm_pins(src):
           and "            if self._bench_held:\n                self._bench_held = False\n"
               "                bench_release()\n            if self._bench_srv_held:" in src
           and 'if _mlx_procs and _mlx_last_use and not _bench["running"] and' in src
-          and 'if time.time() - _mlx_last_use > 300 and \\\n                            not _bench["running"]:' in src
+          and '_why = _engine_evict_why()\n                    if _why and not _bench["running"]:' in src
           and 'env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")\n             if offline else None)' in src
           and 'elif self.path == "/api/bench":\n            # the hardware benchmark (6b331): the run and the saved runs\n' in src
           and "self._send_json(bench_status(self.ctx))" in src
@@ -20206,7 +20206,8 @@ _BM_MUT = [
      '            if False:\n                self._send_json({"err": BENCH_BUSY, "bench": True}, code=409)\n                return\n            self._bench_held = True\n        else:'),
     ("the chat's hold never released", "            if self._bench_held:\n                self._bench_held = False\n                bench_release()",
      "            if self._bench_held:\n                self._bench_held = False"),
-    ("the janitor under a run", 'if _mlx_procs and _mlx_last_use and not _bench["running"] and', 'if _mlx_procs and _mlx_last_use and'),
+    ("the janitor under a run", 'if _mlx_procs and _mlx_last_use and not _bench["running"] and \\\n                    _engine_evict_why():',
+     'if _mlx_procs and _mlx_last_use and \\\n                    _engine_evict_why():'),
     ("the offline switch ignored", 'env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")\n             if offline else None)',
      'env=None'),
     # the first review's fixes
@@ -41180,6 +41181,112 @@ for _mf, _mn, _ma, _mb, _mw in _C36_MUT:
 check("6b537's rules each break a check when broken (%d mutants)" % len(_C36_MUT), not _c36_caught,
       "%r" % _c36_caught)
 # ==== the shell is the app, 7.0 beta (6b537): end ====
+
+# THE DRAFT STREAMS, THEN THE POLISH REPLACES IT (6b539, per Patrick: "faster
+# feels smarter"). Fast's first pass used to be silent; it now shows as it
+# is written, a RESET hands the screen to the polish, the page crossfades
+# (height kept, no motion when effects are off or reduced motion is asked),
+# a failed polish leaves the draft, and the saved turn is what follows the
+# last RESET (turn_text, unchanged).
+_fp39 = _MILLENAI_SRC[_MILLENAI_SRC.index("# TWO PASS, BOTH ON SCREEN (6b539"):]
+_fp39 = _fp39[:_fp39.index("# the page draws the step, not the status line")]
+check("6b539 the Fast draft streams as it is written, then a RESET hands the screen to the polish",
+      "def _draft_live(chunk, _p=parts):\n                        _p.append(chunk)\n                        memit(chunk)" in _fp39
+      and "run_model(lbl, full_messages, _draft_live)" in _fp39
+      and "run_model(lbl, full_messages, parts.append)" not in _fp39
+      and 'status(f"{lbl} is writing a first draft")' in _fp39
+      and 'status(f"{lbl} is polishing")' in _fp39
+      and _fp39.index('step("polish", "Polishing", "run", "")') < _fp39.index('emit(Ctl(NUL + "RESET" + NUL))     # the polish takes the draft\'s place')
+      < _fp39.index("_stream_guarded(\n                                lbl,"), "")
+check("6b539 a polish that fails or times out leaves the draft as the answer; a wandering draft is cleared before the retake",
+      "except (StaleProfile, BrokenPipeError, ConnectionResetError):\n                            raise\n                        except Exception:" in _fp39
+      and 'status(f"{lbl} kept the first draft")' in _fp39
+      and "memit(draft)" in _fp39
+      and "if parts:\n                            emit(Ctl(NUL + \"RESET\" + NUL))" in _fp39, "")
+check("6b539 mutant: a silent draft again, or a RESET before the polish step, is caught",
+      "run_model(lbl, full_messages, parts.append)" in _fp39.replace("_draft_live)", "parts.append)")
+      and _fp39.replace('step("polish", "Polishing", "run", "")\n', "").find('step("polish", "Polishing", "run", "")') < 0, "")
+_pg39 = page[page.index("let swapHold=false,swapAt=0;"):]
+check("6b539 the page holds the shown prose on a RESET until the polish has words, keeps the height, crossfades, and respects effects off and reduced motion",
+      "if(swapHold){" in _pg39 and "full.length<160&&!streamEnded&&performance.now()-swapAt<4000" in _pg39
+      and 'body.style.minHeight=h+"px"' in _pg39 and 'body.classList.add("swapwait")' in _pg39
+      and 'typeof noVideo!=="undefined"&&noVideo' in _pg39
+      and 'matchMedia("(prefers-reduced-motion: reduce)").matches' in _pg39
+      and 'body.classList.add("swapout")' in _pg39 and 'body.classList.add("swapin")' in _pg39
+      and 'body.style.minHeight="";body.classList.remove("swapwait","swapout","swapin");' in _pg39
+      and ".body.swapwait{opacity:.72;transition:opacity .25s ease}" in page
+      and ".body.swapout{opacity:0;transition:opacity .16s ease}" in page
+      and "@keyframes swapIn{from{opacity:0}to{opacity:1}}" in page
+      and "@media (prefers-reduced-motion:reduce){.body.swapwait,.body.swapout{opacity:1;transition:none}.body.swapin{animation:none}}" in page, "")
+check("6b539 mutant: a RESET that empties the answer at once (no hold) is caught",
+      "swapHold=true;swapAt=performance.now();" not in _pg39.replace("swapHold=true;swapAt=performance.now();", "swapHold=false;"), "")
+# IDLE ENGINES STAY WHILE THERE IS ROOM (6b539, per Patrick): the janitor asks
+# _engine_evict_why() instead of the flat five minutes; memory short,
+# swapping, a long idle, or (no psutil) the old five minutes. A bigger model
+# counts an idle engine's memory as room (model_fits_memory).
+_ev39 = _MILLENAI_SRC[_MILLENAI_SRC.index("def _engine_evict_why("):]
+_ev39 = _ev39[:_ev39.index("\n\n\n", 20)]
+check("6b539 the idle-engine rule: a floor, memory short, swapping, the idle cap, and the five minutes without a reading",
+      "if idle < _ENGINE_IDLE_FLOOR_S:\n        return \"\"" in _ev39
+      and 'return "no memory reading, idle %d s" % idle if idle > 300 else ""' in _ev39
+      and "room = max(vm.available or 0, vm.total - vm.used)" in _ev39
+      and "floor = max(_ENGINE_ROOM_MIN, int(vm.total * 0.12))" in _ev39
+      and "if room < floor:" in _ev39
+      and "swap > _ENGINE_SWAP_MAX and last is not None and swap - last >= _ENGINE_SWAP_GROWTH" in _ev39
+      and "if idle > _ENGINE_IDLE_CAP_S:" in _ev39
+      and "_ENGINE_IDLE_FLOOR_S = 20\n" in _MILLENAI_SRC and "_ENGINE_IDLE_CAP_S = 6 * 3600\n" in _MILLENAI_SRC
+      and "time.time() - _mlx_last_use > 300" not in _MILLENAI_SRC, "")
+check("6b539 the janitor asks the rule under the engine lock, never under a benchmark, and a model may take an idle engine's room",
+      'if _mlx_procs and _mlx_last_use and not _bench["running"] and \\\n                    _engine_evict_why():' in _MILLENAI_SRC
+      and '_why = _engine_evict_why()\n                    if _why and not _bench["running"]:' in _MILLENAI_SRC
+      and "if avail is not None and time.time() - _mlx_last_use > _ENGINE_IDLE_FLOOR_S:\n        for _l, _p in list(_mlx_procs.items()):\n            if _l != label and _p.poll() is None:\n                avail += MODEL_MEM_BYTES.get(_l, 0)" in _MILLENAI_SRC, "")
+# the rule itself, run with a fake psutil
+_ns39 = {"time": time, "HAS_PSUTIL": True, "_mlx_last_use": 0.0, "_engine_swap_seen": [None],
+         "_ENGINE_IDLE_FLOOR_S": 20, "_ENGINE_IDLE_CAP_S": 6 * 3600, "_ENGINE_ROOM_MIN": 6 << 30,
+         "_ENGINE_SWAP_MAX": 1 << 30, "_ENGINE_SWAP_GROWTH": 256 << 20}
+class _VM39:
+    def __init__(self, total, used, available):
+        self.total, self.used, self.available = total, used, available
+class _PS39:
+    vm = _VM39(48 << 30, 20 << 30, 20 << 30)
+    swap = 0
+    @classmethod
+    def virtual_memory(cls):
+        return cls.vm
+    @classmethod
+    def swap_memory(cls):
+        class _S:
+            used = cls.swap
+        return _S
+_ns39["psutil"] = _PS39
+exec(_ev39, _ns39)
+_why39 = _ns39["_engine_evict_why"]
+_r39 = []
+_ns39["_mlx_last_use"] = 1000.0
+_r39.append(_why39(1010.0))                      # 10 s idle: never
+_r39.append(_why39(2000.0))                      # 1000 s idle, 20 GB free: stays
+_PS39.vm = _VM39(48 << 30, 44 << 30, 3 << 30)
+_r39.append(_why39(2000.0))                      # 3 GB free: memory short
+_PS39.vm = _VM39(48 << 30, 20 << 30, 20 << 30)
+_PS39.swap = 2 << 30
+_r39.append(_why39(2000.0))                      # swap went 0 -> 2 GB since the last look: swapping
+_PS39.swap = (2 << 30) + (300 << 20)
+_r39.append(_why39(2000.0))                      # swap grew 300 MB: swapping
+_PS39.swap = 0
+_r39.append(_why39(1000.0 + 7 * 3600))           # 7 h idle: the cap
+_ns39["HAS_PSUTIL"] = False
+_r39.append(_why39(1200.0))                      # no reading, 200 s: stays
+_r39.append(_why39(1400.0))                      # no reading, 400 s: the old rule
+check("6b539 the idle-engine rule, run: floor, room, memory short, swap growth, the cap, and the five minutes without a reading",
+      _r39[0] == "" and _r39[1] == "" and _r39[2].startswith("memory short") and _r39[3].startswith("swapping")
+      and _r39[4].startswith("swapping") and _r39[5].startswith("idle 7 h") and _r39[6] == ""
+      and _r39[7].startswith("no memory reading"), repr(_r39))
+_mut39 = _ev39.replace("if room < floor:", "if False:")
+_ns39["HAS_PSUTIL"] = True
+_ns39b = dict(_ns39, HAS_PSUTIL=True); _PS39.vm = _VM39(48 << 30, 44 << 30, 3 << 30); _PS39.swap = 0
+exec(_mut39, _ns39b)
+check("6b539 mutant: an engine kept with 3 GB free is caught",
+      _ns39b["_engine_evict_why"](2000.0) == "" and _why39(2000.0).startswith("memory short"), "")
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
