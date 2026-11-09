@@ -7408,7 +7408,7 @@ def _studio_install_worker(key: str, tid: str):
                                 "install", "--quiet"] + st["pip"],
                                timeout=2400, capture_output=True, text=True)
             if r.returncode != 0 or not _studio_engine_ok(key):
-                raise RuntimeError("engine install failed: "
+                raise RuntimeError("Engine install failed: "
                                    + (r.stderr or "")[-160:])
         # a good engine clears the failed-install mark (6b307)
         try:
@@ -13640,7 +13640,7 @@ def know_model_fetch() -> bool:
                 _hf_prune_old(KNOW_EMBED_REPO)
             else:
                 if not _ensure_ollama_ready():
-                    raise RuntimeError("the Ollama engine did not start")
+                    raise RuntimeError("The Ollama engine didn’t start.")
                 body = json.dumps({"model": KNOW_EMBED_TAG, "stream": True}).encode()
                 req = urllib.request.Request(ollama_url("/api/pull"), data=body,
                                              headers={"Content-Type": "application/json"})
@@ -18397,8 +18397,7 @@ def _download_ollama_binary(dest=None, row=ENGINE_ROW, sha256=None):
                     job["pct"] = min(99, int(done / total * 100))
     if sha256 and digest.hexdigest() != sha256:
         os.remove(tmp)
-        raise RuntimeError("the engine download doesn't match the "
-                           "release's checksum")
+        raise RuntimeError("The engine download failed its checksum.")
     if IS_WIN:
         import zipfile
         with zipfile.ZipFile(tmp) as z:
@@ -18556,10 +18555,10 @@ def _giant_room(layers: dict, where):
     tail = (" \u2014 make room, then press retry soon; it resumes "
             "unless Ollama restarts first")
     if free < GIANT_DISK_FLOOR:
-        return where, ("stopped: %s is almost full (%d GB free)%s"
+        return where, ("Stopped. %s is almost full (%d GB free).%s"
                        % (drive, free // 1_000_000_000, tail))
     if sparse and free < left + GIANT_DISK_SPARE:
-        return where, ("needs %d GB free on %s to finish, %d GB free%s"
+        return where, ("Needs %d GB free on %s; %d GB free.%s"
                        % (int((left + GIANT_DISK_SPARE) / 1e9 + 0.5), drive,
                           free // 1_000_000_000, tail))
     return where, ""
@@ -18793,7 +18792,7 @@ def _fetch_engine_update(have: tuple, need: tuple):
         if IS_WIN_ARM and exe and _pe_machine(exe) != 0xAA64:
             got = ()
         if not got:
-            raise RuntimeError("the download holds no working engine")
+            raise RuntimeError("The download holds no working engine.")
         bad = tuple(_update_note().get("bad") or ())
         if got <= have or got < need or (bad and got <= bad):
             shutil.rmtree(_STAGED_DIR, ignore_errors=True)
@@ -19031,17 +19030,11 @@ def _prove_engine(proc, port: int, wait: float = 90.0):
 
 
 _STAGE_SAY = {
-    "staging": "A newer engine is downloading: in a few minutes quit and "
-               "reopen ConcordeAI, then press retry",
-    "staged": "A newer engine is ready: quit and reopen ConcordeAI, then "
-              "press retry",
-    "current": "A newer engine is on this computer: quit and reopen "
-               "ConcordeAI, then press retry",
-    "arm64": "The native ARM64 engine is downloading: in a few minutes quit "
-             "and reopen ConcordeAI, then press retry",
-    "sibling": "Another ConcordeAI window is open, so the engine can't "
-               "update: close every ConcordeAI window, reopen it, and in a "
-               "few minutes quit and reopen once more, then press retry",
+    "staging": "A newer engine is downloading. In a few minutes, quit, reopen and retry.",
+    "staged": "A newer engine is ready. Quit, reopen and retry.",
+    "current": "A newer engine is installed. Quit, reopen and retry.",
+    "arm64": "The ARM64 engine is downloading. In a few minutes, quit, reopen and retry.",
+    "sibling": "Another ConcordeAI window is open. Close them all, reopen, then quit and reopen once more and retry.",
     "offline": "A newer engine couldn't be downloaded: check the internet "
                "connection, then press retry",
     "released": "Ollama's newest release is older than that; try again "
@@ -19060,10 +19053,9 @@ def _ollama_too_old(tag: str, have: tuple, stage=None) -> str:
         return ""
     v = (".".join(map(str, need)), ".".join(map(str, have)))
     if stage in _STAGE_SAY:
-        return ("needs Ollama %s or newer (the app's engine is %s). " % v
+        return ("Needs Ollama %s or newer; the app has %s. " % v
                 + _STAGE_SAY[stage])
-    return ("needs Ollama %s or newer; this computer has %s. Update "
-            "Ollama (ollama.com/download), then press retry" % v)
+    return ("Needs Ollama %s or newer; this computer has %s. Update at ollama.com, then retry." % v)
 
 
 def _keep_awake(on: bool):
@@ -19133,7 +19125,7 @@ def _ollama_install_worker(labels: list):
     labels = sorted(labels, key=lambda l: MODEL_INFO[l]["gb"])
     try:
         if not _ensure_ollama_ready():
-            raise RuntimeError("the Ollama engine did not start")
+            raise RuntimeError("The Ollama engine didn’t start.")
     except Exception as exc:
         with _setup_lock:
             _setup_jobs[ENGINE_ROW] = {"status": "error",
@@ -19571,12 +19563,12 @@ def _remove_models(want: list) -> tuple:
                 # deepseek-r1:8b, for the retired "DeepSeek R1" row
                 target = _tag + ":latest"
         else:
-            errors[label] = "unknown model"
+            errors[label] = "Unknown model"
             continue
         with _setup_lock:
             _st = (_setup_jobs.get(label) or {}).get("status", "")
         if _st in ("downloading", "queued"):
-            errors[label] = "still downloading"
+            errors[label] = "Still downloading"
             continue
         try:
             if kind == "mlx":
@@ -19803,8 +19795,8 @@ def _offer_reason(label: str, olds: list, seen: set) -> str:
         # anything else stands in for it
         same = all(o.split()[0] == label.split()[0]
                    and _family_of(o) == _family_of(label) for o in olds)
-        return ("newer version of " if same else "replaces ") + ", ".join(olds)
-    return "new" if label not in seen else "not installed yet"
+        return ("Newer version of " if same else "Replaces ") + ", ".join(olds)
+    return "New" if label not in seen else "Not installed"
 
 
 def model_offer_plan(pulled=None) -> dict:
@@ -52080,16 +52072,16 @@ __CODE_ROWS__
 <div id="new-veil" hidden>
   <div id="about-card">
     <div id="new-title">New models available</div>
-    <div id="new-detail">This version adds models you don&rsquo;t have yet.</div>
+    <div id="new-detail">This version adds new models.</div>
     <div id="new-list"></div>
     <div id="new-sum" hidden></div>
     <div class="big-bar" id="new-bar" hidden><i></i></div>
     <div id="new-pct" hidden></div>
-    <button class="about-btn primary" id="new-get">Update model library</button>
+    <button class="about-btn primary" id="new-get">Get them</button>
     <button class="about-btn primary" id="new-retry" hidden>Retry</button>
-    <button class="about-btn" id="new-bg" hidden>Run in background</button>
+    <button class="about-btn" id="new-bg" hidden>Continue in background</button>
     <button class="about-btn" id="new-skip">Not now</button>
-    <button class="about-btn quiet" id="new-off" hidden>Don&rsquo;t remind me again</button>
+    <button class="about-btn quiet" id="new-off" hidden>Don&rsquo;t ask again</button>
   </div>
 </div>
 
@@ -52527,11 +52519,11 @@ __CODE_ROWS__
   <div id="updated-card">
     <div class="sh-icon">&#10024;</div>
     <h2>Updated to <span id="updated-ver"></span></h2>
-    <p id="updated-sub">Here&rsquo;s what changed.</p>
+    <p id="updated-sub">What changed</p>
     <div id="updated-notes"></div>
     <div id="updated-models" class="mu" hidden></div>
     <div class="sh-foot">
-      <button id="updated-ok" class="primary">Nice</button>
+      <button id="updated-ok" class="primary">Done</button>
     </div>
   </div>
 </div>
@@ -52549,7 +52541,7 @@ __CODE_ROWS__
      download progress it already draws well. -->
 <div id="wiz-veil" hidden>
   <div id="wiz-card">
-    <button id="wiz-skip" title="Skip setup — everything lives in Settings too">skip ✕</button>
+    <button id="wiz-skip" title="Everything here is in Settings too">Skip</button>
 
     <div class="wstep" data-w="1">
       <div id="wiz-brand">
@@ -52557,35 +52549,22 @@ __CODE_ROWS__
         <b>Concorde<b>AI</b></b>
         <span id="wiz-ver">__APP_VER__</span>
       </div>
-      <p>MillenAI runs real AI models on your own machine &mdash; private,
-      free, and yours &mdash; with optional cloud power when you want a
-      frontier brain on the case. Its trick is compositing: several
-      &ldquo;minds&rdquo; draft an answer, the strongest one writes the
-      final &mdash; one clean reply, backed by many.</p>
-      <p>This setup takes about a minute: pick how much local brainpower
-      to install, connect any cloud keys you have (or skip them), and
-      you&rsquo;re flying. Everything here can be changed later in
-      Settings.</p>
+      <p>Concorde runs AI models on this Mac. Several draft an answer; the strongest writes the final. Cloud models are optional.</p>
+      <p>About a minute. Pick what to install, add any cloud keys, done. Everything is in Settings later.</p>
     </div>
 
     <div class="wstep" data-w="2" hidden>
       <div class="set-h">Local models</div>
-      <p>A large language model is a brain in a file &mdash; it lives on
-      your disk and answers on your silicon, no internet required.
-      MillenAI installs a few of different sizes and personalities, asks
-      several at once on hard questions, and composites their drafts
-      into one answer. Pick how much to install:</p>
+      <p>Models run on this Mac, no internet needed. Pick how much to install.</p>
       <div id="wiz-plans"></div>
       <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac" checked>
-        Remove outdated models automatically when an update replaces
-        them</label>
+        Remove outdated models after updates</label>
       <label id="wiz-image"><input type="checkbox" id="wiz-img">
-        <span>Add image generation <i class="wsz">(9.6 GB)</i></span></label>
+        <span>Image generation <i class="wsz">(9.6 GB)</i></span></label>
       <label id="wiz-video"><input type="checkbox" id="wiz-vid">
-        <span>Add video generation <i class="wsz">(19.6 GB)</i></span></label>
+        <span>Video generation <i class="wsz">(19.6 GB)</i></span></label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        No limits: also let Everything hold any models
-        bigger than this machine&rsquo;s memory. Those can swap hard or crash it.</label>
+        No limits. Everything includes models bigger than memory; they can crash this Mac.</label>
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
@@ -52595,26 +52574,19 @@ __CODE_ROWS__
 
     <div class="wstep" data-w="3" hidden>
       <div class="set-h">Cloud power</div>
-      <p>Cloud models are frontier brains that answer over the network
-      &mdash; some free, some needing a paid API key from the provider.
-      With any key saved, MillenAI blends cloud drafts into its answers
-      and hands the final word to the strongest mind available. All
-      optional; your prompts only leave this machine while it&rsquo;s
-      on.</p>
+      <p>Optional. Some are free, some need a paid key. While on, your prompts leave this Mac.</p>
       <div id="wiz-provs"></div>
     </div>
 
     <div class="wstep" data-w="4" hidden>
-      <div class="set-h">That&rsquo;s it</div>
-      <p id="wiz-done-line">Thanks for setting up MillenAI. Your models
-      download in the background &mdash; start chatting the moment the
-      first one lands, and find everything else under Settings.</p>
+      <div class="set-h">Done</div>
+      <p id="wiz-done-line">Models download in the background. Chat opens when the first one is ready.</p>
     </div>
 
     <div id="wiz-foot">
       <button class="about-btn" id="wiz-back" hidden>Back</button>
       <div id="wiz-dots"><i class="on"></i><i></i><i></i><i></i></div>
-      <button class="about-btn primary" id="wiz-next">Next</button>
+      <button class="about-btn primary" id="wiz-next">Continue</button>
     </div>
   </div>
 </div>
@@ -60017,7 +59989,7 @@ function setDesc(k,x,where){
 // the count line: what is here already, or what would download
 function setLine(x){
   const n=x.n+" model"+(x.n===1?"":"s");
-  return x.state==="download"?n+" \u00b7 "+muGB(x.dl_gb)+" to download":n+" \u00b7 installed";
+  return x.state==="download"?n+", "+muGB(x.dl_gb):n+" installed";
 }
 // THE RISKY CARD ASKS TWICE, in place, naming the risk (6b258): Everything
 // while it holds models over memory. The question is the screen's own for
@@ -60067,7 +60039,7 @@ function renderSetup(st){
   let html=
     '<div class="big-bar"><i style="width:'+pct+'%"></i></div>'+
     '<div class="big-stat"><span>'+st.have_gb+' / '+st.want_gb+' GB</span>'+
-    '<span>'+(anyDl?pct+'%':(setupAllReady?'complete':'not started'))+'</span></div>'+
+    '<span>'+(anyDl?pct+'%':(setupAllReady?'Complete':'Not started'))+'</span></div>'+
     (anyDl?'<div class="big-speed">'+
       (st.speed_mbs>0?st.speed_mbs+' MB/s':'starting\u2026')+
       dlTail(dlLeft("batch",st.have_b,st.want_b,null,st.checking))+'</div>'
@@ -60078,7 +60050,7 @@ function renderSetup(st){
   // percent — never a wall of per-model rows
   if(anyDl){
     setTitle("Downloading updates",
-      "Keep chatting \u2014 this finishes in the background.");
+      "Chat while it finishes.");
     setupList.innerHTML=html;
     setupLater.textContent="Continue in background";
     finishSetupChrome(st,stars,anyDl);
@@ -60089,9 +60061,8 @@ function renderSetup(st){
   // FIRST RUN, without the wizard: the same three cards as the wizard and
   // Settings (6b405), the button downloading the one picked
   if(!setupManual){
-    setTitle("Welcome to MillenAI",
-      "We\u2019re getting you set up \u2014 private, and entirely on "
-      +"this Mac. Start chatting the moment the first piece lands.");
+    setTitle("Welcome",
+      "Setting up on this Mac. Chat opens when the first model is ready.");
     const sets=st.sets||{};
     if(!setupPlanPicked){if(sets.chosen)setupPlan=sets.chosen;setupPlanPicked=true;}
     setupList.innerHTML=html+'<div class="set-row">'
@@ -60103,8 +60074,8 @@ function renderSetup(st){
   // OPENED FROM THE DOWNLOAD STRIP, and the downloads are over. The window
   // that picked sets here is gone (6b405): adding models, or another set,
   // is Settings › Models; updates and clean-outs stay its Update models card
-  setTitle("Downloads finished",
-    "Add more, or pick another set, in Settings \u203a Models.");
+  setTitle("Done",
+    "More models: Settings > Models.");
   setupList.innerHTML=html;
   setupLater.hidden=true;
   finishSetupChrome(st,stars,anyDl);
@@ -60134,10 +60105,10 @@ setupList.addEventListener("click",e=>{
 
 function finishSetupChrome(st,stars,anyDl){
   if(!st.mlx_ok){
-    setupNote.textContent="engine not installed \u2014 reopen the app to finish setup";
+    setupNote.textContent="Engine not installed. Reopen the app to finish.";
     setupGo.disabled=true;
   }else if(stars.some(m=>m.status==="error")){
-    setupNote.textContent="a download failed \u2014 check your connection, then retry";
+    setupNote.textContent="A download failed. Check the connection and retry.";
   }else{
     setupNote.textContent="";
   }
@@ -60147,11 +60118,11 @@ function finishSetupChrome(st,stars,anyDl){
   }else if(setupManual){
     setupGo.disabled=false;setupGo.dataset.act="close";setupGo.textContent="Done";
   }else if(setupAllReady){
-    setupGo.disabled=false;setupGo.textContent="Let\u2019s run it";
+    setupGo.disabled=false;setupGo.textContent="Open";
   }else{
     const left=(((st.sets||{})[setupPlan])||{}).dl_gb||0;
     setupGo.disabled=!st.mlx_ok||left<=0;
-    setupGo.textContent=left<=0?"Up to date \u2713"
+    setupGo.textContent=left<=0?"Up to date"
       :(stars.some(m=>m.status==="error")?"Retry":"Download "+SET_NAMES[setupPlan])
        +" \u00b7 "+Math.max(1,Math.round(left))+" GB";
   }
@@ -61549,8 +61520,8 @@ function pickServerModel(label){
 loadServers(false).then(()=>{if(srvList.some(s=>s.paired))loadServers(true);});
 $("#ck-save").addEventListener("click",async()=>{
   const note=$("#ck-note"),key=$("#ck-key").value.trim();
-  if(!key){note.textContent="paste a key first";return;}
-  note.textContent="testing the key…";
+  if(!key){note.textContent="Paste a key first.";return;}
+  note.textContent="Checking…";
   try{
     const d=await(await api("/api/cloud/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -61699,7 +61670,7 @@ async function wizPaintProvs(){
       +'</div>'
       +'<div class="wkey" hidden>'
       +'<input type="password" autocomplete="off" '
-      +'placeholder="paste your '+label+' API key">'
+      +'placeholder="'+label+' API key">'
       +'<button class="about-btn slim">Save</button></div>'
       +'<div class="wnote"></div></div>';
   }).join("");
@@ -61715,8 +61686,8 @@ $("#wiz-provs").addEventListener("click",async e=>{
   if(!b)return;
   const p=b.closest(".wprov"),note=p.querySelector(".wnote");
   const key=p.querySelector(".wkey input").value.trim();
-  if(!key){note.textContent="paste a key first";return;}
-  note.textContent="testing the key…";
+  if(!key){note.textContent="Paste a key first.";return;}
+  note.textContent="Checking…";
   try{
     const d=await(await api("/api/cloud/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
@@ -61726,7 +61697,7 @@ $("#wiz-provs").addEventListener("click",async e=>{
       wizPaintProvs();          // the row repaints as connected
       paintTierAvail();
     }else note.textContent=d.err||"that didn’t work";
-  }catch(e2){note.textContent="network error — try again";}
+  }catch(e2){note.textContent="Couldn’t reach the app. Try again.";}
 });
 function openWizard(){wizVeil.hidden=false;wizShow(1);}
 async function wizFinish(){
@@ -62675,7 +62646,7 @@ function offerProgress(started,s){
     // that is all that's moving, say so; the rest wait their turn
     const dl=going.filter(m=>m.status==="downloading"),q=going.length-dl.length;
     if(dl.length&&dl.every(m=>m.checking))
-      return {line:"Finishing: checking the files\u2026"
+      return {line:"Checking the files\u2026"
         +(q?" \u00b7 "+q+" waiting":""),end:""};
     return {line:s.have_gb+" / "+s.want_gb+" GB \u00b7 "+(s.overall_pct||0)+"%"
       +(s.speed_mbs?" \u00b7 "+s.speed_mbs+" MB/s":"")
@@ -62698,7 +62669,7 @@ function offerSum(p){
   const a=p.after_gb;
   return [p.dl_gb?muGB(p.dl_gb)+" to download":"",
           p.free_gb?muGB(p.free_gb)+" freed":"",
-          a==null?"":a<0?muGB(-a)+" short of free space"
+          a==null?"":a<0?muGB(-a)+" short on disk"
             :muGB(a)+" free after"].filter(Boolean).join(" \u00b7 ");
 }
 async function announceModels(){
@@ -62739,9 +62710,9 @@ async function announceModels(){
     }
     if(!fresh.length&&
        Date.now()-(prefs.remind_models_ts||0)<REMIND_GAP)return;
-    title.textContent="More models available";
+    title.textContent="New models";
     $("#new-detail").textContent=
-      "More models to enhance your experience are available.";
+      "This version adds new models.";
     const get=$("#new-get"),note=$("#new-pct");
     const paint=p=>{
       plan=p;
@@ -62754,9 +62725,9 @@ async function announceModels(){
     $("#new-bar").hidden=true;note.hidden=true;
     // one label whatever the mix (6b335, per Patrick): the list above
     // it already says what will change
-    get.textContent="Update model library";
+    get.textContent="Get them";
     $("#new-bg").hidden=true;$("#new-skip").hidden=false;
-    $("#new-bg").textContent="Run in background";$("#new-retry").hidden=true;
+    $("#new-bg").textContent="Continue in background";$("#new-retry").hidden=true;
     $("#new-off").hidden=!!fresh.length;
     veil.hidden=false;
     let poll=null;
@@ -62780,7 +62751,7 @@ async function announceModels(){
         // the library changed since the card opened: nothing was done,
         // and the card shows what's true now
         paint(r.plan);
-        note.hidden=false;note.textContent="The list changed. Check it again.";
+        note.hidden=false;note.textContent="The list changed. Check again.";
         return;
       }
       if(!r||!r.ok){
@@ -62796,7 +62767,7 @@ async function announceModels(){
       get.hidden=true;$("#new-skip").hidden=true;$("#new-off").hidden=true;
       note.hidden=false;
       if(!(r.started||[]).length){
-        note.textContent="Done \u2713"+tail;
+        note.textContent="Done"+tail;
         setTimeout(()=>{veil.hidden=true;},kept.length?4000:1600);
         return;
       }
@@ -62822,7 +62793,7 @@ async function announceModels(){
           retry.hidden=false;$("#new-bg").textContent="Close";
           retry.onclick=async()=>{
             retry.hidden=true;note.textContent="starting\u2026";
-            $("#new-bg").textContent="Run in background";
+            $("#new-bg").textContent="Continue in background";
             try{await api("/api/model/download",{method:"POST",
               headers:{"Content-Type":"application/json"},
               body:JSON.stringify({labels:pr.retry})});}catch(e){}
@@ -63237,7 +63208,7 @@ function manageTick(){
       $("#manage-note").textContent=bad.length
         ?bad.length+" download"+(bad.length>1?"s":"")+" failed \u2014 "
           +bad.map(m=>m.label+(m.note?" ("+m.note+")":"")).join(", ")
-          +" \u00b7 retry from the list"
+          +". Retry from the list."
         :"done \u2014 "+st.ready_n+" models installed";
       paintRoster(lastSetup,lastCloud);
     }
@@ -63256,7 +63227,7 @@ $("#roster-manage").addEventListener("click",async()=>{
   $("#manage-box").hidden=!manageOn;
   $("#roster").classList.toggle("managing",manageOn);
   if(manageOn){
-    planCardsPut('<div class="plan-card plan-wait">reading disk\u2026</div>');
+    planCardsPut('<div class="plan-card plan-wait">Reading disk\u2026</div>');
     await ensureSetup();
     paintPlans();paintMgStats();paintCleanNote();paintStudios();
     if(lastSetup&&lastSetup.busy)manageTick();   // a batch is already running
@@ -63277,12 +63248,12 @@ function muHas(p){return !!(p&&((p.updates||[]).length));}
 function muRows(p,srv){
   const rows=[];
   muOffers(p).forEach(u=>rows.push({t:u.old+" \u2192 "+u.new,gb:muGB(u.dl_gb)}));
-  ((p&&p.refresh)||[]).forEach(r=>rows.push({t:r.label+" \u00b7 newer weights",gb:muGB(r.gb)}));
+  ((p&&p.refresh)||[]).forEach(r=>rows.push({t:r.label+": newer weights",gb:muGB(r.gb)}));
   ((p&&p.added)||[]).forEach(a=>rows.push({t:a.label+" \u00b7 new",gb:muGB(a.gb)}));
   ((p&&p.studio)||[]).forEach(x=>rows.push({t:x.label+" \u00b7 "+x.why,gb:muGB(x.gb)}));
   (srv||[]).forEach(s=>{
     (s.add||[]).forEach(a=>rows.push({t:s.name+" \u00b7 "+a.name+" \u00b7 "+a.why,gb:muGB(a.gb)}));
-    (s.refresh||[]).forEach(r=>rows.push({t:s.name+" \u00b7 "+r.name+" \u00b7 newer weights",
+    (s.refresh||[]).forEach(r=>rows.push({t:s.name+", "+r.name+": newer weights",
       gb:"up to "+muGB(r.gb)}));
   });
   return rows;
@@ -63305,7 +63276,7 @@ function muPaint(el,st){
   let h;
   if(st&&st.state==="running"){
     const eta=dlLeft("modup",st.have_b,st.want_b);
-    h='<div class="mu-h">Updating your models</div>'
+    h='<div class="mu-h">Updating models</div>'
       +'<div class="mu-bar"><i style="width:'+(st.pct||0)+'%"></i></div>'
       +'<div class="mu-m">'+[(st.pct||0)+"%",
           st.want_gb?st.have_gb+" of "+st.want_gb+" GB":"",
@@ -63315,20 +63286,18 @@ function muPaint(el,st){
       +'Continue in background</button></div>';
   }else if(st&&el.dataset.ran&&/^(done|partial|error)$/.test(st.state)){
     const ok=st.state==="done";
-    h='<div class="mu-h">'+(ok?"Your models are up to date"
-        :"Some models couldn’t update")+'</div>'
+    h='<div class="mu-h">'+(ok?"Models up to date"
+        :"Some models didn’t update")+'</div>'
       +'<div class="mu-m">'+(ok
         ?(st.freed_gb?"Freed "+muGB(st.freed_gb)+" of old models":"Everything is current")
-        :"Those were left as they were · try again any time from Settings")
+        :"Try again from Settings > Models.")
       +'</div><div class="mu-foot"><button class="primary" data-mu="close">'
       +'Done</button></div>';
   }else if(n){
     const dl=(+p.dl_gb||0)+muSrvGB(muSrv);
     const meta=[dl?muGB(dl)+" to download":"",
                 p.gb?"frees "+muGB(p.gb):""].filter(Boolean).join(" · ");
-    h='<div class="mu-h">'+(onlyNew?(n===1?"A newer version of one of your models is"
-        :"Newer versions of "+n+" of your models are")
-        :(n===1?"An update for one of your models is":"Updates for "+n+" of your models are"))
+    h='<div class="mu-h">'+(n===1?"A model update is":n+" model updates are")
       +' ready</div>'
       +'<div class="mu-m">'+meta+'</div>'
       +'<button class="mu-which" data-mu="which">Show which</button>'
@@ -63338,20 +63307,20 @@ function muPaint(el,st){
         '<div><span>'+esc(u.old)+'</span><span>remove</span></div>').join("")
       +((p.studio_old)||[]).map(x=>
         '<div><span>'+esc(x.label)+'</span><span>remove</span></div>').join("")
-      +(kept.length?'<div class="mu-kept">Retired, added outside the app, so kept: '
+      +(kept.length?'<div class="mu-kept">Kept (added outside the app): '
         +esc(kept.join(", "))+'</div>':"")+'</div>'
       +'<div class="mu-foot"><button class="primary" data-mu="go">'
       +'Update models</button><button class="ghost" data-mu="later">'
       +'Later</button></div>';
   }else if(p.gb){
-    h='<div class="mu-h">Outdated models are taking '+muGB(p.gb)+'</div>'
-      +'<div class="mu-m">This version doesn’t use them</div>'
+    h='<div class="mu-h">Outdated models use '+muGB(p.gb)+'</div>'
+      +'<div class="mu-m">This version doesn’t use them.</div>'
       +'<div class="mu-foot"><button class="primary" data-mu="go">'
       +'Remove them</button><button class="ghost" data-mu="later">'
-      +'Keep for now</button></div>';
+      +'Keep</button></div>';
   }else{
     h='<div class="mu-h">Everything is current</div>'
-      +'<div class="mu-m">Every model you have is the newest of its kind</div>'
+      +'<div class="mu-m">Every model is current.</div>'
       +'<div class="mu-foot"><button class="primary" data-mu="close">'
       +'Done</button></div>';
   }
@@ -63387,7 +63356,7 @@ function muSrvSaid(st){
   if(muHost){
     const n=document.createElement("div");n.className="mu-m mu-srv";
     n.textContent=bad.length?bad.map(x=>x.err).join(" "):
-      "Your server"+(r.length>1?"s are":" is")+" updating too \u00b7 Settings \u203a Servers shows it";
+      "Your server"+(r.length>1?"s are":" is")+" updating too.";
     setTimeout(()=>{if(muHost&&!muHost.querySelector(".mu-srv"))muHost.appendChild(n);},0);
   }
 }
@@ -63454,14 +63423,14 @@ function paintCleanNote(){
   if(typeof c.auto==="boolean")
     $("#autoclean-toggle").classList.toggle("on",c.auto);
   if(c.running){
-    note.textContent="Updating your models…";btn.textContent="View";btn.hidden=false;
+    note.textContent="Updating models…";btn.textContent="View";btn.hidden=false;
   }else if(n){
     note.textContent=n===muOffers(c).length
       ?(n===1?"A newer version of one model is ready":"Newer versions of "+n+" models are ready")
       :(n===1?"An update for one model is ready":"Updates for "+n+" models are ready");
     btn.textContent="Update";btn.hidden=false;
   }else if(c.gb){
-    note.textContent="Outdated models are taking "+muGB(c.gb);
+    note.textContent="Outdated models use "+muGB(c.gb);
     btn.textContent="Clean up";btn.hidden=false;
   }else{
     note.textContent="Everything is current";btn.hidden=true;
@@ -63482,7 +63451,7 @@ $("#autoclean-toggle").addEventListener("click",async()=>{
     body:JSON.stringify({auto_cleanup:on})});
   if(!on)return;
   // switching it on is a sweep
-  $("#autoclean-note").textContent="Clearing out old models…";
+  $("#autoclean-note").textContent="Removing old models…";
   try{
     await api("/api/model/cleanup",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"});
@@ -63499,12 +63468,12 @@ $("#plan-row").addEventListener("click",async e=>{
   try{r=await(await api("/api/setup/install",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({plan:c.dataset.set})})).json();}
-  catch(e2){$("#manage-note").textContent="could not start \u2014 try again";return;}
+  catch(e2){$("#manage-note").textContent="Couldn\u2019t start. Try again.";return;}
   plansRefresh();
   if(!(r.started||[]).length){
     $("#manage-note").textContent=r.n
-      ?"already installed \u2014 nothing to download"
-      :"nothing to install";
+      ?"Already installed"
+      :"Nothing to install";
     return;
   }
   $("#manage-note").textContent="downloading "+r.started.length+" model"
@@ -63778,16 +63747,12 @@ async function checkUpdate(){
 }
 function openUpdate(){
   if(!upInfo)return;
-  $("#up-ver").textContent=upInfo.latest+"  \u2022  you have "+upInfo.current;
+  $("#up-ver").textContent=upInfo.latest+" (you have "+upInfo.current+")";
   $("#up-detail").textContent=upInfo.manual
     // a PC gets its release file in the browser (6b317): unzip it over
     // this folder, or run the installer; chats live elsewhere and stay
-    ?"Opens the "+(upInfo.size_mb?upInfo.size_mb+" MB ":"")+"download from "+
-     "GitHub in your browser. Quit ConcordeAI and unzip it where this "+
-     "copy is, replacing the old ConcordeAI folder (or run the "+
-     "installer). Your chats and everything it remembers are kept."
-    :"Downloads "+upInfo.size_mb+" MB from GitHub, then restarts. "+
-     "Your chats and everything it remembers are kept.";
+    ?"Opens the "+(upInfo.size_mb?upInfo.size_mb+" MB ":"")+"download in your browser. Quit, then replace this copy with it. Your chats and memories are kept."
+    :"Downloads "+upInfo.size_mb+" MB, then restarts. Your chats and memories are kept.";
   // never over a Mac update already running (review)
   if(!upGo.disabled)upGo.textContent=upInfo.manual?"Download":"Update now";
   upVeil.hidden=false;
@@ -63810,7 +63775,7 @@ upGo.addEventListener("click",async()=>{
     if(st.state==="restarting"){
       clearInterval(poll);
       upGo.textContent="Restarting\u2026";
-      $("#up-detail").textContent="MillenAI is reopening with the new version.";
+      $("#up-detail").textContent="Reopening with the new version.";
     }
     if(st.state==="error"){
       clearInterval(poll);upGo.disabled=false;upGo.textContent="Try again";
