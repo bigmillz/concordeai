@@ -60754,9 +60754,17 @@ async function ensureVoice(){
      withholds the D keyup while Command is down and people let go of
      Command last, so that release gets the longer DICT_HOLD_MOD_MS. It is
      a hold past the threshold, or once repeats were seen, and a hold
-     stops, unless less than DICT_MIN_HOLD_S of audio came in (ev.secs):
-     then it was a tap after all and dictation stays on. The keyup of the
-     second press lands on idle and is ignored.
+     stops; anything shorter was a tap and dictation stays on. HOW LONG
+     THE KEY WAS DOWN is the whole test (6b549, per Patrick: "it just
+     permanently turns on"). It used to need DICT_MIN_HOLD_S of audio as
+     well, but since 6b543 the audio clock starts late: recording only
+     counts once the session (a round trip) and the microphone are both
+     in, while the indicator lights at the keydown, so a real second-long
+     hold released before then read as 0 s, became a toggle and kept
+     listening. A stop that lands while the start is in flight waits in
+     dictPend and runs as soon as the start does, and a clip under
+     DICT_MIN_CLIP_S is dropped, not transcribed. The keyup of the second
+     press lands on idle and is ignored.
    - away: the window lost focus or hid. A recording stops, however it
      began: an open microphone in an unfocused app is the worse outcome.
      But while a start is in flight (ev.starting) nothing stops: that blur
@@ -60766,7 +60774,6 @@ async function ensureVoice(){
      start), so the state resets. */
 const DICT_HOLD_MS=300;          // D keyup: released later than this is a hold
 const DICT_HOLD_MOD_MS=500;      // Command/Ctrl keyup: the same, with slack
-const DICT_MIN_HOLD_S=0.4;       // a "hold" with less audio than this was a tap
 const DICT_MIN_CLIP_S=0.3;       // less than this is never transcribed
 const DICT_KEY=IS_PC?"Ctrl+D":"\u2318D";
 const dictSt={mode:"",t:0,rep:false};
@@ -60788,7 +60795,7 @@ function dictKey(ev,now){
   if(ev.type==="up"){
     if(s.mode!=="hold")return "";
     const held=s.rep||now-s.t>=(ev.mod?DICT_HOLD_MOD_MS:DICT_HOLD_MS);
-    if(held&&(ev.secs||0)>=DICT_MIN_HOLD_S){idle();return "stop";}
+    if(held){idle();return "stop";}
     s.mode="toggle";s.rep=false;return "";
   }
   if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}
@@ -60836,8 +60843,8 @@ function audioSecs(bufs,sr){
      and when the setting goes off. Never while a recording or a start is
      under way: that is not the warm window's to cut.
    - "listening" is said when the first audio chunk arrives (recHeard),
-     "getting the microphone" until then. A start in flight still counts
-     as 0 s of audio for the tap and hold rules of 6b338. */
+     "getting the microphone" until then. The tap and hold rules of 6b338
+     go by the key alone (6b549), so a start in flight doesn't change them. */
 const MIC_WARM_S=15;
 const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,
   autoGainControl:false}};
@@ -61092,7 +61099,6 @@ function dictModal(){
   return !!((p&&!p.hidden)
     ||[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden));
 }
-function recSecs(){return recording?dictSecs:0;}
 let dictStarting=false,dictPend=false;
 function micMsg(e){
   return e&&e.name==="NotFoundError"?"No microphone found."
@@ -61170,7 +61176,7 @@ document.addEventListener("keydown",e=>{
 document.addEventListener("keyup",e=>{
   const modUp=e.key===(IS_PC?"Control":"Meta");
   if(!modUp&&!dictIsD(e.key,e.code))return;
-  dictAct(dictKey({type:"up",mod:modUp,secs:recSecs()},Date.now()));
+  dictAct(dictKey({type:"up",mod:modUp},Date.now()));
 },true);
 addEventListener("blur",dictAway);
 document.addEventListener("visibilitychange",()=>{if(document.hidden)dictAway();});

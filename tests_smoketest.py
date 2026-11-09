@@ -27146,7 +27146,7 @@ _DK_PURE = _MILLENAI_SRC[_DK_A:_MILLENAI_SRC.index(
 _DK_JS = "const IS_PC=false;\n" + _DK_PURE
 _DK_SCEN = r'''
 const D=(o)=>Object.assign({type:"down"},o||{}), R={type:"down",repeat:true};
-const U=(o)=>Object.assign({type:"up",secs:1},o||{}), AW=(o)=>Object.assign({type:"away"},o||{});
+const U=(o)=>Object.assign({type:"up"},o||{}), AW=(o)=>Object.assign({type:"away"},o||{});
 const EN={type:"end"};
 const run=(steps)=>{dictKey(EN,0);return steps.map(([ev,t])=>dictKey(ev,t));};
 const eq=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -27163,11 +27163,14 @@ o.modedge=eq(run([[D(),0],[U({mod:true}),499]]),["start",""])&&dictSt.mode==="to
         &&eq(run([[D(),0],[U(),450]]),["start","stop"]);
 // repeats seen before the release: a hold whatever the time
 o.repeats=eq(run([[D(),0],[R,100],[U({mod:true}),150]]),["start","","stop"]);
-// a "hold" with under 0.4 s of audio was a tap: it stays on; the mic
-// still starting (no audio yet) is the same
-o.shortaudio=eq(run([[D(),0],[U({secs:0.2}),2000],[D(),3000]]),["start","","stop"])
-           &&eq(run([[D(),0],[U({secs:0}),1000]]),["start",""])&&dictSt.mode==="toggle"
-           &&eq(run([[D(),0],[U({secs:0.4}),1000]]),["start","stop"]);
+// 6b549: how long the key was down is the whole test. A 1 s hold released
+// before any audio came in (the start still in flight, so the page would
+// have said 0 s) STOPS, on either keyup; it used to become a toggle and
+// keep listening. A 150 ms tap still stays on
+o.earlyhold=eq(run([[D(),0],[U({secs:0}),1000]]),["start","stop"])&&dictSt.mode===""
+          &&eq(run([[D(),0],[U({mod:true,secs:0}),1000]]),["start","stop"])
+          &&eq(run([[D(),0],[U(),150]]),["start",""])&&dictSt.mode==="toggle"
+          &&eq(run([[D(),0],[U({mod:true}),150],[D(),3000]]),["start","","stop"]);
 // a quick tap leaves it on; the second press stops; its keyup and its
 // repeats are ignored; a third press starts again
 o.tap=eq(run([[D(),0],[U(),120],[D(),5000],[R,5050],[U(),5100],[D(),6000]]),
@@ -27215,7 +27218,7 @@ def _dk_run(js):
 
 
 _DK_BASE = _dk_run(_DK_JS)
-_DK_NAMES = ["hold", "edge", "modedge", "repeats", "shortaudio", "tap", "tapmic", "button",
+_DK_NAMES = ["hold", "edge", "modedge", "repeats", "earlyhold", "tap", "tapmic", "button",
              "modfirst", "modal", "modalstop", "blur", "blurbutton", "blurstart", "stray",
              "dvorak", "cyrillic", "audio"]
 _dk_ok = lambda *ns: all(_DK_BASE.get(n_) is True for n_ in ns)
@@ -27224,8 +27227,10 @@ check("dictation hotkey: hold then release; repeats ignored; 300 ms on the D key
       _dk_ok("hold", "edge", "modedge", "repeats") and "const DICT_HOLD_MS=300;" in _MILLENAI_SRC
       and "const DICT_HOLD_MOD_MS=500;" in _MILLENAI_SRC, "%r" % _DK_BASE)
 check("dictation hotkey: a quick tap stays on, the second press stops, its keyup is ignored, "
-      "the mic button ends it cleanly; a hold under 0.4 s of audio was a tap (node)",
-      _dk_ok("tap", "tapmic", "shortaudio"), "%r" % _DK_BASE)
+      "the mic button ends it cleanly; a 1 s hold with no audio yet stops (6b549) (node)",
+      _dk_ok("tap", "tapmic", "earlyhold") and 'if(held){idle();return "stop";}' in _MILLENAI_SRC
+      and "ev.secs" not in _MILLENAI_SRC and "const DICT_MIN_HOLD_S" not in _MILLENAI_SRC,
+      "%r" % _DK_BASE)
 check("dictation hotkey: the hotkey stops a recording the mic button started; the modifier "
       "released first counts as the release (node)",
       _dk_ok("button", "modfirst"), "%r" % _DK_BASE)
@@ -27245,7 +27250,8 @@ _DK_MUT = [
     ("modedge", "(ev.mod?DICT_HOLD_MOD_MS:DICT_HOLD_MS)", "DICT_HOLD_MS"),
     ("repeats", "const held=s.rep||", "const held="),
     ("repeats", 'if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}', 'if(ev.repeat)return "";'),
-    ("shortaudio", '(ev.secs||0)>=DICT_MIN_HOLD_S', "true"),
+    # 6b549: the audio-seconds condition back (the bug): a hold with no audio yet keeps listening
+    ("earlyhold", 'if(held){idle();return "stop";}', 'if(held&&(ev.secs||0)>=0.4){idle();return "stop";}'),
     ("tap", 's.mode="toggle";s.rep=false;return "";', 's.mode="";return "";'),
     ("hold", 'if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}', ""),
     ("modal", 'if(ev.modal)return "";', ""),
@@ -27287,7 +27293,7 @@ def _dk_pins(src):
                      '  if(!modal||a==="stop")e.preventDefault();' in src)
     _p["keyup"] = ('const modUp=e.key===(IS_PC?"Control":"Meta");\n'
                    '  if(!modUp&&!dictIsD(e.key,e.code))return;\n'
-                   '  dictAct(dictKey({type:"up",mod:modUp,secs:recSecs()},Date.now()));\n},true);' in src)
+                   '  dictAct(dictKey({type:"up",mod:modUp},Date.now()));\n},true);' in src)
     _p["blur"] = ('dictAct(dictKey({type:"away",starting:dictStarting,rec:recording},Date.now()));' in src
                   and 'addEventListener("blur",dictAway);' in src
                   and "if(document.hidden)dictAway();" in src)
@@ -27317,7 +27323,7 @@ check("dictation hotkey: the handler, the tooltip, the placeholders and the exis
 _dkp_bad = []
 for _k, _a in [("mac", "e.metaKey&&!e.ctrlKey"), ("key", "if(!dictIsD(e.key,e.code))return;\n  const modal"),
                ("prevent", 'if(!modal||a==="stop")e.preventDefault();'),
-               ("keyup", "mod:modUp,secs:recSecs()"), ("blur", "document.hidden"),
+               ("keyup", '{type:"up",mod:modUp}'), ("blur", "document.hidden"),
                ("modal", '[id$="-veil"]'), ("tip", "Hold \"+DICT_KEY"), ("hold_ph", "Release to finish"),
                ("toggle_ph", "or tap the mic to finish"), ("slip_ph", "catch that"),
                ("path", "const cap=micAttach();"), ("btn", "  dictStart();\n});")]:
@@ -27735,7 +27741,7 @@ await sec("buttonblur",async()=>{
 // tap and tap while the start is in flight: stopped once it starts
 await sec("taptap",async()=>{
   reset();dictKey({type:"down"},0);const relG=delayedGum();const p=dictStart();await tick();
-  dictAct(dictKey({type:"up",secs:0},50));dictAct(dictKey({type:"down"},100));
+  dictAct(dictKey({type:"up"},50));dictAct(dictKey({type:"down"},100));
   relG();await p;await tick();
   o.taptap=!recording&&dictSt.mode==="";
 });
@@ -27746,13 +27752,31 @@ await sec("slip",async()=>{
   calls.length=0;await dictStart();feed(1);await stopRec();
   o.slip=sl&&ended()&&sent===1;
 });
-// a hold whose audio is under 0.4 s was a tap: it keeps listening, as a toggle
-await sec("shorthold",async()=>{
-  reset();dictKey({type:"down"},0);await dictStart();feed(0.1);
-  dictAct(dictKey({type:"up",mod:true,secs:recSecs()},2000));
-  const sh=recording&&dictSt.mode==="toggle"&&input.placeholder.includes("tap the mic");
-  feed(1);dictAct(dictKey({type:"down"},3000));await tick();
-  o.shorthold=sh&&!recording&&ended();
+// 6b549, the bug: a 1 s hold released while the session is still being
+// asked for (recording false). It stops as soon as the start lands, and the
+// words said meanwhile (the pre-roll) are transcribed; with nothing said it
+// is a slip, dropped. It used to become a toggle and keep listening
+await sec("earlyhold",async()=>{
+  reset();const relV=delayedVoice();dictKey({type:"down"},0);const p=dictStart();await tick();
+  feed(1);const was=recording===false&&dictStarting===true;
+  dictAct(dictKey({type:"up",mod:true},1000));
+  const pend=dictPend===true&&dictSt.mode==="";
+  relV();await p;await tick();
+  const a=was&&pend&&!recording&&ended()&&dictSt.mode===""&&!dictPend;
+  reset();const relV2=delayedVoice();dictKey({type:"down"},0);const p2=dictStart();await tick();
+  dictAct(dictKey({type:"up"},1000));relV2();await p2;await tick();
+  o.earlyhold=a&&!recording&&!ended()&&input.placeholder==="Didn’t catch that. Try again.";
+});
+// ...and a 150 ms tap in the same window still keeps listening, as a toggle,
+// until the next press
+await sec("earlytap",async()=>{
+  reset();const relV=delayedVoice();dictKey({type:"down"},0);const p=dictStart();await tick();
+  dictAct(dictKey({type:"up",mod:true},150));
+  const tg=dictSt.mode==="toggle"&&!dictPend;
+  relV();await p;await tick();feed(1);
+  const on=recording===true&&dictSt.mode==="toggle"&&input.placeholder.includes("tap the mic");
+  dictAct(dictKey({type:"down"},3000));await tick();
+  o.earlytap=tg&&on&&!recording&&ended();
 });
 // 6b543: every call the capture path made went to this app's own /api/
 o.local=allCalls.length>0&&allCalls.every(u=>typeof u==="string"&&u.startsWith("/api/"));
@@ -27771,7 +27795,7 @@ _FS_BASE = _fs_run(_FS_GLUE)
 _FS_NAMES = ["order", "statusskip", "constraints", "ctxonce", "warmreuse", "warmtimer", "warmblur",
              "warmnew", "warmpage", "warmoff", "warmdefault", "warmslip", "leak", "nocut", "blurstart", "listening",
              "trace", "s503", "gone", "gonepend", "notready", "nomic", "prompt", "buttonblur",
-             "taptap", "slip", "shorthold", "local"]
+             "taptap", "slip", "earlyhold", "earlytap", "local"]
 _fs_ok = lambda *ns: all(_FS_BASE.get(n_) is True for n_ in ns)
 check("dictation fast: the capture starts before the session answers; a start with a session "
       "never asks /api/voice/status; less processing is asked for (node)",
@@ -27793,10 +27817,10 @@ check("dictation hotkey: every failed start resets it (server gone, not ready, n
       "mic-button one too (node)",
       _fs_ok("gone", "gonepend", "notready", "nomic", "prompt", "buttonblur", "taptap"),
       "%r" % _FS_BASE)
-check("dictation hotkey: under 0.3 s is never transcribed or sent; a short hold keeps "
-      "listening (node)",
-      _fs_ok("slip", "shorthold") and "const DICT_MIN_CLIP_S=0.3;" in _MILLENAI_SRC
-      and "const DICT_MIN_HOLD_S=0.4;" in _MILLENAI_SRC, "%r" % _FS_BASE)
+check("dictation hotkey: under 0.3 s is never transcribed or sent; a 1 s hold released while "
+      "the start is in flight stops once it lands, a 150 ms tap keeps listening (6b549) (node)",
+      _fs_ok("slip", "earlyhold", "earlytap") and "const DICT_MIN_CLIP_S=0.3;" in _MILLENAI_SRC
+      and "function recSecs" not in _MILLENAI_SRC, "%r" % _FS_BASE)
 _FS_MUT = [
     # (scenario, anchor, replacement)
     ("order", "const cap=micAttach();", "const cap=(await new Promise(r=>realST(r,20)),micAttach());"),
@@ -27839,7 +27863,11 @@ _FS_MUT = [
     ("nomic", "micDetach(false);dictDrop();dictLit(false);input.placeholder=micMsg(e);", "input.placeholder=micMsg(e);"),
     ("taptap", "else if(dictStarting)dictPend=true;}", "}"),
     ("slip", "if(clip.secs<DICT_MIN_CLIP_S||!sid){", "if(!sid){"),
-    ("shorthold", "function recSecs(){return recording?dictSecs:0;}", "function recSecs(){return recording?9:0;}"),
+    # 6b549: the old rule back (a hold needs 0.4 s of audio, and the start in flight counts 0): the bug
+    ("earlyhold", 'if(held){idle();return "stop";}', 'if(held&&(ev.secs||0)>=0.4){idle();return "stop";}'),
+    ("earlyhold", "if(dictPend){dictPend=false;stopRec();}", ""),          # the stop in flight lost
+    ("earlyhold", "else if(dictStarting)dictPend=true;}", "}"),
+    ("earlytap", "const held=s.rep||now-s.t>=(ev.mod?DICT_HOLD_MOD_MS:DICT_HOLD_MS);", "const held=true;"),
     ("local", 'api("/api/dictate/audio?sid="+sid,', 'api("https://127.0.0.1/api/dictate/audio?sid="+sid,'),
     ("prompt", "starting:dictStarting,rec:recording", "starting:false,rec:recording"),
 ]
