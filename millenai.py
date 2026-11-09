@@ -34143,7 +34143,7 @@ def run_cloud_only(messages: list, emit, status, step, plan=None, pen: str = "")
             return
         if c.get("_stop") == "refusal":
             step("draft", "%s declined" % lbl, "done", "")
-            emit(AppText("**%s** declined. Switch to Alpha, Gamma or Sigma to answer here." % lbl))
+            emit(AppText("**%s** declined. Switch to Fast, Thinking or Pro to answer here." % lbl))
             return
         step("draft", "%s dropped out" % lbl, "done", "")
         emit(_cloud_all_down())
@@ -34243,7 +34243,7 @@ def _cloud_all_down() -> str:
         out.append("No cloud provider answered. Try again in a moment.")
     elif not resting and not broken:
         out.append("Add a key in Settings > Cloud. Gemini and Groq are free.")
-    out.append("Or switch to Alpha, Gamma or Sigma to answer here.")
+    out.append("Or switch to Fast, Thinking or Pro to answer here.")
     return AppText("\n\n".join(out))
 
 
@@ -34661,7 +34661,7 @@ def run_council(labels: list, messages: list, emit, status,
         # ledger reads "2 of 3" with the reason instead of a model gone
         # missing (after the drafts, so the page's time-left milestones
         # count only real drafts)
-        took_part(_lbl, "(no answer: not asked. Gamma seats one writer and one critic)")
+        took_part(_lbl, "(no answer: not asked. Thinking seats one writer and one critic)")
 
     good = [d for d in drafts if not d[1].startswith("(no answer")]
     if not good and srv_only:
@@ -37971,7 +37971,9 @@ def effort_think(effort):
     return {"low": "low", "ultra": "high"}.get(effort)
 
 
-MODE_ALIASES = {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro",
+MODE_ALIASES = {"Deep": "Vera Rubin",    # the shown name since 6b544
+                # the Greek names of 6b534, which older pages still send
+                "Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro",
                 "Omega": "Vera Rubin",
                 # the names of 6b526, which older pages still send
                 "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro",
@@ -43749,9 +43751,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             tier = "Fast"   # Best retired (5.3) — it was Fast in a crown
         if tier == "Power":
             tier = "Pro"    # Pro absorbed Power (5.3)
-        # THE MODES' BRAND NAMES (6b526, 6b534 per Patrick): the page says
-        # Alpha, Gamma, Sigma (and Omega where its tier exists); the tiers
-        # keep their keys, and a client that sends the name is understood
+        # THE MODES' SHOWN NAMES (6b526, 6b534, 6b544 per Patrick): the page says
+        # Deep for Vera Rubin, and older pages sent the Greek and the 6b526
+        # names; the tiers keep their keys, and a client that sends the name is understood
         if isinstance(tier, str) and tier in MODE_ALIASES \
                 and MODE_ALIASES[tier] in TIERS:
             tier = MODE_ALIASES[tier]
@@ -45846,7 +45848,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "%d minute%s." % (_mins, "" if _mins == 1 else "s"))
                 else:
                     emit("**Cloud Only** reads images with a Claude or Gemini key. "
-                         "Add one in Settings > Cloud, or switch to Alpha, Gamma or Sigma.")
+                         "Add one in Settings > Cloud, or switch to Fast, Thinking or Pro.")
             elif cloud_only:
                 run_cloud_only(full_messages, memit, status, step, _cplan, mode_pen)
             elif ag_remote:
@@ -51070,7 +51072,7 @@ body.gen #chip-model{color:var(--accent)}
 .hz .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite}
 .hz .msg.ai .who b{font-weight:500;color:#e2e7f5}
 .hz .msg.ai .who .st{font-size:13px;font-weight:400;color:var(--hz-ink-3)}
-/* the deepest modes shimmer (per Patrick): Odyssey in full colour while it writes, Meridian a subtle
+/* the deepest efforts shimmer (per Patrick): Ultra in full colour while it writes, Extra a subtle
    ice-to-violet; both settle to the gradient, still, when the answer lands */
 .hz .msg.ai .who b.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent}
@@ -51096,16 +51098,8 @@ body.gen #chip-model{color:var(--accent)}
 .hz .liveline .lstats{margin-left:auto;display:flex;gap:14px;font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);
   font-variant-numeric:tabular-nums;white-space:nowrap}
 @keyframes hzLbl{from{background-position:100% 0}to{background-position:-150% 0}}
-/* the comets ride over the chat, never over a dialog */
-.hz #comets{display:block;position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:7}
-/* the prose glows in while it writes and settles to white when the answer lands; set on the container,
-   since the stream replaces the body's HTML every frame (the 6b242 trap) */
-.hz .msg.ai .body{transition:color .9s ease,text-shadow .9s ease}
-.hz .msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38),0 0 1px rgba(255,255,255,.5)}
-.hz .msg.ai.live .body>*:last-child{text-shadow:0 0 14px rgba(159,192,255,.6),0 0 2px rgba(255,255,255,.7)}
-.hz .msg.ai.live .body .srcrow,.hz .msg.ai.live .body .codecard,.hz .msg.ai.live .body table{text-shadow:none}
-/* one light runs once round the composer when the answer lands: #composer.finish rides the
-   Horizon effort ring (.hz #composer::before, --hz-ang, hzRing in the HORIZON block; integration) */
+/* the words come in plain, behind the writing star (the WRITING STAR block at the end of the Horizon
+   css, 6b544): no glow, no comets, no light round the composer when the answer lands */
 .hz .msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;letter-spacing:.002em;
   color:var(--hz-ink-read);padding:0;font-kerning:normal;text-rendering:optimizeLegibility;
   font-variant-numeric:normal}
@@ -51477,16 +51471,14 @@ body.gen #chip-model{color:var(--accent)}
 /* ---- still, when asked: reduced motion, and the app's visual effects off */
 @media (prefers-reduced-motion:reduce){
   .hz .msg,.hz .chat-item,.hz #undobar,.hz .msg.ai.live .who .dot,.hz .behind .spine li.live .node,.hz .msg.ai.live .who b.shim,
-  .hz .msg.ai.live .liveline .die,.hz .msg.ai.live .liveline em,.hz #composer.finish::before{animation:none!important}
+  .hz .msg.ai.live .liveline .die,.hz .msg.ai.live .liveline em{animation:none!important}
   .hz .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
-  .hz .msg.ai.live .body,.hz .msg.ai.live .body>*:last-child{text-shadow:none}
   .hz .msg,.hz .chat-item,.hz .mact,.hz .mab,.hz .fopt,.hz #sidebar,.hz #rail-btn svg,.hz .behind .spine .prog i{transition:none!important}
 }
 .hz body.novideo .msg,.hz body.novideo .chat-item,.hz body.novideo #undobar,.hz body.novideo .msg.ai.live .who .dot,
 .hz body.novideo .behind .spine li.live .node,.hz body.novideo .msg.ai.live .who b.shim,.hz body.novideo .msg.ai.live .liveline .die,
-.hz body.novideo .msg.ai.live .liveline em,.hz body.novideo #composer.finish::before{animation:none}
+.hz body.novideo .msg.ai.live .liveline em{animation:none}
 .hz body.novideo .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}
-.hz body.novideo .msg.ai.live .body,.hz body.novideo .msg.ai.live .body>*:last-child{text-shadow:none}
 .hz body.novideo #sidebar{transition:none}
 .hz body.novideo .codecard,.hz body.novideo .fopt,.hz body.novideo .apcard,.hz body.novideo #undobar,.hz body.novideo .mapcard>a,
 .hz body.novideo #recents-menu{-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -51497,7 +51489,7 @@ body.gen #chip-model{color:var(--accent)}
 /* Classic (no html.hz) never sees hz-chat's Horizon-only chrome: the comets canvas (it sat in the
    flow at 1440x900), the live line, the marginalia, the sidebar foot's token facts and the fold button;
    the chips and action buttons that reach both looks keep a size for their icons (integration) */
-html:not(.hz) #comets,html:not(.hz) .liveline,html:not(.hz) aside.behind,html:not(.hz) #sb-today,html:not(.hz) #sb-where,html:not(.hz) #rail-btn{display:none}
+html:not(.hz) .liveline,html:not(.hz) aside.behind,html:not(.hz) #sb-today,html:not(.hz) #sb-where,html:not(.hz) #rail-btn{display:none}
 html:not(.hz) .docchip2 svg{width:13px;height:13px}
 html:not(.hz) .mab svg{width:15px;height:15px}
 html:not(.hz) #chat-search svg{position:absolute;left:10px;top:50%;width:14px;height:14px;margin-top:-7px;opacity:.6;pointer-events:none}
@@ -51729,7 +51721,6 @@ __HZ_FONTS__
 .hz #hz-effort[hidden]{display:none}
 .hz .hz-vh{position:absolute;left:-9999px}
 .hz .hz-sl{position:relative;width:170px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.25}
-.hz .hz-sl:focus-within{box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
   background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
 .hz .hz-sl-track{position:absolute;left:9px;right:9px;top:19px;height:2px;border-radius:1px;pointer-events:none;
@@ -51779,11 +51770,10 @@ __HZ_FONTS__
 .hz .hz-opt.open .ms{max-height:140px;margin-top:10px}
 .hz .hz-opt .hz-mdl{height:26px}
 .hz .hz-opt .hz-mdl b{font-size:12.5px}
-/* the top efforts shimmer and a light runs round the composer (Ultra in full, Max softly; OVERRIDE 4) */
+/* a light runs round the composer at Extra, softly, in Full (OVERRIDE 4); Ultra has its own moment
+   (the ULTRA block at the end of the Horizon css, 6b544) and the label never loops */
 @property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
-.hz .hz-elevel.shim{background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
-  -webkit-background-clip:text;background-clip:text;color:transparent;animation:hzShim 3.2s linear infinite}
-.hz .hz-elevel.shim.soft{background-image:linear-gradient(90deg,#cfe0ff,#b9a8ff,#cfe0ff);animation-duration:5s}
+@property --hz-head{syntax:'<number>';initial-value:0;inherits:false}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
   background:conic-gradient(from var(--hz-ang),rgba(159,168,255,0) 0deg,#9fa8ff 40deg,#ff8fc4 90deg,#ffc58a 140deg,rgba(127,240,214,0) 200deg,rgba(159,168,255,0) 360deg);
@@ -51791,11 +51781,7 @@ __HZ_FONTS__
           mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
   animation:hzRing 4s linear infinite}
 .hz #main:not(:has(#hero)) #composer::before{border-radius:22px}
-.hz.hz-ultra #composer::before{opacity:.9}
-.hz.hz-ultra .gen #composer::before{opacity:1;animation-duration:2.4s}
 .hz.hz-maxe #composer::before{opacity:.35;animation-duration:7s}
-/* the answer landed (6b528): the light runs once round, then the ring returns to its effort's state */
-.hz #composer.finish::before{opacity:1;animation:hzRing 1.5s cubic-bezier(.45,0,.25,1) 1}
 @keyframes hzRing{to{--hz-ang:360deg}}
 .hz.hz-ring-static #composer::before{animation:none;background:linear-gradient(135deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6)}
 /* a model a mode runs: a pill with its machine's die (the machine in the tooltip) */
@@ -51905,16 +51891,15 @@ __HZ_FONTS__
 @keyframes hzRowPop{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(159,192,255,0)}35%{transform:scale(1.035);box-shadow:0 0 0 1px rgba(170,200,255,.55),0 0 26px rgba(159,192,255,.4)}100%{transform:none;box-shadow:0 0 0 0 rgba(159,192,255,0)}}
 @keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
 /* ---- stillness: effects off, reduced motion, hidden or long unfocused */
-.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
 .hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
 .hz .novideo #composer::before{animation:none;opacity:0!important}
 .hz .novideo .hz-streak,.hz .novideo .hz-sweep{display:none}
 .hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen{animation-play-state:paused!important}
-.hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
+.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
   .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
   .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
-  .hz .hz-elevel.shim{animation:none}
   .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
   .hz #composer::before{animation:none;opacity:0!important}
   .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
@@ -51998,15 +51983,12 @@ __HZ_FONTS__
 .hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}
 .hz:not(.hz-full) #hero .greet .bloom,.hz:not(.hz-full) #hero .greet .sheen{display:none}
 /* ---- the composer in Calm: no light ring, no breathing glow, no shimmer at Max or Ultra */
-.hz:not(.hz-full) #composer::before,.hz:not(.hz-full) #composer.finish::before{animation:none;opacity:0!important}
+.hz:not(.hz-full) #composer::before{animation:none;opacity:0!important}
 .hz:not(.hz-full) #hz-cglow{display:none}
-.hz:not(.hz-full) .hz-elevel.shim,.hz:not(.hz-full) .hz-elevel.shim.soft{background:none;color:var(--hz-ink-2);animation:none}
 /* ---- asking in Calm: one quiet status line; the words simply appear. No die, no ticking figures
    (they wait in Details), no shimmer, no glowing prose, no breathing dot */
 .hz:not(.hz-full) .liveline .die,.hz:not(.hz-full) .liveline .lstats{display:none}
 .hz:not(.hz-full) .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2);animation:none}
-.hz:not(.hz-full) .msg.ai.live .body,.hz:not(.hz-full) .msg.ai.live .body>*:last-child{color:var(--hz-ink-read);text-shadow:none}
-.hz:not(.hz-full) .msg.ai .body{transition:none}
 .hz:not(.hz-full) .msg.ai .who b.shim,.hz:not(.hz-full) .msg.ai .who b.shim.soft{background:none;color:#e2e7f5;animation:none}
 .hz:not(.hz-full) .msg.ai .who .dot{box-shadow:none;opacity:.7;animation:none}
 .hz:not(.hz-full) .msg.ai.live .who .st{display:none}   /* the status line below says it; one line, not two */
@@ -52101,7 +52083,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #composer.hastext:focus-within{border-color:var(--hz-ember);border-bottom-color:var(--hz-ember);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 80px rgba(0,0,0,.35)}
 .hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
-.hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-sl:focus-within,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
+.hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
 .hz #newchat:focus-visible,.hz .srcchip:focus-visible,.hz .showm:focus-visible,.hz .retrybtn:focus-visible,.hz #sb-foot #settings-btn:focus-visible,.hz #sb-foot #rail-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
 /* ---- an error: a small ember rule at its left, nothing else */
 .hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}
@@ -52133,7 +52115,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .hz-usweep{position:absolute;left:0;bottom:0;width:40%;height:1px;pointer-events:none;opacity:0;
   background:linear-gradient(90deg,rgba(207,224,255,0),rgba(207,224,255,.9),rgba(207,224,255,0))}
 .hz .hz-usweep[hidden],.hz .novideo .hz-usweep{display:none}
-/* asking: the status dot breathes while working; the words fade in; the landing's pass is hzLandSweep */
+/* asking: the status dot breathes while working; the words fade in; the landing is the star's (6b544) */
 .hz.hz-bal .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite;opacity:1}
 .hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}
 /* hover: the controls lift with a faint light */
@@ -52141,6 +52123,109 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}
 .hz.hz-bal #composer.hastext #send:not(:disabled):not(.stop):hover{box-shadow:0 6px 18px -6px rgba(232,65,90,.5)}
 @media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}
+/* ---- ULTRA (6b544, per Patrick: "that's where I want to use VFX to have it pull something off to show
+   you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
+   look stays restrained; this is the one place the effects perform. Values and timings are the friend
+   page's (scratchpad/preview-site/beta, DESIGN.md "The Ultra moment").
+   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the diamond ignites (a white core; a bloom of
+   violet and rose at 18 %, gone by 900 ms); a 22 px spark runs from the diamond back along the beam to its
+   start (160 ms); from there a line of light runs all the way round the composer's border (a conic reveal
+   from that point's angle, --hz-a0, 600 ms from 160 ms, a white head at its edge) and settles into a still
+   1.5 px spectral rim, ice > violet > rose > ember, at .9; the aurora takes one breath (+.45 at 200 ms,
+   settled within 2 s); ULTRA is lit (a white glow that settles over 900 ms).
+   AT ULTRA (html.hz-ultra): the rim still, the diamond white, and THE LIVING ULTRA: the label's spectral
+   gradient flows across the crisp letters, ice > violet > rose > ember > gold and round again, one cycle in
+   3.5 s (the one approved loop on text, and only here); the diamond carries a faint glow of the same hue.
+   The rim stays still: the life is in the word and the diamond. LEAVING (html.hz-ultra-out) stops the flow
+   at once and drains the rim back the way it came in 300 ms. Calm and reduced motion: the still rim (a
+   300 ms fade in Calm) and the still gradient label. Arrivals ease on cubic-bezier(.16,1,.3,1), the drain on
+   cubic-bezier(.65,0,.35,1), the run on cubic-bezier(.45,0,.2,1). Full's rotating ring (::before) is off at Ultra. */
+@property --hz-rev{syntax:'<angle>';initial-value:360deg;inherits:false}
+.hz #composer{--hz-a0:230deg}
+.hz #composer::after{content:"";display:none;position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;z-index:1;
+  --hz-rev:360deg;--hz-head:0;opacity:.9;
+  background:conic-gradient(from calc(var(--hz-a0) + var(--hz-rev) - 16deg),rgba(255,255,255,0),rgba(255,255,255,var(--hz-head)) 16deg,rgba(255,255,255,0) 17deg),
+    conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);
+  -webkit-mask:conic-gradient(from var(--hz-a0),#000 var(--hz-rev),transparent var(--hz-rev)),linear-gradient(#000 0 0) content-box;-webkit-mask-composite:source-out;
+          mask:conic-gradient(from var(--hz-a0),#000 var(--hz-rev),transparent var(--hz-rev)),linear-gradient(#000 0 0) content-box;mask-composite:subtract}
+.hz #main:not(:has(#hero)) #composer::after{border-radius:14px}
+.hz.hz-ultra #composer::after,.hz.hz-ultra-out #composer::after{display:block}
+.hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}
+.hz.hz-ignite #composer::after{animation:hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both}
+@keyframes hzUltraRun{0%{--hz-rev:0deg;--hz-head:1}90%{--hz-head:1}100%{--hz-rev:360deg;--hz-head:0}}
+.hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}
+@keyframes hzUltraDrain{from{--hz-rev:360deg}to{--hz-rev:0deg}}
+/* the diamond: white at Ultra, with the faint flowing glow; on arrival the white core and the bloom */
+.hz.hz-ultra .hz-sl-thumb{background:#fff}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}
+.hz.hz-ignite .hz-sl-thumb,.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-sl-thumb{animation:hzIgnite .9s cubic-bezier(.16,1,.3,1) both,hzDiamondFlow 3.5s linear .9s infinite}
+@keyframes hzIgnite{0%{box-shadow:0 0 0 0 #fff}18%{box-shadow:0 0 6px 2px #fff,0 0 22px 8px rgba(185,168,255,.75),0 0 44px 16px rgba(242,166,180,.45)}
+  100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 0 rgba(185,168,255,0),0 0 0 0 rgba(242,166,180,0)}}
+@keyframes hzDiamondFlow{0%,100%{box-shadow:0 0 7px 1px rgba(207,224,255,.5)}25%{box-shadow:0 0 7px 1px rgba(185,168,255,.5)}50%{box-shadow:0 0 7px 1px rgba(242,166,180,.5)}
+  70%{box-shadow:0 0 7px 1px rgba(232,65,90,.45)}85%{box-shadow:0 0 7px 1px rgba(241,220,178,.5)}}
+/* the spark: 22 px, from the diamond back to the beam's start in 160 ms; leaving, back out to the diamond */
+.hz .hz-sl-spark{display:none;position:absolute;top:19px;left:9px;width:22px;height:3px;margin-left:-11px;border-radius:2px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(255,255,255,0),#fff);box-shadow:0 0 8px rgba(207,224,255,.9)}
+.hz #hz-effort.compact .hz-sl-spark{top:13px}
+.hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}
+.hz.hz-ultra-out .hz-sl-spark{display:block;animation:hzSpark .3s cubic-bezier(.65,0,.35,1) reverse both}
+@keyframes hzSpark{0%{transform:translateX(var(--hz-eff-px,0px));opacity:1}85%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
+/* the label: the spectral gradient on crisp letters; flowing at Ultra (3.5 s a cycle), still in Calm; lit on arrival */
+.hz .hz-elevel.spectral{background:linear-gradient(90deg,#cfe0ff,#b9a8ff,#f2a6b4,#e8415a,#f1dcb2,#cfe0ff);background-size:300% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent}
+.hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}
+.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzFlow{from{background-position:150% 0}to{background-position:0% 0}}
+@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 12px rgba(255,255,255,.95),0 0 28px rgba(185,168,255,.7)}
+  100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0),0 0 0 rgba(185,168,255,0)}}
+/* the sky answers once: the rays brighten +.45 at 200 ms and settle within 2 s */
+.hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzSkyBreath{0%{filter:brightness(1)}10%{filter:brightness(1.45)}100%{filter:brightness(1)}}
+/* Calm: the rim fades in and out over 300 ms, no run, no spark, no bloom, no flow; a page without
+   @property (hz-ring-static) has no run either, the rim simply shows */
+.hz.hz-calm.hz-ignite #composer::after,.hz.hz-ring-static.hz-ignite #composer::after,.hz.hz-calm.hz-ultra-out #composer::after,.hz.hz-ring-static.hz-ultra-out #composer::after,
+.hz.hz-calm.hz-ignite .hz-sl-thumb,.hz.hz-calm.hz-ignite .hz-elevel.spectral,.hz.hz-calm.hz-ignite #hz-aurw{animation:none}
+.hz.hz-calm.hz-ultra #composer::after{animation:hzRimIn .3s cubic-bezier(.16,1,.3,1) both}
+.hz.hz-calm.hz-ultra-out #composer::after{animation:hzRimOut .3s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzRimIn{from{opacity:0}to{opacity:.9}}
+@keyframes hzRimOut{from{opacity:.9}to{opacity:0}}
+.hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark{display:none!important}
+@media (prefers-reduced-motion:reduce){
+  .hz #composer::after,.hz .hz-sl-thumb,.hz .hz-elevel.spectral,.hz.hz-ignite #hz-aurw{animation:none!important}
+  .hz .hz-sl-spark{display:none!important}
+}
+/* ---- the focus hairline on the beam (6b544): keyboard-only (:focus-visible on the range, never a click),
+   a 1 px ember pill that hugs the beam with the diamond inside, with rounded ends; never a box */
+.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:3px;right:3px;top:13px;height:15px;border-radius:999px;pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}
+.hz #hz-effort.compact .hz-sl:has(input:focus-visible)::after{top:7px}
+/* ---- THE WRITING STAR (6b544, per Patrick: "clean up how it writes and delivers the final result of a
+   query ... I like the star effect, but rethink it"): one idea. While the answer streams, one small star
+   (a soft white point, a faint four-point glint) rides at the end of the newest text like a pen of light,
+   and the words appear just behind it with a soft reveal (160 ms, a 2 px rise; no glow, no blur). On the
+   draft-to-polish swap (6b539) it makes one quick pass down the answer's left edge while the polished text
+   crossfades in. When the answer lands it lifts from the last word to the byline's dot and becomes it
+   (400 ms), then everything is still; Details and the actions follow 120 ms apart. The star is positioned
+   from a Range rect read once per paint and moved with a transform only (hzStarAim / hzStarFrame). Full
+   and Balanced; Calm gets the plain fade alone; reduced motion none. */
+.hz .msg.ai{position:relative}
+.hz .hz-star{display:none;position:absolute;left:0;top:0;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;pointer-events:none;z-index:3;opacity:0;
+  background:#fff;box-shadow:0 0 4px rgba(255,255,255,.95),0 0 10px rgba(207,224,255,.55);will-change:transform}
+.hz .hz-star::before,.hz .hz-star::after{content:"";position:absolute;left:50%;top:50%;width:14px;height:1px;margin:-.5px 0 0 -7px;
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.8),rgba(255,255,255,0))}
+.hz .hz-star::after{transform:rotate(90deg)}
+.hz .msg.ai.live .hz-star,.hz .msg.ai.landing .hz-star{display:block}
+.hz .hz-new{position:relative;animation:hzNew .16s cubic-bezier(.3,0,.2,1) both}
+@keyframes hzNew{from{opacity:0;top:2px}to{opacity:1;top:0}}
+.hz.hz-calm .hz-new{animation-name:hzNewCalm}
+@keyframes hzNewCalm{from{opacity:0}to{opacity:1}}
+.hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}
+.hz .msg.ai .who .dot.lit{animation:hzDotLit .5s cubic-bezier(.3,0,.2,1) both}
+@keyframes hzDotLit{0%{opacity:1;box-shadow:0 0 12px #fff,0 0 4px #fff}100%{opacity:.55;box-shadow:0 0 10px rgba(159,192,255,.9)}}
+.hz .msg.ai.landing>.ans-foot .hz-details,.hz .msg.ai.landing>.ans-foot .mact{opacity:0}
+.hz .msg.ai.landed>.ans-foot .hz-details{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}
+.hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}
+@media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}
+  .hz .hz-new,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -52584,7 +52669,6 @@ __CODE_ROWS__
 <div id="undobar" hidden><span class="ut"></span><button id="undobtn">Undo</button></div>
   <canvas id="stars"></canvas>
   <!-- the comets (6b528): a draft flies in from the machine that wrote it; a ripple on arrival -->
-  <canvas id="comets" aria-hidden="true"></canvas>
   <div id="chat-scroll"><div id="chat-inner">
     <div id="hero">
 <!-- 6.0b2, per Patrick: no in-app hero branding — the greeting IS the
@@ -53239,27 +53323,30 @@ __CODE_ROWS__
 <script>
 "use strict";
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
-// THE MODES' BRAND NAMES (6b526; the Greek ones 6b534, per Patrick): Alpha,
-// Gamma, Sigma, and Omega where its tier exists. Declared first: tierShown() reads modeName
+// THE MODES' NAMES (6b526, 6b534; plain since 6b544, per Patrick): the tiers' own
+// keys are the names people see, Fast, Thinking, Pro, Max; the one renamed tier is
+// Vera Rubin, shown as Deep. Declared first: tierShown() reads modeName
 // during boot, and a const further down would be a temporal-dead-zone throw
 // that kills the whole page (seen live, this build).
 /* MODE NAMES (6b526) */
-const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};
+const MODE_NAMES={"Vera Rubin":"Deep"};
 const modeName=t=>MODE_NAMES[t]||t;
-// a chip line that starts with a mode ("Fast", "Thinking · <server> only") takes the brand name
-const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Vera Rubin)(?=$| \u00b7 )/,m=>modeName(m));
+// a chip line that starts with a mode ("Fast", "Thinking · <server> only") takes the shown name
+const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Max|Vera Rubin)(?=$| \u00b7 )/,m=>modeName(m));
 // the engine menu's rows are built with the tiers' keys (the gauntlet pins their
-// builders); once a menu is on screen its mode names become the brand names
+// builders); once a menu is on screen its mode names become the shown names (Deep)
 function hzMenuBrand(root){
   if(!root)return;
   root.querySelectorAll(".engrow.mode .enm").forEach(e=>{e.textContent=modeName(e.textContent);});
   root.querySelectorAll(".engrow.mode .einfo").forEach(e=>{
     e.setAttribute("aria-label",String(e.getAttribute("aria-label")||"").replace(/^What (Fast|Thinking|Pro|Vera Rubin) uses$/,(m,k)=>"What "+modeName(k)+" uses"));});
 }
-// what each mode is for, in the mode menu (OVERRIDE 3, 6b534)
+// what each mode is for, in the mode menu (OVERRIDE 3, 6b534; the five of 6b544): Pro is
+// every model that fits on this machine and a paired server's (resolve_tier "all",
+// _TIER_ROLE); Max adds every cloud key; Deep (Vera Rubin) runs round after round
 const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",
-  "Pro":"Every model weighs in","Vera Rubin":"Keeps going until you stop it",
-  "Max":"Every model, everywhere"};
+  "Pro":"Every model on your machines","Max":"Every model, every machine",
+  "Vera Rubin":"Keeps going until you stop it"};
 /* THE API TOKEN (6b321, 0a 5.4). The cookie alone opens only this page;
    every /api call also carries X-Api-Token, which the window hands over
    through pywebview's js_api once the page has loaded (pywebviewready).
@@ -53399,7 +53486,7 @@ async function apiDownload(p,nm){
 }
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
-// the answer's signature (6b528): one brain signs each answer, SIGN_BRAND + " Gamma";
+// the answer's signature (6b528): one brain signs each answer, SIGN_BRAND + " Thinking";
 // the mode's name comes from MODE_NAMES at the top of the script (6b534).
 // This constant is the one bare brand word the gauntlet's brand guard allows.
 const SIGN_BRAND="Concorde";
@@ -54307,7 +54394,7 @@ function openEngMenu(){
   const keep=engMenu.hidden?-1:engMenu.scrollTop;   // a repaint keeps the scroll
   srvSyncOff();
   engMenu.innerHTML=engMainRows();
-  hzMenuBrand(engMenu);            // Alpha, Gamma, Sigma (6b526, 6b534)
+  hzMenuBrand(engMenu);            // the shown names (6b526, 6b534, 6b544: Deep)
   engMenu.hidden=false;
   // fit the window (6b336): open on the side with room; when neither
   // side holds the whole list, take the roomier one and scroll
@@ -56200,7 +56287,7 @@ function machineOf(c){
 function modelOf(c){const m=String((c&&c.m)||""),i=m.indexOf(SRV_SEP);return i>0?m.slice(i+SRV_SEP.length):m;}
 function isCloud(c){const w=(c&&c.w)||"local";return w!=="local"&&w!=="server";}
 // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick: "make it sound like, okay,
-// you have it on Zenith right now"): the byline is the brain, a breathing dot
+// you have it on Thinking right now"): the byline is the brain, a breathing dot
 // while it works, and one plain word for what it is doing
 function signatureHTML(mode,st,eff){
   const mn=mode?modeName(mode):"";
@@ -56506,56 +56593,104 @@ function liveLineDone(div,info){
   const html=liveLineHTML({text:t>0?"Done in "+fmtSecs(t):"Done",who:who},st,true);
   if(el)el.outerHTML=html;else{const w=div.querySelector(":scope>.who");(w||div).insertAdjacentHTML("afterend",html);}
 }
-// THE COMETS: a draft leaves its machine's chip and lands on the live line
-const cometsEl=$("#comets");let comets=[],rings=[],cometRaf=0;
-function cometsSize(){if(!cometsEl)return;const d=Math.min(devicePixelRatio||1,2);
-  cometsEl.width=innerWidth*d;cometsEl.height=innerHeight*d;const c=cometsEl.getContext("2d");c.setTransform(d,0,0,d,0,0);}
-if(cometsEl){cometsSize();addEventListener("resize",cometsSize);}
-function rgbaOf(hex,a){const h=String(hex||"#9fc0ff").replace("#","");const n=parseInt(h.length===3?h.split("").map(x=>x+x).join(""):h,16);
-  return "rgba("+(n>>16)+","+((n>>8)&255)+","+(n&255)+","+a+")";}
-function cometsDraw(){
-  if(!cometsEl)return;const c=cometsEl.getContext("2d");
-  c.clearRect(0,0,innerWidth,innerHeight);c.globalCompositeOperation="lighter";const now=performance.now();
-  comets=comets.filter(k=>{const u=Math.min(1,(now-k.t0)/k.dur),e=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
-    const P=t=>[(1-t)*(1-t)*k.a[0]+2*(1-t)*t*k.c[0]+t*t*k.b[0],(1-t)*(1-t)*k.a[1]+2*(1-t)*t*k.c[1]+t*t*k.b[1]];
-    for(let i=0;i<22;i++){const t=Math.max(0,e-i*.012),q=P(t),a=(1-i/22)*.8;c.fillStyle=rgbaOf(k.col,a*.5);c.beginPath();c.arc(q[0],q[1],2.2*(1-i/26),0,7);c.fill();}
-    const h=P(e),g=c.createRadialGradient(h[0],h[1],0,h[0],h[1],16);g.addColorStop(0,"rgba(255,255,255,.95)");g.addColorStop(.25,rgbaOf(k.glow,.7));g.addColorStop(1,rgbaOf(k.glow,0));
-    c.fillStyle=g;c.beginPath();c.arc(h[0],h[1],16,0,7);c.fill();
-    if(u>=1){rings.push({x:k.b[0],y:k.b[1],t0:now,col:k.glow,big:false});return false;}return true;});
-  rings=rings.filter(r=>{const u=(now-r.t0)/(r.big?1100:700);if(u>=1)return false;const R=(r.big?90:34)*(1-Math.pow(1-u,3));
-    c.strokeStyle=rgbaOf(r.col,(1-u)*.8);c.lineWidth=r.big?2:1.4;c.beginPath();c.arc(r.x,r.y,R,0,7);c.stroke();return true;});
-  if(comets.length||rings.length)cometRaf=requestAnimationFrame(cometsDraw);else{c.clearRect(0,0,innerWidth,innerHeight);cometRaf=0;}
+// THE WRITING STAR (6b544, per Patrick; the css block of the same name says what it looks like).
+// hzStarAim reads the end of the newest text ONCE per paint (a Range rect against the message's
+// own rect: two reads, at the paint, never in the frame loop) and keeps the target; hzStarFrame
+// moves the star toward it with a transform alone; hzStarSweep is the pass down the answer's left
+// edge at the draft-to-polish swap; hzStarLand lifts it to the byline's dot and RETIRES it (the
+// loop stops, the element goes). The reveal: the characters painted in the last 200 ms are wrapped
+// in .hz-new spans carrying their age as a negative delay, so a repaint never restarts a fade.
+const hzStar={el:null,div:null,x:NaN,y:NaN,tx:NaN,ty:NaN,raf:0,on:false,marks:[],reads:0,at:0};
+function hzStarOK(){return isHz()&&typeof hzMotionOK==="function"&&hzMotionOK()&&typeof hzFxLevel==="function"&&hzFxLevel()!=="calm";}
+function hzStarStart(div){
+  hzStarLand(null);                                    // one star at a time
+  hzStar.marks=[];hzStar.div=div;
+  if(!div||!hzStarOK())return;
+  let el=div.querySelector(":scope>.hz-star");
+  if(!el){el=document.createElement("i");el.className="hz-star";el.setAttribute("aria-hidden","true");div.appendChild(el);}
+  hzStar.el=el;hzStar.on=true;hzStar.x=hzStar.y=hzStar.tx=hzStar.ty=NaN;hzStar.at=0;
+  if(!hzStar.raf)hzStar.raf=requestAnimationFrame(hzStarFrame);
 }
-function liveTarget(div){
-  const el=div&&div.querySelector(":scope>.liveline .lstep");
-  if(!el)return null;const r=el.getBoundingClientRect();if(!r.width)return null;return [r.left+8,r.top+r.height/2];
+// the prose's text nodes in order (never the sources row or a code card), each with its start offset
+function hzStarNodes(body){
+  const out=[];const w=document.createTreeWalker(body,NodeFilter.SHOW_TEXT,{acceptNode:n=>n.parentElement&&n.parentElement.closest(".srcrow,.codecard,pre,.apcard")?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT});
+  let n,len=0;while((n=w.nextNode())){out.push({n:n,a:len});len+=n.data.length;}
+  return {nodes:out,len:len};
 }
-function cometFor(label,div){
-  if(!cometsEl||hzStill()||document.hidden||!isHz())return;
-  if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the comets are Full's (6b542)
-  const to=liveTarget(div);if(!to)return;
-  const col=machineColours(label),chip=machineChip(label);
-  let from;
-  if(chip){const r=chip.getBoundingClientRect();from=[r.left+r.width/2,r.top+r.height/2];}
-  else from=[innerWidth*(.25+Math.random()*.5),-24];          // a cloud draft falls from the top of the sky
-  const mid=[(from[0]+to[0])/2+(Math.random()-.5)*260,Math.min(from[1],to[1])-40+Math.random()*120];
-  comets.push({a:from,b:to,c:mid,col:col.ac,glow:col.ag,dur:1200+Math.random()*500,t0:performance.now()});
-  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+// the soft reveal: wrap [a,b) of the prose's characters, newest segment first (splitting a text node
+// at its tail keeps every earlier offset true)
+function hzStarWrap(nodes,a,b,age){
+  for(let k=nodes.length-1;k>=0;k--){
+    const o=nodes[k],n=o.n,L=n.data.length,e=o.a+L;if(e<=a)break;if(o.a>=b)continue;
+    const la=Math.max(a,o.a)-o.a,lb=Math.min(b,e)-o.a;if(lb<=la)continue;
+    if(lb<n.data.length)n.splitText(lb);
+    const mid=la>0?n.splitText(la):n;
+    const sp=document.createElement("span");sp.className="hz-new";sp.style.animationDelay=(-Math.round(age))+"ms";
+    mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);
+  }
 }
-function rippleAt(div,col){
-  if(!cometsEl||hzStill()||document.hidden||!isHz())return;
-  if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the ripple is Full's (6b542)
-  const to=liveTarget(div);if(!to)return;
-  rings.push({x:to[0],y:to[1],t0:performance.now(),col:col||"#ffffff",big:true});
-  if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
+// after a paint of the stream: the reveal, then the aim (one layout read, here and nowhere else)
+function hzStarPaint(body){
+  if(!isHz()||!hzMotionOK()||!body)return;
+  const now=performance.now(),m=hzStar.marks,t=hzStarNodes(body);
+  if(m.length&&m[m.length-1].len>t.len)m.length=0;          // a RESET: the text started over
+  m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();
+  for(let k=m.length-1;k>0;k--){const a=m[k-1].len,b=m[k].len;if(b>a)hzStarWrap(t.nodes,a,b,now-m[k].t);}
+  hzStarAim(body,t.nodes);
 }
-// when the answer lands, one light runs once round the composer and the sky is told
+function hzStarAim(body,nodes){
+  const s=hzStar;if(!s.on||!s.el||s.div!==body.parentElement)return;
+  const ns=nodes||hzStarNodes(body).nodes;let last=null;
+  for(let k=ns.length-1;k>=0;k--){if(/\S/.test(ns[k].n.data)){last=ns[k].n;break;}}
+  if(!last)return;
+  const e=last.data.replace(/\s+$/,"").length,r=document.createRange();r.setStart(last,Math.max(0,e-1));r.setEnd(last,e);
+  const rr=r.getBoundingClientRect(),mr=s.div.getBoundingClientRect();s.reads++;
+  if(!rr.width&&!rr.height)return;
+  s.tx=rr.right-mr.left+6;s.ty=rr.top-mr.top+rr.height*.52;
+  if(isNaN(s.x)){s.x=s.tx;s.y=s.ty;}
+}
+// the frame: a transform toward the target, eased on the clock (the same at 60 and 120 Hz); no read
+function hzStarFrame(t){
+  const s=hzStar;s.raf=0;if(!s.on||!s.el)return;
+  const dt=s.at?Math.min(64,t-s.at):16;s.at=t;
+  if(!isNaN(s.tx)&&!isNaN(s.x)){const k=1-Math.exp(-dt/55);s.x+=(s.tx-s.x)*k;s.y+=(s.ty-s.y)*k;
+    s.el.style.transform="translate("+s.x.toFixed(2)+"px,"+s.y.toFixed(2)+"px)";if(s.el.style.opacity!=="1")s.el.style.opacity="1";}
+  s.raf=requestAnimationFrame(hzStarFrame);
+}
+// the draft-to-polish swap (6b539): one quick pass down the answer's left edge, 350 ms, while the
+// polished text crossfades in; the loop holds until the next paint aims again
+function hzStarSweep(body){
+  const s=hzStar;if(!s.on||!s.el||!s.el.animate||isNaN(s.x)||s.div!==body.parentElement)return;
+  const br=body.getBoundingClientRect(),mr=s.div.getBoundingClientRect();
+  const x=br.left-mr.left-10,y0=br.top-mr.top+8,y1=y0+Math.max(24,br.height-16);
+  s.tx=s.ty=NaN;
+  const a=s.el.animate([{transform:"translate("+s.x.toFixed(1)+"px,"+s.y.toFixed(1)+"px)"},{transform:"translate("+x.toFixed(1)+"px,"+y0.toFixed(1)+"px)",offset:.3},
+    {transform:"translate("+x.toFixed(1)+"px,"+y1.toFixed(1)+"px)"}],{duration:350,easing:"cubic-bezier(.3,0,.2,1)"});
+  a.onfinish=()=>{s.x=x;s.y=y1;};
+}
+// the landing: the star lifts from the last word to the byline's dot and becomes it (400 ms), the
+// loop stops and the element goes; then Details and the actions follow (the .landed css). Called
+// for every ending, aborted or not, so no star outlives its answer.
+function hzStarLand(div){
+  const s=hzStar,el=s.el;
+  s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}
+  if(!el){if(div)div.classList.add("landed");return;}
+  s.el=null;
+  if(!div||s.div!==div){el.remove();return;}
+  const dot=div.querySelector(":scope>.who .dot");
+  let over=false;const done=()=>{if(over)return;over=true;el.remove();div.classList.remove("landing");div.classList.add("landed");if(dot)dot.classList.add("lit");};
+  if(!dot||!el.animate||isNaN(s.x)||!hzMotionOK()){done();return;}
+  div.classList.add("landing");
+  const dr=dot.getBoundingClientRect(),mr=div.getBoundingClientRect();
+  const x=dr.left-mr.left+dr.width/2,y=dr.top-mr.top+dr.height/2;
+  const a=el.animate([{transform:"translate("+s.x.toFixed(1)+"px,"+s.y.toFixed(1)+"px)",opacity:1},
+    {transform:"translate("+x.toFixed(1)+"px,"+y.toFixed(1)+"px) scale(1.5)",opacity:1}],{duration:400,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
+  a.onfinish=done;setTimeout(done,480);
+}
+// when the answer lands the sky is told; the star's landing is the whole of the show (6b544): no
+// light round the composer, no pass along its edge
 function answerLanded(){
   try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
-  const cb=$("#composer");if(!cb||hzStill()||!isHz())return;
-  if(typeof hzFxFull!=="function"||!hzFxFull()){if(typeof hzLandSweep==="function")hzLandSweep();return;}   // the light round the composer is Full's; Balanced gets one gentle pass (6b542)
-  cb.classList.remove("finish");void cb.offsetWidth;cb.classList.add("finish");
-  setTimeout(()=>cb.classList.remove("finish"),1700);
 }
 function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   const hero=$("#hero"); if(hero)hero.remove();
@@ -56566,7 +56701,7 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   // a saved message (the record itself rides in as `extra`) is drawn settled:
   // a reopened chat of two hundred messages plays no two hundred entrances
   div.className="msg "+(role==="user"?"user":"ai")+(m.role?" settled":"");
-  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): SIGN_BRAND + " Gamma", a
+  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): SIGN_BRAND + " Thinking", a
   // breathing dot while it works and one plain word for what it is doing; the
   // real models stay behind the answer, in the marginalia, and only when asked.
   // A chat brought from another app (6b529) says who answered there, and
@@ -57235,6 +57370,7 @@ async function send(){
   if(globalThis.hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
   sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
   const aiDiv=addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier,effort:typeof hzEffortWire==="function"?hzEffortWire():""}); const body=aiDiv.querySelector(".body");
+  if(globalThis.hzReady&&typeof hzStarStart==="function")hzStarStart(aiDiv);   // the writing star (6b544)
   aiDiv.classList.add("live");     // soft mask on the newest line
   // the pulsing caret is RETIRED (6b257, per Patrick): the first 5s
   // are a quiet pinwheel; machinery only fades in if the run earns it
@@ -57288,7 +57424,7 @@ async function send(){
     const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
     body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
       +'color:var(--faint);margin-bottom:6px">Your picked models are gone from '
-      +esc(gs?gs.name:"your server")+". Alpha answered.</div>");
+      +esc(gs?gs.name:"your server")+". Fast answered.</div>");
   }
   try{
     // a Try again or Edit & resend rewinds the saved chat: the server
@@ -57380,6 +57516,7 @@ async function send(){
       body.innerHTML=annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
         // the sources sit under the words they back, from the first line on (6b528)
         +(searched&&sources&&sources.length?srcRow(sources):"");
+      if(globalThis.hzReady&&typeof hzStarPaint==="function")hzStarPaint(body);   // the reveal and the star's aim (6b544)
       requestAnimationFrame(()=>wireFlow(body));
       if(curChat===myChat)autoScroll();
     };
@@ -57398,6 +57535,7 @@ async function send(){
           &&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
         body.classList.remove("swapwait");
         if(fx){body.classList.add("swapout");
+          if(globalThis.hzReady&&typeof hzStarSweep==="function")hzStarSweep(body);   // the star's pass down the left edge (6b544)
           setTimeout(()=>{body.classList.remove("swapout");body.classList.add("swapin");
             setTimeout(()=>body.classList.remove("swapin"),300);
             dripTick();},170);
@@ -57437,7 +57575,6 @@ async function send(){
                   // drafting as live nodes, the compositor as the final step
                   if(d.c!==undefined){stepRunning=[];
                     // the merge: one white ripple on the live line (6b528)
-                    if(!stepComp&&drafts.filter(x=>!/^\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");
                     stepComp=String(d.c);
                     const cs=steps.find(x=>x.id==="council");
                     if(cs&&cs.s!=="done")addStep(Object.assign({},cs,{s:"done"}));
@@ -57454,9 +57591,7 @@ async function send(){
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
-                     if(!drafts.some(x=>x.m===d.m)){drafts.push(d);
-                       // a real draft is a comet from its machine (6b528)
-                       if(!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||""))cometFor(d.m,aiDiv);}
+                     if(!drafts.some(x=>x.m===d.m))drafts.push(d);
                      // real drafts arm the Answer-now button (6b257)
                      liveDrafts=drafts.filter(
                        x=>!/^\(no answer/.test(x.t||"")).length;
@@ -57559,6 +57694,7 @@ async function send(){
   // the live line settles on "Done in N s" with the real counts; one light round the composer
   liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});
   if(full&&!wasAborted)answerLanded();
+  if(globalThis.hzReady&&typeof hzStarLand==="function")hzStarLand(aiDiv);   // the star becomes the byline's dot (6b544)
   paintDrafts(aiDiv,drafts,false);   // merge done: collapse (or clear bar)
   // the stream died but good drafts exist — the best one IS the answer;
   // never show "engine returned nothing" over a usable draft
@@ -61355,7 +61491,7 @@ function srvCard(s){
     // off. The Code lane's Workspace and Coding agents read a folder, and what
     // they read goes to the model that answers, so the switch says so
     +(s.paired?'<label class="srv-pref"><input type="checkbox" data-a="prefer"'
-      +(s.prefer!==false?" checked":"")+'><span>Use for Alpha, Gamma, Sigma and Code</span></label>'
+      +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking, Pro and Code</span></label>'
       +'<div class="srv-hint">Code agents may send a folder you choose to this server.</div>':"")
     +srvSleepHtml(s,srvSleep[s.id])
     +srvSetsHtml(s,srvSets[s.id])
@@ -61912,7 +62048,7 @@ function cloudPickRetire(t){
   if(cloudTierParse(t).mode!=="Model")return t;
   const was=cloudTierShown(t);
   prefSet({tier:"cloud:think"});
-  setTimeout(()=>tierNote(was+" is gone from the menu. Now on Gamma, cloud only."),0);
+  setTimeout(()=>tierNote(was+" is gone from the menu. Now on Thinking, cloud only."),0);
   return "cloud:think";
 }
 // CLOUD ONLY'S ROW AND SUB-MENU (6b442, per Patrick: "cloud only, which is
@@ -61972,7 +62108,7 @@ function cloudTierShown(t){
   const p=cloudTierParse(t),inf=tierInfo[t]||{};
   if(p.mode==="Model")return inf.name?inf.name+" only":((cloudProvs().find(x=>x[0]===p.pid)||[0,"Cloud"])[1]+" only");
   if(!p.mode)return "Cloud Only";
-  return p.mode==="Fast"&&(inf.models||[])[0]?"Alpha, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";
+  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";
 }
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
@@ -61992,7 +62128,7 @@ function tierShown(t){
   if(s&&mode)return mode+" \u00b7 "+s.name+" only";   // "Thinking · <name> only" (6b426)
   return !s?"Your server":s.only&&s.only.ok?s.only.label:s.name+" Only";
 }
-// the chip's words carry the modes' brand names (6b526): "Zenith · <server> only"
+// the chip's words carry the modes' shown names (6b526, 6b544): "Thinking · <server> only"
 function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}
 // the modes that can't answer are the ones tierOff holds (setTier, the
 // menu's click and paintTierAvail read it)
@@ -65070,7 +65206,7 @@ function hzSkyBoot(){
   };
   S.setNeon=function(){const lv=hzFxLevel();S.neonTo=lv==="calm"?0:lv==="balanced"?S.lvl*.35:S.lvl+(S.busy?.28:0);};   // Calm has no neon; Balanced a third of Full's, never lifted by the work (6b542)
   // the neon follows the mode and the effort, with a lift at Ultra (the reference's level(m,e)), and the work
-  S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};
+  S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62,.68][Math.max(0,Math.min(4,m))]+e*.035+(e===4?.12:0);S.setNeon();};
   S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};
   // a new clip starts with clean trails
   S.reset=function(){[S.A,S.B].forEach(T=>{gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});gl.bindFramebuffer(gl.FRAMEBUFFER,null);};
@@ -65440,12 +65576,13 @@ function hzTitlePaint(){
 // is for, the dies of the machines it uses right now (/api/tiers), the current one
 // marked by a lit dot. Hovering or focusing a mode slides its real models out under
 // it (each with its machine's die; the machine in the tooltip) and lights those
-// machines in the header. Beside it, Effort: Low, Medium, High, Max over a real
-// range input, sent with every question (effort_polish on the server); Max
-// shimmers. The neon aurora follows both. Max, Cloud only, the servers and
-// Advanced stay in the engine menu (the More modes button).
-function hzModes(){return ["Fast","Thinking","Pro","Vera Rubin"].filter(n=>TIER_META[n]);}
-const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;
+// machines in the header. Beside it, Effort: Low, Medium, High, Extra, Ultra over a real
+// range input, sent with every question (effort_polish on the server; the wire keys
+// stay low/medium/high/max/ultra, Muse's strength map reads them, 6b533). The neon
+// aurora follows both. Cloud only, the servers and Advanced stay in the engine menu
+// (the More modes button); Max is in the picker since 6b544 (per Patrick).
+function hzModes(){return ["Fast","Thinking","Pro","Max","Vera Rubin"].filter(n=>TIER_META[n]);}
+const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;
 function hzEffort(){
   if(hzS&&hzS.effort!=null)return hzS.effort;
   let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-4]$/.test(s))v=+s;}catch(e){}
@@ -65459,9 +65596,11 @@ function hzEffortSet(i){
 }
 function hzModeIndex(t){
   const ms=hzModes(),i=ms.indexOf(t);if(i>=0)return i;
-  const s=String(t||"").toLowerCase();
-  if(t==="Max"||/pro|max/.test(s))return ms.length-1;
-  if(/think/.test(s))return Math.min(1,ms.length-1);
+  const s=String(t||"").toLowerCase(),at=(n,d)=>{const k=ms.indexOf(n);return k>=0?k:Math.min(d,ms.length-1);};
+  if(/rubin|deep/.test(s))return at("Vera Rubin",4);
+  if(/max/.test(s))return at("Max",3);           // a server's or the cloud's Max
+  if(/pro/.test(s))return at("Pro",2);
+  if(/think/.test(s))return at("Thinking",1);
   if(/fast/.test(s))return 0;
   return 1;
 }
@@ -65481,7 +65620,7 @@ function hzModesPaint(){
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
       +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===HZ_EMAX?" last":"")+'" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
-      +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
+      +'<i class="hz-sl-halo"></i><i class="hz-sl-spark"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
@@ -65502,10 +65641,38 @@ function hzEffortPaint(){
   sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
   if(+inp.value!==i)inp.value=String(i);
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
-  // Max shimmers softly and the light runs round the composer softly; Ultra in full (OVERRIDE 4)
-  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);
-  const root=document.documentElement;root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
+  // the label: plain, or at Ultra the spectral gradient (flowing, the one loop on text; the ULTRA css, 6b544)
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("spectral",i===4);
+  const root=document.documentElement,was=hzS.effI;hzS.effI=i;
+  root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
+  // arriving at Ultra ignites it once; leaving drains it (a page that opens at Ultra just rests there)
+  if(i===4&&was!=null&&was!==4)hzIgnite();else if(was===4&&i!==4)hzUltraOut();
   if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
+}
+// ULTRA (6b544): the one moment the effects perform; the css under ULTRA does the drawing, these
+// only set html.hz-ignite (2 s: the moment is 900 ms, the aurora's breath settles within 2 s) and
+// html.hz-ultra-out for the 300 ms drain, and give the composer the angle the light leaves from
+// (--hz-a0: the beam's start, seen from the composer's centre). Calm, reduced motion, a hidden or
+// long-unfocused window: no ignition, the still rim and label alone (Calm's rim fades, in the css).
+function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
+function hzUltraAngle(){
+  const cb=$("#composer"),tr=$("#hz-effort .hz-sl-track");if(!cb||!tr)return;
+  const c=cb.getBoundingClientRect(),t=tr.getBoundingClientRect();if(!c.width||!t.width)return;
+  const dx=t.left-(c.left+c.width/2),dy=t.top-(c.top+c.height/2);
+  cb.style.setProperty("--hz-a0",((Math.atan2(dx,-dy)*180/Math.PI+360)%360).toFixed(1)+"deg");
+}
+function hzIgnite(){
+  const root=document.documentElement;clearTimeout(hzS.igniteT);
+  root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();
+  if(!hzUltraFx())return;
+  void root.offsetWidth;root.classList.add("hz-ignite");
+  hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);
+}
+function hzUltraOut(){
+  const root=document.documentElement;clearTimeout(hzS.igniteT);root.classList.remove("hz-ignite");
+  if(!hzMotionOK())return;
+  root.classList.add("hz-ultra-out");
+  hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ultra-out"),300);
 }
 function hzControlsWire(host){
   const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),pick=host.querySelector(".hz-pick");
@@ -65690,17 +65857,6 @@ function hzChipSweep(b){
   s.hidden=false;
   const a=s.animate([{transform:"translateX(-100%)",opacity:0},{opacity:.9,offset:.3},{transform:"translateX(250%)",opacity:0}],{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
   hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);
-}
-// BALANCED (6b542): when the answer lands, one gentle pass of light along the composer's top
-// edge (700 ms, once); Full's ring stays Full's
-function hzLandSweep(){
-  const c=$("#composer");if(!c||!hzFxBal()||!hzMotionOK()||!c.animate)return;
-  const cr=c.getBoundingClientRect();if(!cr.width)return;
-  let s=c.querySelector(":scope>.hz-sweep");
-  if(!s){s=document.createElement("i");s.className="hz-sweep";s.setAttribute("aria-hidden","true");c.appendChild(s);}
-  s.hidden=false;
-  const a=s.animate([{transform:"translateX(-200px)",opacity:0},{opacity:.55,offset:.3},{opacity:.5,offset:.7},{transform:"translateX("+cr.width.toFixed(0)+"px)",opacity:0}],{duration:700,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
-  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},700);
 }
 // one soft sweep along the composer's top edge, from the chip's x toward the far corner
 function hzSweep(b){
