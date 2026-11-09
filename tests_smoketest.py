@@ -277,7 +277,7 @@ if not _py_has_nacl(_SMOKE_PY):
 _DL_DIR = os.path.join(_SMOKE_TMP, "downloads")
 os.makedirs(_DL_DIR, exist_ok=True)
 INST = Instance(9901, "A", seed=_seed_a,
-                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub,downloads="
+                env={"MILLENAI_TEST_HOOKS": "boot-code,webstore-fake,photoedit-stub,dict-fake,downloads="
                      + _DL_DIR}).start()
 BASE = INST.base
 KEY = INST.key
@@ -2775,6 +2775,7 @@ _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
 # (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
 # window in WKWebView, WebView2 and Qt)
 _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
+_PAGE_HOST |= {"Int16Array"}         # 6b541: the page turns captured audio into 16 kHz PCM
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -27458,18 +27459,22 @@ class FakeCtx{
 const window={AudioContext:FakeCtx};
 const navigator={mediaDevices:{getUserMedia(c){gumLog.push(c);
   return gumImpl?gumImpl():Promise.resolve(mkStream());}}};
-let recording=false,recBuf=[],voiceReady=true,voicePoll=null,voiceChat=false,sent=0;
-const input={placeholder:"",value:"",dispatchEvent(){}};
-const micBtn={classList:{add(){},remove(){}}};
+let recording=false,recBuf=[],voiceReady=true,voicePoll=null,voiceChat=false,sent=0,inputs=0;
+const mkCL=()=>({s:new Set(),add(c){this.s.add(c);},remove(c){this.s.delete(c);},
+  toggle(c,on){if(on===undefined)on=!this.s.has(c);on?this.s.add(c):this.s.delete(c);return on;},contains(c){return this.s.has(c);}});
+const input={placeholder:"",value:"",dispatchEvent(){inputs++;},classList:mkCL(),addEventListener(){}};
+const micBtn={classList:mkCL()};
 function send(){sent++;}
-function wavEncode(){return "wav";}
 function Event(){}
 const IS_PC=false;
+const bodies=[],allCalls=[];           // allCalls: never reset, for the "own /api/ only" rule
 const okJ=(o)=>({ok:true,status:200,json:async()=>o});
-async function api(u,o){calls.push(u);
+async function api(u,o){calls.push(u);allCalls.push(u);bodies.push(o&&o.body);
   if(apiImpl){const r=apiImpl(u,o);if(r!==undefined)return r;}
   if(u.includes("voice/status"))return okJ({supported:true,ready:true});
-  if(u.includes("transcribe"))return okJ({text:"hello"});
+  if(u.includes("dictate/start"))return okJ({ok:true,sid:"s1",engine:"system",partials:true});
+  if(u.includes("dictate/audio"))return okJ({ok:true,partial:"hel"});
+  if(u.includes("dictate/end"))return okJ({ok:true,text:"hello"});
   return okJ({});}
 '''
 _FS_GLUE = _FS_STUBS + _DK_PURE + _FS_REGION + _FS_VOICE
@@ -27484,14 +27489,18 @@ const reset=()=>{
   try{micClose(true);}catch(e){}
   micCtx=null;micProc=null;micSrc=null;micStream=null;micTimer=null;
   dictKey({type:"end"},0);recording=false;dictPend=false;recBuf=[];recHeard=false;
-  calls.length=0;gumLog.length=0;streams.length=0;timers.length=0;
+  calls.length=0;bodies.length=0;gumLog.length=0;streams.length=0;timers.length=0;
   ctxMade=srcMade=resumes=suspends=0;gumImpl=null;resumeImpl=null;apiImpl=null;srcThrow=false;
-  P={mic_warm:true};voiceReady=true;voiceChat=false;sent=0;input.placeholder="";
+  P={mic_warm:true};voiceReady=true;voiceChat=false;sent=0;inputs=0;input.placeholder="";input.value="";
+  input.classList.s.clear();micBtn.classList.s.clear();
+  dictSid=null;dictQ=[];dictInflight=null;dictPartial="";dictSecs=0;dictWarmT=0;
   for(const k of Object.keys(dictT))delete dictT[k];
 };
 const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
-const delayedVoice=()=>{let rel;apiImpl=(u)=>u.includes("voice/status")
-  ?new Promise(r=>{rel=()=>r(okJ({supported:true,ready:true}));}):undefined;return ()=>rel();};
+// the session's answer held back (6b541: the start call is the voice check now)
+const delayedVoice=()=>{let rel;apiImpl=(u)=>u.includes("dictate/start")
+  ?new Promise(r=>{rel=()=>r(okJ({ok:true,sid:"s1",engine:"system",partials:true}));}):undefined;return ()=>rel();};
+const ended=()=>calls.some(u=>u.includes("dictate/end"));
 const o={};
 // a section that throws (a mutation can) is a scenario that failed
 const sec=async(names,fn)=>{
@@ -27500,20 +27509,21 @@ const sec=async(names,fn)=>{
   for(const n of names)if(o[n]===undefined)o[n]=false;
 };
 (async()=>{
-// 1. the capture starts before the voice check has answered
+// 1. the capture starts before the session has answered
 await sec("order",async()=>{
   reset();voiceReady=false;const relV=delayedVoice();
   dictKey({type:"down"},0);const p=dictStart();await tick();
-  const ord=[gumLog.length===1,recording===false,calls.some(u=>u.includes("voice/status")),
-             input.placeholder==="getting the microphone…"];
+  const ord=[gumLog.length===1,recording===false,calls.some(u=>u.includes("dictate/start")),
+             input.placeholder==="Listening…"];
   relV();await p;ord.push(recording===true);
   o.order=ord.every(Boolean);
 });
-// 2. a cached ready engine is never asked
+// 2. a start that answers with a session never asks /api/voice/status (6b541: one round trip)
 await sec("statusskip",async()=>{
-  reset();voiceReady=true;await dictStart();feed(1);await stopRec();
-  calls.length=0;await dictStart();
-  o.statusskip=!calls.some(u=>u.includes("voice/status"))&&recording===true;
+  reset();voiceReady=false;await dictStart();
+  const first=!calls.some(u=>u.includes("voice/status"))&&recording===true;
+  feed(1);await stopRec();calls.length=0;await dictStart();
+  o.statusskip=first&&!calls.some(u=>u.includes("voice/status"))&&recording===true;
 });
 // 3. less processing: the voice-processing unit is not asked for
 await sec("constraints",async()=>{
@@ -27555,14 +27565,16 @@ await sec("warmoff",async()=>{
 // ...a clip too short to use still keeps the warm window
 await sec("warmslip",async()=>{
   reset();await dictStart();feed(0.1);await stopRec();
-  o.warmslip=live(0)&&pending().length===1&&input.placeholder==="didn’t catch anything";
+  o.warmslip=live(0)&&pending().length===1&&input.placeholder==="Didn’t catch that. Try again.";
 });
-// 8. the warm microphone records nothing, and a new recording starts empty
+// 8. the warm microphone records nothing (no chunk queued, none sent), and a new
+// recording starts empty
 await sec("leak",async()=>{
   reset();await dictStart();feed(1);await stopRec();
-  feed(2);const quiet=recBuf.length===0&&micCap===false;
-  await dictStart();const fresh=recBuf.length===0;feed(0.5);
-  o.leak=quiet&&fresh&&audioSecs(recBuf,16000)===0.5;
+  calls.length=0;feed(2);await tick();
+  const quiet=dictQ.length===0&&dictSecs===0&&micCap===false&&!calls.some(u=>u.includes("dictate/audio"));
+  await dictStart();const fresh=dictQ.length===0&&dictSecs===0;feed(0.5);
+  o.leak=quiet&&fresh&&Math.abs(dictSecs-0.5)<1e-9;
   await stopRec();
 });
 // 9. a recording is not the warm window's to cut
@@ -27587,64 +27599,67 @@ await sec("warmdefault",async()=>{
   await dictStart();feed(1);await stopRec();
   o.warmdefault=d&&!live(0)&&micStream===null;
 });
-// 11. "listening" only once the first sound has arrived
+// 11. "Listening…" from the keydown; the hold or toggle words only once the first sound
+// has arrived
 await sec(["listening","trace"],async()=>{
   reset();await dictStart();
-  const pre=input.placeholder==="getting the microphone…"&&recording===true;
+  const pre=input.placeholder==="Listening…"&&recording===true;
   feed(0.1);
-  o.listening=pre&&input.placeholder.includes("(or tap the mic) to finish");
+  o.listening=pre&&input.placeholder.includes("tap the mic to finish");
   o.trace=typeof dictT.gum==="number"&&typeof dictT.voice==="number"&&typeof dictT.chunk==="number";
   await stopRec();await dictStart();feed(0.1);          // the warm one is marked as well
   o.trace=o.trace&&dictT.warm===true&&dictT.gum<50&&typeof dictT.chunk==="number";
 });
-// 12. a 503 on the transcript clears the cached "ready"
+// 12. a 503 on the final clears the cached "ready"
 await sec("s503",async()=>{
-  reset();apiImpl=(u)=>u.includes("transcribe")?{ok:false,status:503,json:async()=>({})}:undefined;
+  reset();apiImpl=(u)=>u.includes("dictate/end")?{ok:false,status:503,json:async()=>({})}:undefined;
   await dictStart();feed(1);await stopRec();
-  o.s503=voiceReady===false&&input.placeholder.includes("couldn’t transcribe");
+  o.s503=voiceReady===false&&input.placeholder.includes("Couldn’t transcribe");
 });
 // the failed starts reset the hotkey, let the microphone go, and the next press starts
 await sec("gone",async()=>{
-  reset();voiceReady=false;apiImpl=(u)=>{if(u.includes("voice/status"))throw new Error("gone");};
+  reset();voiceReady=false;apiImpl=(u)=>{if(u.includes("dictate/start"))throw new Error("gone");};
   dictKey({type:"down"},0);await dictStart();
   o.gone=dictSt.mode===""&&!dictStarting&&!recording&&!micCap&&!live(0)
-    &&input.placeholder.includes("couldn’t reach")&&dictKey({type:"down"},1000)==="start";
+    &&input.placeholder.includes("Couldn’t reach")&&dictKey({type:"down"},1000)==="start";
 });
 await sec("gonepend",async()=>{
   reset();voiceReady=false;dictKey({type:"down"},0);
-  apiImpl=(u)=>u.includes("voice/status")?new Promise((_,rej)=>realST(()=>rej(new Error("409")),5)):undefined;
+  apiImpl=(u)=>u.includes("dictate/start")?new Promise((_,rej)=>realST(()=>rej(new Error("409")),5)):undefined;
   const p=dictStart();dictAct(dictKey({type:"down"},50));const pend=dictPend;await p;
   o.gonepend=pend===true&&dictPend===false&&!recording&&!live(0);
 });
 await sec("notready",async()=>{
-  reset();voiceReady=false;apiImpl=(u)=>u.includes("voice/status")?okJ({supported:true,ready:false,pct:10}):undefined;
+  reset();voiceReady=false;apiImpl=(u)=>u.includes("dictate/start")?okJ({ok:false,ready:false})
+    :u.includes("voice/status")?okJ({supported:true,ready:false,pct:10}):undefined;
   dictKey({type:"down"},0);await dictStart();
   o.notready=dictSt.mode===""&&!recording&&!micCap&&!live(0)&&micStream===null
-    &&input.placeholder.includes("getting the voice engine")&&dictKey({type:"down"},1000)==="start";
+    &&input.placeholder.includes("Downloading dictation")&&calls.some(u=>u.includes("voice/prepare"))
+    &&dictKey({type:"down"},1000)==="start";
 });
 // no microphone, or one that fails after the stream is in: reset, and let go
 await sec("nomic",async()=>{
   reset();gumImpl=()=>Promise.reject({name:"NotFoundError"});
   dictKey({type:"down"},0);await dictStart();
-  const a=dictSt.mode===""&&!recording&&input.placeholder==="no microphone found"
+  const a=dictSt.mode===""&&!recording&&input.placeholder==="No microphone found."
     &&dictKey({type:"down"},1000)==="start";
   reset();srcThrow=true;dictKey({type:"down"},0);await dictStart();
-  o.nomic=a&&dictSt.mode===""&&!recording&&!micCap&&!live(0)&&input.placeholder.includes("microphone blocked");
+  o.nomic=a&&dictSt.mode===""&&!recording&&!micCap&&!live(0)&&input.placeholder.includes("Microphone blocked");
 });
 // the microphone prompt blurs the window mid-start: it records, as a toggle
 await sec("prompt",async()=>{
   reset();dictKey({type:"down"},0);const relG=delayedGum();const p=dictStart();await tick();
   dictAway();const tg=dictSt.mode==="toggle";relG();await p;
   let pr=recording&&dictSt.mode==="toggle"&&tg;feed(1);
-  pr=pr&&input.placeholder.includes("(or tap the mic) to finish");
+  pr=pr&&input.placeholder.includes("tap the mic to finish");
   dictAway();await tick();
-  o.prompt=pr&&!recording&&calls.includes("/api/transcribe");
+  o.prompt=pr&&!recording&&ended();
 });
 // a mic-button start: the prompt doesn't stop it, a later blur does
 await sec("buttonblur",async()=>{
   reset();const relG=delayedGum();const p=dictStart();await tick();dictAway();relG();await p;
   const bon=recording;feed(1);dictAway();await tick();
-  o.buttonblur=bon&&!recording&&calls.includes("/api/transcribe");
+  o.buttonblur=bon&&!recording&&ended();
 });
 // tap and tap while the start is in flight: stopped once it starts
 await sec("taptap",async()=>{
@@ -27656,18 +27671,20 @@ await sec("taptap",async()=>{
 // a slip is never transcribed or sent; a second is
 await sec("slip",async()=>{
   reset();voiceChat=true;await dictStart();feed(0.2);await stopRec();
-  const sl=!calls.includes("/api/transcribe")&&sent===0&&input.placeholder==="didn’t catch anything";
+  const sl=!ended()&&sent===0&&input.placeholder==="Didn’t catch that. Try again.";
   calls.length=0;await dictStart();feed(1);await stopRec();
-  o.slip=sl&&calls.includes("/api/transcribe")&&sent===1;
+  o.slip=sl&&ended()&&sent===1;
 });
 // a hold whose audio is under 0.4 s was a tap: it keeps listening, as a toggle
 await sec("shorthold",async()=>{
   reset();dictKey({type:"down"},0);await dictStart();feed(0.1);
   dictAct(dictKey({type:"up",mod:true,secs:recSecs()},2000));
-  const sh=recording&&dictSt.mode==="toggle"&&input.placeholder.includes("(or tap the mic)");
+  const sh=recording&&dictSt.mode==="toggle"&&input.placeholder.includes("tap the mic");
   feed(1);dictAct(dictKey({type:"down"},3000));await tick();
-  o.shorthold=sh&&!recording&&calls.includes("/api/transcribe");
+  o.shorthold=sh&&!recording&&ended();
 });
+// 6b541: every call the capture path made went to this app's own /api/
+o.local=allCalls.length>0&&allCalls.every(u=>typeof u==="string"&&u.startsWith("/api/"));
 process.stdout.write(JSON.stringify(o));
 })();'''
 
@@ -27683,10 +27700,10 @@ _FS_BASE = _fs_run(_FS_GLUE)
 _FS_NAMES = ["order", "statusskip", "constraints", "ctxonce", "warmreuse", "warmtimer", "warmblur",
              "warmnew", "warmpage", "warmoff", "warmdefault", "warmslip", "leak", "nocut", "blurstart", "listening",
              "trace", "s503", "gone", "gonepend", "notready", "nomic", "prompt", "buttonblur",
-             "taptap", "slip", "shorthold"]
+             "taptap", "slip", "shorthold", "local"]
 _fs_ok = lambda *ns: all(_FS_BASE.get(n_) is True for n_ in ns)
-check("dictation fast: the capture starts before the voice check answers; a cached ready engine is "
-      "never asked; less processing is asked for (node)",
+check("dictation fast: the capture starts before the session answers; a start with a session "
+      "never asks /api/voice/status; less processing is asked for (node)",
       _fs_ok("order", "statusskip", "constraints"), "%r" % _FS_BASE)
 check("dictation fast: the AudioContext is made once, and the microphone is let go after each "
       "dictation when it is not kept warm (node)",
@@ -27697,8 +27714,8 @@ check("dictation fast: the warm microphone is reused for 15 s, and closes on the
 check("dictation fast: the warm microphone records nothing, a new recording starts empty, and a "
       "recording or a start under way is never cut (node)",
       _fs_ok("leak", "nocut", "blurstart"), "%r" % _FS_BASE)
-check("dictation fast: 'listening' only after the first sound, the timings are marked, and a 503 "
-      "clears the cached ready (node)",
+check("dictation fast: 'Listening…' from the keydown, the hold words after the first sound, the "
+      "timings are marked, and a 503 on the final clears the cached ready (node)",
       _fs_ok("listening", "trace", "s503"), "%r" % _FS_BASE)
 check("dictation hotkey: every failed start resets it (server gone, not ready, no mic) and lets "
       "the microphone go; the prompt's blur keeps the recording, a later blur stops it, a "
@@ -27711,8 +27728,9 @@ check("dictation hotkey: under 0.3 s is never transcribed or sent; a short hold 
       and "const DICT_MIN_HOLD_S=0.4;" in _MILLENAI_SRC, "%r" % _FS_BASE)
 _FS_MUT = [
     # (scenario, anchor, replacement)
-    ("order", "const cap=micAttach();", "const cap=(await ensureVoice(),micAttach());"),
-    ("statusskip", "if(voiceReady)return true;", ""),
+    ("order", "const cap=micAttach();", "const cap=(await new Promise(r=>realST(r,20)),micAttach());"),
+    ("statusskip", 'dictSid=d.sid;dictPartial="";dictTrace("session");',
+     'await ensureVoice();dictSid=d.sid;dictPartial="";dictTrace("session");'),
     ("constraints", "echoCancellation:false,", "echoCancellation:true,"),
     ("constraints", "autoGainControl:false}};", "autoGainControl:true}};"),
     ("constraints", "noiseSuppression:false,", "noiseSuppression:true,"),
@@ -27729,8 +27747,8 @@ _FS_MUT = [
     ("warmpage", "if(micTimer){clearTimeout(micTimer);micTimer=null;}\n  try{if(micSrc)micSrc.disconnect();}catch(e){}\n  micSrc=null;\n  if(micStream){micStream.getTracks().forEach(t=>t.stop());micStream=null;}",
      "micSrc=null;"),
     ("leak", "if(!micCap)return;                   // the warm window records nothing", ""),
-    ("leak", [("recBuf=[];recHeard=false;\n  micSrc.connect(micProc);", "micSrc.connect(micProc);"),
-              ("  recBuf=[];recHeard=false;\n  if(keep!==false", "  if(keep!==false")], None),
+    ("leak", [("dictQ=[];dictSecs=0;recHeard=false;\n  micSrc.connect(micProc);", "micSrc.connect(micProc);"),
+              ("  dictSecs=0;recHeard=false;\n  if(keep!==false", "  recHeard=false;\n  if(keep!==false")], None),
     ("nocut", "if(micCap||micGum||(!force&&dictStarting))return;", "if(micGum||(!force&&dictStarting))return;"),
     ("blurstart", "if(micCap||micGum||(!force&&dictStarting))return;", "if(micCap||micGum)return;"),
     ("listening", "if(recording&&recHeard)input.placeholder=dictPrompt();",
@@ -27739,17 +27757,19 @@ _FS_MUT = [
      "micStream=s;micSrc=null;micGum=null;return s;"),
     ("trace", "if(!recHeard){recHeard=true;dictTrace(\"chunk\");recPaint();}",
      "if(!recHeard){recHeard=true;recPaint();}"),
-    ("s503", "if(r.status===503)voiceReady=false;", ""),
+    ("s503", "if(!r.ok){if(r.status===503)voiceReady=false;throw new Error(\"Couldn’t transcribe. Try again.\");}",
+     "if(!r.ok){throw new Error(\"Couldn’t transcribe. Try again.\");}"),
     ("gone", 'if(!on){dictPend=false;dictKey({type:"end"},0);return;}', "if(!on){dictPend=false;return;}"),
     ("notready", 'if(!on){dictPend=false;dictKey({type:"end"},0);return;}', "if(!on){dictPend=false;return;}"),
     ("nomic", 'if(!on){dictPend=false;dictKey({type:"end"},0);return;}', "if(!on){dictPend=false;return;}"),
     ("gonepend", 'if(!on){dictPend=false;dictKey({type:"end"},0);return;}', 'if(!on){dictKey({type:"end"},0);return;}'),
-    ("gone", "micDetach(false);\n      input.placeholder=msg;", "input.placeholder=msg;"),
-    ("notready", "micDetach(false);\n      input.placeholder=msg;", "input.placeholder=msg;"),
-    ("nomic", "micDetach(false);input.placeholder=micMsg(e);", "input.placeholder=micMsg(e);"),
+    ("gone", "micDetach(false);dictDrop();dictLit(false);\n      input.placeholder=msg;", "input.placeholder=msg;"),
+    ("notready", "micDetach(false);dictDrop();dictLit(false);\n      input.placeholder=msg;", "input.placeholder=msg;"),
+    ("nomic", "micDetach(false);dictDrop();dictLit(false);input.placeholder=micMsg(e);", "input.placeholder=micMsg(e);"),
     ("taptap", "else if(dictStarting)dictPend=true;}", "}"),
-    ("slip", "if(audioSecs(clip.bufs,clip.sr)<DICT_MIN_CLIP_S){", "if(false){"),
-    ("shorthold", "recording&&micCtx?audioSecs(recBuf,micCtx.sampleRate):0", "recording&&micCtx?9:0"),
+    ("slip", "if(clip.secs<DICT_MIN_CLIP_S||!sid){", "if(!sid){"),
+    ("shorthold", "function recSecs(){return recording?dictSecs:0;}", "function recSecs(){return recording?9:0;}"),
+    ("local", 'api("/api/dictate/audio?sid="+sid,', 'api("https://127.0.0.1/api/dictate/audio?sid="+sid,'),
     ("prompt", "starting:dictStarting,rec:recording", "starting:false,rec:recording"),
 ]
 _fs_bad = []
@@ -27774,7 +27794,7 @@ def _fs_pins(src):
     _p = {}
     _p["gum"] = ("const cap=micAttach();             // capture starts now...\n"
                  "    cap.catch(()=>{});\n"
-                 "    const vp=dictVoiceP=ensureVoice(); // ...beside the voice check (cached: no call)" in src
+                 "    const vp=dictVoiceP=dictOpen();    // ...beside the session" in src
                  and "const gum=micStreamGet();            // the first thing a press does" in src)
     _p["cons"] = ("const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,\n"
                   "  autoGainControl:false}};" in src
@@ -27800,7 +27820,7 @@ check("dictation fast: the capture order, the constraints, the warm window and i
       all(_FSP.values()) and all(_FSP_PAGE.values()), "%r %r" % (_FSP, _FSP_PAGE))
 _fsp_bad = []
 for _k, _a in [("gum", "const cap=micAttach();"), ("cons", "autoGainControl:false}};"),
-               ("warm", "return P.mic_warm===true;"), ("toggle", "Keep the microphone ready"),
+               ("warm", "return P.mic_warm===true;"), ("toggle", "Keep microphone ready"),
                ("close", '$("#newchat").addEventListener("click",micGone);'),
                ("close", 'addEventListener("pagehide",()=>micClose(true));'),
                ("close", "try{micClose(true);}catch(e){}"),
@@ -28003,6 +28023,261 @@ _mw_src_ok = ("micWarmPaint();\n  prefsReady=true;" in _MILLENAI_SRC
 check("mic warm pref: applyPrefs paints the switch from the saved value; no write to browser storage remains",
       _mw_src_ok and "prefSet({mic_warm:on});" in page)
 # ==== 6b345 dictation fast: end ====
+
+# ==== 6b541 dictation instant: begin ====
+# 6b541, per Patrick: "I want the dictation part to work with very low latency, like really
+# fast, not like you have to wait a second for it to start and then like then it pauses."
+# The page's streaming path runs in node on the 6b345 glue (the indicator in the keydown, the
+# pre-roll, partials in place, the end after the last chunk, the slip's cancel, the warm-up),
+# each rule with a mutant; the server's session runs live on the fake engine (dict-fake hook:
+# a partial per chunk, nothing kept after the end); and "nothing leaves this computer" is a
+# lint over the server's dictation region and the helper's Swift source, with mutants.
+_DI_SCEN = r"""
+process.on("unhandledRejection",()=>{});
+const tick=()=>new Promise(r=>realST(r,5));
+const live=(i)=>streams[i]&&streams[i].tracks[0].readyState==="live";
+const feed=(s)=>micProc.onaudioprocess({inputBuffer:{getChannelData:()=>new Float32Array(Math.round(s*16000))}});
+const reset=()=>{
+  micCap=false;micGum=null;dictStarting=false;
+  try{micClose(true);}catch(e){}
+  micCtx=null;micProc=null;micSrc=null;micStream=null;micTimer=null;
+  dictKey({type:"end"},0);recording=false;dictPend=false;recBuf=[];recHeard=false;
+  calls.length=0;bodies.length=0;gumLog.length=0;streams.length=0;timers.length=0;
+  ctxMade=srcMade=resumes=suspends=0;gumImpl=null;resumeImpl=null;apiImpl=null;srcThrow=false;
+  P={};voiceReady=true;voiceChat=false;sent=0;inputs=0;input.placeholder="";input.value="";
+  input.classList.s.clear();micBtn.classList.s.clear();
+  dictSid=null;dictQ=[];dictInflight=null;dictPartial="";dictSecs=0;dictWarmT=0;
+  for(const k of Object.keys(dictT))delete dictT[k];
+};
+const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
+const delayedStart=()=>{let rel;apiImpl=(u)=>u.includes("dictate/start")
+  ?new Promise(r=>{rel=()=>r(okJ({ok:true,sid:"s1",engine:"system",partials:true}));}):undefined;return ()=>rel();};
+const audio=()=>calls.filter(u=>u.includes("dictate/audio"));
+const bytesOf=(i)=>{const b=bodies[i];return b&&b.byteLength!=null?b.byteLength:-1;};
+const o={};
+const sec=async(names,fn)=>{
+  names=[].concat(names);
+  try{await fn();}catch(e){for(const n of names)o[n]=false;}
+  for(const n of names)if(o[n]===undefined)o[n]=false;
+};
+(async()=>{
+// 1. the indicator is lit in the keydown itself: before the stream, before the session
+await sec("instant",async()=>{
+  reset();const relG=delayedGum();const relS=delayedStart();
+  dictKey({type:"down"},0);const p=dictStart();
+  const lit=micBtn.classList.contains("rec")&&input.placeholder==="Listening…"&&typeof dictT.lit==="number";
+  relG();relS();await p;
+  o.instant=lit&&recording===true&&micBtn.classList.contains("rec");
+});
+// 2. the pre-roll: chunks captured before the session answers are kept and go first, whole
+await sec("preroll",async()=>{
+  reset();const relS=delayedStart();
+  dictKey({type:"down"},0);const p=dictStart();await tick();
+  feed(0.3);feed(0.3);feed(0.3);
+  const held=micCap===true&&dictQ.length===3&&audio().length===0;
+  relS();await p;await tick();
+  const first=calls.findIndex(u=>u.includes("dictate/audio"));
+  o.preroll=held&&audio().length===1&&bytesOf(first)===Math.round(0.9*16000)*2&&dictQ.length===0;
+  await stopRec();
+});
+// 3. partials land in the composer in place, dimmed, each replacing the last; the final is plain
+await sec("partials",async()=>{
+  reset();const seq=["set a","set a reminder","set a reminder for"];let i=0;
+  apiImpl=(u)=>u.includes("dictate/audio")?okJ({ok:true,partial:seq[Math.min(i++,2)]}):undefined;
+  await dictStart();
+  feed(0.5);await tick();const a=input.value==="set a"&&input.classList.contains("dictating");
+  feed(0.5);await tick();const b=input.value==="set a reminder"&&input.classList.contains("dictating")&&inputs===2;
+  await stopRec();
+  o.partials=a&&b&&input.value==="hello"&&!input.classList.contains("dictating")&&typeof dictT.partial==="number"
+    &&typeof dictT.final==="number";
+});
+// 4. no pause: the release waits for the chunk in flight, then sends the tail with the end, and the
+// reply is the final; nothing goes to the old whole-clip route
+await sec("nopause",async()=>{
+  reset();let relA;apiImpl=(u)=>u.includes("dictate/audio")?new Promise(r=>{relA=()=>r(okJ({ok:true,partial:"set"}));}):undefined;
+  await dictStart();feed(1);await tick();
+  const inflight=dictInflight!==null&&audio().length===1;
+  feed(0.5);                                   // queued behind the one in flight
+  const p=stopRec();await tick();
+  const waited=!calls.some(u=>u.includes("dictate/end"))&&input.placeholder==="Finishing…";
+  relA();await p;
+  const endAt=calls.findIndex(u=>u.includes("dictate/end"));
+  o.nopause=inflight&&waited&&endAt>0&&bytesOf(endAt)===Math.round(0.5*16000)*2
+    &&input.value==="hello"&&!calls.some(u=>u.includes("/api/transcribe"))&&input.placeholder==="Ask anything";
+});
+// 5. a slip cancels the session on the server and sends no end
+await sec("cancelslip",async()=>{
+  reset();await dictStart();feed(0.1);await stopRec();await tick();
+  o.cancelslip=calls.some(u=>u.includes("dictate/cancel?sid=s1"))&&!calls.some(u=>u.includes("dictate/end"))
+    &&input.placeholder==="Didn’t catch that. Try again."&&!micBtn.classList.contains("rec");
+});
+// 6. the warm-up on focus: the recognizer asked for and the AudioContext made, once a minute
+await sec("warm",async()=>{
+  reset();dictWarm();dictWarm();await tick();
+  o.warm=calls.filter(u=>u.includes("dictate/warm")).length===1&&ctxMade===1;
+});
+// 7. every call went to this app's own /api/
+o.local=allCalls.length>0&&allCalls.every(u=>typeof u==="string"&&u.startsWith("/api/"));
+process.stdout.write(JSON.stringify(o));
+})();"""
+
+
+def _di_run(js):
+    try:
+        return _node_json(js + _DI_SCEN, "instantglue.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+
+
+_DI_BASE = _di_run(_FS_GLUE)
+_DI_NAMES = ["instant", "preroll", "partials", "nopause", "cancelslip", "warm", "local"]
+_di_ok = lambda *ns: all(_DI_BASE.get(n_) is True for n_ in ns)
+check("dictation instant: the indicator is lit in the keydown itself, before the stream or the "
+      "session (node)", _di_ok("instant"), "%r" % _DI_BASE)
+check("dictation instant: the pre-roll keeps every chunk captured before the session answers and "
+      "sends it first, whole (node)", _di_ok("preroll"), "%r" % _DI_BASE)
+check("dictation instant: partials land in the composer in place, dimmed, each replacing the last; "
+      "the final is plain (node)", _di_ok("partials"), "%r" % _DI_BASE)
+check("dictation instant: the release waits for the chunk in flight, sends the tail with the end, "
+      "and the reply is the final; the whole-clip route is never used (node)",
+      _di_ok("nopause"), "%r" % _DI_BASE)
+check("dictation instant: a slip cancels the session; the warm-up on focus readies the recognizer "
+      "and the AudioContext once a minute; every call is to this app's own /api/ (node)",
+      _di_ok("cancelslip", "warm", "local"), "%r" % _DI_BASE)
+_DI_MUT = [
+    ("instant", 'dictLit(true);dictTrace("lit");      // the indicator in the keydown itself, before any await',
+     'await Promise.resolve();dictLit(true);dictTrace("lit");'),
+    ("preroll", "dictQ.push(b);dictSecs+=b.length/16000;", "if(dictSid)dictQ.push(b);dictSecs+=b.length/16000;"),
+    ("preroll", "  dictPump();                          // the pre-roll goes first\n", ""),
+    ("partials", "if(d.partial!=null&&dictSid===sid)dictShow(d.partial,false);", ""),
+    ("partials", 'input.classList.toggle("dictating",!final);', 'input.classList.toggle("dictating",false);'),
+    ("nopause", "if(dictInflight)await dictInflight;         // the last chunk lands before the end does\n", ""),
+    ("nopause", '  input.placeholder="Finishing…";\n', ""),
+    ("cancelslip", 'if(sid)api("/api/dictate/cancel?sid="+sid,{method:"POST"}).catch(()=>{});', ""),
+    ("warm", "  try{micCtxGet();}catch(e){}\n", ""),
+    ("warm", "const n=Date.now();if(n-dictWarmT<60000)return;dictWarmT=n;", "dictWarmT=Date.now();"),
+    ("local", 'api("/api/dictate/end?sid="+sid,', 'api("https://127.0.0.1/api/dictate/end?sid="+sid,'),
+]
+_di_bad = []
+for _nm, _a, _b in _DI_MUT:
+    if _FS_GLUE.count(_a) != 1:
+        _di_bad.append("anchor %r x%d" % (_a[:40], _FS_GLUE.count(_a)))
+        continue
+    if _di_run(_FS_GLUE.replace(_a, _b)).get(_nm) is not False:
+        _di_bad.append("%s survived %r" % (_nm, _a[:40]))
+check("dictation instant: every mutation of the streaming path breaks the scenario aimed at it (node)",
+      not _di_bad and _DI_BASE.get("err") is None and _di_ok(*_DI_NAMES), "%r %r" % (_di_bad, _DI_BASE))
+# the page: the dimmed partial and the warm-up on focus are served
+check("dictation instant: the served page dims a partial and warms the recognizer when the composer "
+      "takes focus",
+      "#input.dictating{opacity:.62}" in page and 'input.addEventListener("focus",dictWarm);' in page
+      and "micCtx.createScriptProcessor(2048,1,1);" in page and 'api("/api/dictate/warm",{method:"POST"})' in page,
+      "page pins")
+
+# ---- the session, live, on the fake engine (a partial per chunk; the final is the whole; nothing kept)
+# urllib labels a bytes body as a form, which the cross-site wall refuses (6b257): say what it is
+_di_hdr = {"Content-Type": "application/octet-stream"}
+_di_pcm = lambda secs: b"\x00\x00" * int(secs * 16000)
+_di_st = req("/api/dictate/start", "POST", {})
+_di_s = json.loads(_di_st[2] or b"{}")
+_di_sid = _di_s.get("sid", "")
+_di_parts = []
+for _i in range(3):
+    _r = req("/api/dictate/audio?sid=" + _di_sid, "POST", _di_pcm(0.5),
+             headers=_di_hdr)
+    _di_parts.append(json.loads(_r[2] or b"{}"))
+_di_end = req("/api/dictate/end?sid=" + _di_sid, "POST", _di_pcm(0.25),
+              headers=_di_hdr)
+_di_endj = json.loads(_di_end[2] or b"{}")
+_di_after = req("/api/dictate/audio?sid=" + _di_sid, "POST", _di_pcm(0.5),
+                headers=_di_hdr)
+check("dictation instant: a session starts on the fake engine with partials on",
+      _di_st[0] == 200 and _di_s.get("ok") is True and _di_s.get("engine") == "fake"
+      and _di_s.get("partials") is True and len(_di_sid) == 16, "%r" % (_di_s,))
+check("dictation instant: each chunk's reply carries the partial so far, and it grows with the audio",
+      [p.get("partial") for p in _di_parts] == ["heard 0.5 s", "heard 1.0 s", "heard 1.5 s"]
+      and [p.get("secs") for p in _di_parts] == [0.5, 1.0, 1.5], "%r" % (_di_parts,))
+check("dictation instant: the end takes the tail and answers the final; after it the session is gone",
+      _di_end[0] == 200 and _di_endj.get("text") == "heard 1.8 s." and _di_endj.get("engine") == "fake"
+      and _di_after[0] == 404, "%r %r" % (_di_endj, _di_after[0]))
+_di_c = json.loads(req("/api/dictate/start", "POST", {})[2])
+_di_cx = req("/api/dictate/cancel?sid=" + _di_c.get("sid", ""), "POST", b"", headers=_di_hdr)
+_di_cafter = req("/api/dictate/end?sid=" + _di_c.get("sid", ""), "POST", b"", headers=_di_hdr)
+check("dictation instant: a cancel drops the session (an end after it is 404), an unknown session is 404, "
+      "and an unknown route under /api/dictate/ is 404",
+      _di_cx[0] == 200 and _di_cafter[0] == 404
+      and req("/api/dictate/audio?sid=nope", "POST", b"\x00\x00", headers=_di_hdr)[0] == 404
+      and req("/api/dictate/bogus", "POST", b"", headers=_di_hdr)[0] == 404
+      and req("/api/dictate/warm", "POST", b"", headers=_di_hdr)[0] == 200,
+      "%r %r" % (_di_cx[0], _di_cafter[0]))
+# a second start drops the first: there is one microphone
+_di_a = json.loads(req("/api/dictate/start", "POST", {})[2]).get("sid", "")
+_di_b = json.loads(req("/api/dictate/start", "POST", {})[2]).get("sid", "")
+check("dictation instant: a new session drops the one before it",
+      req("/api/dictate/audio?sid=" + _di_a, "POST", b"\x00\x00", headers=_di_hdr)[0] == 404
+      and req("/api/dictate/audio?sid=" + _di_b, "POST", b"\x00\x00", headers=_di_hdr)[0] == 200
+      and req("/api/dictate/cancel?sid=" + _di_b, "POST", b"", headers=_di_hdr)[0] == 200, "%r %r" % (_di_a, _di_b))
+check("dictation instant: the voice status names the engine, and the fake one counts as ready",
+      json.loads(req("/api/voice/status")[2]).get("engine") == "fake"
+      and json.loads(req("/api/voice/status")[2]).get("ready") is True)
+
+
+# ---- nothing leaves this computer: the server's dictation region and the helper's source
+def _di_local(src, swift):
+    """The dictation region of the server (@dictate-begin to @dictate-end) opens no connection
+    and consults no cloud key; the helper's Swift source has no network code and is the system's
+    on-device recognizer. Returns the rules that fail."""
+    bad = []
+    a, b = src.find("# @dictate-begin"), src.find("# @dictate-end")
+    if a < 0 or b < a:
+        return ["region"]
+    reg = src[a:b]
+    for pat in (r"urlopen\(", r"urllib\.request", r"http\.client", r"\bsocket\.", r"requests\.",
+                r"\bssl\.", r"https?://", r"cloud_key", r"CLOUD", r"api_key", r"wss?://"):
+        if re.search(pat, reg):
+            bad.append("server:" + pat)
+    if "subprocess.Popen([path]" not in reg or "_pcm16_to_f32" not in reg:
+        bad.append("server:pipe")
+    if "SpeechTranscriber(" not in swift or "SpeechAnalyzer(" not in swift:
+        bad.append("swift:engine")
+    for pat in (r"URLSession", r"NWConnection", r"import Network", r"https?://", r"NSURLConnection",
+                r"requiresOnDeviceRecognition\s*=\s*false", r"SFSpeechRecognizer", r"CFSocket",
+                r"\bsocket\(", r"Darwin\.connect"):
+        if re.search(pat, swift):
+            bad.append("swift:" + pat)
+    return bad
+
+
+_DI_SWIFT = open("shell/dictate/dictate.swift", encoding="utf-8").read() if os.path.exists("shell/dictate/dictate.swift") else ""
+check("dictation instant: nothing leaves this computer: the server's dictation region opens no "
+      "connection and the helper is the system's on-device recognizer with no network code",
+      _DI_SWIFT and not _di_local(_MILLENAI_SRC, _DI_SWIFT), "%r" % _di_local(_MILLENAI_SRC, _DI_SWIFT))
+_di_lbad = []
+for _tag, _src_m, _sw_m in [
+        ("server:urlopen", _MILLENAI_SRC.replace("# @dictate-begin", "# @dictate-begin\nimport urllib.request\n_x = urllib.request.urlopen('http://x')"), _DI_SWIFT),
+        ("server:socket", _MILLENAI_SRC.replace("_dict_helper = _DictHelper()", "_dict_helper = _DictHelper()\n_s = socket.socket()"), _DI_SWIFT),
+        ("server:key", _MILLENAI_SRC.replace("_dict_helper = _DictHelper()", "_dict_helper = _DictHelper()\n_k = cloud_key('x')"), _DI_SWIFT),
+        ("swift:url", _MILLENAI_SRC, _DI_SWIFT.replace("import Speech", "import Speech\nlet s = URLSession.shared")),
+        ("swift:sf", _MILLENAI_SRC, _DI_SWIFT.replace("SpeechTranscriber(", "SFSpeechRecognizer(")),
+        ("swift:net", _MILLENAI_SRC, _DI_SWIFT.replace("import Speech", "import Speech\nimport Network")),
+        ("region", _MILLENAI_SRC.replace("# @dictate-end", ""), _DI_SWIFT)]:
+    if not _di_local(_src_m, _sw_m):
+        _di_lbad.append(_tag)
+check("dictation instant: each 'nothing leaves' rule fails on a source that breaks it",
+      not _di_lbad, "%r" % _di_lbad)
+# the engine's words on the Mac: the helper is looked for beside this file and in the repo, on
+# macOS 26 and later only, and a dev copy may name one
+check("dictation instant: the helper is found beside millenai.py or in shell/dictate, on macOS 26 "
+      "and later, never off a Mac; whisper's weights are the fallback; the status is a dev hook away",
+      'for p in (resource(DICT_HELPER), resource("shell", "dictate", DICT_HELPER)):' in _MILLENAI_SRC
+      and "DICT_HELPER_MIN_MACOS = 26" in _MILLENAI_SRC
+      and "    if not IS_MAC:\n        return None" in _MILLENAI_SRC
+      and 'if DEV_HOME and os.environ.get("MILLENAI_DICT_HELPER"):' in _MILLENAI_SRC
+      and "return _dict_helper_path() is not None or (_whisper_libs() and _whisper_weights())" in _MILLENAI_SRC
+      and "atexit.register(_dict_helper.stop)" in _MILLENAI_SRC
+      and "./shell/dictate/build.sh" in open("build_shell_dmg.sh").read()
+      and 'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())
+# ==== 6b541 dictation instant: end ====
 
 
 # ==== 6b340 funnel pictures: begin ====

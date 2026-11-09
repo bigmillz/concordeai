@@ -106,6 +106,10 @@ MACHINE_STATE = frozenset((
     "_mlx_engine",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
+    # (6b541) live dictation: the sessions (one microphone, one at a time,
+    # dropped at the end) and whether whisper's weights were warmed; the
+    # helper process is machine state too, held by _dict_helper
+    "_dict_sessions", "_whisper_warmed",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
     "EXPORT_KIND",
     # the hardware benchmark (6b331): its run, the engine call in flight,
@@ -18199,11 +18203,14 @@ def _whisper_weights() -> bool:
 def _voice_supported() -> bool:
     """Speech-to-text: the system recognizer (6b541, macOS 26 and later)
     needs nothing installed; otherwise whisper's library."""
-    return _dict_helper_path() is not None or _whisper_libs()
+    return "dict-fake" in TEST_HOOKS or _dict_helper_path() is not None or _whisper_libs()
 
 
 def _voice_ready() -> bool:
-    """...and the system engine needs no download either."""
+    """...and the system engine needs no download either (the gauntlet's
+    fake engine counts as one)."""
+    if "dict-fake" in TEST_HOOKS:
+        return True
     return _dict_helper_path() is not None or (_whisper_libs() and _whisper_weights())
 
 
@@ -60077,9 +60084,9 @@ async function stopRec(){
   micBtn.classList.remove("rec");
   input.placeholder="Finishing…";
   try{
+    dictSid=null;                               // the pump stops here: no more audio requests, no late partial
     if(dictInflight)await dictInflight;         // the last chunk lands before the end does
-    const body=dictJoin();
-    dictSid=null;                               // no partial may land after this
+    const body=dictJoin();                      // the tail goes with the end
     const r=await api("/api/dictate/end?sid="+sid,{method:"POST",
       headers:{"Content-Type":"application/octet-stream"},body});
     // a 503 is the engine gone from under a cached "ready": ask again next time
