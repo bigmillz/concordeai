@@ -5242,6 +5242,14 @@ def model_fits_memory(label: str) -> bool:
     if HAS_PSUTIL:
         vm = psutil.virtual_memory()
         avail = max(avail or 0, vm.total - vm.used)
+    # an idle engine's memory is this model's to take (6b539): engines stay
+    # resident while there is room, and ensure_mlx_engine stops the others
+    # before it loads, so their footprint is free by the time this one
+    # needs it. Never counted while the engine is answering.
+    if avail is not None and time.time() - _mlx_last_use > _ENGINE_IDLE_FLOOR_S:
+        for _l, _p in list(_mlx_procs.items()):
+            if _l != label and _p.poll() is None:
+                avail += MODEL_MEM_BYTES.get(_l, 0)
     need = MODEL_MEM_BYTES.get(label)
     if avail is None or need is None:
         return True  # unknown — don't cry wolf
@@ -65528,6 +65536,45 @@ HTML_CONTENT = pc_words(HTML_CONTENT)
 
 
 _mlx_last_use = 0.0
+# the idle-engine rule's numbers (6b539): never within the first idle
+# seconds (an answer's next pass may be a moment away), room = what the OS
+# would hand a wiring allocation (model_fits_memory's reading), swap growth
+# is the pressure the app must never cause, and the hard cap and the old
+# five minutes are the fallbacks
+_ENGINE_IDLE_FLOOR_S = 20
+_ENGINE_IDLE_CAP_S = 6 * 3600
+_ENGINE_ROOM_MIN = 6 << 30            # or 12% of the Mac's memory, whichever is more
+_ENGINE_SWAP_MAX = 1 << 30
+_ENGINE_SWAP_GROWTH = 256 << 20
+_engine_swap_seen = [None]
+
+
+def _engine_evict_why(now=None) -> str:
+    """Why an idle MLX engine should go now, or "" to keep it resident
+    (6b539). Memory short, swapping, idle too long; without psutil the old
+    five minutes."""
+    now = time.time() if now is None else now
+    idle = now - _mlx_last_use
+    if idle < _ENGINE_IDLE_FLOOR_S:
+        return ""
+    if not HAS_PSUTIL:
+        return "no memory reading, idle %d s" % idle if idle > 300 else ""
+    vm = psutil.virtual_memory()
+    room = max(vm.available or 0, vm.total - vm.used)
+    floor = max(_ENGINE_ROOM_MIN, int(vm.total * 0.12))
+    if room < floor:
+        return "memory short (%.1f GB free)" % (room / 2 ** 30)
+    try:
+        swap = psutil.swap_memory().used
+    except Exception:
+        swap = 0
+    last = _engine_swap_seen[0]
+    _engine_swap_seen[0] = swap
+    if swap > _ENGINE_SWAP_MAX and last is not None and swap - last >= _ENGINE_SWAP_GROWTH:
+        return "swapping (%.1f GB)" % (swap / 2 ** 30)
+    if idle > _ENGINE_IDLE_CAP_S:
+        return "idle %d h" % (idle // 3600)
+    return ""
 
 
 def _sweep_hf_carcasses(max_age: float = 1800.0) -> int:
@@ -65763,12 +65810,19 @@ def _mlx_janitor():
                 except Exception:
                     pass
         try:
-            # never under a running benchmark (6b331): it owns the engines
+            # never under a running benchmark (6b331): it owns the engines.
+            # IDLE ENGINES STAY WHILE THERE IS ROOM (6b539, per Patrick): the
+            # flat five minutes made the next question pay the load again
+            # (26.9 s to the first word against 14.7 s warm, measured in
+            # 6b531). An idle engine now goes when memory is short or the
+            # Mac starts swapping, after a long idle, or, without a memory
+            # reading, after the old five minutes (_engine_evict_why).
             if _mlx_procs and _mlx_last_use and not _bench["running"] and \
-                    time.time() - _mlx_last_use > 300:
+                    _engine_evict_why():
                 with _engine_lock:
-                    if time.time() - _mlx_last_use > 300 and \
-                            not _bench["running"]:
+                    _why = _engine_evict_why()
+                    if _why and not _bench["running"]:
+                        print("  idle MLX engine let go: " + _why)
                         _stop_other_mlx("")   # no keeper: stop them all
         except Exception:
             pass
