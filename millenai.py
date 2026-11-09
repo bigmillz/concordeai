@@ -52141,8 +52141,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
    look stays restrained; this is the one place the effects perform. Values and timings are the friend
    page's (scratchpad/preview-site/beta, DESIGN.md "The Ultra moment").
-   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the diamond ignites (a white core; a bloom of
-   violet and rose at 18 %, gone by 900 ms); a 22 px spark runs from the diamond back along the beam to its
+   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the diamond ignites (a white core; a small
+   violet bloom at 18 %, within 9 px of the diamond, gone by 900 ms); a 22 px spark runs from the diamond back along the beam to its
    start (160 ms); from there a line of light runs all the way round the composer's border (a conic reveal
    from that point's angle, --hz-a0, 600 ms from 160 ms, a white head at its edge) and settles into a still
    1.5 px spectral rim, ice > violet > rose > ember, at .9; the aurora takes one breath (+.45 at 200 ms,
@@ -52173,8 +52173,10 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-ultra .hz-sl-thumb{background:#fff}
 .hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}
 .hz.hz-ignite .hz-sl-thumb,.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-sl-thumb{animation:hzIgnite .9s cubic-bezier(.16,1,.3,1) both,hzDiamondFlow 3.5s linear .9s infinite}
-@keyframes hzIgnite{0%{box-shadow:0 0 0 0 #fff}18%{box-shadow:0 0 6px 2px #fff,0 0 22px 8px rgba(185,168,255,.75),0 0 44px 16px rgba(242,166,180,.45)}
-  100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 0 rgba(185,168,255,0),0 0 0 0 rgba(242,166,180,0)}}
+/* the bloom stays small (per Patrick: no big circles or ovals in any effect): at its peak it reaches
+   about 9 px past the diamond's edge, a white core and a violet edge; no wide radial halo */
+@keyframes hzIgnite{0%{box-shadow:0 0 0 0 #fff}18%{box-shadow:0 0 6px 2px #fff,0 0 9px 2px rgba(185,168,255,.7)}
+  100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 0 rgba(185,168,255,0)}}
 @keyframes hzDiamondFlow{0%,100%{box-shadow:0 0 7px 1px rgba(207,224,255,.5)}25%{box-shadow:0 0 7px 1px rgba(185,168,255,.5)}50%{box-shadow:0 0 7px 1px rgba(242,166,180,.5)}
   70%{box-shadow:0 0 7px 1px rgba(232,65,90,.45)}85%{box-shadow:0 0 7px 1px rgba(241,220,178,.5)}}
 /* the spark: 22 px, from the diamond back to the beam's start in 160 ms; leaving, back out to the diamond */
@@ -52190,8 +52192,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}
 .hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzFlow{from{background-position:150% 0}to{background-position:0% 0}}
-@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 12px rgba(255,255,255,.95),0 0 28px rgba(185,168,255,.7)}
-  100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0),0 0 0 rgba(185,168,255,0)}}
+@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}
+  100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
 /* the sky answers once: the rays brighten +.45 at 200 ms and settle within 2 s */
 .hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzSkyBreath{0%{filter:brightness(1)}10%{filter:brightness(1.45)}100%{filter:brightness(1)}}
@@ -52258,10 +52260,6 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 #imp-veil button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0;margin:0;text-align:left}
 #imp-veil button:focus-visible,#imp-veil [tabindex]:focus-visible,#imp-veil input:focus-visible{outline:0;
   box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
-#imp-veil .imp-glow{position:absolute;width:min(760px,80vw);height:220px;left:50%;bottom:calc(50% - 320px);
-  transform:translateX(-50%);border-radius:50%;pointer-events:none;
-  background:radial-gradient(ellipse at 50% 100%,rgba(159,192,255,.38),rgba(159,192,255,0) 62%);
-  filter:blur(34px);animation:impBreathe var(--hz-t-breathe) ease-in-out infinite}
 #imp-sheet{position:relative;width:min(980px,100%);height:min(92vh,720px);display:flex;flex-direction:column;
   border-radius:22px;border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
   background:linear-gradient(180deg,rgba(6,8,18,.90),rgba(8,14,34,.88));
@@ -52427,9 +52425,9 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   text-transform:none;color:var(--faint);margin-bottom:6px}
 @keyframes impBreathe{0%,100%{opacity:.5}50%{opacity:1}}
 @media (prefers-reduced-motion:reduce){
-  #imp-veil .imp-glow,.imp-dot.live,.imp-bar.pulse i{animation:none}
+  .imp-dot.live,.imp-bar.pulse i{animation:none}
   .imp-row,.imp-bar i,.imp-tile,.imp-btn,.imp-sw button,.imp-sw button::after{transition:none}}
-body.novideo #imp-veil .imp-glow,body.novideo .imp-dot.live,body.novideo .imp-bar.pulse i{animation:none}
+body.novideo .imp-dot.live,body.novideo .imp-bar.pulse i{animation:none}
 body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
 /* the drop's quiet ask: a small glass bar at the top of the room, two plain buttons */
 #imp-ask{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:8px;
@@ -52698,7 +52696,6 @@ __CODE_ROWS__
 <div id="imp-ask" role="alertdialog" aria-labelledby="imp-ask-t" hidden><span id="imp-ask-t"></span>
   <button type="button" id="imp-ask-go">Import</button><button type="button" id="imp-ask-no">Cancel</button></div>
 <div id="imp-veil" hidden>
-  <div class="imp-glow" aria-hidden="true"></div>
   <div id="imp-sheet" role="dialog" aria-modal="true" aria-labelledby="imp-title" tabindex="-1">
     <div class="imp-sky" aria-hidden="true"></div>
     <header class="imp-head">

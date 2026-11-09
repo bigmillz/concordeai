@@ -40866,7 +40866,7 @@ check("the shell's menu bar is the curated one: ConcordeAI (About, Settingsâ€¦ â
       and all(x in _rs_menu for x in ("PredefinedMenuItem::undo(", "PredefinedMenuItem::redo(", "PredefinedMenuItem::cut(",
                                       "PredefinedMenuItem::copy(", "PredefinedMenuItem::paste(", "PredefinedMenuItem::select_all(",
                                       "PredefinedMenuItem::hide(", "PredefinedMenuItem::hide_others(", "PredefinedMenuItem::quit(",
-                                      "PredefinedMenuItem::about(", "PredefinedMenuItem::fullscreen(", "PredefinedMenuItem::minimize(",
+                                      "PredefinedMenuItem::fullscreen(", "PredefinedMenuItem::minimize(",
                                       "PredefinedMenuItem::maximize(app, Some(\"Zoom\"))"))
       and not any(x in _rs_menu for x in ("services(", "show_all(", "close_window(", '"File"', '"Help"'))
       and '"settings", "Settings\\u{2026}", true, Some("CmdOrCtrl+,")' in _rs_menu
@@ -40875,7 +40875,9 @@ check("the shell's menu bar is the curated one: ConcordeAI (About, Settingsâ€¦ â
       and "#[cfg(not(debug_assertions))]\n    let view = Submenu::with_items(app, \"View\", true, &[&sidebar, &fullscreen])?;" in _rs_menu
       and "let name = app.package_info().name.clone();" in _rs_menu and '"ConcordeAI"' not in _rs_menu
       and '"updates", "Check for Updates\\u{2026}", !nightly' in _rs_menu
-      and '"settings" => Some("typeof openAbout===\'function\'&&openAbout()")' in _rs_act
+      and '"settings" | "about" => Some("typeof openAbout===\'function\'&&openAbout()")' in _rs_act
+      and 'MenuItem::with_id(app, "about", format!("About {}", name)' in _rs_menu
+      and "PredefinedMenuItem::about(" not in _rs_main          # no native About panel: no standard title bar anywhere
       and "hzSidebarToggle()" in _rs_act and "about-check" in _rs_act
       and "function openAbout(" in _MILLENAI_SRC and "function hzSidebarToggle(" in _MILLENAI_SRC
       and 'id="about-check"' in _MILLENAI_SRC
@@ -41378,8 +41380,9 @@ check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape
       and 'x.setRequestHeader("Content-Type","application/octet-stream")' in _pg_imp
       and 'if(e.key!=="Tab")return;' in _pg_imp
       and "function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){" in page   # extra: the saved record (6b528)
-      and "@media (prefers-reduced-motion:reduce){\n  #imp-veil .imp-glow" in page
-      and "body.novideo #imp-veil .imp-glow" in page and ".msg.ai .who.imp{display:flex" in page
+      and "imp-glow" not in page          # its breathing oval went (per Patrick: no big circles or ovals in any effect)
+      and "@media (prefers-reduced-motion:reduce){\n  .imp-dot.live" in page
+      and "body.novideo .imp-dot.live" in page and ".msg.ai .who.imp{display:flex" in page
       and "--hz-font-ui:'Space Grotesk'" in page and "Instrument Sans" not in page
       and "Newsreader" not in page and "Geist Mono" not in page)
 # BRING YOUR CHATS, INTEGRATED (per Patrick: "integrate it more tightly, but not as a main
@@ -42146,11 +42149,14 @@ def _ultra544(css, js):
             and ".hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}" in u
             and "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);" in u and "padding:1.5px" in u and "opacity:.9;" in u
             and ".hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}" in u
-            and "18%{box-shadow:0 0 6px 2px #fff,0 0 22px 8px rgba(185,168,255,.75),0 0 44px 16px rgba(242,166,180,.45)}" in u
+            and "18%{box-shadow:0 0 6px 2px #fff,0 0 9px 2px rgba(185,168,255,.7)}" in u
             and ".hz .hz-elevel.spectral{background:linear-gradient(90deg,#cfe0ff,#b9a8ff,#f2a6b4,#e8415a,#f1dcb2,#cfe0ff);background-size:300% 100%;" in u
             and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}" in u
             and ".hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}" in u
-            and "@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 12px rgba(255,255,255,.95),0 0 28px rgba(185,168,255,.7)}" in u
+            and "@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}" in u
+            # no big circles or ovals (per Patrick): no glow in the moment reaches past 12 px (blur + spread)
+            and max([int(b) + int(sp) for b, sp in re.findall(r"0 0 (\d+)px (\d+)px", u)] + [0]) <= 12
+            and max([int(b) for b in re.findall(r"text-shadow:[^;}]*?0 0 (\d+)px rgba", u)] + [0]) <= 12
             and ".hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}" in u
             and u.count("infinite") == 4                      # the flow on the label and the diamond (plain and igniting): nothing else loops, the rim never
             and ".hz.hz-calm.hz-ultra #composer::after{animation:hzRimIn .3s cubic-bezier(.16,1,.3,1) both}" in u
@@ -42170,7 +42176,8 @@ check("6b544 the Ultra moment: the ignition once per arrival (the diamond's bloo
       and not _ultra544(_hz_css.replace("hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both", "hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s infinite"), _hz_js)      # a looping rim
       and not _ultra544(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow", ".hz.hz-ultra .hz-elevel.spectral{animation:hzFlow"), _hz_js)       # Calm flowing
       and not _ultra544(_hz_css + ".hz .hz-sl:focus-within{box-shadow:0 0 0 1px var(--hz-ember)}", _hz_js)                                                              # the ring from a click
-      and not _ultra544(_hz_css, _hz_js.replace("if(i===4&&was!=null&&was!==4)hzIgnite();", "if(i===4)hzIgnite();")), "")                                               # igniting on every paint
+      and not _ultra544(_hz_css, _hz_js.replace("if(i===4&&was!=null&&was!==4)hzIgnite();", "if(i===4)hzIgnite();"))                                                 # igniting on every paint
+      and not _ultra544(_hz_css.replace("0 0 9px 2px rgba(185,168,255,.7)}", "0 0 9px 2px rgba(185,168,255,.7),0 0 44px 16px rgba(242,166,180,.45)}"), _hz_js), "")   # the wide halo back
 # THE WRITING STAR: one idea for the answer's delivery; the aim reads layout once per paint and the frame
 # loop never; the landing retires the star; the comets, the glow and the composer's landing light are gone
 def _star544(pg):
