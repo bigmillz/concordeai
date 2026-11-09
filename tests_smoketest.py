@@ -26287,7 +26287,10 @@ check("server only (live): a pulled or dropped model moves the pick; a chat stre
       _so_want == "small:8b" and _so_l2["only"]["model"] == _so_want
       and _scS[0] == 200 and "ANSWER-" in _scS[1] and "⚠" not in _scS[1]
       and _stS and {c[2]["model"] for c in _stS} == {_so_want}
-      and _stS[0][2]["messages"][-1]["content"] == "tell me about lighthouses 337"
+      # the question rides last; above it may sit the person's own notes (6b530: "my servers are
+      # mine", a server gets them; this run's earlier lighthouse chats match)
+      and (_stS[0][2]["messages"][-1]["content"] == "tell me about lighthouses 337"
+           or _stS[0][2]["messages"][-1]["content"].endswith("\n\ntell me about lighthouses 337"))
       and ("RUN", json.dumps({"r": [_so_lab], "w": "server", "s": _SVN})) in _scS[2]
       and urllib.parse.unquote(_SVH.get("X-Models", "")) == _so_lab
       and "retrying on" not in json.dumps(_scS[2]) and "stopped responding" not in _scS[1]
