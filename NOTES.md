@@ -19612,3 +19612,43 @@ no API response ≥ 400, no sideways scroll, every × hit by `elementFromPoint`,
 **Risks left.** Not seen in WKWebView. The time cap counts from the helper's start; one pathological page can run
 past it until the 10 s kill. A PDF whose fonts have no ToUnicode map can give PDFKit garbage text that isn't
 flagged. Chars/4 (a model with no MLX build here) undercounts dense scripts, as 6b522 says.
+
+## 6b547 — beta-1: one clean window and menu bar, bring your chats integrated, no big glows, run g's last reds (7.0 beta, per Patrick)
+
+**The menu bar** (per Patrick: "basically looked like one perfect window"). The shell builds four menus and
+nothing else: the app's (About · Settings… ⌘, · Import Chats… · Check for Updates… · Hide · Hide Others ·
+Quit), Edit (Undo, Redo, Cut, Copy, Paste, Select All: the native responders, without which copy and paste
+stop in the webview), View (Toggle Sidebar ⌘\ · Enter Full Screen) and Window (Minimize · Zoom). No File or
+Help, no Services or Show All; Reload only in a debug build; macOS still adds AutoFill, Start Dictation and
+Emoji & Symbols to Edit, and Quit and Keep Windows as Quit's alternate. The page's items call the page's
+own functions (`openAbout`, About's check button, `impOpen`, `hzSidebarToggle`); About opens the page's
+own About, so no native panel and no standard title bar appears anywhere. The app's name comes from the
+bundle's product name (a Nightly's menu says so), and a Nightly's Check for Updates is greyed. Full
+screen: the shell marks `html.tl-fs` on every resize and page load, and the corner's rules stand down
+(the toggle back at x 24). Verified on the release bundle natively and as x86_64 under Rosetta: the same
+four menus, ⌘, opens Settings, ⌘A/⌘C/⌘V copy and paste in the composer (`scratchpad/b1menu/out/`); ⌘\
+folding the sidebar, Esc closing Settings and Import Chats… opening the sheet were proven in the debug build.
+
+**Bring your chats, integrated** (per Patrick: "more tightly, but not as a main feature"). No pill on the
+home at any Effects level. Import Chats… in the app menu. A `.zip` or `.json` dropped on the window goes to
+the importer's own detection first (begin as a file, upload, inspect): a ChatGPT, Claude or Gemini export
+asks once in a small glass bar ("Import your ChatGPT chats?" Import · Cancel) and Import carries on in the
+sheet from the same run; anything else lands the way a drop always did (a small .json attaches, a PDF goes
+to 6b546's reader, a zip is refused). A run cancelled before it started now gives its uploaded copy back
+(it stayed in `imports/incoming`). An imported chat's sidebar row wears its app's initial in a 14 px
+hairline circle titled "From <app>". Search and private search reach imported chats (verified: a title
+hit, a content hit, and know-you's index). No first-launch ask: it isn't on beta-1 (settings-2 brings it).
+
+**No big circles or ovals** (per Patrick). The Ultra ignition's bloom peaks within 9 px of the diamond (was
+a 44 px blur with a 16 px spread of rose); ULTRA's lit glow is 6 px (was 28 px of violet); the import
+sheet's breathing 760 px oval is gone. The Ultra check bounds every glow in the moment at 12 px, with a
+mutant. Left for Patrick: the sky's moon glow (`#hz-moonglow`, a 760 px circle at .3 over the backdrop)
+is the sky's, not an effect's, so it stayed.
+
+**Gauntlet.** pdf-attach (6b546) merged; its drop line and this one's sit together (the importer first, a
+PDF next). Run g's later reds were copy-2's and 6b543's words (the server notes, menu rows and bubbles, the
+pairing and busy lines, offline, the gone-server line, the server caption, the dictation placeholders),
+re-pinned at the same strength; the KEEP_LS pin reads the list. New checks: the curated menu (a Services
+mutant), the corner's full-screen rule, the home pill's absence, the menu's Import Chats, the drop's
+decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
+row mark, the storage sweep.
