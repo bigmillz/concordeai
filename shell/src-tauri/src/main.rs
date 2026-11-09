@@ -486,8 +486,9 @@ fn stop_sidecar(app: &AppHandle) {
 /// window"): the app menu, Edit, View and Window, nothing else. No File or
 /// Help, no Services, no developer items in a release. Every item works:
 /// Edit's are the native responders (without them copy and paste stop in
-/// the webview); Settings, Check for Updates and Toggle Sidebar call the
-/// page's own functions (menu_action). The app's name comes from the bundle's
+/// the webview); Settings, Import Chats (per Patrick: bring your chats
+/// integrated, not a main feature), Check for Updates and Toggle Sidebar
+/// call the page's own functions (menu_action). The app's name comes from the bundle's
 /// product name, so the Nightly's menu says "ConcordeAI Nightly"; the
 /// Nightly's updater is off, so its Check for Updates is greyed.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
@@ -500,6 +501,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         ..Default::default()
     };
     let settings = MenuItem::with_id(app, "settings", "Settings\u{2026}", true, Some("CmdOrCtrl+,"))?;
+    let import = MenuItem::with_id(app, "import", "Import Chats\u{2026}", true, None::<&str>)?;
     let updates = MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", !nightly, None::<&str>)?;
     let app_menu = Submenu::with_items(
         app,
@@ -509,6 +511,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::about(app, Some(&format!("About {}", name)), Some(about))?,
             &PredefinedMenuItem::separator(app)?,
             &settings,
+            &import,
             &updates,
             &PredefinedMenuItem::separator(app)?,
             &PredefinedMenuItem::hide(app, Some(&format!("Hide {}", name)))?,
@@ -559,6 +562,9 @@ fn menu_action(id: &str) -> Option<&'static str> {
         "settings" => Some("typeof openAbout==='function'&&openAbout()"),
         "updates" => Some(
             "typeof openAbout==='function'&&(openAbout(),document.getElementById('about-check')&&document.getElementById('about-check').click())",
+        ),
+        "import" => Some(
+            "typeof impOpen==='function'&&(document.getElementById('about-veil').hidden=true,impOpen())",
         ),
         "sidebar" => Some("typeof hzSidebarToggle==='function'&&hzSidebarToggle()"),
         "reload" => Some("location.reload()"),

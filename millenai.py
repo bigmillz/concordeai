@@ -16869,6 +16869,13 @@ def import_cancel(base, run):
     if job is None:
         return {"ok": False}
     job["cancel"] = True
+    # a run that never started (an export dropped on the window and declined, a
+    # file the importer doesn't recognise, a sheet closed before Start): its
+    # uploaded copy goes now; a started run's goes when its reader ends
+    if (not job.get("started") and job.get("uploaded")
+            and job["state"] in ("receiving", "received", "inspected", "error")):
+        _unlink_quiet(job["path"])
+        job["state"] = "stopped"
     return {"ok": True}
 
 
@@ -52412,12 +52419,6 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 #imp-settings-note .imp-link:hover{color:var(--red)}
 #imp-settings-note .imp-btn{font:inherit;font-size:12px;color:var(--text);background:none;border:1px solid var(--red);border-radius:999px;padding:5px 12px;cursor:pointer}
 .imp-srcrow .n{font-family:var(--hz-font-mono);font-variant-numeric:tabular-nums;color:var(--text)}
-.imp-homecard{display:inline-flex;align-items:center;gap:12px;margin-top:26px;height:44px;padding:0 18px 0 16px;border-radius:999px;
-  border:1px solid var(--hz-hair);background:rgba(255,255,255,.04);color:var(--hz-ink-2);font:500 14px var(--hz-font-ui);cursor:pointer;
-  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);transition:background var(--hz-t-fast),color var(--hz-t-fast)}
-.imp-homecard:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
-.imp-homecard svg{width:18px;height:18px;color:var(--hz-accent)}
-.imp-homecard:focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
 /* who answered in a chat brought from another app, and which model */
 .msg .who .who-model{margin-left:14px;font-size:11.5px;font-weight:400;color:var(--faint);letter-spacing:0;text-transform:none}
 /* the app hides its own answer labels (6b264); an answer brought from
@@ -52430,6 +52431,22 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   .imp-row,.imp-bar i,.imp-tile,.imp-btn,.imp-sw button,.imp-sw button::after{transition:none}}
 body.novideo #imp-veil .imp-glow,body.novideo .imp-dot.live,body.novideo .imp-bar.pulse i{animation:none}
 body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
+/* the drop's quiet ask: a small glass bar at the top of the room, two plain buttons */
+#imp-ask{position:fixed;left:50%;top:84px;transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:8px;
+  padding:8px 8px 8px 16px;border-radius:14px;background:rgba(6,8,18,.82);border:1px solid rgba(255,255,255,.12);
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);box-shadow:0 12px 32px -12px rgba(0,0,0,.6);
+  font-family:var(--hz-font-ui);font-size:13.5px;color:var(--hz-ink)}
+#imp-ask[hidden]{display:none}
+#imp-ask #imp-ask-t{margin-right:8px}
+#imp-ask button{height:32px;padding:0 14px;border-radius:999px;font:inherit;font-weight:500;cursor:pointer;color:var(--hz-ink);
+  border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04)}
+#imp-ask button:hover{background:rgba(255,255,255,.08)}
+#imp-ask #imp-ask-go{background:var(--hz-accent);border-color:transparent;color:#071026;font-weight:600}
+#imp-ask button:focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+/* a chat brought from another app: its app's initial in a small hairline circle, no logos */
+.chat-item .csrc{flex:none;width:14px;height:14px;border-radius:50%;border:1px solid currentColor;box-sizing:border-box;
+  display:inline-flex;align-items:center;justify-content:center;font-size:8px;font-weight:600;line-height:1;
+  opacity:.42;margin-left:6px;user-select:none}
 /* ==== bring your chats (6b529): styles end ==== */
 /* ---- THE MAC SHELL'S CORNER (per Patrick: the traffic lights crowded the sidebar toggle, "too
    tight"). html.tl is the Tauri shell on a Mac (__SHELL_TL__): the page runs under the title bar and
@@ -52678,6 +52695,8 @@ __CODE_ROWS__
   </div>
 </div>
 <!-- ==== bring your chats (6b529): the sheet begin ==== -->
+<div id="imp-ask" role="alertdialog" aria-labelledby="imp-ask-t" hidden><span id="imp-ask-t"></span>
+  <button type="button" id="imp-ask-go">Import</button><button type="button" id="imp-ask-no">Cancel</button></div>
 <div id="imp-veil" hidden>
   <div class="imp-glow" aria-hidden="true"></div>
   <div id="imp-sheet" role="dialog" aria-modal="true" aria-labelledby="imp-title" tabindex="-1">
@@ -57165,6 +57184,7 @@ $("#fpick").addEventListener("change",()=>{
 // composer), and only what the attach button accepts: a PDF read as
 // text reached the model as garbage framed as real data.
 const DROP_TEXT=/\.(txt|md|markdown|csv|json|js|ts|py|html|css|log|sh|ya?ml|xml|toml|rtf)$/i;
+const IMP_DROP=/\.(zip|json)$/i;   // what may be a ChatGPT, Claude or Gemini export
 const hasFiles=e=>!!(e.dataTransfer&&[...(e.dataTransfer.types||[])].includes("Files"));
 addEventListener("dragover",e=>{
   if(!hasFiles(e))return;
@@ -57173,13 +57193,17 @@ addEventListener("drop",e=>{
   if(!hasFiles(e))return;
   e.preventDefault();
   const skipped=[];
+  const skip=n=>{input.placeholder="can't read "+n+" here \u2014 text files and images only";};
   [...(e.dataTransfer.files||[])].forEach(f=>{
+    // a .zip or .json may be a chat export: the importer looks first (impDropCheck), and
+    // anything it doesn't recognise lands the way it always did
+    const old=()=>{if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);else skip(f.name);};
     if(f.type.startsWith("image/"))addImageFile(f);
+    else if(IMP_DROP.test(f.name)&&typeof impDropCheck==="function")impDropCheck(f,old);
     else if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);
     else skipped.push(f.name);
   });
-  if(skipped.length)input.placeholder="can't read "+skipped[0]
-    +" here \u2014 text files and images only";
+  if(skipped.length)skip(skipped[0]);
 });
 input.addEventListener("paste",e=>{
   const items=[...(e.clipboardData||{}).items||[]]
@@ -58578,7 +58602,6 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
   if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
-  impHomeMount();                 // bring your chats (6b529): the home card
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -58824,6 +58847,8 @@ function renderChats(flip){
     +(c.unread&&c.id!==curChat?'<span class="cdot" role="img" aria-label="unread"></span>':'')
     +'<span class="ct" title="'+esc(c.title||"chat")+'">'
     +markTitle(c.title||"chat",window.chatQ)+'</span>'
+    +(c.src&&c.src.app?'<span class="csrc" title="From '+esc(c.src.name||c.src.app)+'" aria-label="From '
+      +esc(c.src.name||c.src.app)+'">'+esc(String(c.src.name||c.src.app).charAt(0).toUpperCase())+'</span>':'')
     +(tk.n?'<span class="ctok"'+(tk.est?' title="estimated from length"':'')+'>'+(tk.est?"~":"")+fmtTok(tk.n)+'</span>':'')
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin")+'">'
     +PIN_SVG+'</span>'
@@ -59397,6 +59422,7 @@ document.addEventListener("keydown",e=>{
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
     if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
+    if(impAskRun){impAskClose(false);e.preventDefault();return;}   // the drop's ask
     if(impEsc()){e.preventDefault();return;}     // bring your chats (6b529)
     for(const sel of ["#bmc-veil","#bmv-veil","#new-veil","#update-veil",
                       "#about-veil","#setup-veil"]){
@@ -66614,7 +66640,7 @@ async function impRunEnded(st){
   if(st.state==="error"&&!(c.chats)){impShowError("That didn't work.",st.err,st.detail,[["again","Choose another file"],["back","Pick another app"]]);return;}
   if(imp.queue.length){const nxt=imp.queue.shift();impPhaseText("Next file","");impBegin(nxt);return;}
   try{await loadChatsFromDisk();}catch(e){}
-  impHomeMount();impSourcesNote();
+  impSourcesNote();
   impShowDone(st);}
 function impLeftLine(c,app){
   const bits=[];
@@ -66689,7 +66715,7 @@ async function impRemove(app,el){
   try{const d=await impApi("/api/import/remove",{app:app});
     try{await loadChatsFromDisk();}catch(e){}
     if(curChat&&!chats.some(c=>c.id===curChat)){curChat=null;messages=[];resetHero();}
-    impHomeMount();impSourcesNote();
+    impSourcesNote();
     const host=el.closest(".imp-actions")||el.parentElement;
     if(host)host.innerHTML='<span style="font-size:13.5px;color:var(--hz-ink-2)">Removed '+impPlural(d.chats||0,"chat")+(d.images?" and "+impPlural(d.images,"picture"):"")+' from '+esc(A.name)+'.</span>';
     if(imp.totals)imp.totals=null;
@@ -66747,19 +66773,9 @@ async function impSourcesNote(){
 $("#imp-settings-open").addEventListener("click",e=>{aboutVeil.hidden=true;impOpen(e.currentTarget);});
 $("#imp-settings-note").addEventListener("click",e=>{const b=e.target.closest("[data-act]");if(b)impAct(b.dataset.act,b);});
 $("#settings-btn").addEventListener("click",impSourcesNote);
-// the empty home: one quiet pill under the greeting while the history is
-// short (five chats or fewer); Settings always has the row
-function impHomeMount(){
-  const hero=$("#hero");if(!hero)return;
-  const old=hero.querySelector(".imp-homecard");
-  const show=chatsLoaded&&chats.length<=5;
-  if(!show){if(old)old.remove();return;}
-  if(old)return;
-  const b=document.createElement("button");b.type="button";b.className="imp-homecard";
-  b.innerHTML=IMP_ICON.home+'<span>Bring your chats from ChatGPT, Claude or Gemini</span>';
-  b.addEventListener("click",()=>impOpen(b));
-  hero.appendChild(b);}
-(function(){let n=0;const t=setInterval(()=>{if(chatsLoaded||++n>100){clearInterval(t);impHomeMount();}},300);})();
+// no pill on the home (per Patrick: bring your chats is integrated, not a main feature): it
+// lives in Settings, in the app menu (Import Chats…) and in a drop of an export on the window
+
 // a dev copy's imp-demo=<path> hook (6b529): the sheet opens on load and
 // brings that export in by itself, so a windowed copy can be captured
 // without a click; "" in the app, where nothing here runs
@@ -66769,6 +66785,41 @@ if(IMP_DEMO){(function(){let n=0;const t=setInterval(()=>{if(!chatsLoaded&&++n<1
   if(IMP_DEMO==="open")return;                 // just the first step, for a look
   impAct("pick",{dataset:{app:"chatgpt"}});impAct("have",{dataset:{}});
   setTimeout(()=>impBegin({path:IMP_DEMO,name:IMP_DEMO.split("/").pop(),size:0}),2500);},300);})();}
+/* AN EXPORT DROPPED ON THE WINDOW (per Patrick: bring your chats integrated, not a main
+   feature). The importer's own detection reads it (begin as a file, upload, inspect); a
+   ChatGPT, Claude or Gemini export asks once, quietly, and Import carries on in the sheet
+   from that same run; anything else is let go (the server drops its copy) and lands the
+   way a drop always did. */
+const IMP_DROP_KINDS=["chatgpt","claude","gemini"];
+let impAskRun=null;
+async function impDropCheck(f,fallback){
+  if(imp.open||!$("#imp-ask").hidden){fallback();return;}
+  let d=null;
+  try{d=await impApi("/api/import/begin",{app:"file",name:f.name,size:f.size});
+    d=await impUpload(f,d.run);}
+  catch(e){d=null;}
+  if(!d||d.state==="error"||!IMP_DROP_KINDS.includes(d.kind)){
+    if(d&&d.run)impApi("/api/import/cancel",{run:d.run}).catch(()=>{});
+    fallback();return;}
+  impDropAsk(d,f);}
+function impDropAsk(d,f){
+  impAskRun={d:d,f:f};
+  $("#imp-ask-t").textContent="Import your "+IMP_APPS[d.kind].name+" chats?";
+  $("#imp-ask").hidden=false;$("#imp-ask-go").focus();}
+function impAskClose(go){
+  const a=impAskRun;impAskRun=null;$("#imp-ask").hidden=true;
+  if(!a)return;
+  if(!go){impApi("/api/import/cancel",{run:a.d.run}).catch(()=>{});return;}
+  imp.app=a.d.kind;imp.queue=[];imp.totals=null;
+  impOpen($("#settings-btn"));
+  imp.step=4;impSetSteps();imp.cursor=0;imp.rows=[];imp.status=null;imp.phase="copy";impDripReset();
+  imp.totals={chats:0,messages:0,images:0,already:0,runs:0,counts:{},extras:{instructions:0,projects:0},first:"",apps:{}};
+  impShowProgress();imp.run=a.d.run;
+  impInspected(a.d,a.f.name,a.d.size||a.f.size);
+  impStart(a.d.kind);}
+$("#imp-ask-go").addEventListener("click",()=>impAskClose(true));
+$("#imp-ask-no").addEventListener("click",()=>impAskClose(false));
+$("#imp-ask").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();impAskClose(false);}});
 /* ==== bring your chats (6b529): script end ==== */
 </script>
 </body>

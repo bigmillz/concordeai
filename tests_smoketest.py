@@ -41370,11 +41370,11 @@ check("6b529 live: after Remove for every app, nothing imported is left in the s
 _pg_imp = page[page.index("/* ==== bring your chats (6b529): script begin ==== */"):
                page.index("/* ==== bring your chats (6b529): script end ==== */")]
 _rh = page.index("function resetHero(){")
-check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape closes first; its hooks sit in Settings and on the empty home; the upload never carries a form content type; motion stops under reduced motion and effects-off; the app's own faces",
+check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape closes first; its hooks sit in Settings (the home's pill is gone, per Patrick); the upload never carries a form content type; motion stops under reduced motion and effects-off; the app's own faces",
       'id="imp-veil" hidden' in page and 'role="dialog" aria-modal="true" aria-labelledby="imp-title"' in page
       and "#imp-veil[hidden]{display:none}" in page and page.count("/* HORIZON TOKENS (6b526) */") == 1
       and 'if(impEsc()){e.preventDefault();return;}' in page and 'id="imp-settings-open"' in page
-      and "impHomeMount();" in page[_rh:_rh + 300]
+      and "impHomeMount" not in page and "imp-homecard" not in page and "impOpen" not in page[_rh:_rh + 300]
       and 'x.setRequestHeader("Content-Type","application/octet-stream")' in _pg_imp
       and 'if(e.key!=="Tab")return;' in _pg_imp
       and "function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){" in page   # extra: the saved record (6b528)
@@ -41382,6 +41382,68 @@ check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape
       and "body.novideo #imp-veil .imp-glow" in page and ".msg.ai .who.imp{display:flex" in page
       and "--hz-font-ui:'Space Grotesk'" in page and "Instrument Sans" not in page
       and "Newsreader" not in page and "Geist Mono" not in page)
+# BRING YOUR CHATS, INTEGRATED (per Patrick: "integrate it more tightly, but not as a main
+# feature"): no pill on the home at any Effects level; Import Chats… in the app menu, wired to
+# the sheet; an export dropped on the window asks once, only when the importer recognises it,
+# and anything else lands the way a drop always did; a run that never started gives its copy
+# back at Cancel; an imported chat's sidebar row wears its app's initial in a hairline circle
+def _home_pill(pg):
+    return ("impHomeMount" in pg or "imp-homecard" in pg
+            or "Bring your chats from ChatGPT, Claude or Gemini</span>" in pg)
+_rs_imp = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+_rs_imp_menu = _rs_imp[_rs_imp.index("fn build_menu("):_rs_imp.index("fn menu_action(")]
+check("bring your chats, integrated: no home pill at any Effects level; Import Chats\u2026 sits below Settings\u2026 in the app menu and opens the sheet; a mutant pill is caught",
+      not _home_pill(page) and _home_pill(page + "function impHomeMount(){}")
+      and '"import", "Import Chats\\u{2026}", true' in _rs_imp_menu
+      and _rs_imp_menu.index("&settings,") < _rs_imp_menu.index("&import,") < _rs_imp_menu.index("&updates,")
+      and "\"import\" => Some(" in _rs_imp and "impOpen()" in _rs_imp[_rs_imp.index("\"import\" => Some("):][:200]
+      and "function impOpen(opener){" in page and 'id="about-veil"' in page, "")
+_dk = _pg_imp[_pg_imp.index("const IMP_DROP_KINDS="):_pg_imp.index("function impDropAsk(")]
+_dkf = os.path.join(_SMOKE_TMP, "impdrop.js")
+def _imp_drop_run(seg):
+    open(_dkf, "w").write(r"""
+const log=[];const imp={open:false};const $=()=>({hidden:true});
+let kind="";
+async function impApi(p,b){log.push(p);if(p==="/api/import/begin")return {run:"r1",state:"receiving"};
+  return {ok:true};}
+async function impUpload(f,run){if(kind==="error")return {run:run,state:"error",kind:""};
+  return {run:run,state:"inspected",kind:kind,mismatch:kind!=="file"};}
+function impDropAsk(d,f){log.push("ask:"+d.kind);}
+""" + seg + r"""
+(async()=>{const out={};
+  for(const k of ["chatgpt","claude","gemini","file","unknown","error"]){
+    kind=k;log.length=0;let fell=false;
+    await impDropCheck({name:"x.zip",size:9},()=>{fell=true;});
+    await new Promise(r=>setTimeout(r,5));
+    out[k]={fell:fell,ask:log.filter(x=>x.startsWith("ask:")).length,cancel:log.includes("/api/import/cancel")};}
+  process.stdout.write(JSON.stringify(out));})();""")
+    return json.loads(subprocess.run(["node", _dkf], capture_output=True, text=True, timeout=30).stdout or "{}")
+_dr = _imp_drop_run(_dk)
+_dr_m = _imp_drop_run(_dk.replace('const IMP_DROP_KINDS=["chatgpt","claude","gemini"];',
+                                  'const IMP_DROP_KINDS=["chatgpt","claude","gemini","file"];'))
+_ok_dr = lambda r: (all(r.get(k) == {"fell": False, "ask": 1, "cancel": False} for k in ("chatgpt", "claude", "gemini"))
+                    and all(r.get(k) == {"fell": True, "ask": 0, "cancel": True} for k in ("file", "unknown", "error")))
+check("bring your chats, the drop: only a recognised ChatGPT, Claude or Gemini export asks; a transcript, an unknown zip or a failed read falls back to the old drop and gives the server's copy back (node); a mutant asking for any file is caught",
+      _ok_dr(_dr) and not _ok_dr(_dr_m)
+      and "if(f.type.startsWith(\"image/\"))addImageFile(f);\n    else if(IMP_DROP.test(f.name)&&typeof impDropCheck===\"function\")impDropCheck(f,old);" in page
+      and "const IMP_DROP=/\\.(zip|json)$/i;" in page
+      and 'if(impAskRun){impAskClose(false);e.preventDefault();return;}' in page,
+      "%r" % [_dr, _dr_m])
+# live: an unknown zip begun and uploaded, then cancelled before any start: its copy is gone
+_nx = open(os.path.join(_IMPF, "not-an-export.zip"), "rb").read()
+_, _, _b0 = req("/api/import/begin", "POST", {"app": "file", "name": "not-an-export.zip", "size": len(_nx)})
+_run0 = json.loads(_b0).get("run", "")
+_, _, _b1 = req("/api/import/upload?run=%s" % _run0, "POST", data=_nx,
+                headers={"Content-Type": "application/octet-stream"}, timeout=60)
+_inc = os.path.join(INST.home, "imports", "incoming")
+_had = [f for f in (os.listdir(_inc) if os.path.isdir(_inc) else []) if f.startswith(_run0)]
+req("/api/import/cancel", "POST", {"run": _run0})
+_left = [f for f in (os.listdir(_inc) if os.path.isdir(_inc) else []) if f.startswith(_run0)]
+check("bring your chats: a run cancelled before it started (a declined drop, an unknown file) leaves no copy in imports/incoming",
+      _run0 and _had and not _left and json.loads(_b1).get("state") == "error", "%r" % [_had, _left, _b1[:120]])
+check("bring your chats: an imported chat's sidebar row wears its app's initial in a small hairline circle with the app's name as its title, no logo",
+      "(c.src&&c.src.app?'<span class=\"csrc\" title=\"From '+esc(c.src.name||c.src.app)" in page
+      and ".chat-item .csrc{flex:none;width:14px;height:14px;border-radius:50%;border:1px solid currentColor;" in page, "")
 _pj = (_pg_imp[_pg_imp.index("function impN("):_pg_imp.index("const IMP_ICON=")]
        + _pg_imp[_pg_imp.index("function impLeftLine("):_pg_imp.index("function impShowDone(")])
 _pf = os.path.join(_SMOKE_TMP, "imp529.js")
