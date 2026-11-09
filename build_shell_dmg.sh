@@ -18,7 +18,7 @@
 #     again, and both keys are read back;
 #   * Resources/ carries millenai.py, fonts/, vfx/, the first-run launch.sh,
 #     crypto-requirements.txt (the sidecar's venv bootstrap, 6b537) and
-#     concorde-dictate, the on-device speech helper (6b542, built here by
+#     concorde-dictate, the on-device speech helper (6b543, built here by
 #     shell/dictate/build.sh and signed on its own);
 #   * the bundle verifies (ad hoc until a Developer ID is in the keychain:
 #     CONCORDE_SIGN_IDENTITY names one).
@@ -49,7 +49,7 @@ fi
 # the bundle only; the disk image is build_dmg.sh's (Finder layout, the
 # starfield, the label), which Tauri's plain dmg target doesn't do
 TARGS=(); [[ -n "$TARGET" ]] && TARGS=(--target "$TARGET")
-# the on-device speech helper (6b542) goes in beside millenai.py
+# the on-device speech helper (6b543) goes in beside millenai.py
 ./shell/dictate/build.sh
 [[ -x shell/dictate/concorde-dictate ]] || { echo "shell/dictate/concorde-dictate wasn't built"; exit 1; }
 ( cd shell/src-tauri && cargo tauri build --bundles app "${TARGS[@]}" )

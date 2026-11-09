@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds concorde-dictate, the on-device speech helper (6b542): one Swift
+# Builds concorde-dictate, the on-device speech helper (6b543): one Swift
 # file over Apple's SpeechAnalyzer, macOS 26 and later. Universal when both
 # targets link (an Intel Mac on macOS 26 dictates too); the machine's own
 # arch otherwise, which is fine for a dev copy, never for a release.

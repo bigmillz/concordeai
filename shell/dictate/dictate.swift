@@ -1,4 +1,4 @@
-// concorde-dictate (6b542): the on-device speech helper ConcordeAI's server
+// concorde-dictate (6b543): the on-device speech helper ConcordeAI's server
 // runs on macOS 26 and later. Apple's SpeechAnalyzer, the system's own
 // recognizer, behind a pipe: NOTHING LEAVES THIS COMPUTER. No network code is
 // in this file (the gauntlet lints it), the model is the OS's, and the only

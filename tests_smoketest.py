@@ -2793,7 +2793,7 @@ _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
 # window in WKWebView, WebView2 and Qt)
 _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
 _PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" otherwise; filled before the page is sent
-_PAGE_HOST |= {"Int16Array"}         # 6b542: the page turns captured audio into 16 kHz PCM
+_PAGE_HOST |= {"Int16Array"}         # 6b543: the page turns captured audio into 16 kHz PCM
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -6565,7 +6565,7 @@ check("stats has memory and no visitor counts",
 check("memory meter replaced the models meter",
       'id="mem-meter"' in page and 'id="mem-val"' not in page  # 6b268
       and "models-meter" not in page
-      and ("MEMORY PRESSURE" in page or "MEMORY USED" in page)
+      and any(_lab in page for _lab in ("MEMORY PRESSURE", "MEMORY USED"))   # one of the two, by platform (the checker reads a bare literal as a must)
       and "def mem_pressure" in _MILLENAI_SRC
       and "Pages occupied by compressor" in _MILLENAI_SRC)
 
@@ -27525,7 +27525,7 @@ const reset=()=>{
   for(const k of Object.keys(dictT))delete dictT[k];
 };
 const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
-// the session's answer held back (6b542: the start call is the voice check now)
+// the session's answer held back (6b543: the start call is the voice check now)
 const delayedVoice=()=>{let rel;apiImpl=(u)=>u.includes("dictate/start")
   ?new Promise(r=>{rel=()=>r(okJ({ok:true,sid:"s1",engine:"system",partials:true}));}):undefined;return ()=>rel();};
 const ended=()=>calls.some(u=>u.includes("dictate/end"));
@@ -27546,7 +27546,7 @@ await sec("order",async()=>{
   relV();await p;ord.push(recording===true);
   o.order=ord.every(Boolean);
 });
-// 2. a start that answers with a session never asks /api/voice/status (6b542: one round trip)
+// 2. a start that answers with a session never asks /api/voice/status (6b543: one round trip)
 await sec("statusskip",async()=>{
   reset();voiceReady=false;await dictStart();
   const first=!calls.some(u=>u.includes("voice/status"))&&recording===true;
@@ -27711,7 +27711,7 @@ await sec("shorthold",async()=>{
   feed(1);dictAct(dictKey({type:"down"},3000));await tick();
   o.shorthold=sh&&!recording&&ended();
 });
-// 6b542: every call the capture path made went to this app's own /api/
+// 6b543: every call the capture path made went to this app's own /api/
 o.local=allCalls.length>0&&allCalls.every(u=>typeof u==="string"&&u.startsWith("/api/"));
 process.stdout.write(JSON.stringify(o));
 })();'''
@@ -28052,8 +28052,8 @@ check("mic warm pref: applyPrefs paints the switch from the saved value; no writ
       _mw_src_ok and "prefSet({mic_warm:on});" in page)
 # ==== 6b345 dictation fast: end ====
 
-# ==== 6b542 dictation instant: begin ====
-# 6b542, per Patrick: "I want the dictation part to work with very low latency, like really
+# ==== 6b543 dictation instant: begin ====
+# 6b543, per Patrick: "I want the dictation part to work with very low latency, like really
 # fast, not like you have to wait a second for it to start and then like then it pauses."
 # The page's streaming path runs in node on the 6b345 glue (the indicator in the keydown, the
 # pre-roll, partials in place, the end after the last chunk, the slip's cancel, the warm-up),
@@ -28305,7 +28305,7 @@ check("dictation instant: the helper is found beside millenai.py or in shell/dic
       and "atexit.register(_dict_helper.stop)" in _MILLENAI_SRC
       and "./shell/dictate/build.sh" in open("build_shell_dmg.sh").read()
       and 'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())
-# ==== 6b542 dictation instant: end ====
+# ==== 6b543 dictation instant: end ====
 
 
 # ==== 6b340 funnel pictures: begin ====
@@ -38423,8 +38423,8 @@ def _hz_intro_gated(head, css, js):
             and 'matchMedia("(prefers-reduced-motion: reduce)").matches' in head
             and 'localStorage.getItem("millen.video")==="0"' in head
             and "@media (prefers-reduced-motion:reduce){" in css
-            and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}" in css
-            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
+            and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}" in css
+            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
             and "if(!hzMotionOK()||hzS.reduced)return;" in js)
 
 
@@ -38470,7 +38470,7 @@ def _hz_pauses(js, css):
     return ('addEventListener("visibilitychange",hzPauseSync);' in js
             and 'const pause=document.hidden||hzS.blurred||(typeof noVideo!=="undefined"&&noVideo);' in js
             and 'root.classList.toggle("hz-pause",pause);' in js
-            and ".hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}" in css
+            and ".hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen{animation-play-state:paused!important}" in css
             and "const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;" in js
             and "if(document.hidden)return;" in js)
 
@@ -38686,11 +38686,12 @@ check("horizon: a question sent from the home glides the composer to the foot an
       and "if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK())" in _hz_js
       and ".hz .chat-item.hz-live .ct{" in _hz_css and 'data-machine="\'+m.esc(m.name)+\'"' in _hz_js
       and ".hz .die{" not in _hz_css, "")
-check("horizon: the Look is Horizon by default, Classic by choice, with Effects Full or Balanced, kept in browser storage with the sidebar and the day's seed",
+check("horizon: the Look is Horizon by default, Classic by choice, with Effects Calm, Balanced or Full (6b542), kept in browser storage with the sidebar and the day's seed",
       '"millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"' in page
       and "function setLook(v,quiet){" in _hz_js and 'sel.addEventListener("change",()=>setLook(sel.value));' in _hz_js
       and "function setFxLevel(v){" in _hz_js and '<label id="look-row"><span>Look</span>' in page
-      and '<label id="fx-level-row"><span>Effects</span>' in page, "")
+      and '<label id="fx-level-row"><span>Effects</span>' in page
+      and '<select id="fx-level"><option value="calm">Calm</option>' in page and '<option value="full">Full</option></select>' in page, "")
 # ==== HORIZON end ====
 
 # ==== know (6b530, per Patrick: "It knows your life"): begin ====
@@ -41609,9 +41610,9 @@ def _mfx_rules(css, js):
             and ".hz .hz-sweep[hidden]{display:none}" in css
             and ".hz .novideo .hz-streak,.hz .novideo .hz-sweep{display:none}" in css
             and ".hz .hz-streak,.hz .hz-sweep{display:none}" in rm
-            and 'function hzFxFull(){return hzMotionOK();}' in js
+            and 'function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js   # Full's show needs Effects Full (6b542)
             and "hzModeFx(nm,label);" in js and 'setAttribute("aria-label","Mode, "+label);' in js
-            and 'const ms=full?260:120,F={duration:ms,fill:"forwards"}' in js
+            and 'const roll=full||calm,ms=full?260:calm?160:120,F={duration:ms,fill:"forwards"}' in js   # Calm: the 160 ms roll alone (6b542)
             and '{duration:320,easing:"cubic-bezier(.65,0,.35,1)",fill:"forwards"}' in js
             and '{duration:600,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"}' in js
             and "t.tm=setTimeout(()=>t.fin(false),ms+80);" in js            # the clock beside every animation: a hidden document never finishes one
@@ -41673,6 +41674,253 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
                  "clock": True, "started": "AB", "quiet": True}
       and _mfx_m1 != _mfx_o and _mfx_m2 != _mfx_o, "%r %r %r" % (_mfx_o, _mfx_m1, _mfx_m2))
 # ==== the mode switch (6b540): end ====
+
+# ==== CALM BY DEFAULT, BALANCED, BALANCE AND STING (6b542, per Patrick): begin ====
+# Effects has three levels: Calm (the quiet page), Balanced (the default: Calm's chrome and a
+# few soft living touches) and Full (today's whole show, by choice). Full's show is PRESENT and GATED behind Effects Full (never
+# deleted): the trace, the streak and sweep, the comets, the ripple, the rings, the arc and
+# glide, the greeting's bloom and sheen, the composer's ring and glow, the Max/Ultra shimmer,
+# the dies. REMOVED outright: the header wordmark's glint and glow, the sidebar's token counts
+# and estimate note, the memory meter and telemetry cluster under Horizon. Balance and Sting:
+# the composer at the golden-ratio point, a balance-beam slider with a diamond thumb, tight
+# radii, one ember accent (contrast computed here) at the send strike, the focus hairline and
+# an error's left rule. The greeting is ONE node in Calm; Full's layers share one string and
+# one box, and a trace is killed at once when the text or the box moves.
+print("== calm by default, balance and sting (6b542) ==")
+def _c542_levels(js, css, pg, head):
+    return ('function hzFxLevel(){\n  try{return localStorage.getItem("millen.fxlevel")==="full"?"full":localStorage.getItem("millen.fxlevel")==="calm"?"calm":"balanced";}catch(e){return "balanced";}' in js
+            and 'function hzCalm(){return hzFxLevel()!=="full";}' in js and 'function hzFxBal(){return hzFxLevel()==="balanced";}' in js
+            and 'function setFxLevel(v){\n  v=v==="full"?"full":v==="calm"?"calm":"balanced";' in js
+            and 'root.classList.toggle("hz-full",lv==="full");root.classList.toggle("hz-bal",lv==="balanced");' in js
+            and 'document.documentElement.classList.add(hzFxl==="full"?"hz-full":hzFxl==="calm"?"hz-calm":"hz-bal");' in head   # before the first paint; unset is Balanced
+            and '<select id="fx-level"><option value="calm">Calm</option>' in pg and '<option value="balanced">Balanced</option>' in pg and '<option value="full">Full</option></select>' in pg
+            and '<div id="fx-level-note">Balanced is the default. Full is the whole show.</div>' in pg
+            and "html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}" in css
+            and "hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)" in _MILLENAI_SRC
+            and 'value="off"' not in pg and "millen.fxlevel\",\"calm\")" not in js)        # no Off level, no migration away from Balanced
+check("6b542 Effects: Calm, Balanced (the default, and what a saved Balanced stays) and Full; hz-full / hz-bal set before the first paint; Classic sees no levels; the mutants are caught",
+      _c542_levels(_hz_js, _hz_css, page, _hz_head)
+      and not _c542_levels(_hz_js.replace('?"calm":"balanced";}catch(e){return "balanced";}', '?"calm":"calm";}catch(e){return "calm";}'), _hz_css, page, _hz_head)
+      and not _c542_levels(_hz_js, _hz_css, page, _hz_head.replace('hzFxl==="calm"?"hz-calm":"hz-bal"', 'hzFxl==="calm"?"hz-calm":"hz-full"')), "")
+def _c542_sky(js, css):
+    return ('if(hzFxLevel()==="calm")return;      // Calm plays no footage' in js                       # no decode, no texImage2D a frame
+            and 'const lv=hzFxLevel(),calm=lv==="calm",bal=lv==="balanced",g2=bal?Math.max(gap,42):gap;' in js   # Balanced at 24 fps
+            and 'const t=calm?0:(nowT-S.t0)/1000,m=S.vmap(t);' in js                                       # the clock held: dust, grain and shafts still
+            and 'if(calm){S.neon=S.neonTo=0;S.boost=1;S.footMul=0;}' in js and 'if(bal)S.boost=0;else S.boost+=(S.boostTo-S.boost)*.03;' in js
+            and 'S.setNeon=function(){const lv=hzFxLevel();S.neonTo=lv==="calm"?0:lv==="balanced"?S.lvl*.35:S.lvl+(S.busy?.28:0);};' in js
+            and 'S.once=function(){if(S.raf||!hzS.mediaOn)return;S.last=0;S.still();};' in js
+            and 'if(S){if(on&&!S.raf&&!hzS.reduced&&!calm)S.raf=requestAnimationFrame(S.frame);' in js      # no loop in Calm
+            and 'if(calm&&on)S.once();}' in js and 'if(hzS.sky&&hzFxLevel()==="calm")hzS.sky.once();' in js
+            and 'addEventListener("resize",()=>{S.size();if(hzFxLevel()==="calm")S.once();});' in js
+            # Balanced: the feedback and blur passes are Full's; the aurora clock slowed; the grain still; a faint twinkle; the footage at half
+            and 'if(full){gl.useProgram(pF);quad(pF);gl.bindFramebuffer(gl.FRAMEBUFFER,S.B.f);' in js
+            and 'hzBlur(gl,pB,quad,S.v2.t,S.v2.w,S.v2.h,S.sk,7,0);}     // Full alone keeps the trails and the bloom (6b542)' in js
+            and 'gl.uniform1f(pA.U.time,bal?t*.4:t);' in js and 'gl.uniform1f(pS.U.gt,full?t:0);gl.uniform1f(pS.U.twk,bal?1:0);' in js
+            and 'S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;' in js
+            and '*(1.-twk*.35*(.5+.5*sin(time*2.3+hash(floor(pc/3.))*50.)));"' in js and 'fract(gt*7.)*91.' in js
+            and ".hz.hz-bal #hz-aurw{opacity:.3;--hz-t-drift:72s}" in css
+            and 'S.free=function(){["A","B","h1","v1","h2","v2","sk","au"].forEach(k=>{const T=S[k];if(T){gl.deleteTexture(T.t);gl.deleteFramebuffer(T.f);S[k]=null;}});};' in js
+            and "    S.free();\n    S.W=Math.max(2,Math.round(innerWidth*d));" in js                        # the old targets freed before new ones (the resize leak)
+            and 'if(!hzS.clip||!hzMediaOK()||hzFxLevel()==="calm")return;' in js
+            and 'const a=$("#hz-aur2");if(!a||!hzFxFull())return;' in js                                   # no pulse on the frames
+            and ".hz:not(.hz-full) #hz-aurw{opacity:.22;--hz-t-drift:56s}" in css
+            and ".hz:not(.hz-full) #hz-washw{animation:none}" in css
+            and ".hz:not(.hz-full) #hz-wash,.hz:not(.hz-full) #hz-wash.bloom,.hz:not(.hz-full).hz-busy #hz-wash{animation:none;opacity:.06}" in css)
+check("6b542 the sky by level: Calm no footage, no neon, no loop (one still on boot, resize and the stars' repaint), the clock held; Balanced a 24 fps loop with the footage at half, no trails, bloom or streak, a third of the neon slowed, a faint twinkle; Full as it was; old GL targets freed on resize; the mutants are caught",
+      _c542_sky(_hz_js, _hz_css)
+      and not _c542_sky(_hz_js.replace("    S.free();\n    S.W=", "    S.W="), _hz_css)
+      and not _c542_sky(_hz_js.replace("&&!hzS.reduced&&!calm)S.raf=", "&&!hzS.reduced)S.raf="), _hz_css)
+      and not _c542_sky(_hz_js.replace("if(bal)S.boost=0;else ", ""), _hz_css), "")
+def _c542_gated(js, css, pg):
+    return ('function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
+            and 'if(hzFxLevel()==="calm")return;      // Calm shows the words plainly' in js
+            and "if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}\n    if(from&&from.home)hzArc(from,hzS.liveChat);}\n  else hzStrike();" in js
+            and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the comets are Full' in pg
+            and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the ripple is Full' in pg
+            and 'if(typeof hzFxFull!=="function"||!hzFxFull()){if(typeof hzLandSweep==="function")hzLandSweep();return;}' in pg
+            and 'if(!w||!hzMotionOK()||hzCalm()||document.documentElement.classList.contains("hz-intro"))return;' in js
+            # present still, for Full: the trace, the streak, the sweep, the comets, the ring, the bloom, the sheen, the dies
+            and "async function hzTraceIn(el,opts){" in js and "function hzStreak(row,b){" in js and "function hzSweep(b){" in js
+            and "function cometsDraw(){" in pg and ".hz.hz-ultra #composer::before{opacity:.9}" in css
+            and ".hz #hero .greet.shown .bloom{opacity:.75;animation:hzBreatheB 8s ease-in-out 1.4s infinite,hzShim 16s linear infinite}" in css
+            and ".hz #hero .greet.shown .sheen{opacity:1;animation:hzSheen 9s var(--hz-ease-out) 3s infinite}" in css
+            and ".hz .hz-rig.working .die{animation:hzDie 1.2s ease-in-out infinite}" in css
+            # and gated in Calm
+            and ".hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}" in css
+            and ".hz:not(.hz-full) #hero .greet .bloom,.hz:not(.hz-full) #hero .greet .sheen{display:none}" in css
+            and ".hz:not(.hz-full) #composer::before,.hz:not(.hz-full) #composer.finish::before{animation:none;opacity:0!important}" in css
+            and ".hz:not(.hz-full) #hz-cglow{display:none}" in css
+            and ".hz:not(.hz-full) .hz-elevel.shim,.hz:not(.hz-full) .hz-elevel.shim.soft{background:none;color:var(--hz-ink-2);animation:none}" in css
+            and ".hz:not(.hz-full) .liveline .die,.hz:not(.hz-full) .liveline .lstats{display:none}" in css
+            and ".hz:not(.hz-full) .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2);animation:none}" in css
+            and ".hz:not(.hz-full) .msg.ai.live .body,.hz:not(.hz-full) .msg.ai.live .body>*:last-child{color:var(--hz-ink-read);text-shadow:none}" in css
+            and ".hz:not(.hz-full) .msg.ai .who b.shim,.hz:not(.hz-full) .msg.ai .who b.shim.soft{background:none;color:#e2e7f5;animation:none}" in css
+            and ".hz:not(.hz-full) .msg.ai.live .who .st{display:none}" in css
+            and ".hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}" in css
+            and '<div class="hz-mdot\'+(working?" working":"")+(awake?"":" asleep")+\'" role="listitem" tabindex="0" aria-label="\'' in js
+            # the opening in Calm: a fade, first launch only, then the home
+            and 'if(hzFxLevel()==="calm"){\n    root.classList.add("hz-calmopen");' in js and 'at(1900,()=>root.classList.add("hz-markout"));' in js
+            and 'at(3000,()=>hzIntroEnd(false));' in js and ".hz.hz-calmopen #hz-intro-mark{transition:opacity 1s var(--hz-ease-out)}" in css
+            and ".hz.hz-calmopen #hz-intro-mark .hz-glint,.hz.hz-calmopen #hz-intro-mark .hz-flare{display:none}" in css
+            # removed outright: the wordmark's glint and glow (any level), the sidebar's counts, the meter
+            and '#hz-mark .hz-glint' not in pg and 'id="hz-vmark3"' not in pg and "@keyframes hzGlint{" not in pg
+            and ".hz #hz-mark{margin-right:0;position:relative;overflow:visible}" in css
+            and ".hz #telemetry,.hz #sb-today,.hz .cfoot,.hz .ctok,.hz .ctot{display:none}" in css
+            and "const hzq=isHz();   // no token counts beside Horizon's chats" in pg
+            and 'const tk=hzq?{n:0,est:false}:chatTokens(c);if(tk.est&&tk.n)anyEst=true;' in pg
+            and "const hzq=typeof isHz===\"function\"&&isHz();\n  return groups.map(g=>'<div class=\"cday\"><span>'+g.l+'</span>'\n    +(g.n&&!hzq?" in pg)
+check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, comets, ripple, rings, arc, glide, bloom, sheen, ring, glow, shimmer, dies, pulse); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
+      _c542_gated(_hz_js, _hz_css, page)
+      and not _c542_gated(_hz_js.replace('return hzMotionOK()&&hzFxLevel()==="full";', "return hzMotionOK();"), _hz_css, page)
+      and not _c542_gated(_hz_js, _hz_css.replace(".hz:not(.hz-full) #hz-cglow{display:none}", ""), page)
+      and not _c542_gated(_hz_js, _hz_css, page + ".hz #hz-mark .hz-glint{animation:hzGlint 11s infinite}")      # the glint back
+      and not _c542_gated(_hz_js, _hz_css, page.replace("const hzq=isHz();   // no token counts beside Horizon's chats", "const hzq=false;")), "")
+def _c542_details(css, pg, js):
+    return ('if(role==="assistant"&&isHz()&&!foot.querySelector(".hz-details")){' in pg
+            and 'd.className="hz-details";d.setAttribute("aria-expanded","false");d.textContent="Details";' in pg
+            and 'const b=e.target.closest&&e.target.closest(".hz-details");if(!b)return;' in js
+            and 'm.classList.toggle("details",open);' in js and 'b.textContent=open?"Hide details":"Details";' in js
+            and ".hz:not(.hz-full) .msg.ai{grid-template-columns:minmax(0,640px)}" in css
+            and ".hz:not(.hz-full) .msg.ai>aside.behind{display:none;grid-column:1;grid-row:auto;padding-top:0;margin-top:8px;order:6}" in css
+            and ".hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}" in css
+            and ".hz.hz-full .hz-details,.hz .msg.ai:not(:has(>aside.behind)) .hz-details{display:none}" in css
+            and ".hz .srcrow{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}" in pg)   # the sources stay a quiet numbered row in the prose
+check("6b542 Details: the marginalia folds behind one small link under the answer, closed by default, in Calm and Off; Full keeps the column; the sources stay in the prose; the mutants are caught",
+      _c542_details(_hz_css, page, _hz_js)
+      and not _c542_details(_hz_css.replace(".hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}", ".hz:not(.hz-full) .msg.ai>aside.behind{display:flex}"), page, _hz_js)
+      and not _c542_details(_hz_css, page, _hz_js.replace('m.classList.toggle("details",open);', "")), "")
+# BALANCE: the golden-ratio placement, run in node (the pure rule the page sets the wrap's padding from)
+_c542_bal_js = _jsfn(_hz_js, "function hzBalanceFor(H,compH,histH,gap){")
+def _c542_balance(src):
+    js = "const HZ_PHI=0.618,HZ_HEAD=72;\n" + src + r"""
+const cy=(H,pb,c)=>H-pb-c/2,o={};
+o.a=cy(900,hzBalanceFor(900,134,0,32),134);o.at=72+(900-72)*0.618;
+o.b=cy(1100,hzBalanceFor(1100,134,150,32)+150+32,134);o.bt=72+(1100-72)*0.618;   // the history rows sit under the composer, inside the band
+o.c=hzBalanceFor(500,134,300,32);
+process.stdout.write(JSON.stringify(o));
+"""
+    try:
+        o = _node_json(js, "balance542.js")
+    except Exception:
+        return False
+    return abs(o["a"] - o["at"]) < 1 and abs(o["b"] - o["bt"]) < 1 and o["c"] == 16
+check("6b542 Balance: the composer's centre lands at the golden point of the room under the header (61.8%), with and without history rows, never under a 16 px floor; the mutant is caught",
+      _c542_balance(_c542_bal_js) and not _c542_balance(_c542_bal_js.replace("room*HZ_PHI", "room*.5"))
+      and "function hzBalance(){" in _hz_js and 'w.style.paddingBottom=pb+"px";' in _hz_js and "function hzGlowFit(){\n  hzBalance();" in _hz_js, "")
+# STING: the ember, its contrast on the night and on the glass, where it appears and where it never does
+def _c542_lum(h):
+    r_, g_, b_ = [int(h[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    f_ = lambda c: c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    return 0.2126 * f_(r_) + 0.7152 * f_(g_) + 0.0722 * f_(b_)
+def _c542_cr(a, b):
+    la, lb = sorted((_c542_lum(a), _c542_lum(b)), reverse=True)
+    return (la + .05) / (lb + .05)
+def _c542_over(fg, bg, a):
+    return "#" + "".join("%02x" % round(int(fg[i:i + 2], 16) * a + int(bg[i:i + 2], 16) * (1 - a)) for i in (1, 3, 5))
+_c542_ember = re.search(r"--hz-ember:(#[0-9a-f]{6})", _hz_css)
+_c542_ember = _c542_ember.group(1) if _c542_ember else "#000000"
+def _c542_sting(css, js, ember):
+    return (_c542_cr(ember, "#04050a") >= 4.5 and _c542_cr(ember, _c542_over("#ffffff", "#04050a", .075)) >= 4.5   # AA on the night and on the composer's glass
+            and _c542_cr("#ffffff", ember) >= 3                                                                   # the arrow on the ember key
+            and ".hz .hz-strike{position:absolute;left:14px;right:14px;top:-1px;height:1px;pointer-events:none;background:var(--hz-ember);transform-origin:0 50%;transform:scaleX(0);opacity:0}" in css
+            and ".hz .hz-strike[hidden],.hz .novideo .hz-strike{display:none}" in css and "@media (prefers-reduced-motion:reduce){.hz .hz-strike{display:none}}" in css
+            and 'const c=$("#composer");if(!c||!hzMotionOK()||!c.animate)return;' in js
+            and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);' in js   # once, 300 ms, then gone
+            and ".hz #composer.hastext:focus-within{border-color:var(--hz-ember);border-bottom-color:var(--hz-ember);" in css
+            and ".hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:#fff;box-shadow:none}" in css
+            and ".hz #send{width:40px;height:40px;border-radius:8px;background:transparent;color:var(--hz-ink-2);box-shadow:inset 0 0 0 1px var(--hz-hair-3);" in css
+            and ".hz #send svg{stroke-width:1.5}" in css
+            and ".hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}" in css
+            and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
+            and css.count("var(--hz-ember)") == 6 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops
+            and ':root{--hz-r-composer:14px;--hz-ember:' in css
+            and ".hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;" in css
+            and "transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}" in css
+            and ".hz .hz-sl-track{top:20px;height:1px;border-radius:0;background:var(--hz-hair-3)}" in css
+            and ".hz .hz-sl-dot{top:17px;width:1px;height:6px;margin-left:-.5px;border-radius:0;background:var(--hz-hair-3)}" in css
+            and ".hz .hz-sl-glow,.hz .hz-sl-halo{display:none}" in css
+            and ".hz .hz-elevel{font-family:var(--hz-font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--hz-ink-2);min-width:60px}" in css
+            and ".hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}" in css and ".hz .hz-pick{height:40px;border-radius:8px;" in css
+            and 'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/>' in js)
+check("6b542 Sting: one ember (%s), AA on the night and the glass, at the send strike (once, 300 ms), the text-and-focus composer hairline, the full send key, an error's left rule and the keyboard focus ring, never looping; the balance-beam slider with its diamond; 8 px keys, a 14 px composer; the mutants are caught" % _c542_ember,
+      _c542_sting(_hz_css, _hz_js, _c542_ember)
+      and not _c542_sting(_hz_css, _hz_js, "#8a1c2b")                                                     # too dark on the night
+      and not _c542_sting(_hz_css.replace("transform:scaleX(0);opacity:0}", "transform:scaleX(0);opacity:0;animation:hzRing 2s linear infinite}"), _hz_js, _c542_ember)
+      and not _c542_sting(_hz_css.replace("rotate(45deg);transition:transform 120ms ease}", "rotate(45deg);transition:transform 260ms var(--hz-ease-spring)}"), _hz_js, _c542_ember), "")
+# ONE GREETING: hzHeadline run in node on a stand-in element: Calm writes one text node; Full
+# builds three layers from the same string at the same moment; a tracer in flight is killed first
+_c542_hl_js = _jsfn(_hz_js, "function hzHeadline(g,text){")
+def _c542_greeting(src, calm):
+    js = r"""
+let killed=0;function hzTraceKill(){killed++;}
+function hzCalm(){return CALM;}
+class El{constructor(c){this.className=c||"";this.children=[];this._t="";this.dataset={};this.attrs={};this.classList={_s:new Set(),add:(...a)=>a.forEach(x=>this.classList._s.add(x)),remove:(...a)=>a.forEach(x=>this.classList._s.delete(x)),contains:x=>this.classList._s.has(x)};}
+  set textContent(v){this.children=[];this._t=String(v);}get textContent(){return this.children.length?this.children.map(c=>c.textContent).join(""):this._t;}
+  set innerHTML(v){this.children=[];this._t="";}appendChild(c){this.children.push(c);}setAttribute(k,v){this.attrs[k]=v;}get childNodes(){return this.children.length?this.children:(this._t?[this._t]:[]);}}
+const document={createElement:c=>new El()};
+""".replace("CALM", "true" if calm else "false") + src + r"""
+const g=new El("greet");hzHeadline(g,"Up late?");
+const spans=g.children.map(s=>({c:s.className,t:s.textContent}));
+hzHeadline(g,"Up late?");const again=killed;hzHeadline(g,"Good evening.");
+process.stdout.write(JSON.stringify({nodes:g.childNodes.length,text:g.children.length?null:g.textContent,spans,same:spans.every(s=>s.t===spans[0].t),killedFirst:killed>=1,noRekill:again===1,
+  after:g.children.length?g.children.map(s=>s.textContent):[g.textContent],shown:g.classList.contains("shown"),label:g.attrs["aria-label"]}));
+"""
+    try:
+        return _node_json(js, "greet542%s.js" % ("c" if calm else "f"))
+    except Exception as e_:
+        return {"err": repr(e_)}
+_c542_g1 = _c542_greeting(_c542_hl_js, True)
+_c542_g2 = _c542_greeting(_c542_hl_js, False)
+_c542_gm = _c542_greeting(_c542_hl_js.replace('g.appendChild(mk("sheen",text));', 'g.appendChild(mk("sheen",text+" "));'), False)   # a layer from another string
+check("6b542 one greeting: Calm writes ONE text node (shown at once); Full's three layers carry the same string, built together, a tracer killed first and only on a change; a resize, the sidebar and a Look switch kill a trace at once and release the wait; the mutant is caught",
+      _c542_g1.get("nodes") == 1 and _c542_g1.get("text") == "Good evening." and _c542_g1.get("spans") == [] and _c542_g1.get("shown") is True
+      and _c542_g1.get("after") == ["Good evening."] and _c542_g1.get("label") == "Good evening."
+      and _c542_g2.get("nodes") == 3 and [s_["c"] for s_ in _c542_g2.get("spans", [])] == ["bloom", "fill", "sheen"] and _c542_g2.get("same") is True
+      and _c542_g2.get("killedFirst") is True and _c542_g2.get("noRekill") is True and _c542_g2.get("after") == ["Good evening."] * 3
+      and _c542_gm.get("same") is False
+      and ".hz #hero .greet .bloom{position:absolute;inset:0;" in _hz_css and ".hz #hero .greet .sheen{position:absolute;inset:0;" in _hz_css   # the layers share the greeting's box
+      and "const kill=now=>{if(!alive)return;alive=false;cancelAnimationFrame(raf);" in _hz_js and "if(now)drop();else{cv.style.opacity=0;setTimeout(drop,700);}" in _hz_js
+      and "if(settle)settle();};" in _hz_js and "function hzTraceKill(){if(hzS&&hzS.tracers){hzS.tracers.forEach(k=>k(true));hzS.tracers.clear();}}" in _hz_js
+      and "function hzSidebarToggle(){\n  const root=document.documentElement;\n  hzTraceKill();" in _hz_js
+      and 'addEventListener("resize",()=>{hzTraceKill();clearTimeout(rz);' in _hz_js
+      and 'function setLook(v,quiet){\n  v=v==="classic"?"classic":"horizon";\n  hzTraceKill();' in _hz_js
+      and 'if(!fill){g.classList.add("shown");delete g.dataset.hzBusy;return;}' in _hz_js
+      and 'if(hzReady){hzMachinesPaint();const g=$("#hero .greet");if(g&&root.classList.contains("hz")){hzHeadline(g,hzGreeting());hzHeadlineShow(g);}}' in _hz_js
+      and "Update?" not in page, "%r %r %r" % (_c542_g1, _c542_g2, _c542_gm.get("same")))
+# BALANCED (the default): the living touches, each soft, from a real input or the hour, settling;
+# nothing loops but the slow sky (the status dot breathes only while an answer works)
+def _c542_bal(js, css):
+    bal = css[css.index("/* ---- BALANCED (6b542"):]
+    return ('if(hzFxBal()){\n    root.classList.add("hz-balopen");' in js
+            and 'hzTraceIn(word,{margin:40,speed:900,spread:.45}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");});' in js   # traced, about 2.5 s, no hz-litmark: no streak, no glint
+            and 'at(3300,()=>root.classList.add("hz-markout"));' in js and 'at(4700,()=>hzIntroEnd(false));' in js
+            and ".hz.hz-balopen #hz-intro-mark .hz-glint,.hz.hz-balopen #hz-intro-mark .hz-flare{display:none}" in css
+            and 'if(calm){g.classList.remove("shown");void g.offsetWidth;g.textContent=text;g.classList.add("shown");return;}' in js   # one node, the settle once per text
+            and ".hz.hz-bal #hero .greet.shown{animation:hzGreetIn 1.5s var(--hz-ease-out) both}" in css
+            and "@keyframes hzGreetIn{0%{opacity:0;text-shadow:0 0 18px rgba(205,222,255,.75),0 0 60px rgba(140,175,255,.55)}" in css
+            and "100%{opacity:1;text-shadow:0 0 0 rgba(205,222,255,0),0 0 0 rgba(140,175,255,0)}}" in css
+            and ".hz .novideo #hero .greet.shown{animation:none}" in css
+            and ".hz.hz-bal #composer{box-shadow:inset 0 1px 0 rgba(200,222,255,.22)," in css and ".hz.hz-bal #composer:focus-within{box-shadow:inset 0 1px 0 rgba(200,222,255,.45)," in css
+            and ".hz.hz-bal .hz-sl-halo{display:block;animation:none;opacity:calc(.3 + var(--hz-eff-u) * .6);" in css
+            and "transform:translateX(var(--hz-eff-px,0px)) scale(calc(.7 + var(--hz-eff-u) * .7));transition:transform 120ms ease,opacity 120ms ease}" in css
+            and 'if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}' in js and "function hzChipSweep(b){" in js
+            and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);\n}\n// BALANCED (6b542): when the answer lands' in js
+            and ".hz .hz-usweep[hidden],.hz .novideo .hz-usweep{display:none}" in css
+            and "function hzLandSweep(){\n  const c=$(\"#composer\");if(!c||!hzFxBal()||!hzMotionOK()||!c.animate)return;" in js
+            and 'hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},700);' in js
+            and ".hz.hz-bal .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite;opacity:1}" in css      # only while .live
+            and ".hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}" in css
+            and ".hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}" in css
+            and "@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}" in css
+            and bal.count("infinite") == 1 and ".live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite" in bal)   # the one loop: the dot, while working
+check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the landing's one pass, the breathing dot only while working, the lifting hover; nothing else loops; the mutants are caught",
+      _c542_bal(_hz_js, _hz_css)
+      and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .hz-sl-halo{display:block;animation:none;", ".hz.hz-bal .hz-sl-halo{display:block;animation:hzBreathe 8s ease-in-out infinite;"))
+      and not _c542_bal(_hz_js.replace("if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}", "if(!full)return;"), _hz_css)
+      and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .msg.ai.live .who .dot{", ".hz.hz-bal .msg.ai .who .dot{")), "")
+check("6b542 the Horizon rules added stay scoped under .hz and name no outside URL",
+      _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
+# ==== calm by default, balanced, balance and sting (6b542): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
