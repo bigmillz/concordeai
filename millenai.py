@@ -1900,29 +1900,22 @@ def giant_blurb() -> tuple:
         return "%d" % lo if lo == hi else "%d\u2013%d" % (lo, hi)
     names = (" and ".join(g) if len(g) < 3
              else ", ".join(g[:-1]) + " and " + g[-1])
-    tip = ("%s. %s %s GB or more of memory (%s GB in use) and a "
-           "%s GB download." % (
+    tip = ("%s. Needs %s GB of memory and a %s GB download." % (
                names,
-               ("Needs" if len(g) == 1 else
-                "Each needs" if len(tiers) == 1 else "They need"),
                "\u2013".join(map(str, tiers)),
-               span([MODEL_INFO[l]["mem"] / 1e9 for l in g]),
                span([MODEL_INFO[l]["gb"] for l in g])))
     if not here:
-        tip += (" None of them runs on this computer: they run on "
-                "Apple silicon Macs and on Windows.")
+        tip += " Won't run on this computer."
     elif any(l in WINDOWS_ONLY for l in g):
         # WORKSTATION-ONLY, AND HONEST ABOUT SPEED (6b315, per Patrick: a
         # few words a second "is going to be useless to anybody")
-        tip += (" For workstations: with one graphics card most of the "
-                "model runs from system RAM, at roughly 5\u201312 tokens a "
-                "second; it is fast only when it all fits in graphics "
-                "memory (three to five 96 GB cards).")
+        tip += (" On a workstation with one graphics card: about 5\u201312 tokens a "
+                "second. Fast only when it all fits in graphics memory.")
         short = [l for l in g if not giant_fits_here(l)]
         if short:
             tip += (" This computer can't hold %s." % (
                 "them" if len(short) == len(g) else " or ".join(short)))
-    return ("Include models for %d GB+ systems" % tier, tip)
+    return ("Models for %d GB+ systems" % tier, tip)
 
 
 def model_fits_machine(label: str) -> bool:
@@ -2370,7 +2363,7 @@ def _cloud_save_failed(which: str, entry: dict, auth: bool = False):
 
 def _kept_note(name: str, kept) -> str:
     if kept == "ok":
-        return ". Your saved %s key is unchanged and still in use" % name
+        return ". Your saved %s key still works" % name
     if kept:
         return ". Your saved %s key is unchanged" % name
     return ""
@@ -10076,7 +10069,7 @@ def check_update(force=False):
     # daily calls get an honest "off", uncached.
     if not force and machine_prefs().get("auto_update_check") is False:
         return {"configured": True, "available": False, "auto": False,
-                "note": "automatic checks are off"}
+                "note": "Automatic checks are off"}
     if not UPDATE_REPO:
         return {"configured": False, "available": False}
     beta = update_channel()          # the cache is keyed per channel
@@ -10095,7 +10088,7 @@ def _check_update_live():
         rel = _channel_release()
     except urllib.error.HTTPError as exc:
         # 404 simply means the repo has no releases yet — not a failure
-        note = ("no releases published yet" if exc.code == 404
+        note = ("No releases yet" if exc.code == 404
                 else "HTTP %s" % exc.code)
         return {"configured": True, "available": False, "note": note}
     except Exception as exc:
@@ -25237,7 +25230,7 @@ def ground_start(question: str, planner=None, want_photos: bool = False,
 # Calls stay one per line for 14 days, then roll up into hours, and after
 # 120 days into local days, so "All time" stays small for years.
 USAGE_FILE = "usage.jsonl"
-READ_FAIL[USAGE_FILE] = "Couldn’t read your usage. Nothing was changed."
+READ_FAIL[USAGE_FILE] = "Couldn’t read your usage. Nothing changed."
 USAGE_RAW_DAYS = 14
 USAGE_HOURLY_DAYS = 120
 USAGE_COMPACT_BYTES = 1_500_000
@@ -26291,11 +26284,10 @@ def _srv_url(raw) -> tuple:
         return "", "That isn\u2019t a web address."
     host = u.hostname or ""
     if not (u.scheme == "https" or (u.scheme == "http" and _srv_loopback_ok(u))):
-        return "", "The address has to start with https://."
+        return "", "The address must start with https://."
     if (not _SRV_HOST_RX.fullmatch(host) or u.username or u.password
             or u.query or u.fragment or u.path not in ("", "/")):
-        return "", ("Type the server\u2019s address only, like "
-                    "https://server.example.com.")
+        return "", ("Enter the address only, like https://server.example.com.")
     return "%s://%s%s" % (u.scheme, host.lower(), ":%d" % port if port else ""), ""
 
 
@@ -26310,10 +26302,9 @@ def _srv_token(aid, asec) -> tuple:
     """(id, secret, '') or ('', '', why): both parts or neither."""
     aid, asec = str(aid or "").strip(), str(asec or "").strip()
     if bool(aid) != bool(asec):
-        return "", "", ("An Access token has two parts: the Client ID and "
-                        "the Client Secret. Paste both, or neither.")
+        return "", "", ("Paste both the Client ID and the Client Secret, or neither.")
     if aid and not (_SRV_TOKEN_RX.fullmatch(aid) and _SRV_TOKEN_RX.fullmatch(asec)):
-        return "", "", "That Access token has characters a token never has."
+        return "", "", "That token has characters a token never has."
     return aid, asec, ""
 
 
@@ -28211,10 +28202,10 @@ def server_add(ctx, d: dict) -> dict:
 
     def fn(entries):
         if len(entries) >= SERVER_MAX:
-            return {"err": "That\u2019s %d servers, the most this keeps."
+            return {"err": "%d servers is the most this keeps."
                     % SERVER_MAX}
         if any(x["url"] == url for x in entries):
-            return {"err": "That address is already in your servers."}
+            return {"err": "That address is already added."}
         taken = {x["name"].lower() for x in entries}
         nm, n = name, 2
         while nm.lower() in taken:
@@ -28331,9 +28322,8 @@ def server_pair(ctx, sid: str, code) -> dict:
         c = str(js.get("code") or "")
         if c == "wrong_code":
             left = js.get("attempts_left")
-            return {"err": "That code is wrong." + (
-                " %d more tr%s before the server closes the window." % (
-                    left, "y" if left == 1 else "ies")
+            return {"err": "Wrong code." + (
+                " %d tr%s left." % (left, "y" if left == 1 else "ies")
                 if isinstance(left, int) and not isinstance(left, bool) else "")}
         if c in _PAIR_WHY:
             return {"err": _PAIR_WHY[c] % e["name"]}
@@ -28346,8 +28336,7 @@ def server_pair(ctx, sid: str, code) -> dict:
     if not (hmac.compare_digest(str(js.get("device_id") or "").encode("utf-8"),
                                 dev_id.encode("utf-8"))
             and hmac.compare_digest(got, o1_pair_proof(key, dev_id, pub, nonce))):
-        return {"err": "%s\u2019s answer didn\u2019t prove it knows the code, "
-                       "so the pairing was discarded. Nothing was saved."
+        return {"err": "%s didn’t prove it knows the code. Nothing was saved."
                        % e["name"]}
 
     def fn(entries):
@@ -28475,12 +28464,12 @@ def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:
     except ServerError as se:
         return {"ok": False, "kind": se.kind, "err": str(se)}
     if st == 404 and str(js.get("code") or "") == "not_found":
-        return {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+        return {"ok": False, "kind": "old", "err": "Needs a newer server kit."}
     if st != 200:
         return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
     v = _srv_sleep_parse(js)
     if v is None:
-        return {"ok": False, "kind": "server", "err": "%s answered in a way this app doesn\u2019t understand."
+        return {"ok": False, "kind": "server", "err": "%s’s answer wasn’t understood."
                 % e["name"]}
 
     def fn(entries):
@@ -28510,7 +28499,7 @@ def server_sleep_set(ctx, sid: str, d: dict) -> dict:
     if "minutes" in d:
         mn = d["minutes"]
         if not isinstance(mn, int) or isinstance(mn, bool):
-            return {"ok": False, "kind": "input", "err": "Minutes must be a whole number, %d to %d."
+            return {"ok": False, "kind": "input", "err": "Whole minutes, %d to %d."
                     % (SRV_SLEEP_MIN, SRV_SLEEP_MAX)}
         body["minutes"] = max(SRV_SLEEP_MIN, min(SRV_SLEEP_MAX, mn))
     if not body:
@@ -28618,17 +28607,17 @@ def _srv_relay_url(raw) -> tuple:
         u = urllib.parse.urlsplit(s)
         port = u.port
     except ValueError:
-        return "", "That isn\u2019t a web address, or its port isn\u2019t 1 to 65535."
+        return "", "That isn’t a web address, or the port isn’t 1 to 65535."
     host = u.hostname or ""
     if u.scheme not in ("http", "https"):
-        return "", "Start the address with http:// or https://."
+        return "", "Start with http:// or https://."
     if not _SRV_HOST_RX.fullmatch(host):
-        return "", "The address needs a host name or number, like http://10.0.0.5:8080."
+        return "", "Needs a host, like http://10.0.0.5:8080."
     if port is not None and not 1 <= port <= 65535:
         return "", "The port has to be 1 to 65535."
     if ("@" in u.netloc or "?" in s or "#" in s or u.query or u.fragment
             or u.path not in ("", "/")):
-        return "", "Type the address only, like http://10.0.0.5:8080."
+        return "", "Enter the address only, like http://10.0.0.5:8080."
     return "%s://%s%s" % (u.scheme, host.lower(), ":%d" % port if port is not None else ""), ""
 
 
@@ -28702,16 +28691,16 @@ def _srv_relay_post(e) -> dict:
         if st == 200 and js.get("ok") is True:
             return done(True, "ok", "", int(js.get("sent") or 0))
         if st == 401:
-            return done(False, "token", "Relay refused the token.")
+            return done(False, "token", "The relay refused the token.")
         if st == 403:
-            return done(False, "denied", "Relay doesn\u2019t allow this server.")
+            return done(False, "denied", "The relay doesn’t allow this server.")
         if st == 429:
-            return done(False, "limited", "Relay is limiting wake-ups. Try again in a moment.")
+            return done(False, "limited", "The relay is limiting wake-ups. Try again in a moment.")
         if 300 <= st < 400:
-            return done(False, "redirect", "Relay not reachable: it sent the app somewhere else, which isn\u2019t followed.")
-        return done(False, "bad", "Relay answered something unexpected (%d)." % st)
+            return done(False, "redirect", "The relay redirected, which isn’t followed.")
+        return done(False, "bad", "The relay answered with %d." % st)
     except Exception as ex:
-        return done(False, "unreachable", "Relay not reachable: %s" % _srv_relay_reason(ex))
+        return done(False, "unreachable", "The relay isn’t reachable: %s" % _srv_relay_reason(ex))
 
 
 def server_set_relay(ctx, sid: str, d: dict) -> dict:
@@ -28736,7 +28725,7 @@ def server_set_relay(ctx, sid: str, d: dict) -> dict:
             e["relay"], e["relay_token"] = None, _Secret("")
         else:
             if not tok and not e.get("relay_token"):
-                return {"err": "Type the relay\u2019s token too."}
+                return {"err": "Enter the relay’s token too."}
             e["relay"] = {"url": url}
             if tok:
                 e["relay_token"] = _Secret(tok)
@@ -28840,13 +28829,13 @@ def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
     if e is None:
         return {"ok": False, "kind": "gone", "err": SRV_GONE}
     if not e.get("wake"):
-        return {"ok": False, "kind": "nowake", "err": "%s has no wake-up address yet." % _srv_plain(e["name"])}
+        return {"ok": False, "kind": "nowake", "err": "%s has no wake-up address." % _srv_plain(e["name"])}
     if relay_only:
         r = _srv_relay_post(e)
         if r["kind"] == "none":
-            return {"ok": False, "kind": "norelay", "err": "Save the relay\u2019s address and token first."}
+            return {"ok": False, "kind": "norelay", "err": "Save the relay address and token first."}
         return {"ok": r["ok"], "kind": r["kind"],
-                "err": "Relay answered: wake-up sent." if r["ok"] else r["err"]}
+                "err": "The relay sent the wake-up." if r["ok"] else r["err"]}
     tried_n, failed_n, first = _srv_wake_send(e)
     rl = _srv_relay_post(e)        # the broadcast is out; a relay is asked as well
     blocked = bool(tried_n and failed_n == tried_n) and not rl["ok"]
@@ -29396,8 +29385,7 @@ def server_models_get(ctx, sid: str) -> dict:
         return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
     state = _srv_mstate_parse(js)
     if state is None:
-        return {"ok": False, "kind": "server", "err": "%s answered in a way this app "
-                "doesn\u2019t understand." % e["name"]}
+        return {"ok": False, "kind": "server", "err": "%s\u2019s answer wasn\u2019t understood." % e["name"]}
     # the card's size: the gateway's own, else the last check's
     vram = state["vram_bytes"] or ((_srv_seen.get(e["id"]) or {}).get("gpu") or {}).get("vram_bytes")
     view = server_sets_view(state, vram)
@@ -29457,15 +29445,12 @@ def server_models_apply(ctx, sid: str, d: dict) -> dict:
         _srv_mstate.pop(e["id"], None)
         return {"ok": False, "kind": "changed", "err": SRV_SETS_CHANGED}
     if st == 409 and code == "busy":
-        return {"ok": False, "kind": "busy", "err": "%s is busy changing its models. "
-                "Nothing was changed. Try again in a moment." % name}
+        return {"ok": False, "kind": "busy", "err": "%s is busy changing models. Try again in a moment." % name}
     if st == 409 and code == "in_use":
-        return {"ok": False, "kind": "in_use", "err": "%s is in use on %s, so nothing was "
-                "changed. Try again when it\u2019s done." % (_srv_text(js.get("name"), 80)
+        return {"ok": False, "kind": "in_use", "err": "%s is in use on %s. Try again when it’s done." % (_srv_text(js.get("name"), 80)
                                                           or "A model", name)}
     if st == 400:
-        return {"ok": False, "kind": "server", "err": "%s refused the change%s. Nothing was "
-                "changed." % (name, (": " + _srv_text(js.get("error"), 160))
+        return {"ok": False, "kind": "server", "err": "%s refused the change%s." % (name, (": " + _srv_text(js.get("error"), 160))
                               if js.get("error") else "")}
     if st == 404 and code == "not_found":
         return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
@@ -29594,7 +29579,7 @@ def _srv_state_now(e):
         return None, (SRV_SETS_OLD if st == 404 else str(_srv_fail(e, st, js)))
     state = _srv_mstate_parse(js)
     if state is None:
-        return None, "%s answered in a way this app doesn’t understand." % e["name"]
+        return None, "%s’s answer wasn’t understood." % e["name"]
     vram = state["vram_bytes"] or ((_srv_seen.get(e["id"]) or {}).get("gpu") or {}).get("vram_bytes")
     return (state, vram), ""
 
@@ -29647,8 +29632,7 @@ def _srv_apply_now(e, v: dict, add: list, remove: list) -> dict:
         return {"ok": True, "jobs": _srv_jobs_parse(js.get("jobs"))}
     code = str(js.get("code") or "")
     if st == 409 and code in ("changed", "busy", "in_use"):
-        return {"ok": False, "kind": code, "err": "%s is busy or its models changed. Nothing was "
-                "changed; try again in a moment." % e["name"]}
+        return {"ok": False, "kind": code, "err": "%s is busy or its models changed. Try again in a moment." % e["name"]}
     if st == 404 and code == "not_found":
         return {"ok": False, "kind": "old", "err": SRV_SETS_OLD}
     return {"ok": False, "kind": "server", "err": str(_srv_fail(e, st, js))}
@@ -31299,15 +31283,13 @@ def _bench_skip_why(label: str, fits: bool, avail, total):
     if fits:
         return None
     if model_is_giant(label) and not giants_on():
-        return ("Skipped: the largest models are off (Settings › "
-                "Models).")
+        return ("Skipped. The largest models are off in Settings > Models.")
     need = MODEL_MEM_BYTES.get(label, 0)
     if total and need > total * 0.8:
-        return ("Skipped: it needs about %d GB, more than a model may use "
-                "on this computer (80%% of %d GB)."
-                % (round(need / 2 ** 30), round(total / 2 ** 30)))
+        return ("Skipped. Needs about %d GB; the limit here is %d GB."
+                % (round(need / 2 ** 30), round(total * 0.8 / 2 ** 30)))
     want = need * (1.3 if "MoE" in label else 1.5)
-    return ("Skipped: it needs about %d GB free; %d GB is free now."
+    return ("Skipped. Needs %d GB free; %d GB free now."
             % (round(want / 2 ** 30), round((avail or 0) / 2 ** 30)))
 
 
@@ -31472,12 +31454,11 @@ class _BenchMLX:
         try:
             port = _own_engine_port(self.label)
         except RuntimeError:
-            return "Skipped: couldn't tell who runs its engine."
+            return "Skipped. Couldn’t tell who runs its engine."
         if _port_in_use(port):
             # the desktop app and a dev copy share the engine ports: one
             # copy never stops or times another's engine
-            return ("Skipped: another copy of ConcordeAI is running this "
-                    "model.")
+            return ("Skipped. Another ConcordeAI is running this model.")
         return _bench_fit(self.label)
 
     def load(self):
@@ -31600,8 +31581,7 @@ class _BenchOllama:
 
     def prepare(self):
         if slow_giant(self.label):
-            return ("Skipped: a model this size loads from disk for many "
-                    "minutes on Ollama.")
+            return ("Skipped. A model this size takes minutes to load on Ollama.")
         # no MLX engine of this copy beside it (review of 6b331): the one
         # loaded before is tested last, so it was still resident here
         with _engine_lock:
@@ -31900,8 +31880,7 @@ def _bench_one(row: dict, keep: bool, eng=None):
                 # the rise is everyone's, not this model's: no figures, a word
                 mem.update(mem_rise=None, mem_peak=None, pressured=False,
                            crowded=True)
-                _bench_set(row, note=((row.get("note") or "") + " Other "
-                           "programs were using memory.").strip())
+                _bench_set(row, note=((row.get("note") or "") + " Other apps were using memory.").strip())
             _bench_set(row, **mem)
         kept = keep and ok and not _bench_stop.is_set()
         try:
@@ -31919,7 +31898,7 @@ def _bench_restore(prev: str, rows: list, stopped: bool) -> str:
         return ""
     last = rows[-1] if rows else {}
     if last.get("label") == prev and last.get("status") == "done":
-        return "%s is loaded again, as it was before the benchmark." % prev
+        return "%s is loaded again." % prev
     if not stopped:
         try:
             with _engine_lock:
@@ -31937,12 +31916,11 @@ def _bench_restore(prev: str, rows: list, stopped: bool) -> str:
                                          "messages": [{"role": "user",
                                                        "content": "Hello"}]},
                                 timeout=max(5.0, end - time.monotonic()))
-                    return ("%s is loaded again, as it was before the "
-                            "benchmark." % prev)
+                    return ("%s is loaded again." % prev)
                 time.sleep(0.5)
         except Exception:
             pass
-    return "%s will load again on your next question." % prev
+    return "%s loads again on your next question." % prev
 
 
 def _bench_worker(run: dict):
@@ -31964,7 +31942,7 @@ def _bench_worker(run: dict):
             run["versions"] = vers
             run["models"] = rows
             if not rows:
-                run["note"] = "No local models are installed on this computer."
+                run["note"] = "No local models installed."
         for i, row in enumerate(rows):
             if _bench_stop.is_set():
                 _bench_set(row, status="not run")
@@ -32000,7 +31978,7 @@ def _bench_worker(run: dict):
             run["saved"] = saved
             if not saved:
                 run["note"] = ((run.get("note") or "")
-                               + " This run couldn't be saved.").strip()
+                               + " This run wasn’t saved.").strip()
             _bench["running"] = False
 
 
@@ -32100,7 +32078,7 @@ def bench_start(spec=None, ctx=None) -> tuple:
     spec = spec if isinstance(spec, dict) else {}
     target = spec.get("target") or "local"
     if target not in ("local", "server", "cloud"):
-        return False, "That isn't something the benchmark can test."
+        return False, "The benchmark can’t test that."
     plan = None
     if target != "local":
         if ctx is None:
@@ -32380,13 +32358,13 @@ def bench_cloud_models() -> list:
 def bench_card_line(gpu) -> str:
     """A server's card as its /v1/info says it: "Radeon RX 6900 XT · 16 GB"."""
     if not isinstance(gpu, dict):
-        return "graphics card not reported"
+        return "Graphics card not reported"
     parts = [str(gpu.get("name") or "").strip()
              or str(gpu.get("vendor") or "").upper()]
     vb = gpu.get("vram_bytes")
     if isinstance(vb, int) and vb > 0:
         parts.append("%d GB" % round(vb / 2 ** 30))
-    return " · ".join(p for p in parts if p) or "graphics card not reported"
+    return " · ".join(p for p in parts if p) or "Graphics card not reported"
 
 
 def bench_server_view(e) -> dict:
@@ -32400,10 +32378,10 @@ def bench_server_view(e) -> dict:
     for m in s.get("models") or []:
         fit = bool(_srv_fits(m, vram))
         pl = m.get("placement")
-        why = ("It also uses the server\u2019s memory, which loads its CPU hard."
+        why = ("Spills into the server\u2019s memory."
                if pl == "gpu+ram" else
-               "Where it runs isn\u2019t reported." if pl != "gpu" else
-               "It may not fit on the card." if not fit else "")
+               "Placement not reported." if pl != "gpu" else
+               "May not fit on the card." if not fit else "")
         models.append({"name": m.get("name"), "placement": pl, "fit": fit,
                        "tick": fit, "why": why, "loaded": bool(m.get("loaded")),
                        "size": m.get("size") or 0})
@@ -32442,9 +32420,9 @@ def bench_cloud_plan(ctx, picks) -> dict:
             chosen.append({"pid": k[0], "model": k[1],
                            "provider": offered[k]["name"]})
     if not chosen:
-        return {"err": "Tick at least one cloud model."}
+        return {"err": "Select at least one cloud model."}
     if len(chosen) > BENCH_CLOUD_MAX:
-        return {"err": "A run calls at most %d cloud models. Untick %d."
+        return {"err": "At most %d cloud models a run. Deselect %d."
                 % (BENCH_CLOUD_MAX, len(chosen) - BENCH_CLOUD_MAX)}
     now = time.time()
     for k in [k for k, r in _bench_confirms.items()
@@ -32472,7 +32450,7 @@ def _bench_plan_remote(target: str, spec: dict, ctx) -> dict:
             raise _BenchRefuse(SRV_GONE)
         if not _srv_paired(e):
             raise _BenchRefuse("%s isn\u2019t paired with this computer. Pair it in "
-                               "Settings › Your servers." % e["name"])
+                               "Settings > Servers." % e["name"])
         names = []
         for n in spec.get("models") or []:
             n = str(n)
@@ -32480,14 +32458,13 @@ def _bench_plan_remote(target: str, spec: dict, ctx) -> dict:
                     and not ollama_internal(n) and n not in names):
                 names.append(n)
         if not names:
-            raise _BenchRefuse("Tick at least one model.")
+            raise _BenchRefuse("Select at least one model.")
         return {"target": "server", "name": e["name"], "e": e, "ctx": ctx,
                 "rows": [{"label": e["name"] + SERVER_SEP + n, "model": n,
                           "engine": "Ollama", "status": "waiting", "note": "",
                           "tok": 0, "network": True} for n in names[:40]]}
     if spec.get("understood") is not True:
-        raise _BenchRefuse("Tick “I understand this may cost money” "
-                           "first. Nothing was sent.")
+        raise _BenchRefuse("Select “This may cost money” first. Nothing was sent.")
     cid = str(spec.get("confirm") or "")
     rec = _bench_confirms.get(cid)
     if (not isinstance(rec, dict) or time.time() - rec["t"] > BENCH_CONFIRM_S
@@ -32548,7 +32525,7 @@ def _bench_wait(fn, cleanup=None):
             raise box["e"]
     if _bench_stop.is_set():
         raise BenchStopped()
-    raise RuntimeError("it didn\u2019t answer in time")
+    raise RuntimeError("No answer in time")
 
 
 def _bench_remote_lines(open_, read_s: float):
@@ -32678,7 +32655,7 @@ class _BenchServer:
         return self.e["name"]
 
     def back_line(self) -> str:
-        return "waiting for %s to come back\u2026" % self.e["name"]
+        return "Waiting for %s…" % self.e["name"]
 
     def wait_back(self, secs=None) -> bool:
         """Polls the server's /api/version (the gateway answers it from
@@ -32731,19 +32708,19 @@ class _BenchServer:
                     mid += " (an older kit: a newer one empties the card first)"
             else:
                 mid = ", alone"
-            return "%s loaded only %s of %s on the card%s; its GPU-only rule unloaded it" % (
+            return "%s fit only %s of %s on the card%s, so it unloaded it" % (
                 name, part, self.model, mid)
         if exc.code == "gpu_fit":
             need, have = _bench_int(js.get("need_bytes")), _bench_int(js.get("budget_bytes"))
             if need and have is not None:
                 where = ("the card" if "VRAM" in det and "system memory" not in det
                          else "the server\u2019s memory")
-                return "%s won\u2019t load it: it needs about %.1f GB and %s has %.1f GB free" % (
+                return "%s can’t load it: needs %.1f GB, %s has %.1f GB free" % (
                     name, need / 1e9, where, have / 1e9)
             return "%s won\u2019t load it%s" % (name, (": " + det) if det else "")
         if exc.kind == "busy":
-            return "%s won\u2019t run it right now: %s" % (
-                name, det or "it is busy with other requests")
+            return "%s is busy: %s" % (
+                name, det or "other requests are running")
         if exc.code == "ollama" and det:
             return "On %s, %s" % (name, det[0].lower() + det[1:] if det[:2] != "Ol" else det)
         return str(exc)
@@ -32868,8 +32845,8 @@ class _BenchServer:
                                                                   % raw["chunks"]) if raw["chunks"] else ""))
         if raw["t_first"] is None:
             raise RuntimeError(
-                "nothing came back within %d minutes" % (BENCH_RUN_CAP // 60)
-                if _bench_live["capped"] else "it answered with nothing")
+                "Nothing back in %d minutes" % (BENCH_RUN_CAP // 60)
+                if _bench_live["capped"] else "Answered with nothing")
         ec = _bench_int(raw.get("eval_count"))
         if ec and not _bench_pos(raw.get("eval_duration")):
             # a count with no duration: the count is exact, the time is ours
@@ -32889,21 +32866,19 @@ class _BenchServer:
             if miss:
                 # an estimate says what it rests on (6b454): Ollama's last
                 # line came, without these; the figure is this computer's
-                notes.append("Ollama\u2019s last line carried no %s, so the writing speed is "
-                             "this computer\u2019s count of the %d pieces that arrived over "
-                             "the time they took, network included%s." % (
+                notes.append("Ollama\u2019s last line carried no %s; the writing speed is counted here "
+                             "from the %d pieces that arrived, network included%s." % (
                                  " or ".join(miss), nums.get("gen_tokens") or 0,
                                  "; reads weren\u2019t measured" if nums.get("prompt_tps") is None else ""))
         if self.still and not self.was_loaded:
-            notes.append("%s stayed loaded on the card through this run." % ", ".join(self.still))
+            notes.append("%s stayed loaded through this run." % ", ".join(self.still))
         if nums.get("load_src") != "engine":
             if not self.was_loaded and nums.get("load_s") is not None:
                 nums["load_src"] = "timed"       # by this computer, network in it (6b409)
             else:
                 nums["load_s"], nums["load_src"] = None, "not measured"
-                notes.append("Already in the server\u2019s memory and it wouldn\u2019t unload, so "
-                             "its load time wasn\u2019t measured." if self.was_loaded else
-                             "The server didn\u2019t report a load time.")
+                notes.append("Already loaded and wouldn\u2019t unload, so no load time." if self.was_loaded else
+                             "The server reported no load time.")
         if notes:
             nums["note"] = " ".join(notes)
 
@@ -32928,12 +32903,12 @@ class _BenchCloud:
         v = (_cloud_all().get("providers") or {}).get(self.pid)
         if not (isinstance(v, dict) and v.get("key") and v.get("base")
                 and v.get("status", "ok") == "ok"):
-            return "Failed: there is no working key for this provider any more."
+            return "No working key for this provider."
         self.c = dict(v, model=self.model, role="fast")
         u = urllib.parse.urlsplit(str(v["base"]))
         if u.scheme != "https" and not (
                 _PROVIDER_STUB and str(v["base"]).startswith(_PROVIDER_STUB)):
-            return "Failed: the provider\u2019s address isn\u2019t https, so nothing was sent."
+            return "The provider’s address isn’t https. Nothing was sent."
         return None
 
     def load(self):
@@ -33097,12 +33072,11 @@ class _BenchCloud:
         self.total = round(time.monotonic() - raw["t_send"], 3)
         if raw["t_first"] is None:
             if stop in ("length", "max_tokens"):
-                raise RuntimeError("it used all %d tokens before writing (it "
-                                   "thinks first), so there is nothing to time"
+                raise RuntimeError("Spent all %d tokens thinking; nothing to time"
                                    % BENCH_MAX_TOKENS)
             raise RuntimeError(
-                "nothing came back within %d minutes" % (BENCH_RUN_CAP // 60)
-                if _bench_live["capped"] else "it answered with nothing")
+                "Nothing back in %d minutes" % (BENCH_RUN_CAP // 60)
+                if _bench_live["capped"] else "Answered with nothing")
         if u_out:
             # reasoning the stream never showed was counted but is not in
             # the time between the first and the last word
@@ -33220,9 +33194,9 @@ def _bench_worker_remote(run: dict, plan: dict):
             bench_targets_save(ctx, _bench_record(run, keys))
             saved = True
         except StaleProfile:
-            why = "The profile changed, so this run wasn't saved."
+            why = "The profile changed. This run wasn’t saved."
         except Exception:
-            why = "This run couldn't be saved."
+            why = "This run wasn’t saved."
         with _bench_lock:
             run["saved"] = saved
             if why:
@@ -33392,7 +33366,7 @@ def bench_hardware() -> dict:
             k = seen.count(key)
             parts.append(("%d × %s" % (k, key)) if k > 1 else key)
         if not cards:
-            parts.append("no graphics card in use")
+            parts.append("No graphics card in use")
     hw["line"] = " · ".join(parts)
     _bench_hw.update(hw)
     return dict(hw)
@@ -41867,7 +41841,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             amt = balance_valid(d.get("amount"))
             if amt is None:
                 self._send_json({"ok": False,
-                                 "err": "type an amount from 0 to %d" % BALANCE_MAX_USD})
+                                 "err": "Enter an amount from 0 to %d." % BALANCE_MAX_USD})
                 return
             now = round(time.time(), 1)
 
@@ -41926,7 +41900,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 "kimi": ("Kimi K3", PROVIDER_BASES["kimi"], "kimi-k3"),
             }.get(which)
             if not spec or len(key) < 12:
-                self._send_json({"ok": False, "err": "paste a full key"})
+                self._send_json({"ok": False, "err": "Paste the whole key."})
                 return
             name, base, model = spec
             # CAUGHT BEFORE THE NETWORK: a key whose prefix identifies the
@@ -41937,9 +41911,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _pre and _want and key.startswith(_pre) and len(key) < _want:
                 self._send_json({
                     "ok": False,
-                    "err": "that paste looks cut off — %d characters, but "
-                           "a %s key is %s%d. Copy the whole thing and try "
-                           "again." % (len(key), which.title(),
+                    "err": "The key looks cut off: %d characters, not %s%d. Copy it again." % (len(key), which.title(),
                                        "" if _exact else "at least ",
                                        _want)})
                 return
@@ -42056,9 +42028,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     self._send_json({
                         "ok": True, "name": name, "model": model,
                         "models": found,
-                        "warn": ("key saved — the %s account is out of "
-                                 "credit, so it sits out until it's topped "
-                                 "up." % which.title()) if _broke else
+                        "warn": ("Key saved. The %s account is out of credit, so it sits out for now." % which.title()) if _broke else
                                 ("key saved — %s is rate limited right now, "
                                  "so it sits out for a few minutes and comes "
                                  "back on its own." % which.title())})
@@ -42070,21 +42040,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 hint = ""
                 _pre, _want, _exact = KEY_SHAPE.get(which, ("", 0, False))
                 if _pre and not key.startswith(_pre):
-                    hint = (" — and this doesn't look like a %s key: they "
-                            "start with %s. Wrong provider selected, or the "
-                            "front of the paste was lost"
+                    hint = (" This doesn’t look like a %s key; they start with %s."
                             % (which.title(), _pre))
                 elif _want and _exact and len(key) != _want:
-                    hint = (" — this key is %d characters and a %s key is "
-                            "%d, so the paste looks wrong"
+                    hint = (" The key is %d characters; a %s key is %d."
                             % (len(key), which.title(), _want))
                 elif _want:
                     # right prefix, plausible length: the paste is fine, so
                     # the key itself is the problem — say so plainly rather
                     # than leaving "Invalid API Key" to be argued with
-                    hint = (" — the key is the right shape, so this isn't a "
-                            "bad paste: it has been revoked or regenerated. "
-                            "Issue a fresh one")
+                    hint = (" The key looks right, so it was revoked or replaced. Issue a new one.")
                 _kept = _cloud_save_failed(which, {
                     "name": name, "base": base, "key": key, "model": model,
                     "status": "fail",
@@ -42093,7 +42058,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     auth=(cloud_failure_kind(exc.code, raw or detail) == "auth"
                           and not found))
                 self._send_json({"ok": False,
-                                 "err": "that key didn't work: %s%s%s"
+                                 "err": "That key didn’t work: %s%s%s"
                                         % (detail or ("HTTP %s"
                                            % exc.code), hint,
                                            _kept_note(name, _kept))})
@@ -42116,8 +42081,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     "status": "fail",
                     "note": "%s was busy; the key wasn't checked" % name})
                 self._send_json({"ok": False,
-                                 "err": "couldn't check that key: %s is busy "
-                                        "right now. Try again in a minute%s."
+                                 "err": "Couldn’t check the key: %s is busy. Try again in a minute%s."
                                         % (name, _kept_note(name, _kept))})
                 return
             try:
@@ -42941,7 +42905,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             wav = self.rfile.read(n)
             if not (_voice_supported() and _voice_ready()):
-                self.send_error(503, "voice engine not ready")
+                self.send_error(503, "Dictation isn’t ready")
                 return
             try:
                 self._send_json({"text": _transcribe_wav(wav)})
@@ -52146,7 +52110,7 @@ __CODE_ROWS__
       <div id="up-version">__APP_VER__</div>
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
-      <button class="about-btn" id="about-check">Check for updates</button>
+      <button class="about-btn" id="about-check">Check now</button>
       <!-- 6b285: three channels. Stable is the default; Prerelease
            (value "beta", kept for saved prefs; renamed 6b318 per
            Patrick) gets the betas and RCs; Nightly follows the rolling
@@ -52160,11 +52124,11 @@ __CODE_ROWS__
            app checks at launch and daily; off, the button above is the
            only check. And "performance mode" is now just the backdrop. -->
       <div class="toggle-row" id="autochk-toggle"
-           title="On: checks at launch and once a day. Off: only when you click Check for updates.">
-        <div class="switch"></div><span>Check for updates automatically</span></div>
+           title="At launch and once a day.">
+        <div class="switch"></div><span>Check for updates</span></div>
       <div class="toggle-row" id="fx-toggle"
-           title="The moving backdrop behind the chat. Everything else stays as it is.">
-        <div class="switch"></div><span>Enable visual effects</span></div>
+           title="The moving backdrop.">
+        <div class="switch"></div><span>Visual effects</span></div>
       <!-- THE LOOK (6b526, per Patrick): Horizon is the new home, sky and
            intro; Classic is the look before it, exactly as it was -->
       <label id="look-row"><span>Look</span>
@@ -52179,17 +52143,15 @@ __CODE_ROWS__
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
-      <div class="toggle-row" id="micwarm-toggle"
-           title="After you dictate, the microphone stays open for 15 seconds, recording nothing, so the next hold starts at once.">
-        <div class="switch"></div><span>Keep the microphone ready for 15 seconds after dictating</span></div>
-      <div id="micwarm-note">The next hold starts at once. macOS shows its microphone indicator while it's ready.</div>
+      <div class="toggle-row" id="micwarm-toggle">
+        <div class="switch"></div><span>Keep microphone ready</span></div>
+      <div id="micwarm-note">On for 15 seconds after you dictate.</div>
     </section>
     <!-- ACCOUNT sits directly under About (6b260, per Patrick):
          identity reads as part of the front matter, not a footnote. -->
     <section class="spane" id="p-account">
       <div class="set-h">Account</div>
-      <p class="tdesc">Who you are on this Mac, and the exit: erase what
-      MillenAI knows about you.</p>
+      <p class="tdesc">Your name here, and the way out.</p>
       <div id="acct-card">
         <div id="acct-av">&#128187;</div>
         <div><b id="acct-kind">&mdash;</b>
@@ -52203,7 +52165,7 @@ __CODE_ROWS__
         <div id="imp-settings-note" class="tdesc"></div>
       </div>
       <!-- ==== bring your chats (6b529): Settings hook end ==== -->
-      <button class="about-btn danger" id="about-forget">Forget me&hellip;</button>
+      <button class="about-btn danger" id="about-forget">Erase everything&hellip;</button>
       <div id="forget-steps" hidden>
         <div id="forget-what">
           <label class="fscope"><input type="checkbox" id="fs-mem" checked>
@@ -52213,31 +52175,28 @@ __CODE_ROWS__
           <label class="fscope"><input type="checkbox" id="fs-prefs">
             <span>Personal settings</span></label>
         </div>
-        <input id="forget-word" placeholder="type FORGET ME to confirm"
+        <input id="forget-word" placeholder="Type FORGET ME"
                autocomplete="off" spellcheck="false" autocapitalize="characters">
         <div id="forget-note"></div>
-        <button class="about-btn danger" id="forget-go" disabled>Erase forever</button>
+        <button class="about-btn danger" id="forget-go" disabled>Erase</button>
       </div>
     </section>
     <section class="spane" id="p-persona">
       <div class="set-h">Personality</div>
-      <p class="tdesc">How MillenAI talks to you &mdash; what it calls
-      you, how long its answers run, and the standing instructions it
-      re-reads before every reply.</p>
+      <p class="tdesc">Your name, answer length, and standing instructions.</p>
       <input id="user-name" type="text" maxlength="80" spellcheck="false"
-        autocomplete="off" placeholder="Your name (or nickname)">
+        autocomplete="off" placeholder="Name">
       <textarea id="persona" rows="3" maxlength="2000" spellcheck="false"
-        placeholder="e.g. Be direct, skip the pleasantries. I work in finance, so assume I know the vocabulary."></textarea>
+        placeholder="Be direct. I work in finance; assume I know the vocabulary."></textarea>
       <button class="about-btn slim" id="persona-save">Save</button>
       <div id="len-row">
         <div id="len-head">Response length <b id="len-val">Balanced</b></div>
         <input type="range" id="len-slider" min="1" max="5" step="1" value="3">
       </div>
       <!-- 6b390: the starter chips follow what you ask about -->
-      <div class="toggle-row on" id="sugg-toggle"
-           title="The three chips above the message box follow what you ask about most.">
-        <div class="switch"></div><span>Personalise suggestions</span></div>
-      <div id="sugg-note">Reads the titles of your recent chats, nothing else. Your server writes the chips, else this computer; the cloud only in Cloud Only.
+      <div class="toggle-row on" id="sugg-toggle">
+        <div class="switch"></div><span>Personal suggestions</span></div>
+      <div id="sugg-note">From the titles of recent chats. Written on your server or this Mac.
         <div id="sugg-row" class="ctlrow"><button class="about-btn slim" id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div></div>
     </section>
     <!-- YOUR STUFF (6b530, per Patrick: "It knows your life"). Minimal;
@@ -52270,17 +52229,10 @@ __CODE_ROWS__
         <span class="kn-engine" id="know-engine"></span></div>
     </section>
     <section class="spane" id="p-cloud">
-      <div class="set-h">Cloud power</div>
-      <p class="tdesc">Optional frontier models. While Use cloud power is
-      on, cloud models answer your chats; the Cloud Only tier does that
-      for one question. Pictures and videos made with Gemini go to Google
-      whenever a Gemini key is saved, switch on or off. The switch never
-      removes a key. A question that needs the web goes, as typed, to a
-      search engine; weather and place questions send the place name to
-      weather and map services.</p>
+      <div class="set-h">Cloud</div>
+      <p class="tdesc">Optional. While on, cloud models answer and your prompts leave this Mac. Gemini pictures and video go to Google whenever a Gemini key is saved. Keys stay saved when off. A question that needs the web goes, as typed, to a search engine; weather and place questions send the place name.</p>
       <label id="turbo-row" hidden><input type="checkbox" id="turbo">
-        <span>Use cloud power</span><i class="hint" id="turbo-hint"
-        title="Answers come from a cloud service instead of this computer. Your prompts leave this computer while this is on, and whenever you pick the Cloud Only tier. Pictures and videos use a saved Gemini key either way; keys stay saved when it is off.">i</i></label>
+        <span>Cloud models</span></label>
       <div id="turbo-note" hidden></div>
       <div id="cloudkey-box">
         <div id="cloudkey-row" class="ctlrow">
@@ -52291,7 +52243,7 @@ __CODE_ROWS__
             <option value="kimi">Kimi K3 (paid)</option>
           </select>
           <input id="ck-key" type="password" autocomplete="off"
-                 placeholder="paste API key">
+                 placeholder="API key">
           <button class="about-btn slim" id="ck-save">Save</button>
         </div>
         <div id="ck-note"></div>
@@ -52300,25 +52252,22 @@ __CODE_ROWS__
     </section>
     <section class="spane" id="p-models">
       <div class="set-h">Models</div>
-      <p class="tdesc">Every mind this machine can call on: what's
-      loaded, what's on disk, what answers from the cloud &mdash; and
-      what each one is for.</p>
+      <p class="tdesc">What&rsquo;s installed, what&rsquo;s loaded, and what each model is for.</p>
       <div id="roster"></div>
       <div id="roster-foot">
-        <button class="about-btn slim" id="roster-manage">Manage models&hellip;</button>
+        <button class="about-btn slim" id="roster-manage">Manage&hellip;</button>
       </div>
       <div id="manage-box" hidden>
         <dl id="mg-stats">
-          <div><dt>models installed</dt><dd id="mg-count">&mdash;</dd></div>
-          <div><dt>space taken</dt><dd id="mg-space">&mdash;</dd></div>
+          <div><dt>installed</dt><dd id="mg-count">&mdash;</dd></div>
+          <div><dt>on disk</dt><dd id="mg-space">&mdash;</dd></div>
         </dl>
         <!-- THE THREE SETS (6b405): Light, Recommended, Everything, drawn by
              setCardsHtml; the No limits boxes sit beside Everything, the
              only set they change -->
         <div id="plan-row"><div id="plan-limits">
           <label id="nolimits-row"><input type="checkbox" id="nolimits">
-            <span>No limits: also let Everything hold any models
-            bigger than this machine&rsquo;s memory. Those can swap hard or crash it.</span></label>
+            <span>No limits. Everything includes models bigger than memory; they can crash this Mac.</span></label>
           <label id="giants-row" class="giants-row off"><input type="checkbox"
             id="giants" disabled><span>__GIANT_LABEL__</span><i
             class="hint" title="__GIANT_TIP__">i</i></label>
@@ -52333,12 +52282,11 @@ __CODE_ROWS__
              where things stand, and a button only when there is
              something to do -->
         <div id="autoclean-bar">
-          <div class="toggle-row" id="autoclean-toggle"
-               title="Removes models this version no longer uses, after each update and every few hours. Never downloads anything on its own.">
+          <div class="toggle-row" id="autoclean-toggle">
             <div class="switch"></div>
-            <span class="ac-txt"><span>Remove outdated models automatically</span>
+            <span class="ac-txt"><span>Remove outdated models</span>
               <span id="autoclean-note"></span></span></div>
-          <button class="about-btn slim" id="clean-now" hidden>Update</button>
+          <button class="about-btn slim" id="clean-now" hidden>Remove now</button>
         </div>
         <div id="manage-note"></div>
       </div>
@@ -52349,19 +52297,13 @@ __CODE_ROWS__
          reach the page: /api/servers answers with the public view only -->
     <section class="spane" id="p-servers">
       <div class="set-h">Your servers</div>
-      <p class="tdesc">For advanced users. Connect a dedicated server you
-      run yourself, so it can take on queries and speed up answers.
-      Instructions for setting one up are available <a class="srv-link"
+      <p class="tdesc">Advanced. A server you run answers faster and keeps more local.
+      <a class="srv-link"
       href="https://github.com/bigmillz/concordeai/blob/main/docs/your-own-server.md"
-      target="_blank" rel="noopener">here</a> &middot; <a class="srv-link"
+      target="_blank" rel="noopener">Setup guide</a> &middot; <a class="srv-link"
       href="https://github.com/bigmillz/concordeai/tree/main/ollama1"
-      target="_blank" rel="noopener">Setup scripts</a>.</p>
-      <p class="srv-about">Each server is paired with this computer at the
-      server, with the code its screen shows. Its models answer when you
-      pick them in the engine menu, whether or not Use cloud power is on.
-      A server that can&rsquo;t answer says so; no other model answers in
-      its place. In an Advanced council with a cloud compositor, the
-      server&rsquo;s drafts go to that cloud provider to be combined.</p>
+      target="_blank" rel="noopener">Scripts</a></p>
+      <p class="srv-about">Pair with the code on the server&rsquo;s screen. Its models answer when you pick them. A server that can&rsquo;t answer says so; nothing answers in its place.</p>
       <div id="srv-list"></div>
       <div id="srv-add">
         <div class="srv-h">Add a server</div>
@@ -52369,7 +52311,7 @@ __CODE_ROWS__
           <input id="srv-url" type="text" autocomplete="off" spellcheck="false"
                  placeholder="https://server.example.com" aria-label="Address">
           <input id="srv-name" type="text" maxlength="40" autocomplete="off"
-                 spellcheck="false" placeholder="Name: My server" aria-label="Name">
+                 spellcheck="false" placeholder="Name" aria-label="Name">
           <input id="srv-aid" type="password" autocomplete="off"
                  placeholder="Access Client ID (optional)" aria-label="Access Client ID">
           <input id="srv-asec" type="password" autocomplete="off"
@@ -52384,7 +52326,7 @@ __CODE_ROWS__
     <section class="spane" id="p-usage">
       <div class="us-head">
         <svg class="us-ico" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 17v-3.5M7.5 17v-6M11.5 17v-4M15.5 17V8.5"/><path d="M3.5 9.5l4-4 4 3 5.5-5.5"/></svg>
-        <span class="us-title">Usage &amp; Stats</span>
+        <span class="us-title">Usage</span>
         <select id="us-range" aria-label="Time period">
           <option value="1h">1 hour</option><option value="1d">1 day</option>
           <option value="1w">1 week</option><option value="1m">1 month</option>
@@ -52395,15 +52337,15 @@ __CODE_ROWS__
       <div class="us-grid">
         <div class="us-card"><div class="us-k">Requests</div>
           <div class="us-v" id="us-req">&mdash;</div><div class="us-s" id="us-ans"></div></div>
-        <div class="us-card"><div class="us-k">Input toks</div>
+        <div class="us-card"><div class="us-k">Tokens in</div>
           <div class="us-v" id="us-in">&mdash;</div><div class="us-s" id="us-cached"></div></div>
-        <div class="us-card"><div class="us-k">Output toks</div>
+        <div class="us-card"><div class="us-k">Tokens out</div>
           <div class="us-v" id="us-out">&mdash;</div><div class="us-s"></div></div>
         <div class="us-card"><div class="us-k">Cache hit</div>
           <div class="us-v" id="us-hit">&mdash;</div><div class="us-s"></div></div>
       </div>
       <div class="us-card us-chart">
-        <div id="us-span">Token Usage</div>
+        <div id="us-span">Tokens</div>
         <div id="us-fresh"></div>
         <div id="us-plot"></div>
         <div class="us-leg"><span><i style="background:#e6b422"></i>Input</span>
@@ -52423,7 +52365,7 @@ __CODE_ROWS__
         </div>
         <div class="bm-tg" id="bm-tg" hidden><select id="bm-target" aria-label="What to benchmark" hidden></select><button class="bm-btn" id="bm-cv-open" hidden>Compare runs</button></div>
         <div id="bm-hw">&mdash;</div>
-        <div class="bm-desc" id="bm-desc">The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.</div>
+        <div class="bm-desc" id="bm-desc">Reads 1,000 tokens and writes 256 on each installed model. About a minute each. Chat pauses while it runs.</div>
         <div class="us-card bm-list bm-pk" id="bm-pk" hidden></div>
         <div id="bm-prog" hidden><div class="pbar-track"><div class="pbar-fill" id="bm-fill"></div></div>
           <div id="bm-status"></div></div>
@@ -52458,15 +52400,15 @@ __CODE_ROWS__
      Compare. Both sit over Settings -->
 <div id="bmc-veil" hidden>
   <div id="bmc-card" role="dialog" aria-modal="true" aria-labelledby="bmc-title">
-    <div class="set-h" id="bmc-title">Call these cloud models?</div>
+    <div class="set-h" id="bmc-title">Run on these cloud models?</div>
     <ul id="bmc-list"></ul>
     <p id="bmc-sum"></p>
     <p id="bmc-est"></p>
     <p id="bmc-warn"></p>
-    <label class="bmc-ck"><input type="checkbox" id="bmc-ok"> I understand this may cost money</label>
+    <label class="bmc-ck"><input type="checkbox" id="bmc-ok"> This may cost money</label>
     <div class="sh-foot">
       <button id="bmc-cancel" class="about-btn slim ghost">Cancel</button>
-      <button id="bmc-go" class="about-btn slim" disabled>Call these models</button>
+      <button id="bmc-go" class="about-btn slim" disabled>Run</button>
     </div>
   </div>
 </div>
@@ -52496,7 +52438,7 @@ __CODE_ROWS__
 <div id="bmv-veil" hidden>
   <div id="bmv-card" role="dialog" aria-modal="true" aria-labelledby="bmv-title">
     <div class="set-h" id="bmv-title">Compare runs</div>
-    <p class="bm-desc">Tick the runs to put side by side. Only runs of the same test compare.</p>
+    <p class="bm-desc">Select runs of the same test to compare.</p>
     <div id="bmv-runs"></div>
     <div id="bmv-out"></div>
     <div class="sh-foot"><button id="bmv-close" class="about-btn slim">Done</button></div>
@@ -52573,7 +52515,7 @@ __CODE_ROWS__
     </div>
 
     <div class="wstep" data-w="3" hidden>
-      <div class="set-h">Cloud power</div>
+      <div class="set-h">Cloud</div>
       <p>Optional. Some are free, some need a paid key. While on, your prompts leave this Mac.</p>
       <div id="wiz-provs"></div>
     </div>
@@ -59325,20 +59267,20 @@ async function ensureVoice(){
   if(voiceReady)return true;
   const st=await(await api("/api/voice/status")).json();
   if(!st.supported){input.placeholder=IS_PC
-    ?"voice input isn't installed on this PC (its speech engine didn't install)"
-    :"voice input needs an Apple silicon Mac";return false;}
+    ?"Dictation isn’t installed on this PC."
+    :"Dictation needs an Apple silicon Mac.";return false;}
   if(st.ready){voiceReady=true;return true;}
   await api("/api/voice/prepare",{method:"POST"});
-  input.placeholder="getting the voice engine ("+(st.pct||0)+"%)\u2026 tap the mic again soon";
+  input.placeholder="Downloading dictation ("+(st.pct||0)+"%)\u2026";
   if(!voicePoll)voicePoll=setInterval(async()=>{
     const s2=await(await api("/api/voice/status")).json();
     if(s2.ready){clearInterval(voicePoll);voicePoll=null;voiceReady=true;
-      input.placeholder="voice ready \u2014 tap the mic and talk";}
+      input.placeholder="Ready. Tap the mic and talk.";}
     else if(s2.note&&!s2.downloading){
       // a failed fetch says so; tapping the mic again retries (6b317)
       clearInterval(voicePoll);voicePoll=null;
-      input.placeholder="the voice engine didn't download ("+s2.note.slice(0,80)
-        +") \u2014 tap the mic to try again";}
+      input.placeholder="Download failed ("+s2.note.slice(0,80)
+        +"). Tap the mic to retry.";}
     else input.placeholder="getting the voice engine ("+(s2.pct||0)+"%)\u2026";
   },2000);
   return false;
@@ -59406,8 +59348,8 @@ function dictKey(ev,now){
   s.mode="hold";s.t=now;s.rep=false;return "start";
 }
 function dictPrompt(){
-  return dictSt.mode==="hold"?"listening\u2026 release to finish"
-    :"listening\u2026 press "+DICT_KEY+" (or tap the mic) to finish";
+  return dictSt.mode==="hold"?"Listening. Release to finish."
+    :"Listening. Press "+DICT_KEY+" or tap the mic to finish.";
 }
 function audioSecs(bufs,sr){
   let n=0;for(const c of bufs)n+=c.length;
@@ -59551,20 +59493,20 @@ async function stopRec(){
   // under DICT_MIN_CLIP_S is a slip, not speech: never transcribed, and
   // never sent in voice chat (6b338)
   if(audioSecs(clip.bufs,clip.sr)<DICT_MIN_CLIP_S){
-    input.placeholder="didn\u2019t catch anything";return;}
+    input.placeholder="Didn\u2019t catch that. Try again.";return;}
   input.placeholder="transcribing\u2026";
   try{
     const wav=wavEncode(clip.bufs,clip.sr);
     const r=await api("/api/transcribe",{method:"POST",body:wav});
     // a 503 is the engine gone from under a cached "ready": ask again next time
-    if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("transcribe failed");}
+    if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("Couldn’t transcribe. Try again.");}
     const text=(await r.json()).text;
     input.placeholder="Ask anything";
     if(text){
       input.value=text;input.dispatchEvent(new Event("input"));
       if(voiceChat)send();          // voice chat: straight to the model
     }
-  }catch(e){input.placeholder="couldn\u2019t transcribe \u2014 try again";}
+  }catch(e){input.placeholder="Couldn\u2019t transcribe. Try again.";}
 }
 
 // Settings, Advanced, the palette, the first-run and update dialogs:
@@ -59577,16 +59519,16 @@ function dictModal(){
 function recSecs(){return recording&&micCtx?audioSecs(recBuf,micCtx.sampleRate):0;}
 let dictStarting=false,dictPend=false;
 function micMsg(e){
-  return e&&e.name==="NotFoundError"?"no microphone found"
-    :IS_PC?"microphone blocked \u2014 allow it in Settings \u25b8 Privacy & security \u25b8 Microphone"
-    :"microphone blocked \u2014 allow it in System Settings \u25b8 Privacy";
+  return e&&e.name==="NotFoundError"?"No microphone found."
+    :IS_PC?"Microphone blocked. Allow it in Settings > Privacy & security > Microphone."
+    :"Microphone blocked. Allow it in System Settings > Privacy & Security > Microphone.";
 }
 async function dictStart(){
   if(dictStarting){dictPend=true;dictKey({type:"end"},0);return;}  // a second ask is a stop
   dictStarting=true;dictPend=false;
   let on=false;
   dictTrace("down");
-  input.placeholder="getting the microphone\u2026";
+  input.placeholder="Starting the microphone\u2026";
   try{
     api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in: not awaited
@@ -59600,7 +59542,7 @@ async function dictStart(){
       // not ready (its own words are on the page now) or the server gone:
       // the clip is discarded, the microphone let go
       const msg=ok===false?input.placeholder
-        :"couldn\u2019t reach the voice engine \u2014 try again";
+        :"Couldn\u2019t reach dictation. Try again.";
       await cap.catch(()=>{});
       micDetach(false);
       input.placeholder=msg;
@@ -59674,8 +59616,7 @@ function micWarmPaint(){
   const t=$("#micwarm-toggle");if(!t)return;
   t.classList.toggle("on",micWarmOn());
   t.addEventListener("click",()=>setMicWarm(!micWarmOn()));
-  if(IS_PC)$("#micwarm-note").textContent="The next hold starts at once. "
-    +"Windows shows its microphone icon while it\u2019s ready.";
+  if(IS_PC)$("#micwarm-note").textContent="On for 15 seconds after you dictate.";
 })();
 
 /* ------------------------------------------------------ find in chat */
@@ -59978,11 +59919,11 @@ function dlTail(t){return t?" \u00b7 "+t:"";}
 const SET_KEYS=["light","recommended","everything"];
 const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};
 const SET_HERE=IS_PC?"this PC":"this Mac";
-const SET_ASK="This adds models bigger than "+SET_HERE+"\u2019s memory. They can crash it. Click again to go ahead.";
+const SET_ASK="Bigger than "+SET_HERE+"\u2019s memory. They can crash it. Click again to continue.";
 function setDesc(k,x,where){
-  if(x.same)return "The same as "+SET_NAMES[x.same]+" on "+where+".";
-  if(k==="light")return "One everyday model and two quick ones.";
-  if(k==="recommended")return "A model for each job: answers, thinking, code and pictures.";
+  if(x.same)return "Same as "+SET_NAMES[x.same]+" on "+where+".";
+  if(k==="light")return "One everyday model, two quick ones.";
+  if(k==="recommended")return "One model each for answers, thinking, code and pictures.";
   return x.risky?"Every model, even ones too big for "+where+". They can crash it."
     :"Every model "+where+" can run.";
 }
@@ -60341,10 +60282,7 @@ const CK_PROVS=[["gemini","Gemini"],["groq","Groq"],["claude","Claude"],
 // free tier, and Kimi shows the figure Moonshot itself reports. Every figure
 // carries a * and the footnote is always on the row. Pure, so node runs it.
 const CK_BAL_IDS=["claude"];
-const CK_BAL_NOTE="* Estimated from this app\u2019s own calls since you set it. "
-  +"Anthropic doesn\u2019t offer a balance API for personal accounts; use "
-  +"console.anthropic.com for the real figure. Spending elsewhere isn\u2019t "
-  +"counted, and neither are web search or tool costs on Anthropic\u2019s side.";
+const CK_BAL_NOTE="* Estimated from this app\u2019s calls since you set it. The real figure is at console.anthropic.com.";
 function ckBalUsd(n){
   const v=Math.round((+n||0)*100)/100;
   return (v<0?"-":"")+"$"+Math.abs(v).toFixed(2);
@@ -60357,21 +60295,20 @@ function ckBalHtml(id,est){
   if(CK_BAL_IDS.indexOf(id)<0)return "";
   const fld='<span class="ckbal-set"><input type="text" inputmode="decimal" '
     +'autocomplete="off" class="ckbal-in" placeholder="$ balance" '
-    +'aria-label="Your real balance in dollars">'
+    +'aria-label="Balance in dollars">'
     +'<button type="button" class="about-btn slim ckbal-go" data-p="'+id+'">';
   if(!est||typeof est.amount!=="number")
     return '<div class="ckbal" data-p="'+id+'"><span class="ckbal-add">'
-      +'Add your balance to track it</span>'+fld+'Set</button></span></div>';
+      +'Track balance</span>'+fld+'Set</button></span></div>';
   const lvl=est.level==="used"?"used":est.level==="low"?"low":"ok";
-  const head=lvl==="used"?"Balance used up*"
+  const head=lvl==="used"?"Balance spent*"
     :(lvl==="low"?"Low balance \u2248 ":"Balance \u2248 ")+ckBalUsd(est.amount)+"*";
   return '<div class="ckbal '+lvl+'" data-p="'+id+'">'
     +'<span class="ckbal-fig">'+head+'</span>'
     +'<span class="ckbal-when">set '+ckBalUsd(est.set_usd)+" on "
       +esc(ckBalDate(est.set_at))+'</span>'
     +fld+'Update balance</button></span>'
-    +(est.unpriced?'<div class="ckbal-un">Unpriced calls included at the '
-      +'highest price*</div>':"")
+    +(est.unpriced?'<div class="ckbal-un">Unpriced calls counted at the top rate*</div>':"")
     +'<div class="ckbal-note">'+esc(CK_BAL_NOTE)+'</div></div>';
 }
 let ckBalLast={};
@@ -60394,9 +60331,9 @@ function ckBoard(provs,active,bal){
     return '<div class="ckm'+(rest?" rest":st==="ok"?" on"
         :st==="fail"?" bad":"")
       +'">'+mark+label
-      +(rest?(/credit/i.test(note)?' <i>· out of credit · top up the account</i>'
+      +(rest?(/credit/i.test(note)?' <i>Out of credit</i>'
           :' <i>· resting '+Math.ceil(cool/60)+'m</i>')
-        :st==="ok"&&id===active?' <i>· in use</i>':"")
+        :st==="ok"&&id===active?' <i>In use</i>':"")
       +(st==="ok"&&bal?' <i>· '+esc(bal)+'</i>':"")
       +(st==="fail"&&note?' <i>· '+esc(note)+'</i>':"")+'</div>'
       +(st==="ok"?ckBalHtml(id,(ckBalLast||{})[id]):"");
@@ -60429,9 +60366,9 @@ function srvWhere(m){
 function srvStatus(s){
   const st=s.status||{};
   if(!s.paired)return st.err?"Not paired \u00b7 "+st.err
-    :st.reachable?"Not paired \u00b7 reachable":"Not paired";
+    :st.reachable?"Not paired. Reachable.":"Not paired";
   if(st.err)return "Paired \u00b7 "+st.err;
-  if(!st.at)return "Paired \u00b7 not checked yet";
+  if(!st.at)return "Paired. Not checked.";
   return "Paired \u00b7 reachable"
     +(st.latency_ms!=null?" \u00b7 "+st.latency_ms+" ms":"")
     +(st.version?" \u00b7 Ollama "+st.version:"");
@@ -60444,9 +60381,9 @@ const SRV_TEST_HOLD_MS=8000;
 function srvTestResult(s){
   const st=(s&&s.status)||{};
   if(st.err)return {kind:"bad",text:st.err};
-  if(!st.at)return {kind:"warn",text:"No answer yet. Try again."};
+  if(!st.at)return {kind:"warn",text:"No answer. Try again."};
   const ms=st.latency_ms!=null?st.latency_ms+" ms":"";
-  if(!s.paired)return {kind:"warn",text:"Reachable"+(ms?" ("+ms+")":"")+", but not paired yet. Pair it first."};
+  if(!s.paired)return {kind:"warn",text:"Reachable"+(ms?" ("+ms+")":"")+". Pair it first."};
   const bits=["Reachable","signed in"];
   if(s.gpu&&s.gpu.name)bits.push(s.gpu.name);
   if(st.version)bits.push("Ollama "+st.version);
@@ -60473,15 +60410,15 @@ function srvSleepView(z){
   z=z||{st:"load"};
   const known=z.st==="ok";
   const v={disabled:true,unknown:!known,checked:known&&!!z.enabled,minutes:known?(z.minutes||30):null,hint:""};
-  if(z.st==="load")v.hint="Reading it from the server\u2026";
-  else if(z.st==="old")v.hint="Update the server kit to use sleep.";
-  else if(z.st==="off")v.hint="Couldn\u2019t read the setting. The server isn\u2019t answering.";
+  if(z.st==="load")v.hint="Reading\u2026";
+  else if(z.st==="old")v.hint="Needs a newer server kit.";
+  else if(z.st==="off")v.hint="The server isn\u2019t answering.";
   else if(z.st==="err")v.hint=z.msg||"Couldn\u2019t read the setting.";
-  else if(z.supported===false)v.hint="This server can\u2019t sleep (no deep sleep).";
+  else if(z.supported===false)v.hint="This server can\u2019t sleep.";
   else{
     v.disabled=false;
-    v.hint="Sleeps after this long with no questions, and wakes when you ask."
-      +(z.wakeable?"":" Waking it from here needs wake-on-LAN set up on the server.");
+    v.hint="Sleeps after this long idle. Wakes when you ask."
+      +(z.wakeable?"":" Needs Wake-on-LAN on the server.");
   }
   return v;
 }
@@ -60502,20 +60439,20 @@ function srvSleepNext(prev,d,write){
 // macOS keeps an app off the local network until it is allowed (6b430, per Patrick: "still no
 // pop-up to allow the app to access devices on the local network"). Only in the macOS app
 // (srvLan), only for a server with wake addresses; the amber line only after every send failed
-const SRV_LAN_BLOCKED="macOS isn\u2019t letting ConcordeAI use the local network. Open System Settings \u203a Privacy & Security \u203a Local Network and turn ConcordeAI on.";
-const SRV_LAN_LINE="This computer isn\u2019t allowing local-network access (Settings \u203a Privacy & Security \u203a Local Network)";
+const SRV_LAN_BLOCKED="Local network access is off. Turn on ConcordeAI in System Settings > Privacy & Security > Local Network.";
+const SRV_LAN_LINE="Local network access is off (Settings > Privacy & Security > Local Network).";
 // "Wake up server" and Advanced share one row (6b436); the amber line goes under that row
 function srvWakeBtn(s){
   if(!srvLan||!s.wakeable)return "";
-  return '<button class="about-btn slim" data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>';
+  return '<button class="about-btn slim" data-a="waketest">Wake server</button>';
 }
 function srvWakeNote(s){
   if(!srvLan||!s.wakeable)return "";
-  return (s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open Local Network settings</button></div>':"");
+  return (s.lan_blocked?'<div class="srv-hint srv-amber">'+esc(SRV_LAN_LINE)+' <button class="about-btn slim" data-a="lansettings">Open settings</button></div>':"");
 }
 // the wake relay (6b431): Advanced, collapsed and off until set up. Written for the owner's own
 // network; the words are neutral and the token field is write-only (a saved one only says so)
-const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up for you when you\u2019re away. Address and token.";
+const SRV_RELAY_HINT="Wake relay. A service on your network that wakes the server when you\u2019re away.";
 function srvRelayHtml(s){
   if(!s.paired)return "";
   const r=s.relay||{},open=!!srvRelayOpen[s.id];
@@ -60544,7 +60481,7 @@ function srvSleepHtml(s,z){
     +'<input type="checkbox" data-a="sleepon"'+(v.checked?" checked":"")+dis+'><span>Sleep when idle</span></label>'
     +'<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
     +'data-a="sleepmin" data-k="smin" value="'+esc(String(v.minutes))+'"'+dis
-    +' aria-label="Minutes with no questions before it sleeps"><span>minutes</span></span></div>'
+    +' aria-label="Minutes idle before sleep"><span>minutes</span></span></div>'
     +'<div class="srv-hint">'+esc(v.hint)+'</div>'+srvRelayHtml(s)+'</div>';
 }
 function srvCard(s){
@@ -60559,7 +60496,7 @@ function srvCard(s){
   return '<div class="srv'+cls+'" data-id="'+esc(s.id)+'">'
     +'<div class="srv-top"><b>'+esc(s.name)+'</b><span class="srv-host">'
     +esc(s.host)+'</span><span class="srv-tok">'
-    +(s.access?"Access token saved":"no Access token")+'</span></div>'
+    +(s.access?"Token saved":"No token")+'</span></div>'
     +'<div class="srv-st">'+esc(srvStatus(s))+'</div>'
     // what the server can make (6b356): a small chip each, only for what it says it can
     +((s.gen&&(s.gen.image||s.gen.video))?'<div class="srv-caps">'
@@ -60567,36 +60504,34 @@ function srvCard(s){
       +(s.gen.video?'<span class="srv-cap">Video</span>':"")+'</div>':"")
     +(s.paired&&ms?'<div class="srv-ms">'+ms+'</div>'
       :s.paired&&st.at&&!st.err?'<div class="srv-ms"><div class="srv-m">'
-        +'no chat models installed</div></div>':"")
+        +'No chat models</div></div>':"")
     // "Use for Fast, Thinking, Pro and the Code lane" (6b339): on unless turned
     // off. The Code lane's Workspace and Coding agents read a folder, and what
     // they read goes to the model that answers, so the switch says so
     +(s.paired?'<label class="srv-pref"><input type="checkbox" data-a="prefer"'
-      +(s.prefer!==false?" checked":"")+'><span>Use for Fast, Thinking, Pro and the Code lane</span></label>'
-      +'<div class="srv-hint">The Workspace and Coding agents can send the contents of a '
-      +'folder you give them to this server.</div>':"")
+      +(s.prefer!==false?" checked":"")+'><span>Use for Alpha, Gamma, Sigma and Code</span></label>'
+      +'<div class="srv-hint">Code agents may send a folder you choose to this server.</div>':"")
     +srvSleepHtml(s,srvSleep[s.id])
     +srvSetsHtml(s,srvSets[s.id])
     +(pairing?'<div class="srv-pair"><input class="srv-code" data-k="code" maxlength="20" '
         +'placeholder="XXXX-XXXX-XXXX" aria-label="Pairing code" '
         +'autocomplete="off" spellcheck="false" autocapitalize="characters">'
         +'<button class="about-btn slim" data-a="pair">Pair</button></div>'
-        +'<div class="srv-hint">Open a pairing window at the server, then '
-        +'type the code its screen shows.</div>':"")
+        +'<div class="srv-hint">Type the code from the server’s pairing window.</div>':"")
     +'<div class="srv-acts"><button class="about-btn slim" data-a="test">Test</button>'
     +(s.paired&&!srvPairOpen[s.id]
       ?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
-    +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change Access token</button>')
+    +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change token</button>')
     +'<button class="about-btn slim danger srv-rm'+(armed?' armed':'')+'" data-a="rm" '
     +'aria-label="Remove this server" title="Remove this server">'
-    +(armed?"Remove it and its key? Click again":"\u2715")+'</button></div>'
+    +(armed?"Remove this server and its key? Click again.":"\u2715")+'</button></div>'
     +(srvTokOpen[s.id]?'<div class="srv-tokf"><input type="password" data-k="aid" '
       +'autocomplete="off" placeholder="Access Client ID" aria-label="Access Client ID">'
       +'<input type="password" data-k="asec" autocomplete="off" '
       +'placeholder="Access Client Secret" aria-label="Access Client Secret">'
       +'<button class="about-btn slim" data-a="toksave">Save</button>'
       +'<button class="about-btn slim" data-a="tokcancel">Cancel</button></div>'
-      +'<div class="srv-hint">Both empty removes the token.</div>':"")
+      +'<div class="srv-hint">Leave both empty to remove the token.</div>':"")
     +'<div class="srv-msg'+(srvMsgKind[s.id]?" "+srvMsgKind[s.id]:"")+'">'+esc(srvMsgs[s.id]||"")+'</div></div>';
 }
 function paintServers(){
@@ -60609,7 +60544,7 @@ function paintServers(){
       if(i===act)foc=[c.dataset.id,i.dataset.k,i.selectionStart,i.selectionEnd];});
   });
   box.innerHTML=srvList.map(srvCard).join("")
-    ||'<p class="srv-none">No servers yet.</p>';
+    ||'<p class="srv-none">No servers</p>';
   box.querySelectorAll(".srv").forEach(c=>{
     const k=keep[c.dataset.id]||{};
     c.querySelectorAll("input[data-k]").forEach(i=>{
@@ -60693,7 +60628,7 @@ $("#srv-list").addEventListener("change",async ev=>{
   if(c.dataset.a==="sleepon")body={id:id,enabled:c.checked};
   else{
     const p=srvSleepParse(c.value);
-    if(!p){c.value=z.minutes;srvMsg(id,"Enter whole minutes, 5 to 1440.");return;}
+    if(!p){c.value=z.minutes;srvMsg(id,"Whole minutes, 5 to 1440.");return;}
     c.value=p.v;
     if(p.v===z.minutes){srvMsg(id,p.clamped?"Minutes go from 5 to 1440.":"");return;}
     body={id:id,minutes:p.v};
@@ -60745,7 +60680,7 @@ $("#srv-list").addEventListener("click",async ev=>{
   }
   if(a==="relaysave"||a==="relayclear"||a==="relaytest"){
     const v=k=>(card.querySelector('input[data-k="'+k+'"]')||{}).value||"";
-    b.disabled=true;srvMsg(id,a==="relaytest"?"Asking the relay\u2026":"Saving\u2026");
+    b.disabled=true;srvMsg(id,a==="relaytest"?"Checking\u2026":"Saving\u2026");
     let d={};
     try{
       if(a==="relaytest")d=await srvPost("wake-test",{id:id,relay_only:true});
@@ -60769,11 +60704,11 @@ $("#srv-list").addEventListener("click",async ev=>{
     paintServers();
     // 6b456: a relay that failed is never hidden behind "sent" (away from home it is the only way in)
     const rl=d&&d.relay,rbad=rl&&!rl.ok,rwhy=rbad?(rl.err||"no reason given").replace(/[.\s]+$/,""):"";
-    if(d&&d.blocked)srvMsg(id,SRV_LAN_BLOCKED+(rbad?" The relay didn\u2019t answer either: "+rwhy+".":""),"warn");
-    else if(d&&d.ok&&rbad)srvMsg(id,"Wake-up sent on this network, but the relay didn\u2019t answer: "+rwhy+". Away from home, the relay is how the server gets woken.","warn");
-    else if(d&&d.ok&&rl)srvMsg(id,"Wake-up sent to "+s.name+", and the relay answered.","ok");
-    else if(d&&d.ok)srvMsg(id,"Wake-up sent to "+s.name+".","ok");
-    else srvMsg(id,(d&&d.err)||"Couldn\u2019t send the wake-up.","bad");
+    if(d&&d.blocked)srvMsg(id,SRV_LAN_BLOCKED+(rbad?" The relay didn\u2019t answer: "+rwhy+".":""),"warn");
+    else if(d&&d.ok&&rbad)srvMsg(id,"Sent on this network. The relay didn\u2019t answer: "+rwhy,"warn");
+    else if(d&&d.ok&&rl)srvMsg(id,"Sent to "+s.name+". The relay answered.","ok");
+    else if(d&&d.ok)srvMsg(id,"Sent to "+s.name+".","ok");
+    else srvMsg(id,(d&&d.err)||"Couldn\u2019t send it. Try again.","bad");
     return;
   }
   if(a==="repair"){
@@ -60834,7 +60769,7 @@ function srvSheet(d,k,rm){
 function srvSheetHtml(sh){
   // a coder that goes there partly in the server's memory (6b496): the pane's own words for gpu+ram
   const row=m=>'<div class="mrow"><span class="mname">'+esc(m.name)
-    +(m.ram?' · card + memory, slower':"")+'</span>'
+    +(m.ram?'. Card and memory; slower':"")+'</span>'
     +'<span class="msize">'+muGB(m.gb)+'</span></div>';
   return (sh.dl.length?'<div class="og">Download</div>'+sh.dl.map(row).join(""):"")
     +(sh.rm.length?'<div class="og">Remove</div>'+sh.rm.map(row).join(""):"")
@@ -60853,16 +60788,16 @@ function srvJobLine(j){
 }
 // the line under the cards: which set the server has, or what it is doing
 function srvSetsLine(name,d){
-  if(!d.vram)return name+" didn\u2019t say how much graphics memory it has, so the sets can\u2019t be sized. Update the server kit.";
-  if(d.running)return name+" is changing its models\u2026";
+  if(!d.vram)return name+" didn\u2019t report its graphics memory. Update the server kit.";
+  if(d.running)return "Changing models\u2026";
   const by=d.plan&&d.plan.by?" Picked on "+d.plan.by+".":"";
   return d.mine?name+" has "+SET_NAMES[d.mine]+"."+(d.plan&&d.plan.name===d.mine?by:"")
-    :name+" has "+d.n+" model"+(d.n===1?"":"s")+", not all of any set.";
+    :name+" has "+d.n+" model"+(d.n===1?"":"s")+": a custom pick, not a set.";
 }
 function srvSetsHtml(s,z){
   if(!s.paired)return "";
   let h='<div class="srv-sets"><div class="srv-sh">Models on '+esc(s.name)+'</div>';
-  if(!z||z.st==="load")return h+'<div class="srv-hint">Reading its models\u2026</div></div>';
+  if(!z||z.st==="load")return h+'<div class="srv-hint">Reading models\u2026</div></div>';
   if(z.st==="err")return h+'<div class="srv-hint">'+esc(z.msg||"")+'</div></div>';
   const d=z.d;
   h+='<div class="set-row srv-setrow" data-sid="'+esc(s.id)+'">'
@@ -60888,7 +60823,7 @@ async function srvSetsLoad(s){
     if(was&&!d.running){
       // the change ended: what the server really has now, and the picker's list with it
       const bad=(d.jobs||[]).filter(j=>j.state==="failed");
-      srvSets[s.id].line=bad.length?"Some changes didn\u2019t finish.":"Done.";
+      srvSets[s.id].line=bad.length?"Some changes didn\u2019t finish. Try again.":"Done.";
       srvSets[s.id].kind=bad.length?"warn":"ok";
       try{const t=await srvPost("test",{id:s.id});if(t.server)srvPut(t.server);}catch(e){}
     }
@@ -60965,7 +60900,7 @@ $("#srvset-go").addEventListener("click",async()=>{
 });
 $("#srv-add-go").addEventListener("click",async()=>{
   const note=$("#srv-note");
-  if(!$("#srv-url").value.trim()){note.textContent="Type the server\u2019s address first.";return;}
+  if(!$("#srv-url").value.trim()){note.textContent="Enter the address first.";return;}
   note.textContent="Adding\u2026";
   let d={};
   try{d=await srvPost("add",{url:$("#srv-url").value.trim(),
@@ -60975,7 +60910,7 @@ $("#srv-add-go").addEventListener("click",async()=>{
   if(d.err){note.textContent=d.err;return;}
   ["#srv-url","#srv-name","#srv-aid","#srv-asec"].forEach(k=>{$(k).value="";});
   if(d.server)srvPut(d.server);
-  note.textContent="Added. Pair it next.";
+  note.textContent="Added. Now pair it.";
   paintServers();
 });
 // the badge under an answer (6b334): the server that answered, or the
@@ -61275,7 +61210,7 @@ function srvMeterRows(list,use){
     const vb=(ug&&ug.vram_total_bytes)||g.vram_bytes;
     const t=[s.name,g.name||"",vb?Math.round(vb/1073741824)+" GB":""];
     t.push(off?"not answering":busy!=null?busy+"% busy"
-      :u.ok?"usage not reported (update the server kit)":"");
+      :u.ok?"Usage not reported. Update the server kit.":"");
     // the card's memory, under its card (6b452, per Patrick: "change the bar to reflect VRAM
     // usage"): the same bar, from the same reading. A kit that reports the server's memory
     // but can't read the card's (Intel, no nvidia-smi) keeps the memory row it had (6b342);
@@ -61288,7 +61223,7 @@ function srvMeterRows(list,use){
       vram=vu!=null&&vt!=null,ram=!vram&&rU!=null&&rT!=null,have=vram||ram,
       ru=vram?vu:rU,rt=vram?vt:rT,what=ram?"MEMORY":"VRAM";
     const m=[s.name,ram?"memory":"VRAM",off?"not answering":have?srvGB(ru)+" of "+srvGB(rt)+" GB in use"
-      :u.ok?"usage not reported (update the server kit)":""];
+      :u.ok?"Usage not reported. Update the server kit.":""];
     return [{id:s.id,name:srvMeterName(g),title:t.filter(Boolean).join(" \u00b7 "),
       pct:off?null:busy,off:off},
       {id:s.id+":m",name:srvMemName(s.name,what),title:m.filter(Boolean).join(" \u00b7 "),
@@ -61311,7 +61246,7 @@ function srvPollList(list){
 function srvMoreCount(list){
   return Math.max(0,(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);
 }
-function srvMoreWord(n){return "+"+n+(n===1?" server more":" servers more");}
+function srvMoreWord(n){return "+"+n+" more";}
 // every paired server in full, from what the poll holds (srvUse). While the dialog is open every paired server is
 // polled (srvPollList), so a figure with no reading yet says "reading\u2026"; the dialog itself asks for nothing
 function srvAllRows(list,use){
@@ -61326,7 +61261,7 @@ function srvAllRows(list,use){
     // the word for a figure we have no number for
     const none=off?"not answering":u.ok?"usage not reported":"reading\u2026";
     return {id:s.id,name:s.name||"",off:off,state:off?"not answering":"answering",
-      rows:[["GPU",g.name||SRV_GPU[g.vendor]||"no card named"],
+      rows:[["GPU",g.name||SRV_GPU[g.vendor]||"No graphics card reported"],
         ["GPU load",off?none:busy!=null?busy+"%":none],
         ["GPU memory",off?none:vu!=null&&vt?srvGB(vu)+" of "+srvGB(vt)+" GB"
           :vt?srvGB(vt)+" GB"+SRV_SEP+none:none],
@@ -61340,7 +61275,7 @@ function srvAllPaint(){
   const rows=srvAllRows(srvList,srvUseDead?{}:srvUse),keep=box.scrollTop;
   while(box.firstChild)box.firstChild.remove();
   if(!rows.length){
-    const e=document.createElement("div");e.className="srvall-e";e.textContent="No servers paired.";
+    const e=document.createElement("div");e.className="srvall-e";e.textContent="No servers paired";
     box.appendChild(e);return;
   }
   rows.forEach(r=>{
@@ -61529,14 +61464,14 @@ $("#ck-save").addEventListener("click",async()=>{
     // a rate-limited key still SAVES (it's a good key) — say what
     // happened rather than claiming it's live when it's resting
     if(d.ok){note.textContent=d.warn?"⏳ "+d.warn
-        :"✓ "+d.name+" is live — cloud answers are on.";
+        :"✓ "+d.name+" works. Cloud models are on.";
       $("#ck-key").value="";
       $("#turbo-row").hidden=false;$("#turbo").checked=true;}
-    else note.textContent=d.err||"that didn't work";
+    else note.textContent=d.err||"That didn’t work. Try again.";
     try{const cs2=await(await api("/api/cloud")).json();
         ckBoard(cs2.providers,cs2.active,cs2.balance||{});}catch(e){}
     paintTierAvail();   // a new key may have just switched Cloud Only on
-  }catch(e){note.textContent="network error — try again";}
+  }catch(e){note.textContent="Couldn’t reach the app. Try again.";}
 });
 /* the giants box only means something while "no limits" is on: greyed
    and cleared otherwise, so a dim box never reads as a hidden "yes" */
@@ -61666,7 +61601,7 @@ async function wizPaintProvs(){
       +'<b>'+label+'</b><span class="wtag">'+tag+'</span>'
       +(ok?'<span class="wlink" style="color:var(--faint);text-decoration:none">connected</span>'
           :'<a class="wlink" href="'+url+'" target="_blank" '
-           +'rel="noopener noreferrer">get a key ↗</a>')
+           +'rel="noopener noreferrer">Get a key</a>')
       +'</div>'
       +'<div class="wkey" hidden>'
       +'<input type="password" autocomplete="off" '
@@ -62005,11 +61940,11 @@ function paintUsage(d,err){
       o.value=v;o.textContent=v||"All models";sel.appendChild(o);});
     sel.value=cur;
   }
-  $("#us-span").textContent=d?"Token Usage: "+uWhen(d.from)+" \u2013 "+uWhen(d.to):"Token Usage";
-  $("#us-fresh").textContent=d?"Data refreshed "+uWhen(d.refreshed):"";
+  $("#us-span").textContent=d?"Tokens: "+uWhen(d.from)+" \u2013 "+uWhen(d.to):"Tokens";
+  $("#us-fresh").textContent=d?"Updated "+uWhen(d.refreshed):"";
   const plot=$("#us-plot");
   if(!d)plot.innerHTML='<div class="us-empty">'+esc(err)+'</div>';
-  else if(!T.requests&&!T.answers)plot.innerHTML='<div class="us-empty">Nothing recorded in this period.</div>';
+  else if(!T.requests&&!T.answers)plot.innerHTML='<div class="us-empty">Nothing in this period</div>';
   else plot.innerHTML=uChart(d,Math.max(240,plot.clientWidth||400));
   const note=$("#us-note");note.textContent=d?d.note||"":"";note.hidden=!note.textContent;
 }
@@ -62022,8 +61957,8 @@ async function loadUsage(){
     const r=await api("/api/usage?range="+encodeURIComponent($("#us-range").value)
       +"&model="+encodeURIComponent($("#us-model").value));
     const j=await r.json();
-    if(r.ok)d=j;else err=j.err||"Couldn\u2019t read your usage.";
-  }catch(e){err="Couldn\u2019t read your usage.";}
+    if(r.ok)d=j;else err=j.err||"Couldn\u2019t read usage. Try again.";
+  }catch(e){err="Couldn\u2019t read usage. Try again.";}
   if(seq!==uSeq)return;           // a newer choice is already on its way
   pane.classList.remove("busy");
   paintUsage(d,err);
@@ -62053,15 +61988,15 @@ async function loadUsage(){
    the cloud (nothing ticked; a dialog with the cost warning, every run).
    Compare puts any stored runs of the same test side by side
    (bmCompare, pure, run in node by the gauntlet). */
-const BM_STEP={checking:"checking memory",loading:"loading",
-  reading:"reading the passage",writing:"writing"};
+const BM_STEP={checking:"Checking memory",loading:"Loading",
+  reading:"Reading",writing:"Writing"};
 // (6b341) a server's and a provider's rows say what they are doing
-const BM_STEP_S={checking:"checking the server",loading:"loading on the server",
-  reading:"reading the passage",writing:"writing"};
-const BM_STEP_C={checking:"checking the key",loading:"sending",
-  reading:"waiting for the first token",writing:"writing"};
+const BM_STEP_S={checking:"Checking the server",loading:"Loading on the server",
+  reading:"Reading",writing:"Writing"};
+const BM_STEP_C={checking:"Checking the key",loading:"Sending",
+  reading:"Waiting for the first token",writing:"Writing"};
 // (6b454) "back": the row waits for its server to answer again, its note says so
-function bmStep(r){if(r.status==="back")return r.note||"waiting for the server to come back\u2026";
+function bmStep(r){if(r.status==="back")return r.note||"Waiting for the server\u2026";
   return (r.provider?BM_STEP_C:r.network?BM_STEP_S:BM_STEP)[r.status]||r.status;}
 const BM_GIB=1073741824;
 let bmSeq=0,bmT=0,bmErr="",bmShow="",bmCmp="";
@@ -62115,8 +62050,8 @@ function bmRow(r,cur,old,max,ow){
     top+='<span class="bm-v">'+bmGen(r.gen_tps)+(bmEst(r)?"*":"")+'<small>tok/s</small></span>';
     // a model cut at the time limit is estimated, and never compared
     // (review of 6b331); a change inside run-to-run noise stays grey
-    if(bmEst(r))top+='<span class="bm-d" title="'+(r.capped?'Cut at the time limit: counted from what arrived'
-      :'Counted from what arrived: no token count came with it')+'">estimated*</span>';
+    if(bmEst(r))top+='<span class="bm-d" title="'+(r.capped?'Cut at the time limit. Counted from what arrived.'
+      :'No token count sent. Counted from what arrived.')+'">estimated*</span>';
     else if(old&&!bmEst(old)&&old.gen_tps>0&&r.gen_tps>0){
       const p=(r.gen_tps-old.gen_tps)/old.gen_tps*100;
       top+='<span class="bm-d'+(p>=BM_NOISE?" up":p<=-BM_NOISE?" dn":"")+'" title="'
@@ -62156,7 +62091,7 @@ function bmRow(r,cur,old,max,ow){
   if(mem)h+='<div class="bm-s">'+mem+"</div>";
   // (6b469) a model loading on this computer can be skipped
   if(cur&&r.status==="loading"&&!r.provider&&!r.network)
-    h+='<div class="bm-s"><button class="bm-btn" data-bm-skip="1">Skip this model</button></div>';
+    h+='<div class="bm-s"><button class="bm-btn" data-bm-skip="1">Skip</button></div>';
   if(cur)h+='<div class="pbar-track"><div class="pbar-fill" style="width:'
     +(r.status==="writing"?Math.round(100*Math.min(1,(r.tok||0)/max)):r.status==="reading"?4:1)
     +'%"></div></div>';
@@ -62197,7 +62132,7 @@ function bmCompare(runs){
       net:!!r.network||run.target==="cloud",cloud:run.target==="cloud",est:bmEst(r),
       gen:r.gen_tps,prompt:r.prompt_tps,ttft:r.ttft_s,load:r.load_s,total:r.total_s};
     out.rows.push(row);sets.add(row.setup);}));
-  if(sets.size>1)out.warn="These runs were measured on different hardware or versions, so the figures compare setups, not just models.";
+  if(sets.size>1)out.warn="Different hardware or versions: this compares setups, not only models.";
   ["gen","prompt","ttft","load"].forEach(k=>{
     const v=out.rows.map(r=>r[k]).filter(x=>x>0);out.max[k]=v.length?Math.max.apply(null,v):0;});
   // a model that ran in more than one place, side by side: each against the slowest
@@ -62219,9 +62154,9 @@ function bmFaster(it,slowWhere){
 // a cell of the table: the figure, "-" where the cloud has none, "not measured" where a server gave none
 function bmCell(r,v,fmt){return v!=null&&isFinite(+v)?fmt(v):r.cloud?"-":r.net?"not measured":"—";}
 function bmCmpHtml(c){
-  if(!c.rows.length)return '<p class="bmv-w">Tick two or more runs to compare them.</p>';
+  if(!c.rows.length)return '<p class="bmv-w">Select two or more runs.</p>';
   let h="";
-  if(c.left)h+='<p class="bmv-w">'+esc(c.left+(c.left===1?" run":" runs")+" of another test left out: only runs of the same test compare.")+"</p>";
+  if(c.left)h+='<p class="bmv-w">'+esc(c.left+(c.left===1?" run":" runs")+" from another test left out.")+"</p>";
   if(c.warn)h+='<p class="bmv-w">'+esc(c.warn)+"</p>";
   h+='<table class="bmv-t"><thead><tr><th>Model</th><th>Ran on</th><th class="n">Writes</th><th class="n">Reads</th><th class="n">First token</th><th class="n">Load</th></tr></thead><tbody>';
   c.rows.forEach(r=>{
@@ -62265,11 +62200,11 @@ function bmReady(p,cloudMax){
   if(p.target==="local")return true;
   if(p.target==="server"){const s=bmSrv();return !!(s&&s.reachable&&p.models.length);}
   return p.models.length>0&&p.models.length<=(cloudMax||6);}
-const BM_DESC_LOCAL="The same test on each model installed here: read a passage of about 1,000 tokens, then write 256. About a minute a model. Questions asked during a run are turned away. Results stay on this computer.";
+const BM_DESC_LOCAL="Reads 1,000 tokens and writes 256 on each installed model. About a minute each. Chat pauses while it runs.";
 function bmDesc(){
   const s=bmSrv();
-  if(s)return "Loads each ticked model on "+s.name+" and runs the same test: read about 1,000 tokens, write 256. Nothing is stored on the server. Models that also use its memory start unticked: they load its CPU hard. Questions asked during a run are turned away.";
-  if(bmTg==="cloud")return "Sends the same test to each ticked model: about 1,000 tokens in, up to 256 out. This uses your API keys and may cost money. Up to "+((bmTD&&bmTD.cloud_max)||6)+" models a run. Questions asked during a run are turned away.";
+  if(s)return "Reads 1,000 tokens and writes 256 on each selected model on "+s.name+". Models that spill into its memory start unselected. Chat pauses while it runs.";
+  if(bmTg==="cloud")return "Sends 1,000 tokens and asks for 256 from each selected model. Uses your keys and may cost money. Up to "+((bmTD&&bmTD.cloud_max)||6)+" a run. Chat pauses while it runs.";
   return BM_DESC_LOCAL;}
 // the checklist for a server or the cloud
 function bmPickHtml(){
@@ -62285,16 +62220,16 @@ function bmPickHtml(){
       +(m.why?'<div class="bm-s bm-ckn"><span class="bm-f">'+esc(m.why)+"</span></div>":"")+"</div>").join("");
   }
   const P=(bmTD&&bmTD.cloud)||[];
-  if(!P.length)return '<div class="bm-row"><div class="bm-s">No cloud key is saved. Add one in Settings › Cloud power.</div></div>';
+  if(!P.length)return '<div class="bm-row"><div class="bm-s">No cloud key. Add one in Settings > Cloud.</div></div>';
   let h="",est=false;
   P.forEach(p=>{
-    h+='<div class="bm-gh">'+esc(p.name)+(p.rest?" · resting after a limit":"")+"</div>";
+    h+='<div class="bm-gh">'+esc(p.name)+(p.rest?" Resting after a limit":"")+"</div>";
     p.models.forEach(m=>{est=est||!!m.est;
       h+='<div class="bm-row"><label class="bm-ck"><input type="checkbox" data-pid="'+esc(p.pid)+'" data-m="'+esc(m.id)+'"'
         +(bmTick.cloud[p.pid+"/"+m.id]?" checked":"")+'><span class="bm-n">'+esc(m.id)+"</span>"
         +(m.est?'<span class="bm-d">'+esc(m.est)+"</span>":"")+"</label></div>";});});
   const n=bmCloudTicked().length,mx=(bmTD&&bmTD.cloud_max)||6;
-  h+='<div class="bm-row"><div class="bm-s'+(n>mx?" bm-f":"")+'">'+n+" of "+mx+" models ticked"
+  h+='<div class="bm-row"><div class="bm-s'+(n>mx?" bm-f":"")+'">'+n+" of "+mx+" selected"
     +(n?": "+n+(n===1?" call":" calls")+", about "+uInt(n*((bmTD&&bmTD.cloud_in)||1000))+" tokens in, up to "
       +uInt(n*((bmTD&&bmTD.cloud_out)||256))+" out.":".")+(est?" * estimate":"")+"</div></div>";
   return h;}
@@ -62328,18 +62263,18 @@ function paintBench(d){
     :bmTg==="cloud"?"cloud, includes the network":d?d.hw||"":"—";
   $("#bm-go").hidden=going;$("#bm-stop").hidden=!going;
   $("#bm-desc").textContent=going&&gone.target==="cloud"?bmDescFor("cloud"):going&&gone.target==="server"
-    ?"Running on "+gone.target_name+". Questions asked during a run are turned away.":bmDesc();
+    ?"Running on "+gone.target_name+". Chat pauses while it runs.":bmDesc();
   const prog=$("#bm-prog");prog.hidden=!going;
   if(going){
     const run=d.run,M=run.models||[],r=M[run.cur];
     $("#bm-fill").style.width=Math.round(100*bmFrac(run,max))+"%";
     $("#bm-status").textContent=r?"Model "+(run.cur+1)+" of "+M.length+" · "+(r.network&&r.model?r.model:r.label)
-      :M.length?"Finishing":run.target==="local"?"Listing the models on this computer":"Getting ready";
+      :M.length?"Finishing":run.target==="local"?"Listing models":"Getting ready";
   }
   // the target and its checklist; neither while a run goes
   const tg=$("#bm-target"),pk=$("#bm-pk");
   const opts=[["local","This computer"]].concat(((bmTD&&bmTD.servers)||[]).map(s=>["srv:"+s.id,s.name]))
-    .concat(bmTD&&(bmTD.cloud||[]).length?[["cloud","Cloud models (may cost money)"]]:[]);
+    .concat(bmTD&&(bmTD.cloud||[]).length?[["cloud","Cloud (may cost money)"]]:[]);
   if(!opts.some(o=>o[0]===bmTg))bmTg="local";
   if(tg.dataset.k!==opts.map(o=>o.join("=")).join("|")){
     tg.textContent="";opts.forEach(o=>{const e=document.createElement("option");e.value=o[0];e.textContent=o[1];tg.appendChild(e);});
@@ -62393,25 +62328,25 @@ function paintBench(d){
     const wh=x=>x.target==="cloud"?"the cloud":x.target==="server"?(x.target_name||"a server"):"this computer";
     if(old&&(old.target||"local")!==(shown.target||"local")||old&&(old.target_name||"")!==(shown.target_name||""))
       bits.push("Compared with the run on "+wh(old)+(bmHw(old)?" ("+bmHw(old)+")":"")+": "
-        +(old.target==="cloud"||shown.target==="cloud"?"a different place, and cloud figures include the network, so the difference is not only the model.":"a different machine, so the difference is the machine as much as the model."));
+        +(old.target==="cloud"||shown.target==="cloud"?"a different place; cloud figures include the network.":"a different machine; the difference is partly the machine."));
     else if(old&&on(old)!==on(shown))bits.push("This run: measured on "+on(shown)
       +". The run compared: measured on "+on(old)+".");
     else if(shown.target==="server")bits.push("Ran on "+shown.target_name+(on(shown)?" ("+on(shown)+")":"")+".");
     else if(!cloud&&shown.hw&&shown.hw.line&&d&&shown.hw.line!==d.hw)bits.push("Measured on "+on(shown)+".");
     if((shown.models||[]).some(r=>r.status==="done"))bits.push(cloud
-      ?"Cloud, includes the network: these are not hardware speeds. Writes use the provider’s token counts when it sends them. This run used your API keys."
+      ?"Cloud figures include the network. Writes use the provider’s token counts when given."
       :shown.target==="server"
-      ?"Speeds are tokens a second, as the server's Ollama reports them. First token is timed here and includes the network. A model already loaded on the server has no load time to measure."
-      :"Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "
-      +"Memory is the rise in memory in use while the model loaded and wrote.");
+      ?"Tokens a second as the server reports them. First token includes the network. An already-loaded model has no load time."
+      :"Tokens a second. MLX timed by the app; Ollama reports its own. "
+      +"Memory is the rise while the model loaded and wrote.");
   }
-  if(!shown&&d&&!going&&bmTg!=="local")bits.push("No run on "+(sv?sv.name:"the cloud")+" yet. Tick the models and press Run benchmark.");
+  if(!shown&&d&&!going&&bmTg!=="local")bits.push("No run on "+(sv?sv.name:"the cloud")+" yet. Select models and press Run.");
   if(!shown&&d&&!going&&bmTg==="local"){
     const n=(d.installed||[]).length;
     bits.push(n?n+(n===1?" model":" models")+" installed here: about "+n
-      +(n===1?" minute.":" minutes."):"No local models are installed on this computer.");
+      +(n===1?" minute.":" minutes."):"No local models installed.");
   }
-  if(d&&!going&&(shown||(d.history||[]).length))bits.push("Keeps the last "+(d.keep||100)+" runs for each target: this computer, each server and the cloud.");
+  if(d&&!going&&(shown||(d.history||[]).length))bits.push("Keeps the last "+(d.keep||100)+" runs per target.");
   const note=$("#bm-note");note.textContent=bits.join(" ");note.hidden=!bits.length;
 }
 function bmDescFor(t){return t==="cloud"?"Sends the same test to each ticked model: about 1,000 tokens in, up to 256 out. This uses your API keys and may cost money. Questions asked during a run are turned away.":"";}
@@ -62459,23 +62394,21 @@ async function benchPost(path,body){
   let j={},ok=false;
   try{const r=await api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
     ok=r.ok;j=await r.json().catch(()=>({}));}catch(e){}
-  return ok?"":(j.err||"The benchmark couldn’t start.");
+  return ok?"":(j.err||"Couldn’t start. Try again.");
 }
 // ---- the cost dialog: every cloud run, never remembered
 async function bmCloudAsk(p){
   let j={};
   try{const r=await api("/api/bench/cloud-plan",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({models:p.models})});j=await r.json().catch(()=>({}));}catch(e){}
-  if(!j.ok){bmErr=j.err||"Couldn’t prepare the run.";loadBench();return;}
+  if(!j.ok){bmErr=j.err||"Couldn’t prepare the run. Try again.";loadBench();return;}
   bmPlan=j;
   const anyEst=j.models.some(m=>m.est);
   $("#bmc-list").innerHTML=j.models.map(m=>"<li><span>"+esc(m.provider)+" · "+esc(m.model)+"</span>"
     +(m.est?'<span class="bm-d">'+esc(m.est)+"</span>":"")+"</li>").join("");
-  $("#bmc-sum").textContent=j.calls+(j.calls===1?" call":" calls")+". Each sends about "+uInt(bmTD&&bmTD.cloud_in||1000)
-    +" tokens in and asks for up to "+uInt(bmTD&&bmTD.cloud_out||256)+" tokens out: about "+uInt(j.tokens_in)
-    +" in and up to "+uInt(j.tokens_out)+" out in all. At most "+j.max+" models a run.";
-  $("#bmc-est").textContent=anyEst?"* Rough estimate, not a quote. A model with no estimate has no price held here."
-    :"ConcordeAI holds no prices for these models, so it shows no estimate.";
+  $("#bmc-sum").textContent=j.calls+(j.calls===1?" call":" calls")+". About "+uInt(j.tokens_in)+" tokens in and up to "+uInt(j.tokens_out)+" out in all. At most "+j.max+" a run.";
+  $("#bmc-est").textContent=anyEst?"* Estimate. Models with no price here show none."
+    :"No prices held for these models, so no estimate.";
   $("#bmc-warn").textContent=j.warning;
   $("#bmc-ok").checked=false;$("#bmc-go").disabled=true;
   $("#bmc-veil").hidden=false;$("#bmc-ok").focus();
@@ -62622,7 +62555,7 @@ function offerList(p){
   return (dl.length?'<div class="og">Download</div>'
       +dl.map(d=>row("dl",d,d.why)).join(""):"")
     +(rm.length?'<div class="og">Remove</div>'
-      +rm.map(r=>row("rm",r,"retired, not used by this version")).join(""):"")
+      +rm.map(r=>row("rm",r,"Retired")).join(""):"")
     +(n?'<div class="mmore">'+n+' other model'+(n>1?"s":"")+' unchanged</div>':"");
 }
 /* WHERE THE CARD'S DOWNLOADS ARE (6b335, from Patrick's "stuck at 8.5 /
@@ -62832,11 +62765,11 @@ function suggPane(d){
   const el=$("#sugg-status");if(!el)return;
   const who={"your server":"your server","this computer":"this computer",
     "the cloud":"the cloud"};
-  el.textContent=!d||!d.on?"Off. You see the standard suggestions."
+  el.textContent=!d||!d.on?"Off"
     :d.refreshing?"Updating…"
-    :d.busy&&d.refresh?"An answer or download is running. Try again after it."
+    :d.busy&&d.refresh?"Busy. Try again after the current answer or download."
     :d.chips&&d.chips.length?"Updated "+suggAgo(d.at)+(who[d.made]?", by "+who[d.made]:"")+"."
-    :"Using the standard suggestions for now.";
+    :"Standard suggestions for now.";
 }
 $("#sugg-toggle").addEventListener("click",async()=>{
   const on=!$("#sugg-toggle").classList.contains("on");
@@ -62902,13 +62835,13 @@ function rosRow(m,ready){
   const act=ready
       ?'<span class="rrm" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
         +'">'+(rosArmedOn("rm:"+m.label)
-          ?"really remove? frees "+m.est_gb+" GB":"remove")+'</span>'
+          ?"Remove? Frees "+m.est_gb+" GB. Click again.":"remove")+'</span>'
     :going
       ?'<span class="rgo">'+(m.status==="queued"?"waiting":dlPct(m))
         +'</span>'
       :'<span class="rin" data-l="'+esc(m.label)+'" data-gb="'+m.est_gb
         +(m.giant?'" data-giant="1':'')+'">'
-        +(rosArmedOn("in:"+m.label)?"download "+m.est_gb+" GB? click again"
+        +(rosArmedOn("in:"+m.label)?"download "+m.est_gb+" GB. Click again."
           :failed?"retry":"install")+'</span>';
   const why=failed&&m.note
     ?'<span class="rd rerr" title="'+esc(m.note)+'">'+esc(m.note)+'</span>'
@@ -62941,9 +62874,9 @@ function paintRoster(st,cloud){
   // section"): the cloud providers have their own home in Settings >
   // Cloud power; the roster is what is on this computer
   let h="";
-  if(rdy.length)h+='<div class="ros-gh">ready · this mac</div>'
+  if(rdy.length)h+='<div class="ros-gh">On this Mac</div>'
     +rdy.map(m=>rosRow(m,true)).join("");
-  if(miss.length)h+='<div class="ros-gh">not downloaded</div>'
+  if(miss.length)h+='<div class="ros-gh">Not downloaded</div>'
     +miss.map(m=>rosRow(m,false)).join("");
   host.innerHTML=h;
   paintMgStats();
@@ -62981,9 +62914,9 @@ function paintPlans(){
 // by hand rather than as <input type=range> so each notch can carry its
 // own colour and a rung this Mac cannot hold can refuse the click.
 const STUDIO_META={image:{title:"Image generation",
-    desc:"make pictures from a description, on this Mac"},
+    desc:"Pictures from a description, on this Mac"},
   video:{title:"Video generation",
-    desc:"make short video from a description, on this Mac"}};
+    desc:"Short video from a description, on this Mac"}};
 const stPick={};              // key -> tier id the user is looking at
 function studioHTML(key,st){
   const meta=STUDIO_META[key]||{},tiers=st.tiers||[];
@@ -62994,10 +62927,9 @@ function studioHTML(key,st){
     +'<div class="sthead"><b>'+esc(meta.title)+'</b><em>'
     +(st.ready?("installed \u2713"+(st.on_disk_gb?" \u00b7 "+st.on_disk_gb+" GB":""))
       :busy?esc((st.note||"downloading"))+" \u00b7 "+st.pct+"%"
-      :st.status==="error"?("failed \u2014 "+esc(st.note||"try again")):"")
+      :st.status==="error"?("Failed. "+esc(st.note||"Try again.")):"")
     +'</em>'
-    +'<button class="stgear" title="Settings for '+esc(meta.title)
-    +'" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" '
+    +'<button class="stgear" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" '
     +'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" '
     +'stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/>'
     +'<path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83'
@@ -63019,13 +62951,13 @@ function studioHTML(key,st){
         +'"><i></i><span>'+esc(t.name)+'</span></button>').join("")
       +'</div>'
       +'<div class="sttier"><b>'+esc(cur.name||"")+'</b> \u00b7 '
-      +(cur.gb||0)+' GB to download \u00b7 <i>'+esc(cur.note||"")+'</i>'
-      +(cur.fit==="red"?' <u>needs more memory than this Mac has</u>':"")
+      +(cur.gb||0)+' GB to download. <i>'+esc(cur.note||"")+'</i>'
+      +(cur.fit==="red"?' <u>More memory than this Mac has</u>':"")
       +'</div>'
       +'<div class="stlegend">'
-      +'<span class="lg green">green \u2014 runs comfortably here</span>'
-      +'<span class="lg amber">amber \u2014 fits, if the Mac is otherwise clear</span>'
-      +'<span class="lg red">red \u2014 more memory than this Mac has</span>'
+      +'<span class="lg green">Green: runs well</span>'
+      +'<span class="lg amber">Amber: fits when the Mac is clear</span>'
+      +'<span class="lg red">Red: too big</span>'
       +'</div></div>';
   }
   if(busy){
@@ -63045,12 +62977,12 @@ function studioHTML(key,st){
   return h+'</div></div>';
 }
 // the sizes a person actually wants, not a spinner they can put 4096 in
-const GEAR_SIZES={image:[["512x512","Small · 512"],["768x768","Medium · 768"],
-    ["1024x1024","Large · 1024"],["1440x1440","Extra large · 1440"],
-    ["1024x576","Wide · 1024x576"],["576x1024","Tall · 576x1024"]],
-  video:[["512x320","Small · 512x320"],["640x384","Medium · 640x384"],
-    ["704x480","Large · 704x480"],["832x480","Wide · 832x480"],
-    ["384x640","Tall · 384x640"]]};
+const GEAR_SIZES={image:[["512x512","Small (512)"],["768x768","Medium (768)"],
+    ["1024x1024","Large (1024)"],["1440x1440","Extra large (1440)"],
+    ["1024x576","Wide (1024x576)"],["576x1024","Tall (576x1024)"]],
+  video:[["512x320","Small (512x320)"],["640x384","Medium (640x384)"],
+    ["704x480","Large (704x480)"],["832x480","Wide (832x480)"],
+    ["384x640","Tall (384x640)"]]};
 let gearKey="";
 function gearRow(label,hint,ctrl){
   return '<div class="gearrow"><div class="gl">'+esc(label)
@@ -63062,8 +62994,8 @@ function openGear(key){
   const o=st.opts||{},saved=st.saved||{},rng=st.ranges||{};
   $("#gear-title").textContent=(STUDIO_META[key]||{}).title||"Settings";
   $("#gear-sub").textContent=st.ready
-    ?"These apply to every render until you change them. In chat you can say \u201cdouble the resolution\u201d or \u201chigher quality\u201d for one picture without touching them."
-    :"Set these now; they apply once it is installed.";
+    ?"Defaults for every render. Ask for more in chat for one picture."
+    :"Applies once installed.";
   const cur=o.w+"x"+o.h;
   const sizes=GEAR_SIZES[key]||[];
   const known=sizes.some(p=>p[0]===cur);
@@ -63073,29 +63005,29 @@ function openGear(key){
     +(known?"":'<option value="'+cur+'" selected>Custom \u00b7 '+cur+'</option>')
     +'</select>');
   const smin=(rng.steps||[1,50])[0],smax=(rng.steps||[1,50])[1];
-  h+=gearRow("Effort","more steps, slower",
+  h+=gearRow("Effort","More steps, slower",
     '<input type="range" data-f="steps" min="'+smin+'" max="'+smax
     +'" value="'+o.steps+'"><b class="gv">'+o.steps+'</b>');
-  h+=gearRow("Guidance","how literally it follows the words",
+  h+=gearRow("Guidance","How closely it follows the words",
     '<input type="range" data-f="guidance" min="1" max="10" step="0.5" value="'
     +o.guidance+'"><b class="gv">'+o.guidance+'</b>');
   if(key==="video"){
     const fps=st.native_fps||24;
     const secs=Math.round((o.frames/fps)*10)/10;
-    h+=gearRow("Length","seconds \u00b7 renders at "+fps+" fps",
+    h+=gearRow("Length","seconds at "+fps+" fps",
       '<input type="range" data-f="frames" min="5" max="97" step="4" value="'
       +o.frames+'"><b class="gv">'+secs+'s</b>');
-    h+=gearRow("Playback rate","re-times the finished clip",
+    h+=gearRow("Playback rate","Re-times the finished clip",
       '<input type="range" data-f="fps" min="8" max="60" value="'+o.fps
       +'"><b class="gv">'+o.fps+' fps</b>');
-    h+=gearRow("Avoid","things to keep out of it",
-      '<input type="text" data-f="neg" maxlength="300" placeholder="optional" value="'
+    h+=gearRow("Avoid","Keep out",
+      '<input type="text" data-f="neg" maxlength="300" placeholder="Optional" value="'
       +esc(o.neg||"")+'">');
   }
   h+=gearRow("Format","",'<select data-f="fmt">'
     +(st.formats||[]).map(f=>'<option value="'+f+'"'+(f===o.fmt?" selected":"")
       +'>'+f.toUpperCase()+'</option>').join("")+'</select>');
-  h+=gearRow("Seed","0 is a new one each time",
+  h+=gearRow("Seed","0 picks a new one each time",
     '<input type="number" data-f="seed" min="0" max="999999" value="'+(o.seed||0)+'">');
   $("#gear-rows").innerHTML=h;
   $("#gear-rows").classList.toggle("dirty",Object.keys(saved).length>0);
@@ -63177,7 +63109,7 @@ $("#studio-row").addEventListener("click",async e=>{
       body:JSON.stringify({key:key})})).json();}catch(e2){}
     $("#manage-note").textContent=out.ok
       ?STUDIO_META[key].title+" removed \u2014 freed "+out.freed_gb+" GB"
-      :"couldn\u2019t remove it \u2014 "+((out.errors||[])[0]||"try again");
+      :"Couldn\u2019t remove it. "+((out.errors||[])[0]||"Try again.");
     lastSetup=null;await ensureSetup();
     paintPlans();paintMgStats();paintCleanNote();paintStudios();
   }
@@ -63209,7 +63141,7 @@ function manageTick(){
         ?bad.length+" download"+(bad.length>1?"s":"")+" failed \u2014 "
           +bad.map(m=>m.label+(m.note?" ("+m.note+")":"")).join(", ")
           +". Retry from the list."
-        :"done \u2014 "+st.ready_n+" models installed";
+        :"Done. "+st.ready_n+" models installed.";
       paintRoster(lastSetup,lastCloud);
     }
   },2000);
@@ -63491,7 +63423,7 @@ $("#roster").addEventListener("click",async e=>{
     const age=Date.now()-(rosArmed[k]||0);
     if(age>=15000){
       rosArmed[k]=Date.now();
-      i.textContent="download "+i.dataset.gb+" GB? click again";
+      i.textContent="download "+i.dataset.gb+" GB. Click again.";
       return;
     }
     if(age<600)return;
@@ -63571,7 +63503,7 @@ async function paintUpdatesPane(){
     if(r.available)
       $("#up-reldate").textContent=r.latest+" is available";
     else if(r.auto===false)
-      $("#up-reldate").textContent="Automatic checks are off \u2014 use Check for updates";
+      $("#up-reldate").textContent="Automatic checks are off. Use Check now.";
     else if(r.published)
       $("#up-reldate").textContent="Released on "
         +new Date(r.published).toLocaleDateString("en-US",
@@ -63595,7 +63527,7 @@ async function paintAccount(){
   // one kind since the web version's visitor profiles went (6b320):
   // this computer's own
   const K={owner:["💻","This Mac's owner",
-             "local account · everything stays on this machine"]};
+             "Local account. Everything stays on this Mac."]};
   const row=K[me.kind]||K.owner;
   $("#acct-av").textContent=row[0];
   $("#acct-kind").textContent=row[1];
@@ -63614,7 +63546,7 @@ function acctWinButton(on){
   if(b)return;
   b=document.createElement("button");
   b.id="acct-window";b.type="button";b.className="about-btn";
-  b.textContent="Open the account window";
+  b.textContent="Open account";
   b.addEventListener("click",()=>{
     try{const p=window.pywebview&&window.pywebview.api;
       if(p&&p.open_account)p.open_account("status");}catch(e){}
@@ -63638,8 +63570,8 @@ function fgCheck(keepNote){
   // that quietly re-enables (6b257)
   if(keepNote)return;
   $("#forget-note").textContent=scopes.length
-    ?"erases: "+scopes.join(", ")+" — this cannot be undone"
-    :"pick at least one thing to erase";
+    ?"Erases "+scopes.join(", ")+". This can’t be undone."
+    :"Choose at least one thing to erase.";
 }
 ["#fs-mem","#fs-chats","#fs-prefs"].forEach(id=>
   $(id).addEventListener("change",fgCheck));
@@ -63658,11 +63590,11 @@ $("#forget-go").addEventListener("click",async ev=>{
     b.textContent="Erased";
     $("#forget-word").value="";
     setTimeout(()=>{$("#forget-steps").hidden=true;
-      b.textContent="Erase forever";b.disabled=true;},1600);
+      b.textContent="Erase";b.disabled=true;},1600);
   }else{
-    b.textContent="Erase forever";
+    b.textContent="Erase";
     fgCheck(true);                    // re-enable, keep the message
-    $("#forget-note").textContent="couldn't erase — try again";
+    $("#forget-note").textContent="Couldn’t erase. Try again.";
   }
 });
 // the box shows what was SAVED (6b326, from review): a save that fails
@@ -63681,7 +63613,7 @@ $("#turbo").addEventListener("change",async()=>{
   if(ok)cloudChipLoad();
   if(!ok){
     $("#turbo").checked=!on;
-    note.textContent="Couldn\u2019t save that. Cloud power is still "+(on?"off":"on")+".";
+    note.textContent="Couldn’t save. Cloud models are still "+(on?"off":"on")+".";
     note.hidden=false;
   }
 });
@@ -63711,7 +63643,7 @@ $("#about-check").addEventListener("click",async ev=>{
   try{
     // a human click deserves a real answer, not the 15-min server cache
     const r=await(await api("/api/update/check?force=1")).json();
-    if(!r.configured){b.textContent="Updates not configured";}
+    if(!r.configured){b.textContent="Updates unavailable";}
     else if(r.available){
       upInfo=r;$("#update-flag").hidden=false;
       b.textContent=(r.manual?"Download ":"Update to ")+r.latest;
@@ -63721,7 +63653,7 @@ $("#about-check").addEventListener("click",async ev=>{
     }
     else b.textContent=r.note?("No update \u2014 "+r.note)
                              :"You\u2019re up to date";
-  }catch(e){b.textContent="Couldn\u2019t reach GitHub";}
+  }catch(e){b.textContent="Couldn’t check. Try again.";}
   setTimeout(()=>{b.textContent=was;b.disabled=false;},2600);
 });
 // Forget Me moved to the Account pane (6b257) — it opens the scoped
