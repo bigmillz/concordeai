@@ -17615,7 +17615,9 @@ check("6b443: the .app's main executable is a native launcher that keeps the bun
       and 'codesign --verify --strict "$APP"' in _bm443
       and '@"launch.sh"' in _lm443 and "execv" not in _lm443
       and "packaging/macos_launcher.m" in open(".github/workflows/nightly.yml").read()
-      and '/Contents/MacOS/MillenAI" >/dev/null || break' in _MILLENAI_SRC)
+      # 6b537: the helper waits for the bundle's executable, whichever it
+      # is: MillenAI (this launcher) or ConcordeAI (the native shell)
+      and '/Contents/MacOS/" >/dev/null || break' in _MILLENAI_SRC)
 # THE WINDOW'S PROCESS IS THE APP (6b455, per Patrick: the Dock showed a
 # Python rocket, no dot under the app's icon, and a click started a second
 # copy): the launcher loads the venv's Python framework and runs the
@@ -40950,6 +40952,206 @@ check("6b529 an imported chat continued here: the messages brought in keep the o
       _byimp(page) and not _byimp(page.replace(',m.loc,m,m.imp?by:"",m.model));', ',m.loc,m,by,m.model));'))
       and '_m["imp"] = 1' in _IMP_SEG and 'for _m in chat.get("messages") or []:' in _IMP_SEG, "")
 # ==== bring your chats (6b529): end ====
+
+# ==== the shell is the app, 7.0 beta (6b537): begin ====
+print("== the shell is the app: release, updater, CI (6b537) ==")
+# THE 7.0 BETA SHIPS THE NATIVE SHELL (6b537, per Patrick: the move to Rust,
+# step 1 → the app). release.sh builds the shell's bundle into the same
+# ConcordeAI-<version>.dmg, CFBundleVersion = APP_BUILD (the tag's number),
+# the version from APP_VERSION, both read back from the built bundle; a
+# --dry-run builds everything and publishes nothing. The updater's helper
+# waits for either executable and relaunches whatever the new bundle is,
+# so a Python install updates into the shell and the shell into the next
+# shell; the shell quits when its sidecar exits cleanly (the updater's
+# path), and bootstraps the venv on a fresh Mac. CI builds the Windows and
+# Linux shells from a release's tag and attaches nothing (the Windows
+# updater would offer any .msi). Proven live against a fake feed before
+# this was written (Python 6.1/276 → shell 7.0/277 → shell 278).
+_F36 = {k: open(v, encoding="utf-8").read() for k, v in {
+    "rel": "release.sh", "bsd": "build_shell_dmg.sh", "bdm": "build_dmg.sh",
+    "stamp": os.path.join("packaging", "shell_stamp.py"),
+    "rs": os.path.join("shell", "src-tauri", "src", "main.rs"),
+    "conf": os.path.join("shell", "src-tauri", "tauri.conf.json"),
+    "sb": os.path.join(".github", "workflows", "shell-build.yml"),
+    "nw": os.path.join(".github", "workflows", "nightly.yml"),
+    "wi": os.path.join(".github", "workflows", "windows-installer.yml")}.items()}
+_F36["src"] = _MILLENAI_SRC
+
+
+def _c36_release(f):
+    """release.sh: the macOS asset is the shell's DMG under the one name; the
+    bundle's CFBundleVersion and short version are checked against the cut;
+    --dry-run needs no gh, stamps nothing, and leaves before the commit."""
+    r = f["rel"]
+    out = {
+        "shell dmg, same name": "./build_shell_dmg.sh >/dev/null" in r and "./build_dmg.sh >/dev/null" not in r
+                                and 'DMG="ConcordeAI-${VERSION}.dmg"' in r,
+        "bundle read back": '[[ "$GOT_BUILD" == "$BUILD" ]] || {' in r and '[[ "$GOT_VER" == "$VERSION" ]] || {' in r
+                            and 'PlistBuddy -c "Print :CFBundleVersion" "$PL"' in r,
+        "dry run flag": 'if [[ "$1" == "--dry-run" ]]; then DRY_RUN=1; shift; fi' in r
+                        and 'if [[ "$DRY_RUN" == 0 ]] && ! command -v gh' in r,
+        "dry run stamps nothing": 'if [[ "$DRY_RUN" == 1 ]]; then' in r
+                                  and r.index('if [[ "$DRY_RUN" == 1 ]]; then') < r.index("p.write_text(s)"),
+    }
+    i_dry = r.find("dry run: built, verified, published nothing")
+    i_pub = r.find('gh release create "v$BUILD"')
+    i_push = r.find("git push origin HEAD")
+    out["dry run leaves before commit, push, release"] = (
+        0 < i_dry < i_push < i_pub and "  exit 0\nfi" in r[i_dry:i_push])
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_bundle(f):
+    """build_shell_dmg.sh: stamped from millenai.py; CFBundleVersion set to
+    APP_BUILD after the build and signed after that; both keys, the id, the
+    executable and the resources read back; universal; the image is
+    build_dmg.sh's, which keeps the Python path when not told otherwise."""
+    b, d, st = f["bsd"], f["bdm"], f["stamp"]
+    conf = json.loads(f["conf"])
+    res = conf.get("bundle", {}).get("resources", {})
+    out = {
+        "stamped from millenai.py": 'read -r VER BUILD <<<"$(python3 packaging/shell_stamp.py)"' in b
+                                    and 'conf["version"] = version' in st
+                                    and "re.search(r\"<<'LAUNCH'\\n(.*?)\\nLAUNCH\\n\", bm, re.S)" in st
+                                    and "crypto_reqs.py" in st,
+        "CFBundleVersion = APP_BUILD, then signed": '/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"' in b
+                                                   and 'codesign --force --sign "$IDENTITY" "$BUNDLE"' in b
+                                                   and 'codesign --verify --strict "$BUNDLE"' in b
+                                                   and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign --force --sign'),
+        "read back": '[[ "$GOT_BUILD" == "$BUILD" ]] ||' in b and '[[ "$GOT_VER" == "$VER" ]] ||' in b
+                     and '[[ "$GOT_ID" == "com.millen.millenai" ]]' in b and '[[ "$GOT_EXE" == "ConcordeAI" ]]' in b
+                     and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx; do" in b
+                     and 'cmp -s millenai.py "$BUNDLE/Contents/Resources/millenai.py"' in b,
+        "universal": 'TARGET="universal-apple-darwin"' in b and "expected a universal binary" in b,
+        "the image is build_dmg.sh's": "DMG_APP_READY=1 ./build_dmg.sh" in b
+                                      and 'if [[ -n "$DMG_APP_READY" ]]; then' in d and "  ./build_macos_app.sh\n" in d,
+        "the bundle's identity and resources": conf.get("identifier") == "com.millen.millenai"
+                                              and {"millenai.py", "launch.sh", "crypto-requirements.txt", "fonts", "vfx"} <= set(res.values())
+                                              and conf["bundle"]["macOS"].get("minimumSystemVersion") == "11.0",
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_updater(f):
+    """The swap helper waits for the bundle's executable whichever it is and
+    relaunches whatever the new bundle is; the feed is GitHub unless a dev
+    copy points it elsewhere; the display strips one .0; the shell quits
+    on its sidecar's clean exit and bootstraps the venv on a fresh Mac."""
+    s, rs = f["src"], f["rs"]
+    out = {}
+    m = re.search(r'_SWAP_SCRIPT = """(.*?)"""', s, re.S)
+    swap = (m.group(1) if m else "") % {"app": "/Applications/ConcordeAI.app", "dmg": "/t/update.dmg", "tmp": "/t"}
+    pm = re.search(r'pgrep -f "(.*?)"', swap)
+    pat = pm.group(1) if pm else "(?!)"
+    out["helper waits for either executable, not the server"] = (
+        bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/ConcordeAI"))
+        and bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/MillenAI"))
+        and not re.search(pat, "/x/venv/bin/python3 /Applications/ConcordeAI.app/Contents/Resources/millenai.py")
+        and 'open -n "/Applications/ConcordeAI.app"' in swap
+        and 'ditto "$NEW" "/Applications/ConcordeAI.app.new" && rm -rf "/Applications/ConcordeAI.app"' in swap)
+    out["feed: GitHub, or a dev copy's stand-in"] = (
+        'UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")\n'
+        '               if DEV_HOME else "") or "https://api.github.com")' in s
+        and '"MILLENAI_UPDATE_API"))' in s and "https://api.github.com/repos" not in s
+        and s.count('UPDATE_API + "/repos/%s/') == 3)
+    out["one .0 falls away in the offer"] = (
+        '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]\n        shown = num + mnum.group(2)' in s
+        and 'while num.count(".") >= 1' not in s)
+    out["shell: sidecar's clean exit quits the shell"] = (
+        "fn watch_sidecar(app: AppHandle, log_path: PathBuf)" in rs
+        and "if status.code() == Some(0) {\n            app.exit(0);" in rs
+        and "watch_sidecar(app.clone(), log_path.clone());" in rs
+        and rs.index("*sc.child.lock().unwrap() = Some(child);") < rs.index("watch_sidecar(app.clone(), log_path.clone());")
+        and rs.count("#[tauri::command]") == 1)
+    out["shell: venv bootstrap on a fresh Mac"] = (
+        "fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool" in rs
+        and 'if !cfg!(target_os = "macos") || std::env::var_os("CONCORDE_PYTHON").is_some()' in rs
+        and '.arg("--bootstrap")' in rs and "if !py.exists() && !bootstrap_venv(&app, &py) {" in rs)
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_ci(f):
+    """shell-build.yml runs on a published release from its tag, stamps the
+    shell the same way, uploads artifacts and attaches nothing; nightly.yml
+    builds the shell DMG; the Windows MSI stays the Python app's."""
+    sb, nw, wi = f["sb"], f["nw"], f["wi"]
+    out = {
+        "on release, from the tag": "release:\n    types: [published]" in sb
+                                    and "ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}" in sb
+                                    and "!= 'nightly'" in sb,
+        "attaches nothing": "gh release upload" not in sb and "actions/upload-artifact@v4" in sb
+                            and "run: python packaging/shell_stamp.py" in sb,
+        "no mac rows (release.sh's job)": "macos-" not in sb,
+        "nightly builds the shell dmg": "./build_shell_dmg.sh" in nw and "./build_dmg.sh\n" not in nw
+                                        and 'cargo install tauri-cli --version "^2" --locked' in nw
+                                        and "aarch64-apple-darwin,x86_64-apple-darwin" in nw
+                                        and "shell/**" in nw and "build_shell_dmg.sh," in nw,
+        "windows msi stays python": "ConcordeAI-$ver-x64.msi" in wi and "build_windows_exe.ps1" in wi,
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_C36_CHECKS = [("6b537 release.sh: the shell's DMG under the one asset name, the bundle's build and version read back, "
+                "--dry-run publishes nothing", _c36_release),
+               ("6b537 build_shell_dmg.sh: stamped from millenai.py, CFBundleVersion = APP_BUILD then signed, "
+                "read back, universal, the resources, build_dmg.sh's image", _c36_bundle),
+               ("6b537 updater: the helper waits for either executable and relaunches the new bundle, the feed knob is "
+                "a dev copy's, one .0 in the offer, the shell quits on its sidecar's exit and bootstraps the venv", _c36_updater),
+               ("6b537 CI: the shell's Windows and Linux builds from a release's tag as artifacts only, nightly's DMG "
+                "is the shell's, the Windows MSI stays the Python app's", _c36_ci)]
+
+
+def _c36_run(f, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C36_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(f)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i36, _n36, _o36, _d36 in _c36_run(_F36):
+    check(_n36, _o36, "%r" % (_d36,))
+_C36_MUT = [
+    ("rel", "the Python DMG again", "./build_shell_dmg.sh >/dev/null", "./build_dmg.sh >/dev/null", [0]),
+    ("rel", "the bundle's build not checked", '[[ "$GOT_BUILD" == "$BUILD" ]] || {', '[[ -n "$GOT_BUILD" ]] || {', [0]),
+    ("rel", "a dry run that goes on to publish", '  exit 0\nfi\n\necho "→ publishing v$BUILD"', 'fi\n\necho "→ publishing v$BUILD"', [0]),
+    ("rel", "a dry run that stamps millenai.py", 'if [[ "$DRY_RUN" == 1 ]]; then\n  if [[ -n "$ARG" ]]; then', 'if false; then\n  if [[ -n "$ARG" ]]; then', [0]),
+    ("bsd", "CFBundleVersion from the version", 'Set :CFBundleVersion $BUILD', 'Set :CFBundleVersion $VER', [1]),
+    ("bsd", "one arch only", 'TARGET="universal-apple-darwin"', 'TARGET=""', [1]),
+    ("bsd", "signed before the plist is patched", 'codesign --force --sign "$IDENTITY" "$BUNDLE"\ncodesign --verify --strict "$BUNDLE"\n',
+     "", [1]),
+    ("bdm", "build_dmg.sh never builds the Python app", 'if [[ -n "$DMG_APP_READY" ]]; then', "if true; then", [1]),
+    ("conf", "the first-run script left out of the bundle", '      "sidecar/launch.sh": "launch.sh",\n', "", [1]),
+    ("src", "the helper waits for the Python launcher only", 'pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break',
+     'pgrep -f "%(app)s/Contents/MacOS/MillenAI" >/dev/null || break', [2]),
+    ("src", "the feed knob honoured by the real app", '\n               if DEV_HOME else "") or "https://api.github.com")',
+     ') or "https://api.github.com")', [2]),
+    ("src", "every .0 stripped from the offer", '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]',
+     '        while num.count(".") >= 1 and num.endswith(".0"):\n            num = num[:-2]', [2]),
+    ("rs", "the shell stays open on the sidecar's clean exit", "if status.code() == Some(0) {\n            app.exit(0);",
+     "if status.code() == Some(0) {\n            return;", [2]),
+    ("rs", "no venv bootstrap", "if !py.exists() && !bootstrap_venv(&app, &py) {", "if !py.exists() {", [2]),
+    ("sb", "the shell MSI attached to the release", "      - uses: actions/upload-artifact@v4",
+     "      - run: gh release upload v1 x.msi\n      - uses: actions/upload-artifact@v4", [3]),
+    ("nw", "the nightly DMG is the Python app's", "./build_shell_dmg.sh", "./build_dmg.sh", [3]),
+]
+_c36_caught = []
+for _mf, _mn, _ma, _mb, _mw in _C36_MUT:
+    _mut = dict(_F36)
+    _mut[_mf] = _F36[_mf].replace(_ma, _mb, 1)
+    if _mut[_mf] == _F36[_mf]:
+        _c36_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c36_run(_mut, _mw)):
+        _c36_caught.append((_mn, "not caught"))
+check("6b537's rules each break a check when broken (%d mutants)" % len(_C36_MUT), not _c36_caught,
+      "%r" % _c36_caught)
+# ==== the shell is the app, 7.0 beta (6b537): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
