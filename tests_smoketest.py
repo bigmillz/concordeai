@@ -26385,15 +26385,16 @@ _o1("/up", {})
 _svq("/api/prefs", "POST", {"turbo": False})
 check("servers (live): pair again works; offline is said, with cloud power on, and no other model answers",
       _sp3[1].get("ok") is True and "ANSWER-ed again 334" in _sc8[1]
-      and _sc9[1].strip() == ("⚠️ %s didn’t answer. It may be off, asleep or "
-                              "offline. Nothing was sent anywhere else." % _SVN)
+      and _sc9[1].strip() == ("⚠️ %s didn’t answer. It may be off or asleep. "
+                              "Nothing was sent anywhere else." % _SVN)
       and [f for f in _sc9[2] if f[0] == "RUN"]
       and all(_SVLJ in f[1] for f in _sc9[2] if f[0] == "RUN")
       and _st9.get("status", {}).get("kind") == "offline" and _st9["status"]["reachable"] is False,
       "%r" % [_sp3, _sc8[1][:80], _sc9, _st9.get("status")])
 check("server only (live): the server off: the row is off with the reason, the chat says so plainly and "
       "no local, cloud or other model answers",
-      _scO[1].strip() == _sc9[1].strip() and _scO[1].startswith("\u26a0\ufe0f " + _SVN)
+      # copy-2 (2b0b902) said the refusal without the sign; the words are the plain pick's
+      _scO[1].strip() == _sc9[1].strip().replace("\u26a0\ufe0f ", "", 1) and _scO[1].startswith(_SVN)
       and "Nothing was sent anywhere else" in _scO[1] and "ANSWER" not in _scO[1]
       and "stopped responding" not in _scO[1] and "retrying on" not in json.dumps(_scO[2])
       and _soO.get("available") is False and _soO.get("models") == [] and _soO.get("why")
@@ -26401,8 +26402,8 @@ check("server only (live): the server off: the row is off with the reason, the c
       and all(r["path"] != "/api/chat" for r in _o1("/log")["log"][_nlO:]),
       "%r" % [_scO[1], _soO, _svO])
 check("servers (live): a council of server models that none answers says why, and no other model answers",
-      _scC[1].strip() == ("⚠️ None of the picked models answered. %s didn’t answer. It may be off, "
-                          "asleep or offline. Nothing was sent anywhere else." % _SVN)
+      _scC[1].strip() == ("⚠️ None of the picked models answered. %s didn’t answer. It may be off "
+                          "or asleep. Nothing was sent anywhere else." % _SVN)
       and "stopped responding" not in _scC[1] and "retrying on" not in json.dumps(_scC[2]),
       "%r" % [_scC[1], _scC[2][-4:]])
 # ==== 6b342 server meters (live): begin ====
@@ -26494,7 +26495,7 @@ check("servers (live): a server added in one profile is invisible and unusable i
       "%r" % [_vB34, _scB[1], _tB34, _rmB34, _vA34])
 check("server only (live): profile B has no row for A's server, and A's mode says the server is gone "
       "there without a request leaving",
-      _scBo[1].strip() == "\u26a0\ufe0f That server isn\u2019t in Settings \u203a Your servers any more. "
+      _scBo[1].strip() == "That server isn\u2019t in Settings \u203a Your servers any more. "
                           "Pick another model. Nothing was sent anywhere else."
       and not [k_ for k_ in _tiB if k_.startswith("srv:")] and len(_o1("/log")["log"]) == _nlogB,
       "%r" % [_scBo[1], list(_tiB)])
@@ -26815,7 +26816,7 @@ _l56_p = _svchat(text="generate an image of a red balloon", tier="Fast")
 _l56_lg2 = _o1("/log")["log"][_l56_n:]
 _l56_jobs = _l56_gen(_l56_lg2)
 _l56_st = [d_ for t_, d_ in _l56_p[2] if t_ == "STATUS"]
-_l56_m = re.search(r"!\[[^\]]*\]\(/api/image/([\w-]+\.png)\)\n\n\*[^*]*made on %s\*" % re.escape(_SVN), _l56_p[1])
+_l56_m = re.search(r"!\[[^\]]*\]\(/api/image/([\w-]+\.png)\)\n\n\*[^*]*\. Made on %s\.\*" % re.escape(_SVN), _l56_p[1])
 _l56_f = _l56_m.group(1) if _l56_m else ""
 _l56_served = _ireq(_SV, "/api/image/" + _l56_f) if _l56_f else (0, b"")
 _l56_cc = _o1("/comfy")["calls"][_l56_nc:]
@@ -26850,7 +26851,7 @@ _l56_n = len(_o1("/log")["log"])
 _l56_v = _svchat(text="make a video of a red balloon", tier="Fast")
 _l56_lg3 = _o1("/log")["log"][_l56_n:]
 _l56_jv = _l56_gen(_l56_lg3)
-_l56_vm = re.search(r"\[\[vid:(\{[^}]*\})\]\]\n\n\*[^*]*made on %s\*" % re.escape(_SVN), _l56_v[1])
+_l56_vm = re.search(r"\[\[vid:(\{[^}]*\})\]\]\n\n\*[^*]*\. Made on %s\.\*" % re.escape(_SVN), _l56_v[1])
 _l56_vid = (json.loads(_l56_vm.group(1)) if _l56_vm else {}).get("id", "")
 _l56_vs = _ireq(_SV, "/api/video/" + _l56_vid, headers={"Range": "bytes=4-7"}) if _l56_vid else (0, b"")
 _l56_vpost = next((json.loads(r_["body"]) for r_ in _l56_jv if r_["method"] == "POST"), {})
@@ -26921,7 +26922,7 @@ _svq("/api/servers/prefer", "POST", {"id": _sid34, "on": False})
 _l56_k3 = _svchat(text="generate an image of a red balloon", tier="Fast")
 _svq("/api/servers/prefer", "POST", {"id": _sid34, "on": True})
 _l56_lg6 = _o1("/log")["log"][_l56_n:]
-_l56_prev = '[[vid:{"id":"%s","t":"a red balloon"}]]\n\n*A red balloon \u2014 made on %s*' % (_l56_vid, _SVN)
+_l56_prev = '[[vid:{"id":"%s","t":"a red balloon"}]]\n\n*A red balloon. Made on %s.*' % (_l56_vid, _SVN)
 _l56_n2 = len(_o1("/log")["log"])
 _l56_k4 = _l56_chat([{"role": "user", "content": "make a video of a red balloon"},
                      {"role": "assistant", "content": _l56_prev}, {"role": "user", "content": "as a gif"}])
@@ -27060,7 +27061,7 @@ check("server sets (live): a used sheet, a list that changed, a model in use, bu
       _l7c == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
       and _l7e.get("kind") == "changed" and "/v1/models/apply" in _l7lg2
       and _l7g.get("kind") == "in_use" and "small:8b is in use on " + _SVN in _l7g.get("err", "")
-      and _l7h.get("kind") == "busy" and "Nothing was changed" in _l7h.get("err", "")
+      and _l7h.get("kind") == "busy" and _l7h.get("err") == _SVN + " is busy changing models. Try again in a moment."
       and _l7i.get("kind") == "server" and "no such tag" in _l7i.get("err", "")
       and {"small:8b", "huge:70b", "extra:1b"} <= _l7left,
       "%r" % [_l7c, _l7e, _l7g, _l7h, _l7i, sorted(_l7left)])
@@ -27113,7 +27114,7 @@ _prG = _svq("/api/prefs")[1].get("tier")
 check("server only (live): a restart keeps the mode; with its server removed the row is gone and a chat "
       "says so, never answering from another model",
       _prG == _so_tier and not [k_ for k_ in _tiG if k_.startswith("srv:")]
-      and _scG[1].strip() == "\u26a0\ufe0f That server isn\u2019t in Settings \u203a Your servers any "
+      and _scG[1].strip() == "That server isn\u2019t in Settings \u203a Your servers any "
                              "more. Pick another model. Nothing was sent anywhere else."
       and "ANSWER" not in _scG[1],
       "%r" % [_prG, _scG[1], list(_tiG)])
@@ -27291,7 +27292,7 @@ def _dk_pins(src):
                  and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
     _p["hold_ph"] = '"Listening. Release to finish."' in src
     _p["toggle_ph"] = '"Listening. Press "+DICT_KEY+" or tap the mic to finish."' in src
-    _p["slip_ph"] = 'input.placeholder="Didn\\u2019t catch that. Try again.";return;}' in src
+    _p["slip_ph"] = 'input.placeholder="Didn’t catch that. Try again.";return;}' in src     # the real apostrophe (6b543)
     _p["path"] = ("const cap=micAttach();" in src
                   and 'body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in' in src
                   and 'input.placeholder=dictPrompt();\n}' in src
@@ -27309,8 +27310,8 @@ _dkp_bad = []
 for _k, _a in [("mac", "e.metaKey&&!e.ctrlKey"), ("key", "if(!dictIsD(e.key,e.code))return;\n  const modal"),
                ("prevent", 'if(!modal||a==="stop")e.preventDefault();'),
                ("keyup", "mod:modUp,secs:recSecs()"), ("blur", "document.hidden"),
-               ("modal", '[id$="-veil"]'), ("tip", "Hold \"+DICT_KEY"), ("hold_ph", "release to finish"),
-               ("toggle_ph", "(or tap the mic) to finish"), ("slip_ph", "catch anything"),
+               ("modal", '[id$="-veil"]'), ("tip", "Hold \"+DICT_KEY"), ("hold_ph", "Release to finish"),
+               ("toggle_ph", "or tap the mic to finish"), ("slip_ph", "catch that"),
                ("path", "const cap=micAttach();"), ("btn", "  dictStart();\n});")]:
     if _MILLENAI_SRC.count(_a) < 1:
         _dkp_bad.append("anchor " + _a)
