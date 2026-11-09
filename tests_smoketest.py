@@ -39058,7 +39058,7 @@ check("mutant: without the stash the card is cut in two again", _fcm.get("pres")
 # ==== hz-chat (6b528): end ====
 
 # ==== muse (6b533) Muse Glimmer's channels and the trial row: begin ====
-print("== Muse Glimmer's channels and Gamma's writer (6b533) ==")
+print("== Muse Glimmer's channels, Gamma's writer, its strength by effort (6b533) ==")
 # Per Patrick: the app work before a fair retest. Muse Glimmer writes its
 # reasoning and its answer as channels (to=self / to=user) that mlx-lm 0.32.2
 # streams raw; MuseChannels turns them into the page's <think> block and the
@@ -39071,7 +39071,7 @@ print("== Muse Glimmer's channels and Gamma's writer (6b533) ==")
 # rule broken in the source and shown caught.
 _MU_NAMES = {"MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MUSE_LEVELS", "MuseChannels", "muse_level",
              "_muse_hold", "_muse_could_head", "_THINK_RE", "strip_think",
-             "SRV_RAM_ROWS"}
+             "MUSE_EFFORT", "muse_draft_level", "EFFORT_LEVELS"}
 # a Muse turn as mlx-lm 0.32.2 streams it (the 6b533 bench's q27, trimmed)
 _MU_THINK = "Compute: 11*95 = 1045. + 1350 = 2395.\n\nLead with the answer."
 _MU_ANS = "Separate is cheaper by $5.\n\nWith the 12% tax, the package is cheaper by $120.40."
@@ -39137,7 +39137,8 @@ def _mu_sse(raw, size):
 
 def _mu_run(src, which=(0, 1, 2, 3)):
     """[(part, name, ok, detail)]: 0 the splitter, 1 the two routes and the
-    wiring, 2 the catalog row, the seat and the trial rule, 3 the card guard."""
+    wiring, 2 the catalog row, the seat and the trial rule, 3 the effort map
+    and the card guard."""
     out = []
 
     def ck(part, name, ok, detail=""):
@@ -39166,7 +39167,9 @@ def _mu_run(src, which=(0, 1, 2, 3)):
     if 1 in which:
         ns, sent, plan = _mu_engines(src)
         res = {}
-        for key, label, think in (("mlx-low", "Muse Glimmer 30B", False), ("mlx-high", "Muse Glimmer 30B", True)):
+        for key, label, think in (("mlx-low", "Muse Glimmer 30B", False), ("mlx-high", "Muse Glimmer 30B", True),
+                                  ("mlx-lvl-low", "Muse Glimmer 30B", "low"),
+                                  ("mlx-lvl-high", "Muse Glimmer 30B", "high")):
             plan.append(_mu_sse(_MU_RAW, 6))
             o = []
             ns["stream_openai_compat"](1, label, [{"role": "user", "content": "q"}], o.append, think)
@@ -39178,6 +39181,9 @@ def _mu_run(src, which=(0, 1, 2, 3)):
         ck(1, "the MLX route: a Muse row's channels split, its strength sent (low / high); another row untouched",
            res["mlx-low"] == (_MU_WANT, {"enable_thinking": False, "reasoning_strength": "low"})
            and res["mlx-high"] == (_MU_WANT, {"enable_thinking": True, "reasoning_strength": "high"})
+           # a draft's level (muse_draft_level) goes as it is; enable_thinking stays a bool
+           and res["mlx-lvl-low"] == (_MU_WANT, {"enable_thinking": True, "reasoning_strength": "low"})
+           and res["mlx-lvl-high"] == (_MU_WANT, {"enable_thinking": True, "reasoning_strength": "high"})
            and res["mlx-gemma"] == ("Plain answer.", {"enable_thinking": False}), "%r" % res)
         # Ollama 0.32.8+: its glimmer parser sends the reasoning as `thinking`
         parsed = (['{"message":{"thinking":"%s"},"done":false}\n' % w for w in ("Compute ", "it.")]
@@ -39188,6 +39194,7 @@ def _mu_run(src, which=(0, 1, 2, 3)):
         oll = {}
         for key, label, lines, think in (("parsed", "Muse Glimmer 30B", parsed, False),
                                          ("raw", "Muse Glimmer 30B", raw, True),
+                                         ("lvl-low", "Muse Glimmer 30B", parsed, "low"),
                                          ("gemma", "Gemma 4 26B", parsed[2:], False)):
             plan.append(lines)
             o = []
@@ -39196,14 +39203,15 @@ def _mu_run(src, which=(0, 1, 2, 3)):
         ck(1, "Ollama: the parser's reasoning goes in the block, a raw stream is split, `think` carries the "
            "strength; another row untouched",
            oll["parsed"] == ("<think>Compute it.</think>The answer.", "low")
-           and oll["raw"] == (_MU_WANT, "high")
+           and oll["raw"] == (_MU_WANT, "high") and oll["lvl-low"][1] == "low"
            and oll["gemma"] == ("The answer.", "none"), "%r" % oll)
         rm = src[src.index("def run_model("):src.index("def _stream_guarded(")]
         rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
-        ck(1, "run_model hands the depth on; a mode's drafts ask a Muse row for high; no other pass asks",
+        ck(1, "run_model hands the depth on; a draft asks a Muse row for the effort's level; no other pass asks",
            "> BIG_MODEL_BYTES, thinking=thinking)" in rm
            and "stream_openai_compat(target, label, msgs, _tap, thinking)" in rm
-           and 'or _lbl.startswith("Muse")))' in rc
+           and "or (muse_draft_level(_eff)\n                                            if _lbl.startswith(\"Muse\") else False)))" in rc
+           and "_eff = getattr(globals().get(\"_srv_think\"), \"effort\", None)" in rc
            # the critic, peer and merge passes give no depth: a Muse row answers them at "low"
            and rc.count("thinking=") == 1, "%d" % rc.count("thinking="))
     if 2 in which:
@@ -39263,6 +39271,14 @@ def _mu_run(src, which=(0, 1, 2, 3)):
         ck(2, "a row on trial, downloaded, still joins no blend (Pro); every other model does",
            "Muse Glimmer 30B" not in pro and "Qwen 3.8 27B" in pro and "Gemma 4 26B" in pro, "%r" % pro)
     if 3 in which:
+        ns = _mu_ns(src)
+        lv = {e: ns["muse_draft_level"](e) for e in ("low", "medium", "high", "max", "ultra", None, "", "turbo")}
+        ck(3, "the effort map: Low, Medium, High -> low; Max, Ultra -> high; none (or unknown) -> high",
+           lv == {"low": "low", "medium": "low", "high": "low", "max": "high", "ultra": "high",
+                  None: "high", "": "high", "turbo": "high"}
+           and set(ns["MUSE_EFFORT"]) == set(ns["EFFORT_LEVELS"])
+           and all(ns["muse_level"](v) == v for v in ("low", "high"))
+           and ns["muse_level"](True) == "high" and ns["muse_level"](False) == "low", "%r" % lv)
         z = _s5_mac(src, 48, mlxv=(0, 32, 2))
         _s5_exec(src, z, {"SRV_RAM_ROWS", "SRV_RAM_EXTRA_B"})
         g16 = z["model_sets"]({"vram": 16 << 30, "ram": 64 << 30})
@@ -39296,9 +39312,18 @@ _MU_MUT = [
     ("Ollama's reasoning dropped", '                    think = msg.get("thinking") or ""', '                    think = ""', [1]),
     ("Ollama not told the strength", '        extra["think"] = muse_level(thinking)', "        pass", [1]),
     ("run_model loses the depth", "> BIG_MODEL_BYTES, thinking=thinking)", "> BIG_MODEL_BYTES)", [1]),
-    ("a mode's drafts at low", 'or _lbl.startswith("Muse")))', "or False))", [1]),
+    ("a draft ignores the effort", "or (muse_draft_level(_eff)", "or (muse_draft_level(None)", [1]),
     ("a critic asks for high", "_critic, critic_prompt(question, _texts, persona=_persona), parts.append))",
      "_critic, critic_prompt(question, _texts, persona=_persona), parts.append, thinking=True))", [1]),
+    ("a draft's level not passed on", "    if thinking in MUSE_LEVELS:\n        return thinking",
+     "    if False:\n        return thinking", [0, 1, 3]),
+    ("enable_thinking given the level", '{"enable_thinking": bool(thinking)},', '{"enable_thinking": thinking},', [1]),
+    ("Low at high", 'MUSE_EFFORT = {"low": "low",', 'MUSE_EFFORT = {"low": "high",', [3]),
+    ("Medium at high", '"medium": "low", "high"', '"medium": "high", "high"', [3]),
+    ("High at high", '"high": "low", "max"', '"high": "high", "max"', [3]),
+    ("Max at low", '"max": "high",\n               "ultra"', '"max": "low",\n               "ultra"', [3]),
+    ("Ultra at low", '"ultra": "high"}', '"ultra": "low"}', [3]),
+    ("no effort at low", 'MUSE_EFFORT.get(effort, "high")', 'MUSE_EFFORT.get(effort, "low")', [3]),
     ("Muse not the writer", '"picks": ["GPT-OSS 120B", "Muse Glimmer 30B", "Gemma 4 26B", "Qwen 3.8 27B",',
      '"picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B", "Muse Glimmer 30B",', [2]),
     ("Muse in Fast", '        "picks": ["GPT-OSS 120B", "Gemma 4 26B", "Qwen 3.8 27B",\n          "Qwen 3.6 35B MoE"',

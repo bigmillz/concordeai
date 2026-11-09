@@ -1254,7 +1254,8 @@ CATALOG = [
     ("Qwen 3.8 27B",       "🐉", "27B",  "big",  "mlx-community/Qwen3.8-27B-4bit",                 "qwen3.8:27b",       8938, 17.6, 16.1, False),
     ("Qwen 3.6 35B MoE",   "🚀", "35B",  "big",  "mlx-community/Qwen3.6-35B-A3B-4bit",             "qwen3.6:35b",       8918, 20.0, 18.5, True),
     # 6b533, per Patrick: Meta's Muse Glimmer 30B, Gamma's writer since its
-    # fair retest (first of the Thinking picks after GPT-OSS 120B). Dense, 27.9B text + 1.9B vision,
+    # fair retest (first of the Thinking picks after GPT-OSS 120B; its strength
+    # follows the Effort slider, muse_draft_level). Dense, 27.9B text + 1.9B vision,
     # 131,072 context, Apache 2.0, released 2026-08-10. It always reasons (low
     # to xhigh, no off) in Meta's channel format, which MuseChannels turns into
     # the app's <think> block and answer. The MLX repo is 19,443,248,945 bytes
@@ -29026,11 +29027,28 @@ MUSE_ENDS = ("<|eom|>", "<|eot|>", "<|end_of_text|>")
 MUSE_LEVELS = ("low", "medium", "high", "xhigh")
 
 
-def muse_level(thinking: bool) -> str:
-    """The reasoning strength a Muse row is asked for: "high" where the app
-    asks a model to think (a deep mode's drafts), else "low" (Fast, and the
-    passes that review or rewrite). It has no off."""
+def muse_level(thinking) -> str:
+    """The reasoning strength a Muse row is asked for. `thinking` is a level
+    (a draft's, from muse_draft_level) or a bool: True where the app asks a
+    model to think, "high"; False (Fast, a lone pick, and the passes that
+    review or rewrite: critic, peer, merge, polish) "low". It has no off."""
+    if thinking in MUSE_LEVELS:
+        return thinking
     return "high" if thinking else "low"
+
+
+# THE STRENGTH FOLLOWS EFFORT (6b533, per Patrick): a council draft by a Muse
+# row (Gamma's writer) reasons by the Effort slider: Low, Medium and High at
+# "low" (its retest: 52.5/90 at about 38 s a short answer), Max and Ultra at
+# "high" (56.0 at about 71 s). No effort sent (an old page, a node run): a
+# draft at "high", as before. The review and merge passes stay at "low".
+MUSE_EFFORT = {"low": "low", "medium": "low", "high": "low", "max": "high",
+               "ultra": "high"}
+
+
+def muse_draft_level(effort) -> str:
+    """A Muse row's strength for a council draft at this effort."""
+    return MUSE_EFFORT.get(effort, "high")
 
 
 def _muse_hold(text: str) -> int:
@@ -29253,7 +29271,7 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
         # flag ignore it, so this is safe to send to every model. A Muse row
         # has no off: it gets a strength instead (6b533)
         "chat_template_kwargs": dict(
-            {"enable_thinking": thinking},
+            {"enable_thinking": bool(thinking)},
             **({"reasoning_strength": muse_level(thinking)}
                if model_label in MUSE_ROWS else {})),
         # the counts for the usage ledger (6b325), in a last chunk with
@@ -32764,12 +32782,13 @@ def run_council(labels: list, messages: list, emit, status,
                 # a mode's server seat gives up on a first word early
                 with server_first_deadline(srv_first_s if server_label(_lbl)
                                            else None):
-                    # a Muse row reasons at "high" in a mode's drafts
-                    # (6b533, muse_level); the review and merge passes ask
-                    # for "low"
+                    # a Muse row's draft reasons by the effort (6b533,
+                    # muse_draft_level: Max and Ultra "high", else "low"; no
+                    # effort "high"); the review and merge passes ask for "low"
                     run_model(_lbl, messages, _c,
                               thinking=((reflect and _lbl.startswith("Qwen"))
-                                        or _lbl.startswith("Muse")))
+                                        or (muse_draft_level(_eff)
+                                            if _lbl.startswith("Muse") else False)))
             except _DraftAbandoned:
                 pass
             except Exception as exc:      # noqa: BLE001 — recorded below
