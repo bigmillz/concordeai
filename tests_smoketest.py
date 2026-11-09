@@ -29208,7 +29208,7 @@ _M42_TEL = ('  <div id="telemetry">\n'
             '      <div class="meter-label"><span>__MEM_LABEL__</span></div>\n'
             '      <div class="meter" id="mem-meter"></div>\n'
             '    </div>\n'
-            '  </div>\n</aside>')
+            '  </div>\n  <!-- the foot (6b528)')        # 6b528's sidebar foot follows the card now
 
 _M42_ENV = r'''
 let NOW=1000000;Date.now=()=>NOW;
@@ -29644,7 +29644,7 @@ check("server meters: the served page's card is the same markup, tokens replaced
       re.search(r'<div id="telemetry">\n    <div class="t-head"><span>[^<]+</span></div>\n'
                 r'    <div class="meter-row">\n      <div class="meter" id="gpu-meter"></div>\n    </div>\n'
                 r'    <div class="meter-row">\n      <div class="meter-label"><span>MEMORY (PRESSURE|USED)</span></div>\n'
-                r'      <div class="meter" id="mem-meter"></div>\n    </div>\n  </div>\n</aside>', page)
+                r'      <div class="meter" id="mem-meter"></div>\n    </div>\n  </div>\n  <!-- the foot \(6b528\)', page)
       is not None, "")
 
 _M42_MUT = [
@@ -29930,7 +29930,7 @@ def _m53c_rows(src):
                                    "Memory=usage not reported")
     out["off"] = (rows[2][4] == "GPU=Arc B580 | GPU load=not answering | GPU memory=not answering | Memory=not answering"
                   and rows[3][4].startswith("GPU=Radeon VII | GPU load=not answering"))
-    out["nocard"] = rows[4][4].startswith("GPU=no card named | ")
+    out["nocard"] = rows[4][4].startswith("GPU=No graphics card reported | ")     # copy-2 (a8f6348)
     out["fresh"] = [x[1] for x in R["rows0"][0]["rows"]] == ["Radeon RX 6900 XT", "reading\u2026",
                                                             "16 GB \u00b7 reading\u2026", "reading\u2026"]
     out["undef"] = R["undef"] == [0, 0]
@@ -29948,7 +29948,7 @@ def _m53c_dialog(src):
                                     "Memory=22 of 62 GB in use"]
     out["safe"] = R["safe"] == [0, 0, True] and R["names"][2] == "<img src=x onerror=alert(1)>"
     out["live"] = R["live"] == ["88%", 5]
-    out["emptied"] = R["emptied"] == [1, "No servers paired.", False]
+    out["emptied"] = R["emptied"] == [1, "No servers paired", False]                # copy-2 (a8f6348)
     out["norequest"] = R["noRequest"] is True
     out["close"] = R["close1"] == [True, True, True, False] and R["gone"] == [True, True]
     out["reopen"] = R["reopen"] == [False, 5]
@@ -30578,8 +30578,8 @@ def _w46c_only_wake(src):
     said = []
     ta = t[0]
     lbl, why = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
-    out["failed"] = (lbl == "" and why == "Desktop didn\u2019t wake up in 60 seconds. It may be off or offline. "
-                                          "Nothing was sent anywhere else."
+    out["failed"] = (lbl == "" and why == "Desktop didn\u2019t wake in 60 seconds. "
+                                          "Nothing was sent anywhere else."             # copy-2
                      and 60 <= t[0] - ta <= 62 and said[0] == "Waking Desktop..."
                      and len(said) >= 28 and said[-1] == "Waking Desktop... 2 s"
                      and ns["server_label_down"](ctx, "Desktop \u00b7 small:8b"))
@@ -31205,19 +31205,19 @@ def _l31c_post(src):
         # a refused port, a slow relay, a name that is not there: said plainly, never raised
         ns2, ctx2, sid2 = _l31_ns(src, relay=_l31_dead_url())
         r = ns2["_srv_relay_post"](ns2["_srv_read"](ctx2)[0])
-        out["refused"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"] == "Relay not reachable: connection refused"
+        out["refused"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"] == "The relay isn’t reachable: connection refused"
         slow = _l31_stub(sleep=2.0)
         try:
             ns3, ctx3, sid3 = _l31_ns(src, relay=slow["url"])
             ns3["SRV_RELAY_S"] = 0.4
             t0 = time.time()
             r = ns3["_srv_relay_post"](ns3["_srv_read"](ctx3)[0])
-            out["timeout"] = (r["ok"] is False and r["err"] == "Relay not reachable: timed out" and time.time() - t0 < 1.8)
+            out["timeout"] = (r["ok"] is False and r["err"] == "The relay isn’t reachable: timed out" and time.time() - t0 < 1.8)
         finally:
             _l31_stop(slow)
         ns4, ctx4, sid4 = _l31_ns(src, relay="http://relay.invalid:8080")
         r = ns4["_srv_relay_post"](ns4["_srv_read"](ctx4)[0])
-        out["dns"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"].startswith("Relay not reachable: ")
+        out["dns"] = r["ok"] is False and r["kind"] == "unreachable" and r["err"].startswith("The relay isn’t reachable: ")
         # nothing set: nothing asked, nothing recorded
         ns5, ctx5, sid5 = _l30_ns(src)
         r = ns5["_srv_relay_post"](ns5["_srv_read"](ctx5)[0])
@@ -31307,7 +31307,7 @@ def _l31c_wake(src):
         got.append("raised %r" % ex)
         s3 = None
     out["failure is quiet"] = (got == ["woke"] and len(sent) == 4 and s3 is not None and s3["ok"] is False
-                               and s3["err"] == "Relay not reachable: connection refused")
+                               and s3["err"] == "The relay isn’t reachable: connection refused")
     # no relay, every send refused: blocked as before (6b420)
     ns, ctx, sid = _l30_ns(src)
     _l31_wakeable(ns, ctx)
@@ -31380,7 +31380,7 @@ def _l31c_test(src):
         _l31_stop(st)
     ns, ctx, sid = _l31_ns(src, relay=_l31_dead_url())
     r = ns["server_wake_test"](ctx, sid, True)
-    out["unreachable"] = r == {"ok": False, "kind": "unreachable", "err": "Relay not reachable: connection refused"}
+    out["unreachable"] = r == {"ok": False, "kind": "unreachable", "err": "The relay isn’t reachable: connection refused"}
     return all(out.values()), out
 
 
@@ -31450,7 +31450,7 @@ process.stdout.write(JSON.stringify(R));
     out["collapsed"] = ('data-a="relayopen" aria-expanded="false"' in R["collapsed"] and "<input" not in R["collapsed"]
                         and "Wake relay" not in R["collapsed"] and R["unpaired"] == "")
     o = R["open"]
-    out["open"] = ('aria-expanded="true"' in o and "Wake relay (advanced): a small service on your network that sends the wake-up for you when you’re away. Address and token." in o
+    out["open"] = ('aria-expanded="true"' in o and "Wake relay. A service on your network that wakes the server when you’re away." in o
                    and 'type="text" data-k="rurl"' in o and 'type="password" data-k="rtok"' in o and 'placeholder="Token"' in o
                    and 'data-a="relaysave">Save</button>' in o and '<button class="about-btn slim" data-a="relayclear" disabled>Clear</button>' in o
                    and '<button class="about-btn slim" data-a="relaytest" disabled>Test relay</button>' in o)
@@ -32040,7 +32040,7 @@ def _g56c_job(src):
     o11, e11, lg11, _s11 = ended(states=[{"state": "done", "type": "image/png"}], result=_G56_PNG + b"\0" * 30)
     o12, e12, lg12, _s12 = ended(states=[{"state": "done", "type": "image/png"}], result=_G56_PNG[:8] + b"\0" * 92)
     ns["SRV_GEN_MAX"] = {"image": 16 << 20, "video": 64 << 20}
-    out["too_large"] = "larger than" in str(e11) and o12 is not None and o12[1] == "image/png"
+    out["too_large"] = "sent more than" in str(e11) and "MB. It was refused." in str(e11) and o12 is not None and o12[1] == "image/png"
     # a dropped tunnel: four polls lost in a row are carried over, five end it
     def off():
         raise ns["ServerError"]("offline", "Desktop didn’t answer.")
@@ -32073,8 +32073,8 @@ def _g56c_job(src):
     # the clock: pictures stop at 5 minutes, video at 20, the server told to let go
     o, e14, lg, sd, ck = _g56_gen(ns, ctx, states=[{"state": "running", "progress": 0.1}] * 2)
     o2_, e15, lg2, sd2, ck2 = _g56_gen(ns, ctx, "video", "w", {}, states=[{"state": "running", "progress": 0.1}] * 2)
-    out["cap"] = (e14 is not None and "more than 5 minutes" in str(e14) and 300 <= ck.t - 1000 <= 304
-                  and lg[-1][0] == "DELETE" and e15 is not None and "more than 20 minutes" in str(e15)
+    out["cap"] = (e14 is not None and "took over 5 minutes" in str(e14) and 300 <= ck.t - 1000 <= 304
+                  and lg[-1][0] == "DELETE" and e15 is not None and "took over 20 minutes" in str(e15)
                   and 1200 <= ck2.t - 1000 <= 1204 and ns["SRV_GEN_CAP_S"] == {"image": 300, "video": 1200})
     # a clock-skew refusal on the result is signed again once
     log2 = _g56_job(ns)
@@ -32161,7 +32161,7 @@ def _g56c_make(src):
     files = [f for f in os.listdir(os.path.join(d, "images")) if not f.endswith(".render.json")]
     out["image"] = (r is True and err is None and len(files) == 1 and files[0].endswith(".png")
                     and open(os.path.join(d, "images", files[0]), "rb").read() == _G56_PNG
-                    and em == ["![a red balloon](/api/image/%s)\n\n*A red balloon — made on Desktop*" % files[0]]
+                    and em == ["![a red balloon](/api/image/%s)\n\n*A red balloon. Made on Desktop.*" % files[0]]
                     and sts[0] == "Making the picture on Desktop..." and "Making the picture on Desktop... 40%" in sts
                     and [s[2] for s in steps] == ["run", "done"] and steps[0][1] == "Making the picture on Desktop"
                     and steps[1][1] == "Made the picture on Desktop")
@@ -32170,12 +32170,12 @@ def _g56c_make(src):
     out["note"] = len(nt) == 1 and nt[0][0] == {"w": 1024, "h": 1024} and nt[0][1] >= 0
     # the picture's words are the person's, "]" removed, as always
     r2 = _g56_run_make(ns, ctx, subject="a cat ] [x](y)")
-    out["alt"] = r2[3][0].startswith("![a cat  [x(y)](/api/image/") and "*A cat ] [x](y) — made on Desktop*" in r2[3][0]
+    out["alt"] = r2[3][0].startswith("![a cat  [x(y)](/api/image/") and "*A cat ] [x](y). Made on Desktop.*" in r2[3][0]
     # a video: an MP4 in videos, the token the page plays
     r3 = _g56_run_make(ns, ctx, "video", "waves", {"w": 640, "h": 360, "frames": 49, "seed": 7},
                        states=[{"state": "done", "type": "video/mp4"}], result=_G56_MP4)
     vfiles = [f for f in os.listdir(os.path.join(d, "videos")) if not f.endswith(".render.json")]
-    tok = re.match(r"\[\[vid:(\{.*?\})\]\]\n\n\*Waves — made on Desktop\*$", r3[3][0] if r3[3] else "")
+    tok = re.match(r"\[\[vid:(\{.*?\})\]\]\n\n\*Waves\. Made on Desktop\.\*$", r3[3][0] if r3[3] else "")
     out["video"] = (r3[0] is True and len(vfiles) == 1 and vfiles[0].endswith(".mp4") and tok
                     and json.loads(tok.group(1)) == {"id": vfiles[0], "t": "waves"}
                     and json.loads(r3[2][0][2]) == {"width": 640, "height": 352, "frames": 49, "seed": 7,
@@ -32188,7 +32188,7 @@ def _g56c_make(src):
     r5 = _g56_run_make(ns, ctx, use={"w": 3000, "h": 3000})
     out["size_note"] = "the size came out at 1280x1280, the most this server takes" in r5[3][0]
     r5b = _g56_run_make(ns, ctx, notes_in=["twice as large"])
-    out["notes"] = r5b[3][0].endswith("made on Desktop · twice as large*")
+    out["notes"] = r5b[3][0].endswith("Made on Desktop · twice as large.*")     # inside the sentence, not after its stop
     # a gif, a jpg: not the server's to make
     n0 = len(log)
     out["format"] = (_g56_run_make(ns, ctx, "video", use={"fmt": "gif"})[0] is False
@@ -32233,7 +32233,7 @@ def _g56c_make(src):
     real_write = ns["_write_raw"]
     ns["_write_raw"] = lambda *a, **k: (_ for _ in ()).throw(OSError("full"))
     r12 = _g56_run_make(ns, ctx)
-    out["unsaved"] = (r12[0] is True and len(r12[3]) == 1 and "couldn’t save it" in r12[3][0]
+    out["unsaved"] = (r12[0] is True and len(r12[3]) == 1 and "couldn’t be saved here" in r12[3][0]
                       and isinstance(r12[3][0], ns["AppText"]))
     # a stale profile is not covered up
     ns["_write_raw"] = real_write
@@ -32270,7 +32270,7 @@ def _g56c_name_make(src):
     lines = r[3] + r[5] + [x for st in r[4] for x in st[1:]]
     plain = ns["_srv_plain"](ns["_srv_read"](ctx)[0]["name"])
     fname = re.search(r"/api/image/([\w.-]+)\)", r[3][0]).group(1)
-    out["caption"] = (r[0] is True and r[3] == ["![a red balloon](/api/image/%s)\n\n*A red balloon \u2014 made on %s*" % (fname, plain)]
+    out["caption"] = (r[0] is True and r[3] == ["![a red balloon](/api/image/%s)\n\n*A red balloon. Made on %s.*" % (fname, plain)]
                       and r[3][0].count("*") == 2)
     out["lines"] = (all(plain in x for x in r[5]) and all(plain in x[1] for x in r[4])
                     and not re.search(r"[*\[\]<>`]", "".join(r[5]) + "".join(x[1] + x[3] for x in r[4])))
@@ -32583,7 +32583,7 @@ def _s7_get(src):
     out["refusals"] = (got["old"] == {"ok": False, "kind": "old",
                                       "err": "Update the server kit to manage its models from here."}
                        and got["server"]["kind"] == "server" and "boom" in got["server"]["err"]
-                       and got["shape"]["kind"] == "server" and "doesn’t understand" in got["shape"]["err"]
+                       and got["shape"]["kind"] == "server" and got["shape"]["err"] == "Desktop’s answer wasn’t understood."   # copy-2
                        and got["offline"] == {"ok": False, "kind": "offline", "err": "Desktop didn’t answer."})
     a2 = ns["server_add"](ctx, {"url": "https://other.example.com", "name": "Other", "access_id": "id.access",
                                 "access_secret": "SECRET-" + "y" * 20})
@@ -35558,7 +35558,7 @@ def _w465(src):
     out["only waits a minute"] = (lbl == "" and 60 <= t[0] - ta <= 62 and steps[0] == ("wake", "Waking " + name, "run", "60 s")
                                   and left[:3] == [60, 60, 58] and left[-1] == 2 and left == sorted(left, reverse=True)
                                   and steps[-1] == ("wake", name + " didn\u2019t wake in 60 s", "done", "")
-                                  and "didn\u2019t wake up in 60 seconds" in why and stats[-1] == "Waking %s... 2 s" % name)
+                                  and "didn\u2019t wake in 60 seconds" in why and stats[-1] == "Waking %s... 2 s" % name)
     # a Skip on it: stop waiting, say it is asleep, nothing is sent elsewhere, the server is not marked down
     steps.clear(); stats.clear(); ns["_srv_wake_at"].clear()
     ev2 = _th329.Event(); ev2.set()

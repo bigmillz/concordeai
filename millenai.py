@@ -29838,11 +29838,12 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
                      % (opts["width"], opts["height"]))
     note = "" if not extra else " · " + "; ".join(extra)
     cap = subject[:1].upper() + subject[1:]
+    # the note rides inside the sentence ("Made on Desk · twice as large."), not after its stop
     if sub == IMAGE_SUB:
-        emit("![%s](/api/image/%s)\n\n*%s. Made on %s.%s*"
+        emit("![%s](/api/image/%s)\n\n*%s. Made on %s%s.*"
              % (subject.replace("]", ""), os.path.basename(path), cap, name, note))
     else:
-        emit("[[vid:%s]]\n\n*%s. Made on %s.%s*"
+        emit("[[vid:%s]]\n\n*%s. Made on %s%s.*"
              % (json.dumps({"id": os.path.basename(path), "t": subject[:80]},
                            separators=(",", ":")), cap, name, note))
     return True
