@@ -19233,6 +19233,18 @@ and 390 in Calm, Balanced and Full: zero page errors, zero API responses ≥400;
 `MillenAI-dev-tidy`, killed by PID; no chat sent (the asking state is a stand-in built from the page's own
 `addMsg`/`liveLineHTML`). Not verified: WKWebView, and the footage in Balanced (Chromium plays no H.264).
 Stills (before = beta-1 on 9885, after = tidy) and `balanced-walk.mp4` in `scratchpad/tidy/shots/`.
+- **On merge into beta-1 (7.0 beta 1, per Patrick): Full is the default**, not Balanced. A fresh install or
+  an unset `millen.fxlevel` is Full; a saved "balanced" or "calm" keeps its choice; a saved "full" stays
+  Full (`hzFxLevel`, `setFxLevel` and the head script's root class all fall to Full; the Settings note reads
+  "Full is the default. Balanced and Calm are lighter."). Full is as it was: the GL loop at the display's
+  own refresh rate, the footage at its clip's speed, the eased transitions. **Balanced is smooth too**: its
+  loop runs at the display's rate (the 42 ms gap, 24 fps, is gone, and the 32 ms gap below Full with it;
+  the footage reads as smooth once the frames that upload it are no longer a quarter of them), still with
+  fewer passes than Full (no feedback, blur, bloom or streak; the footage at half; the neon at a third,
+  slowed; the grain still). Only a local engine's writing holds the sky to 15 fps, at every level, as
+  before. Calm, Balanced's touches, the Balance and Sting chrome, the static logo and the one greeting
+  stay as built. Pins: the levels' default and its two mutants, the frame-gap line, the note.
+
 ## 6b543 — dictation-instant: it listens at the press, writes as you speak, and is done at the release (per Patrick)
 
 Patrick: "I want the dictation part to work with very low latency, like really fast, not like you

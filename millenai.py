@@ -47605,8 +47605,8 @@ if(hzLook==="horizon"){
   try{hzReduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){}
   var hzSeen=__HZ_SEEN__;   // the full opening plays on the first launch only (the seen_opening pref)
   if(!hzFxOff&&!hzIntroDone&&!hzReduced&&!hzSeen)document.documentElement.classList.add("hz-intro");
-  // the Effects level (6b542) is marked before the first paint: Full, or Balanced (the default); Calm carries neither
-  try{var hzFxl=localStorage.getItem("millen.fxlevel");document.documentElement.classList.add(hzFxl==="full"?"hz-full":hzFxl==="calm"?"hz-calm":"hz-bal");}catch(e){}
+  // the Effects level (6b542) is marked before the first paint: Full (the default, and unset), Balanced or Calm
+  try{var hzFxl=localStorage.getItem("millen.fxlevel");document.documentElement.classList.add(hzFxl==="calm"?"hz-calm":hzFxl==="balanced"?"hz-bal":"hz-full");}catch(e){}
   // DEAD-MAN'S SWITCH: should the main script die, the finished home shows anyway
   // (a dev copy's deliberately frozen intro says it is alive, and keeps its moment)
   setTimeout(function(){if(!window.hzFrozen&&!window.hzReady)document.documentElement.classList.remove("hz-intro","hz-markin","hz-markout");},5000);
@@ -52812,15 +52812,15 @@ __CODE_ROWS__
       <label id="look-row"><span>Look</span>
         <select id="look-sel"><option value="horizon">Horizon</option>
           <option value="classic">Classic</option></select></label>
-      <!-- EFFECTS (6b526; 6b542, per Patrick): Calm is the quiet page;
-           Balanced, the default, adds a few soft living touches; Full is
-           the whole show, by choice. The Visual effects switch above is
-           still the stills switch under every level -->
+      <!-- EFFECTS (6b526; 6b542, per Patrick): Full, the default, is the
+           whole show; Balanced is Calm's chrome with a few soft living
+           touches; Calm is the quiet page. The Visual effects switch above
+           is still the stills switch under every level -->
       <label id="fx-level-row"><span>Effects</span>
         <select id="fx-level"><option value="calm">Calm</option>
           <option value="balanced">Balanced</option>
           <option value="full">Full</option></select></label>
-      <div id="fx-level-note">Balanced is the default. Full is the whole show.</div>
+      <div id="fx-level-note">Full is the default. Balanced and Calm are lighter.</div>
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
@@ -64910,13 +64910,14 @@ const HZ_SKYCOL=[[0,3,4,10,6,11,28,16,34,79],[5,3,4,10,6,11,28,16,34,79],[6.5,8,
 function hzKeyed(keys,h){for(let i=0;i<keys.length-1;i++){const a=keys[i],b=keys[i+1];if(h>=a[0]&&h<=b[0]){const t=(h-a[0])/(b[0]-a[0]||1);return a.map((v,k)=>v+(b[k]-v)*t);}}return keys[0];}
 // THE EFFECTS LEVEL (6b542, per Patrick: "too much going on ... like an old lady's house
 // with all these trinkets everywhere", then, seeing Calm: "that's definitely cleaner, but it
-// feels dry"): Calm is the quiet page; Balanced, the default, is Calm's chrome with a few
-// living touches, each soft, from a real input or the hour, and settling; Full is today's
-// whole show, by choice. A saved "balanced" stays Balanced, "full" Full. The root carries
+// feels dry"): Calm is the quiet page; Balanced is Calm's chrome with a few living touches,
+// each soft, from a real input or the hour, and settling; Full, the default (per Patrick, on
+// the beta-1 merge), is the whole show. A saved "balanced" stays Balanced, "calm" Calm,
+// an unset or saved "full" is Full. The root carries
 // hz-full or hz-bal; what Calm and Balanced share hangs off .hz:not(.hz-full). Stills (the
 // Visual effects switch, millen.video; reduced motion) sit under every level as before.
 function hzFxLevel(){
-  try{return localStorage.getItem("millen.fxlevel")==="full"?"full":localStorage.getItem("millen.fxlevel")==="calm"?"calm":"balanced";}catch(e){return "balanced";}
+  try{return localStorage.getItem("millen.fxlevel")==="calm"?"calm":localStorage.getItem("millen.fxlevel")==="balanced"?"balanced":"full";}catch(e){return "full";}
 }
 function hzCalm(){return hzFxLevel()!=="full";}          // Calm or Balanced: the quiet chrome
 function hzFxBal(){return hzFxLevel()==="balanced";}     // Balanced's living touches
@@ -65011,8 +65012,8 @@ function hzSkyBoot(){
     if(!hzS.mediaOn)return;
     S.raf=requestAnimationFrame(S.frame);
     if(document.hidden)return;
-    const full=hzFxLevel()==="full",gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);
-    const lv=hzFxLevel(),calm=lv==="calm",bal=lv==="balanced",g2=bal?Math.max(gap,42):gap;     // Balanced runs at 24 fps (6b542)
+    const full=hzFxLevel()==="full",gap=hzS.gen&&hzS.genLocal?1000/15:0;
+    const lv=hzFxLevel(),calm=lv==="calm",bal=lv==="balanced",g2=gap;     // Balanced and Full at the display's own rate (6b542, per Patrick: smooth); only a local engine's writing holds the sky to 15 fps
     if(g2&&nowT-S.last<g2)return;S.last=nowT;
     const hasVid=vid.readyState>=2&&!!vid.dataset.i;
     if(!S.ready){S.ready=true;cv.classList.add("on");}
@@ -65966,11 +65967,11 @@ function setLook(v,quiet){
     const g=$("#hero .greet");if(g&&typeof greeting==="function"){g.innerHTML="";g.textContent=greeting();delete g.dataset.hzText;}
     if(!quiet&&typeof bootSkyline==="function"){skyBooted=false;bootSkyline();}}
 }
-// Effects: Calm, Balanced (the default) or Full (6b542), kept in millen.fxlevel. The root's
+// Effects: Calm, Balanced or Full (the default; 6b542), kept in millen.fxlevel. The root's
 // hz-full / hz-bal classes carry the level to the sheet; the sky resizes to its pixel ratio,
 // Calm draws its one still, Balanced and Full start their loop; the greeting is rebuilt.
 function setFxLevel(v){
-  v=v==="full"?"full":v==="calm"?"calm":"balanced";
+  v=v==="calm"?"calm":v==="balanced"?"balanced":"full";
   try{localStorage.setItem("millen.fxlevel",v);}catch(e){}
   hzFxApply();
 }
