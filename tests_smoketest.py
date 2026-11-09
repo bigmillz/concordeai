@@ -34733,7 +34733,7 @@ def _cm_page(src):
             o["rows2"].count(' off"') == 3 and "no key yet</span>" in o["rows2"] and 'title="Add a key under Settings"' in o["rows2"]
             and "no key yet</span>" in o["row2"]),
         "no blend line in the sub-menu": "blend" not in o["rows1"] and "engblend" not in o["rows0"] + o["rows2"],
-        "chip": o["chip"] == ["Alpha, cloud only: Claude", "Gamma, cloud only", "Sigma, cloud only", "Gemini only", "Kimi K3 only", "Max", "Cloud Only", "Fast"],
+        "chip": o["chip"] == ["Fast, cloud only: Claude", "Thinking, cloud only", "Pro, cloud only", "Gemini only", "Kimi K3 only", "Max", "Cloud Only", "Fast"],
         "bubble of a mode: the models and the promise": ("Groq · gpt" in o["pop"][0] and "Nothing runs on this computer." in o["pop"][0]
                                                          and "Fast · cloud only" in o["pop"][0]),
         "bubble of an unavailable pick: why": "Key rejected." in o["pop"][1] and "Claude only" in o["pop"][1],
@@ -34908,7 +34908,7 @@ _CM_MUT = [
      "+(on&&!advOn?\" on\":\"\")\n    +'\" data-t=\"'+esc(t)+'\" tabindex=\"0\"'"),
     ("greyed rows without the tooltip", "off&&inf.why?inf.why:\"\",tier===t", "\"\",tier===t"),
     ("greyed rows without the reason", "modeRow(t,ic,n,off?(inf.short||\"unavailable\"):\"\"", "modeRow(t,ic,n,\"\""),
-    ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Alpha, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";',
+    ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";',
      '  return modeName(p.mode)+", cloud only";'),
     ("a pick's chip", '  if(p.mode==="Model")return inf.name?inf.name+" only"', '  if(p.mode==="Model")return "Cloud Only"+""'),
     ("Max's chip names a seat", '  if(t==="Max")return "Max";', '  if(false)return "Max";'),
