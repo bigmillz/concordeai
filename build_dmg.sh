@@ -4,7 +4,15 @@
 set -e
 cd "$(dirname "$0")"
 
-./build_macos_app.sh
+# THE BUNDLE IS A PARAMETER (6b537): build_shell_dmg.sh builds the native
+# shell's ConcordeAI.app and sets DMG_APP_READY=1 to have it packaged here
+# instead of the Python app's; without it this script builds the Python
+# app as it always did. Either way the image, label and layout are one.
+if [[ -n "$DMG_APP_READY" ]]; then
+  [[ -d ConcordeAI.app ]] || { echo "DMG_APP_READY is set but there is no ConcordeAI.app"; exit 1; }
+else
+  ./build_macos_app.sh
+fi
 
 VER="$(python3 -c "import re;print(re.search(r'APP_VERSION = \"([^\"]+)\"', open('millenai.py').read()).group(1))")"
 # THE LABEL (6b287, per Patrick: "keep the version numbers in the DMG

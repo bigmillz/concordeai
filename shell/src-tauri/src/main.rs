@@ -260,6 +260,77 @@ fn show_error(app: &AppHandle, title: &str, why: &str, log: &str) {
     }
 }
 
+/// FIRST RUN ON A FRESH MAC (6b537): the Python app's launcher built the
+/// venv on first run (launch.sh, written by build_macos_app.sh). The shell
+/// carries that same script in its Resources (build_shell_dmg.sh extracts
+/// it) and runs it with --bootstrap: it makes the venv, installs the
+/// engine and exits 0, then the server starts as usual. A Mac that has the
+/// Python app's venv already (an install updating into the shell) never
+/// gets here. macOS only: the script is zsh and the venv path is a Mac's.
+fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool {
+    if !cfg!(target_os = "macos") || std::env::var_os("CONCORDE_PYTHON").is_some() {
+        return false;
+    }
+    let Ok(res) = app.path().resource_dir() else { return false };
+    let script = res.join("launch.sh");
+    if !script.exists() {
+        return false;
+    }
+    show_error(
+        app,
+        "Setting up ConcordeAI",
+        "First run: building the AI engine. This needs the internet and takes a few minutes; the window opens on its own when it is ready.",
+        "",
+    );
+    let ok = Command::new("/bin/zsh")
+        .arg(&script)
+        .arg("--bootstrap")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    ok && py.exists()
+}
+
+/// THE SIDECAR'S END IS THE SHELL'S (6b537). The updater (millenai.py's
+/// _do_update) exits the server with 0 and leaves a helper waiting for
+/// this process to be gone before it swaps the bundle and relaunches it
+/// with `open -n`; a clean exit of the server therefore quits the shell,
+/// the way the Python app's own exit closed its window. Any other end
+/// (a crash, a signal) shows the log's tail instead of a dead page. Quit
+/// takes the child out of the state first, so the watcher simply stops.
+fn watch_sidecar(app: AppHandle, log_path: PathBuf) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(200));
+        let Some(sc) = app.try_state::<Sidecar>() else { return };
+        let status = {
+            let Ok(mut g) = sc.child.lock() else { return };
+            let Some(child) = g.as_mut() else { return };
+            match child.try_wait() {
+                Ok(Some(s)) => {
+                    g.take();
+                    s
+                }
+                Ok(None) => continue,
+                Err(_) => return,
+            }
+        };
+        if status.code() == Some(0) {
+            app.exit(0);
+        } else {
+            let why = format!(
+                "The server stopped: {} (exit {}).",
+                exit_meaning(status.code()),
+                status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into())
+            );
+            show_error(&app, "ConcordeAI's server stopped", &why, &tail_of(&log_path, 30));
+        }
+        return;
+    });
+}
+
 /// Start the server and, once it has written its notes, point the window
 /// at it. On its own thread: the window is already up and dark meanwhile.
 fn start_sidecar(app: AppHandle) {
@@ -267,7 +338,7 @@ fn start_sidecar(app: AppHandle) {
         let home = data_home();
         let py = python_path();
         let script = server_script(&app);
-        if !py.exists() {
+        if !py.exists() && !bootstrap_venv(&app, &py) {
             show_error(
                 &app,
                 "ConcordeAI can't find its Python engine",
@@ -360,6 +431,7 @@ fn start_sidecar(app: AppHandle) {
         if let Some(sc) = app.try_state::<Sidecar>() {
             *sc.child.lock().unwrap() = Some(child);
         }
+        watch_sidecar(app.clone(), log_path.clone());
         if let Some(b) = app.try_state::<Bridge>() {
             *b.inner.lock().unwrap() = Some((note.port, note.token.clone()));
         }

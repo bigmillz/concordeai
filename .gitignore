@@ -46,3 +46,5 @@ v23-*
 # the native shell (6b532): Rust build output and Tauri's generated schemas
 shell/src-tauri/target/
 shell/src-tauri/gen/
+# the shell build's extracted first-run script and pins (build_shell_dmg.sh, 6b537)
+shell/src-tauri/sidecar/
