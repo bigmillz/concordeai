@@ -110,6 +110,10 @@ MACHINE_STATE = frozenset((
     # dropped at the end) and whether whisper's weights were warmed; the
     # helper process is machine state too, held by _dict_helper
     "_dict_sessions", "_whisper_warmed",
+    # (6b528) the page's usage tap and the role of the call on this thread:
+    # a callback and a word, nothing personal; (6b539) the janitor's last
+    # swap reading, a machine fact
+    "_tl_usage", "_engine_swap_seen",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
     "EXPORT_KIND",
     # the hardware benchmark (6b331): its run, the engine call in flight,
@@ -10578,11 +10582,13 @@ class ProfileCtx:
                 return False
 
 
-def _unlink_quiet(p):
+def _unlink_quiet(p) -> bool:
+    """Remove p if it is there; True when it went."""
     try:
         os.remove(p)
+        return True
     except OSError:
-        pass
+        return False
 
 
 # RUN/PROFILE.LOCK (1a 5.1). Every profile write and every switch holds
@@ -11388,6 +11394,10 @@ def profile_switch(ctx_new, erase_old=False) -> ProfileCtx:
             _turns_flush_ctx(old)
         except Exception:
             pass            # the answer is dropped, as before M9; the switch goes on
+        try:
+            know_stop(old)  # (6b530) no pass of the old profile is open past the epoch (ISO-7)
+        except Exception:
+            pass
         with _say_lock:
             try:
                 _stop_speaking()
@@ -11764,6 +11774,22 @@ def _write_file_raw(path: str, raw: bytes, mode=0o600):
     except BaseException:
         _unlink_quiet(tmp)
         raise
+
+
+def _copy_stream_raw(path: str, rfile, n: int) -> int:
+    """A file in a folder that isn't a live profile's store (an
+    imports/<dir> upload, 6b529), streamed from a request body in 1 MB
+    pieces: the bytes received. The caller checks the count against n
+    and keeps the file's record."""
+    got = 0
+    with open(path, "wb") as f:
+        while got < n:
+            chunk = rfile.read(min(1 << 20, n - got))
+            if not chunk:
+                break
+            f.write(chunk)
+            got += len(chunk)
+    return got
 
 
 def _read_file_json(path: str, want=dict, default=None):
@@ -13354,7 +13380,11 @@ def _know_state(base) -> dict:
 
 def _know_conn(base):
     """An open connection to the profile's index (made on first use);
-    the caller closes it."""
+    the caller closes it. Only for the active profile: a stale ctx (a
+    pass or a request that outlived a switch) gets StaleProfile and
+    opens or creates nothing, as the section's other writers (ISO-7)."""
+    if isinstance(base, ProfileCtx):
+        base.check()
     p = _pfile(KNOW_DB, base)
     _ensure_parent(p, base)
     c = sqlite3.connect(p, timeout=30)
@@ -13387,6 +13417,21 @@ def _know_meta(c, k, v=None):
         r = c.execute("SELECT v FROM meta WHERE k=?", (k,)).fetchone()
         return r[0] if r else ""
     c.execute("INSERT OR REPLACE INTO meta(k, v) VALUES(?, ?)", (k, str(v)))
+
+
+def _know_commit(c, base):
+    """The index's commit, only while base is still the active profile:
+    a switch mid-pass rolls the open transaction back and raises
+    StaleProfile, so nothing of the old profile lands after the epoch
+    moved (ISO-7). The index's SQLite writes are profile writes (6b530),
+    refused the way ctx.write refuses them."""
+    if isinstance(base, ProfileCtx):
+        try:
+            base.check()
+        except StaleProfile:
+            c.rollback()
+            raise
+    c.commit()
 
 
 # ------------------------------------------------------- the text of things
@@ -13909,8 +13954,10 @@ def _know_pass_chats(c, base, st) -> int:
         ts = float(ch.get("ts") or 0) / 1000.0
         _know_put_doc(c, "chat", key, str(ch.get("title") or "chat")[:120], ts, sig,
                       know_chat_chunks(ch))
-        c.commit()
+        _know_commit(c, base)
         n += 1
+        if st["stop"].is_set() or base.cancel.is_set():
+            return n
     for key, (i, _s) in have.items():
         if key not in seen:
             _know_drop_doc(c, i)
@@ -13959,7 +14006,7 @@ def _know_pass_files(c, base, st, folders: list, budget: int) -> int:
             title, ts, text = know_file_text(p)
             _know_put_doc(c, "file", key, title or os.path.basename(p), ts, sig,
                           know_chunks(text, title or os.path.basename(p)) if text else [])
-            c.commit()
+            _know_commit(c, base)
             n += 1
             if st["stop"].is_set() or base.cancel.is_set():
                 return n
@@ -14000,13 +14047,13 @@ def _know_pass_embed(c, base, st) -> int:
             break
         for (i, _h, _b), v in zip(rows, vecs):
             c.execute("INSERT OR REPLACE INTO vecs(chunk, v) VALUES(?, ?)", (i, v.tobytes()))
-        c.commit()
+        _know_commit(c, base)
         done += len(rows)
         st["mat"] = None
     return done
 
 
-def _know_model_follow(c):
+def _know_model_follow(c, base):
     """Models follow app updates (per Patrick): once per build, the
     embedding model's newer weights are fetched when they are out (the
     hub sends only what changed; Ollama only new layers), retired repos
@@ -14016,11 +14063,11 @@ def _know_model_follow(c):
         if _know_meta(c, "embed_model"):
             c.execute("DELETE FROM vecs")
         _know_meta(c, "embed_model", want)
-        c.commit()
+        _know_commit(c, base)
     if _know_meta(c, "model_build") == str(APP_BUILD):
         return
     _know_meta(c, "model_build", str(APP_BUILD))
-    c.commit()
+    _know_commit(c, base)
     for r in KNOW_EMBED_RETIRED:
         try:
             _rm_hf_repo(r)
@@ -14037,7 +14084,7 @@ def know_pass(base, st=None) -> int:
     cfg = know_settings(base)
     c = _know_conn(base)
     try:
-        _know_model_follow(c)
+        _know_model_follow(c, base)
         n = 0
         st["state"] = "indexing"
         if cfg["chats"]:
@@ -14046,9 +14093,11 @@ def know_pass(base, st=None) -> int:
             for (i,) in c.execute("SELECT id FROM docs WHERE src='chat'").fetchall():
                 _know_drop_doc(c, i)
                 n += 1
-        c.commit()
+        _know_commit(c, base)
+        if st["stop"].is_set() or base.cancel.is_set():
+            return n            # a switch under way: the pass ends here (ISO-7)
         n += _know_pass_files(c, base, st, cfg["folders"], KNOW_PASS_DOCS)
-        c.commit()
+        _know_commit(c, base)
         if n:
             st["mat"] = None
         n += _know_pass_embed(c, base, st)
@@ -14128,6 +14177,23 @@ def know_kick(base, now: bool = False):
         st["wake"].set()
 
 
+def know_stop(base, wait: float = 5.0):
+    """At a switch (ISO-7): the indexer of the profile being left stops
+    and its pass is waited out (one document at most: the passes watch
+    `stop` at every commit), before the epoch moves, so no pass of the
+    old profile is open past it. A pass that outlives the wait can't
+    commit anyway (_know_commit) and ends at its next check. Nothing is
+    started here; a later kick for the next active profile starts afresh."""
+    with _know_lock:
+        st = _know.get(_bk(base))
+        t = st["thread"] if st else None
+        if st:
+            st["stop"].set()
+            st["wake"].set()
+    if t is not None and t.is_alive() and t is not threading.current_thread():
+        t.join(wait)
+
+
 def know_forget_folder(base, root: str) -> int:
     """Forget this folder: its entries leave the index and the list; the
     count of documents removed. The folder itself is never touched."""
@@ -14140,7 +14206,7 @@ def know_forget_folder(base, root: str) -> int:
                                        ("file:" + root, "file:" + root.replace("%", "\\%") + os.sep + "%"))]
         for i in ids:
             _know_drop_doc(c, i)
-        c.commit()
+        _know_commit(c, base)
     finally:
         c.close()
     _know_state(base)["mat"] = None
@@ -14158,7 +14224,7 @@ def know_forget_all(base):
     try:
         for t in ("fts", "vecs", "chunks", "docs"):
             c.execute("DELETE FROM " + t)
-        c.commit()
+        _know_commit(c, base)
     finally:
         c.close()
 
@@ -16544,13 +16610,7 @@ def import_upload(base, run, rfile, n):
     _ensure_parent(p, base)
     got = 0
     try:
-        with open(p, "wb") as f:
-            while got < n:
-                chunk = rfile.read(min(1 << 20, n - got))
-                if not chunk:
-                    break
-                f.write(chunk)
-                got += len(chunk)
+        got = _copy_stream_raw(p, rfile, n)
     except OSError as exc:
         job["state"], job["err"] = "error", "Couldn't save the file here: %s" % exc
         raise ImportError_(job["err"]) from exc
@@ -16759,10 +16819,7 @@ def _import_run(job, base):
         except Exception:
             pass
         if job.get("uploaded"):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
+            _unlink_quiet(path)
 
 
 def _imp_left_line(counts):
@@ -16875,18 +16932,12 @@ def import_remove(base, app):
     for rel in files:
         if rel in still or not _media_ok(rel):
             continue
-        try:
-            os.remove(_pfile(rel, base))
+        if _unlink_quiet(_pfile(rel, base)):
             removed_files += 1
-        except OSError:
-            pass
     ledger["keys"] = {k: v for k, v in ledger["keys"].items() if not k.startswith(app + ":")}
     ledger["runs"] = [r for r in ledger["runs"] if r.get("app") != app]
     _imp_ledger_save(ledger, base)
-    try:
-        os.remove(_pfile("%s/%s-extras.json" % (IMPORT_DIR, app), base))
-    except OSError:
-        pass
+    _unlink_quiet(_pfile("%s/%s-extras.json" % (IMPORT_DIR, app), base))
     return {"ok": True, "chats": len(gone_ids), "images": removed_files}
 
 
@@ -52943,7 +52994,7 @@ __CODE_ROWS__
         <b>Concorde<b>AI</b></b>
         <span id="wiz-ver">__APP_VER__</span>
       </div>
-      <p>Concorde runs AI models on this Mac. Several draft an answer; the strongest writes the final. Cloud models are optional.</p>
+      <p>ConcordeAI runs AI models on this Mac. Several draft an answer; the strongest writes the final. Cloud models are optional.</p>
       <p>About a minute. Pick what to install, add any cloud keys, done. Everything is in Settings later.</p>
     </div>
 
@@ -53163,7 +53214,7 @@ async function apiDownload(p,nm){
 }
 // a Windows PC (6b317): its commands, settings and words differ
 const IS_PC=__IS_PC__;
-// the answer's signature (6b528): one brain signs each answer, "Concorde Gamma";
+// the answer's signature (6b528): one brain signs each answer, SIGN_BRAND + " Gamma";
 // the mode's name comes from MODE_NAMES at the top of the script (6b534).
 // This constant is the one bare brand word the gauntlet's brand guard allows.
 const SIGN_BRAND="Concorde";
@@ -56320,7 +56371,7 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   // a saved message (the record itself rides in as `extra`) is drawn settled:
   // a reopened chat of two hundred messages plays no two hundred entrances
   div.className="msg "+(role==="user"?"user":"ai")+(m.role?" settled":"");
-  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): "Concorde Gamma", a
+  // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick): SIGN_BRAND + " Gamma", a
   // breathing dot while it works and one plain word for what it is doing; the
   // real models stay behind the answer, in the marginalia, and only when asked.
   // A chat brought from another app (6b529) says who answered there, and
@@ -58567,7 +58618,7 @@ function loadChat(id){
   messages=c.messages.slice();
   inner.innerHTML="";
   const by=c.src&&c.src.name;     // a chat brought from another app (6b529)
-  // only the messages brought in carry the other app's byline (integration); an answer written here signs as Concorde
+  // only the messages brought in carry the other app's byline (integration); an answer written here signs with SIGN_BRAND
   messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));
   renderChats();
   markSeen();
