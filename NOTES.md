@@ -19130,3 +19130,126 @@ that cuts). Video and stills in `scratchpad/modefx/` (`mode-switch.mp4`, `.gif` 
   privacy line for "Your stuff" (6b530): "Stays on your machines. Cloud only if you allow it." (was "Stays on
   this Mac. Never sent anywhere.", untrue since paired servers may read records, and Mac-only while the app
   goes cross-platform; the owner wants it short).
+
+## 6b541 — dictation-instant: it listens at the press, writes as you speak, and is done at the release (per Patrick)
+
+Patrick: "I want the dictation part to work with very low latency, like really fast, not like you
+have to wait a second for it to start and then like then it pauses." Branch `dictation-instant` from
+beta-1 (c5762a8), for beta 2. Measured first, on his M4 Pro, with a WAV of the system voice played
+as the page's microphone (headless Blink, Playwright's fake capture device; never his own voice), the
+dev copy's `dict-trace` line, and the recognizers on the bench.
+
+**What caused the wait and the pause.** Three things, none of them the microphone:
+1. `mlx_whisper` costs **~760 ms a call whatever the clip's length** (it pads every clip to a 30 s
+   window: a 0.5 s clip and a 4.4 s clip both take 750-810 ms) and **3.1 s on the first call** of the
+   process (the weights). The page sent one WAV after the release, so "transcribing…" sat there
+   0.9-2 s (cold) and nothing at all showed while he spoke. Partials on whisper were out of reach by
+   construction: one pass a second, each 760 ms, and the final would still wait on its own pass.
+2. The indicator came on with the FIRST AUDIO CHUNK (6b345's `recHeard`), 200-800 ms after the
+   press; before it the composer said "Starting the microphone…".
+3. The keydown's one long synchronous task was `new AudioContext()`, 160-213 ms in Blink, made on the
+   first press: the indicator could not paint until it was done, and getUserMedia's answer queued
+   behind it (380 ms to the stream with it on the keydown; 25 ms without).
+
+**Before and after** (same harness, same WAV with 1 s of lead silence, the composer focused first as
+a person would have it):
+
+| | before, cold | before, warm | after, 1st press | after, 2nd press |
+|---|---|---|---|---|
+| press → listening indicator | 790 ms | 200-290 ms | **1 ms** | **1 ms** |
+| press → first audio frame | 273 ms | 292 ms | **74 ms** (stream at 29 ms) | **86 ms** |
+| speech start → first partial | none | none | **~1.1 s** | **~1.1 s** |
+| release → final text | 2050 ms | 857 ms | **72 ms** | **144 ms** (61-185 over runs) |
+
+Blink numbers; the shipped app is WKWebView, where getUserMedia's own time is still unverified
+(6b345 said so too). The `dict-trace` line now reads `keydown to indicator N ms, to microphone N ms,
+to first sound N ms, to session N ms, to first partial N ms; release to final N ms` for a dev copy
+started with `MILLENAI_TEST_HOOKS=dict-trace`, and `window.dictT` is there for the console.
+
+**The engine: the system's own, on this computer.** macOS 26 and later carry Apple's
+`SpeechAnalyzer`/`SpeechTranscriber`, the on-device recognizer Notes dictates with. Behind a 100 KB
+Swift program, `shell/dictate/dictate.swift` (built by `shell/dictate/build.sh`, universal), it
+measured: **spawn to ready 70-250 ms** (1.1 s the very first time the OS loads the model), **final
+49-110 ms after the end of audio**, volatile partials **about once a second** (1.05 s to the first
+word with 100 ms chunks; 20 ms chunks made it slower, 1.25 s; a second of lead silence moved the
+first partial by a second, so the cadence is the recognizer's own window, not ours), ~18 MB resident,
+and **no permission prompt of its own** (unlike `SFSpeechRecognizer`, which also asks for Speech
+Recognition and whose CLI attempt died on the authorization). It needs no download: a Mac on macOS
+26+ dictates without the 1.6 GB whisper fetch (`_voice_ready` says yes when the helper is there).
+Whisper stays for everything else (macOS before 26, Windows), warmed on the first press so the 3.1 s
+overlaps the speech, with a partial pass a second on Apple silicon or CUDA (a CPU PC gets the final
+alone: whisper small takes seconds a pass there, 6b317).
+
+**Protocol.** Helper: frames of u32 LE length + PCM int16 16 kHz mono on stdin, a zero length ends
+the utterance; JSON lines on stdout (`ready`, `listening`, `partial`, `final`, `done`, `err`, with
+`u` the utterance number so a late line for an old one is dropped). A fresh `SpeechTranscriber` per
+utterance (a module can't be restarted on a second analyzer; that was a crash), the model kept with
+`modelRetention: .processLifetime`, `priority: .userInitiated`. Server: `_DictHelper` (one resident
+process, spawned ahead by `/api/dictate/warm`, killed at exit), `_DictSession` (the audio so far,
+the last partial, the final; dropped at the end or a cancel; a new start drops the one before it:
+one microphone). Routes under `/api/dictate/`: `start` → `{sid, engine, partials}` (or
+`{ok:false, ready:false}`: the page then runs `ensureVoice` for the download words), `audio?sid=`
+with raw PCM → `{partial, secs}` (the partial rides the reply: the page posts every ~43 ms chunk
+anyway, so no second connection), `end?sid=` with the tail → `{text}`, `cancel`, `warm`. The old
+`/api/transcribe` (a whole WAV) runs through the same engines (`_dict_oneshot`).
+
+**The page** (the `MIC_WARM_S` region, the 6b345 capture kept: getUserMedia first, no
+voice-processing unit, one AudioContext, the warm window exactly as it was):
+- `dictLit(true)` in the keydown before any `await`: the mic button lit and "Listening…" on the
+  composer at once; the hold/toggle words follow with the first sound (`recPaint`), as before.
+- `dictWarm` on the composer's focus (once a minute): the helper spawned, and the AudioContext made
+  there instead of in the keydown.
+- Every chunk is turned to 16 kHz int16 on the page (`pcm16`) and queued (`dictQ`). **Until the
+  session answers the queue is the pre-roll**: nothing said while the server was asked is lost; it
+  all goes in the first POST. The warm window keeps nothing (`micCap` false there), unchanged.
+- `dictPump`: one request in flight, the queue batches itself under load; the reply's partial lands
+  in the composer in place (`dictShow`), dimmed (`#input.dictating{opacity:.62}`) while it may still
+  change, each replacing the last; the final undims.
+- `stopRec`: `dictSid=null` FIRST (the pump stops; a late partial is ignored), then the chunk in
+  flight is awaited, then the tail goes with `end`. Found by the gauntlet's `nopause` scenario:
+  with the order the other way round, the in-flight request's own continuation pumped the tail as
+  one more audio request behind the end, and the end could overtake it. A slip (under 0.3 s)
+  cancels the session and transcribes nothing (6b338). On an error the last partial stands, plain.
+- `ScriptProcessor` buffer 4096 → 2048 (~43 ms at 48 kHz): the first sound shows sooner.
+- The copy: "Listening…", "Finishing…", "Didn’t catch that. Try again.", "Couldn’t transcribe. Try
+  again." (the copy pass's words).
+
+**Nothing leaves this computer.** The gauntlet lints the server's `# @dictate-begin … @dictate-end`
+region (no `urlopen`, `urllib.request`, `http.client`, `socket.`, `requests.`, `ssl.`, URL, cloud
+key) and the helper's Swift source (`SpeechTranscriber`/`SpeechAnalyzer` present; no `URLSession`,
+`NWConnection`, `import Network`, `SFSpeechRecognizer`, URL), with seven mutants each of which the
+lint must catch. The page's node scenarios assert every call the capture path made went to this
+app's own `/api/` (`allCalls`, never reset), with a mutant that points the end at an absolute URL.
+
+**Build.** `build_shell_dmg.sh` runs `shell/dictate/build.sh` before the shell, copies the binary
+into `Contents/Resources/concorde-dictate`, signs it on its own (a nested executable) before the
+bundle's seal, and verifies it is there. `millenai.py` looks beside itself, then in
+`shell/dictate/` (a dev copy), on macOS 26+ only; `MILLENAI_DICT_HELPER` names one in a dev copy.
+The binary is a build output (`.gitignore`). Not done: `build_macos_app.sh` (the Python-app
+bundle) doesn't carry it, so that bundle stays on whisper.
+
+**Gauntlet.** The 6b345 node scenarios had kept the pre-copy-pass words ("getting the
+microphone…", "didn’t catch anything", "(or tap the mic)") and were **red on beta-1 already**
+(copy-2, a8f6348, changed the page and not them); they now run the streaming path on the copy
+pass's words, their mutants moved to the new lines (the `order` mutant delays the capture by 20 ms
+instead of awaiting a second start, which hung the file; `statusskip` now watches both presses).
+New block "6b541 dictation instant": `instant`, `preroll`, `partials`, `nopause`, `cancelslip`,
+`warm`, `local` in node with eleven mutants; the session live on the fake engine (`dict-fake` hook,
+on the gauntlet's main copy: a partial per chunk, the whole at the end, 404 after, a cancel drops,
+a new start drops the old, the status names the engine); the "nothing leaves" lint and its mutants;
+the helper's discovery pins. `Int16Array` joins the page's host globals; `_dict_sessions` and
+`_whisper_warmed` are machine state. Checked here with ast.parse, `node --check`, the pin checker
+(only the `MEMORY USED` false positive and the dev copy's own `DICT_TRACE=true`), and the two
+dictation blocks against a dev copy, not the full gauntlet (tonight's beta run owns it).
+
+**Open, for Patrick.**
+- The partials' cadence is the recognizer's: ~1 s to the first word, then a batch a second. The
+  target was ~300 ms; nothing in the API moved it (chunk size, priority). Whisper would not have
+  done better (760 ms a pass). It refines in place and never pauses, which was the complaint.
+- A pre-roll *before* the press (the syllable said as the key goes down) would need the warm
+  window to keep a few hundred milliseconds of audio. 6b345's rule is that the warm microphone is
+  open and NOT listening, and it is opt-in. Not changed here; his call.
+- A native helper now ships inside the .app (Swift, built by `build_shell_dmg.sh`; a Developer ID
+  signs it with the rest). The release machine needs the Xcode command-line tools' `swiftc`.
+- WKWebView's own getUserMedia time is unverified in this session (no real microphone was opened);
+  the `dict-trace` line gives it in one dictation on a dev copy.

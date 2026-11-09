@@ -16,8 +16,10 @@
 #     v<APP_BUILD>, so the bundle's own build must match it. Tauri writes
 #     the version there; the bundle is patched after the build and signed
 #     again, and both keys are read back;
-#   * Resources/ carries millenai.py, fonts/, vfx/, the first-run launch.sh
-#     and crypto-requirements.txt (the sidecar's venv bootstrap, 6b537);
+#   * Resources/ carries millenai.py, fonts/, vfx/, the first-run launch.sh,
+#     crypto-requirements.txt (the sidecar's venv bootstrap, 6b537) and
+#     concorde-dictate, the on-device speech helper (6b541, built here by
+#     shell/dictate/build.sh and signed on its own);
 #   * the bundle verifies (ad hoc until a Developer ID is in the keychain:
 #     CONCORDE_SIGN_IDENTITY names one).
 set -e
@@ -47,6 +49,9 @@ fi
 # the bundle only; the disk image is build_dmg.sh's (Finder layout, the
 # starfield, the label), which Tauri's plain dmg target doesn't do
 TARGS=(); [[ -n "$TARGET" ]] && TARGS=(--target "$TARGET")
+# the on-device speech helper (6b541) goes in beside millenai.py
+./shell/dictate/build.sh
+[[ -x shell/dictate/concorde-dictate ]] || { echo "shell/dictate/concorde-dictate wasn't built"; exit 1; }
 ( cd shell/src-tauri && cargo tauri build --bundles app "${TARGS[@]}" )
 BUNDLE="shell/src-tauri/target/${TARGET:+$TARGET/}release/bundle/macos/ConcordeAI.app"
 [[ -d "$BUNDLE" ]] || { echo "expected $BUNDLE but it wasn't built"; exit 1; }
@@ -63,6 +68,10 @@ echo "  archs: $ARCHS"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VER" "$PLIST"
 IDENTITY="${CONCORDE_SIGN_IDENTITY:--}"
+# the speech helper is a nested executable: copied in and signed on its own
+# before the bundle's seal is written over it
+ditto shell/dictate/concorde-dictate "$BUNDLE/Contents/Resources/concorde-dictate"
+codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"
 codesign --force --sign "$IDENTITY" "$BUNDLE"
 codesign --verify --strict "$BUNDLE"
 [[ "$IDENTITY" == "-" ]] && echo "  ad-hoc signed (no Developer ID; set CONCORDE_SIGN_IDENTITY to sign for Gatekeeper)" \
@@ -77,7 +86,7 @@ GOT_EXE="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST")"
 [[ "$GOT_VER" == "$VER" ]] || { echo "CFBundleShortVersionString is $GOT_VER, not $VER"; exit 1; }
 [[ "$GOT_ID" == "com.millen.millenai" ]] || { echo "bundle id is $GOT_ID"; exit 1; }
 [[ "$GOT_EXE" == "ConcordeAI" ]] || { echo "executable is $GOT_EXE"; exit 1; }
-for f in millenai.py launch.sh crypto-requirements.txt fonts vfx; do
+for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate; do
   [[ -e "$BUNDLE/Contents/Resources/$f" ]] || { echo "Resources/$f is missing from the bundle"; exit 1; }
 done
 # the bundled server is this source, build and all

@@ -48,3 +48,6 @@ shell/src-tauri/target/
 shell/src-tauri/gen/
 # the shell build's extracted first-run script and pins (build_shell_dmg.sh, 6b537)
 shell/src-tauri/sidecar/
+# the on-device speech helper (6b541): built by shell/dictate/build.sh
+shell/dictate/concorde-dictate
+shell/dictate/concorde-dictate.*
