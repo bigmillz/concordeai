@@ -38383,12 +38383,12 @@ check("horizon: a question sent from the home glides the composer to the foot an
       and "if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK())" in _hz_js
       and ".hz .chat-item.hz-live .ct{" in _hz_css and 'data-machine="\'+m.esc(m.name)+\'"' in _hz_js
       and ".hz .die{" not in _hz_css, "")
-check("horizon: the Look is Horizon by default, Classic by choice, with Effects Calm, Full or Off (6b542), kept in browser storage with the sidebar and the day's seed",
+check("horizon: the Look is Horizon by default, Classic by choice, with Effects Calm, Balanced or Full (6b542), kept in browser storage with the sidebar and the day's seed",
       '"millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"' in page
       and "function setLook(v,quiet){" in _hz_js and 'sel.addEventListener("change",()=>setLook(sel.value));' in _hz_js
       and "function setFxLevel(v){" in _hz_js and '<label id="look-row"><span>Look</span>' in page
       and '<label id="fx-level-row"><span>Effects</span>' in page
-      and '<select id="fx-level"><option value="calm">Calm</option>' in page and '<option value="off">Off</option></select>' in page, "")
+      and '<select id="fx-level"><option value="calm">Calm</option>' in page and '<option value="full">Full</option></select>' in page, "")
 # ==== HORIZON end ====
 
 # ==== know (6b530, per Patrick: "It knows your life"): begin ====
@@ -41372,9 +41372,9 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
       and _mfx_m1 != _mfx_o and _mfx_m2 != _mfx_o, "%r %r %r" % (_mfx_o, _mfx_m1, _mfx_m2))
 # ==== the mode switch (6b540): end ====
 
-# ==== CALM BY DEFAULT, BALANCE AND STING (6b542, per Patrick): begin ====
-# Effects has three levels: Calm (the default, the quiet page), Full (today's whole show, by
-# choice) and Off (stills). Full's show is PRESENT and GATED behind Effects Full (never
+# ==== CALM BY DEFAULT, BALANCED, BALANCE AND STING (6b542, per Patrick): begin ====
+# Effects has three levels: Calm (the quiet page), Balanced (the default: Calm's chrome and a
+# few soft living touches) and Full (today's whole show, by choice). Full's show is PRESENT and GATED behind Effects Full (never
 # deleted): the trace, the streak and sweep, the comets, the ripple, the rings, the arc and
 # glide, the greeting's bloom and sheen, the composer's ring and glow, the Max/Ultra shimmer,
 # the dies. REMOVED outright: the header wordmark's glint and glow, the sidebar's token counts
@@ -41385,50 +41385,56 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
 # one box, and a trace is killed at once when the text or the box moves.
 print("== calm by default, balance and sting (6b542) ==")
 def _c542_levels(js, css, pg, head):
-    return ('function hzFxLevel(){\n  if(typeof noVideo!=="undefined"&&noVideo)return "off";' in js
-            and 'localStorage.getItem("millen.fxlevel")==="full"?"full":"calm"' in js
-            and 'function hzCalm(){return hzFxLevel()!=="full";}' in js
-            and 'function setFxLevel(v){\n  v=v==="full"?"full":v==="off"?"off":"calm";' in js
-            and 'if(v==="off"){if(typeof setVideo==="function"&&!noVideo)setVideo(false);}' in js
-            and 'root.classList.toggle("hz-full",lv==="full");' in js
-            and 'if(localStorage.getItem("millen.fxlevel")==="balanced")localStorage.setItem("millen.fxlevel","calm");' in js   # Balanced migrates to Calm
-            and 'if(!hzFxOff&&localStorage.getItem("millen.fxlevel")==="full")document.documentElement.classList.add("hz-full");' in head
-            and '<select id="fx-level"><option value="calm">Calm</option>' in pg and '<option value="full">Full</option>' in pg and '<option value="off">Off</option></select>' in pg
-            and '<div id="fx-level-note">Calm is quiet and light. Full is the whole show.</div>' in pg
-            and ".hz #fx-toggle{display:none}" in css and "html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}" in css
+    return ('function hzFxLevel(){\n  try{return localStorage.getItem("millen.fxlevel")==="full"?"full":localStorage.getItem("millen.fxlevel")==="calm"?"calm":"balanced";}catch(e){return "balanced";}' in js
+            and 'function hzCalm(){return hzFxLevel()!=="full";}' in js and 'function hzFxBal(){return hzFxLevel()==="balanced";}' in js
+            and 'function setFxLevel(v){\n  v=v==="full"?"full":v==="calm"?"calm":"balanced";' in js
+            and 'root.classList.toggle("hz-full",lv==="full");root.classList.toggle("hz-bal",lv==="balanced");' in js
+            and 'document.documentElement.classList.add(hzFxl==="full"?"hz-full":hzFxl==="calm"?"hz-calm":"hz-bal");' in head   # before the first paint; unset is Balanced
+            and '<select id="fx-level"><option value="calm">Calm</option>' in pg and '<option value="balanced">Balanced</option>' in pg and '<option value="full">Full</option></select>' in pg
+            and '<div id="fx-level-note">Balanced is the default. Full is the whole show.</div>' in pg
+            and "html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}" in css
             and "hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)" in _MILLENAI_SRC
-            and "Balanced</option>" not in pg)
-check("6b542 Effects: Calm (default), Full, Off; Off is the old Visual effects switch; a saved Balanced reads as Calm; hz-full is set before the first paint; Horizon hides the old toggle and Classic the levels; the mutants are caught",
+            and 'value="off"' not in pg and "millen.fxlevel\",\"calm\")" not in js)        # no Off level, no migration away from Balanced
+check("6b542 Effects: Calm, Balanced (the default, and what a saved Balanced stays) and Full; hz-full / hz-bal set before the first paint; Classic sees no levels; the mutants are caught",
       _c542_levels(_hz_js, _hz_css, page, _hz_head)
-      and not _c542_levels(_hz_js.replace('?"full":"calm"', '?"full":"balanced"'), _hz_css, page, _hz_head)
-      and not _c542_levels(_hz_js, _hz_css, page, _hz_head.replace("if(!hzFxOff&&", "if(")), "")
+      and not _c542_levels(_hz_js.replace('?"calm":"balanced";}catch(e){return "balanced";}', '?"calm":"calm";}catch(e){return "calm";}'), _hz_css, page, _hz_head)
+      and not _c542_levels(_hz_js, _hz_css, page, _hz_head.replace('hzFxl==="calm"?"hz-calm":"hz-bal"', 'hzFxl==="calm"?"hz-calm":"hz-full"')), "")
 def _c542_sky(js, css):
-    return ('if(hzCalm())return;      // Calm plays no footage' in js                                   # no decode, no texImage2D a frame
-            and 'const calm=hzCalm(),t=calm?0:(nowT-S.t0)/1000,m=S.vmap(t);' in js                        # the clock held: dust, grain and shafts still
-            and 'if(calm){S.neon=S.neonTo=0;S.boost=1;S.footMul=0;}' in js
-            and 'S.setNeon=function(){S.neonTo=hzCalm()?0:S.lvl+(S.busy?.28:0);};' in js
+    return ('if(hzFxLevel()==="calm")return;      // Calm plays no footage' in js                       # no decode, no texImage2D a frame
+            and 'const lv=hzFxLevel(),calm=lv==="calm",bal=lv==="balanced",g2=bal?Math.max(gap,42):gap;' in js   # Balanced at 24 fps
+            and 'const t=calm?0:(nowT-S.t0)/1000,m=S.vmap(t);' in js                                       # the clock held: dust, grain and shafts still
+            and 'if(calm){S.neon=S.neonTo=0;S.boost=1;S.footMul=0;}' in js and 'if(bal)S.boost=0;else S.boost+=(S.boostTo-S.boost)*.03;' in js
+            and 'S.setNeon=function(){const lv=hzFxLevel();S.neonTo=lv==="calm"?0:lv==="balanced"?S.lvl*.35:S.lvl+(S.busy?.28:0);};' in js
             and 'S.once=function(){if(S.raf||!hzS.mediaOn)return;S.last=0;S.still();};' in js
             and 'if(S){if(on&&!S.raf&&!hzS.reduced&&!calm)S.raf=requestAnimationFrame(S.frame);' in js      # no loop in Calm
-            and 'if(calm&&on)S.once();}' in js and 'if(hzS.sky&&hzCalm())hzS.sky.once();' in js
-            and 'addEventListener("resize",()=>{S.size();if(hzCalm())S.once();});' in js
+            and 'if(calm&&on)S.once();}' in js and 'if(hzS.sky&&hzFxLevel()==="calm")hzS.sky.once();' in js
+            and 'addEventListener("resize",()=>{S.size();if(hzFxLevel()==="calm")S.once();});' in js
+            # Balanced: the feedback and blur passes are Full's; the aurora clock slowed; the grain still; a faint twinkle; the footage at half
+            and 'if(full){gl.useProgram(pF);quad(pF);gl.bindFramebuffer(gl.FRAMEBUFFER,S.B.f);' in js
+            and 'hzBlur(gl,pB,quad,S.v2.t,S.v2.w,S.v2.h,S.sk,7,0);}     // Full alone keeps the trails and the bloom (6b542)' in js
+            and 'gl.uniform1f(pA.U.time,bal?t*.4:t);' in js and 'gl.uniform1f(pS.U.gt,full?t:0);gl.uniform1f(pS.U.twk,bal?1:0);' in js
+            and 'S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;' in js
+            and '*(1.-twk*.35*(.5+.5*sin(time*2.3+hash(floor(pc/3.))*50.)));"' in js and 'fract(gt*7.)*91.' in js
+            and ".hz.hz-bal #hz-aurw{opacity:.3;--hz-t-drift:72s}" in css
             and 'S.free=function(){["A","B","h1","v1","h2","v2","sk","au"].forEach(k=>{const T=S[k];if(T){gl.deleteTexture(T.t);gl.deleteFramebuffer(T.f);S[k]=null;}});};' in js
             and "    S.free();\n    S.W=Math.max(2,Math.round(innerWidth*d));" in js                        # the old targets freed before new ones (the resize leak)
-            and 'if(!hzS.clip||!hzMediaOK()||hzCalm())return;' in js
+            and 'if(!hzS.clip||!hzMediaOK()||hzFxLevel()==="calm")return;' in js
             and 'const a=$("#hz-aur2");if(!a||!hzFxFull())return;' in js                                   # no pulse on the frames
             and ".hz:not(.hz-full) #hz-aurw{opacity:.22;--hz-t-drift:56s}" in css
             and ".hz:not(.hz-full) #hz-washw{animation:none}" in css
             and ".hz:not(.hz-full) #hz-wash,.hz:not(.hz-full) #hz-wash.bloom,.hz:not(.hz-full).hz-busy #hz-wash{animation:none;opacity:.06}" in css)
-check("6b542 Calm's sky: no footage, no neon, no loop (one still on boot, resize and the stars' repaint), the clock held, the ice rays dimmer and slower, the wash still; old GL targets freed on resize; the mutants are caught",
+check("6b542 the sky by level: Calm no footage, no neon, no loop (one still on boot, resize and the stars' repaint), the clock held; Balanced a 24 fps loop with the footage at half, no trails, bloom or streak, a third of the neon slowed, a faint twinkle; Full as it was; old GL targets freed on resize; the mutants are caught",
       _c542_sky(_hz_js, _hz_css)
       and not _c542_sky(_hz_js.replace("    S.free();\n    S.W=", "    S.W="), _hz_css)
-      and not _c542_sky(_hz_js.replace("&&!hzS.reduced&&!calm)S.raf=", "&&!hzS.reduced)S.raf="), _hz_css), "")
+      and not _c542_sky(_hz_js.replace("&&!hzS.reduced&&!calm)S.raf=", "&&!hzS.reduced)S.raf="), _hz_css)
+      and not _c542_sky(_hz_js.replace("if(bal)S.boost=0;else ", ""), _hz_css), "")
 def _c542_gated(js, css, pg):
     return ('function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
-            and 'if(hzCalm())return;      // the tracer is Full' in js
+            and 'if(hzFxLevel()==="calm")return;      // Calm shows the words plainly' in js
             and "if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}\n    if(from&&from.home)hzArc(from,hzS.liveChat);}\n  else hzStrike();" in js
             and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the comets are Full' in pg
             and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the ripple is Full' in pg
-            and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the light round the composer is Full' in pg
+            and 'if(typeof hzFxFull!=="function"||!hzFxFull()){if(typeof hzLandSweep==="function")hzLandSweep();return;}' in pg
             and 'if(!w||!hzMotionOK()||hzCalm()||document.documentElement.classList.contains("hz-intro"))return;' in js
             # present still, for Full: the trace, the streak, the sweep, the comets, the ring, the bloom, the sheen, the dies
             and "async function hzTraceIn(el,opts){" in js and "function hzStreak(row,b){" in js and "function hzSweep(b){" in js
@@ -41450,7 +41456,7 @@ def _c542_gated(js, css, pg):
             and ".hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}" in css
             and '<div class="hz-mdot\'+(working?" working":"")+(awake?"":" asleep")+\'" role="listitem" tabindex="0" aria-label="\'' in js
             # the opening in Calm: a fade, first launch only, then the home
-            and 'if(hzCalm()){\n    root.classList.add("hz-calmopen");' in js and 'at(1900,()=>root.classList.add("hz-markout"));' in js
+            and 'if(hzFxLevel()==="calm"){\n    root.classList.add("hz-calmopen");' in js and 'at(1900,()=>root.classList.add("hz-markout"));' in js
             and 'at(3000,()=>hzIntroEnd(false));' in js and ".hz.hz-calmopen #hz-intro-mark{transition:opacity 1s var(--hz-ease-out)}" in css
             and ".hz.hz-calmopen #hz-intro-mark .hz-glint,.hz.hz-calmopen #hz-intro-mark .hz-flare{display:none}" in css
             # removed outright: the wordmark's glint and glow (any level), the sidebar's counts, the meter
@@ -41460,7 +41466,7 @@ def _c542_gated(js, css, pg):
             and "const hzq=isHz();   // no token counts beside Horizon's chats" in pg
             and 'const tk=hzq?{n:0,est:false}:chatTokens(c);if(tk.est&&tk.n)anyEst=true;' in pg
             and "const hzq=typeof isHz===\"function\"&&isHz();\n  return groups.map(g=>'<div class=\"cday\"><span>'+g.l+'</span>'\n    +(g.n&&!hzq?" in pg)
-check("6b542 Calm: Full's show is present and gated behind Effects Full (trace, streak, sweep, comets, ripple, rings, arc, glide, bloom, sheen, ring, glow, shimmer, dies, pulse); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
+check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, comets, ripple, rings, arc, glide, bloom, sheen, ring, glow, shimmer, dies, pulse); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
       _c542_gated(_hz_js, _hz_css, page)
       and not _c542_gated(_hz_js.replace('return hzMotionOK()&&hzFxLevel()==="full";', "return hzMotionOK();"), _hz_css, page)
       and not _c542_gated(_hz_js, _hz_css.replace(".hz:not(.hz-full) #hz-cglow{display:none}", ""), page)
@@ -41523,7 +41529,7 @@ def _c542_sting(css, js, ember):
             and ".hz #send svg{stroke-width:1.5}" in css
             and ".hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}" in css
             and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
-            and css.count("var(--hz-ember)") == 6 and "infinite" not in css[css.index("/* ---- the sting"):]   # the ember never loops
+            and css.count("var(--hz-ember)") == 6 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops
             and ':root{--hz-r-composer:14px;--hz-ember:' in css
             and ".hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;" in css
             and "transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}" in css
@@ -41578,9 +41584,40 @@ check("6b542 one greeting: Calm writes ONE text node (shown at once); Full's thr
       and 'if(!fill){g.classList.add("shown");delete g.dataset.hzBusy;return;}' in _hz_js
       and 'if(hzReady){hzMachinesPaint();const g=$("#hero .greet");if(g&&root.classList.contains("hz")){hzHeadline(g,hzGreeting());hzHeadlineShow(g);}}' in _hz_js
       and "Update?" not in page, "%r %r %r" % (_c542_g1, _c542_g2, _c542_gm.get("same")))
+# BALANCED (the default): the living touches, each soft, from a real input or the hour, settling;
+# nothing loops but the slow sky (the status dot breathes only while an answer works)
+def _c542_bal(js, css):
+    bal = css[css.index("/* ---- BALANCED (6b542"):]
+    return ('if(hzFxBal()){\n    root.classList.add("hz-balopen");' in js
+            and 'hzTraceIn(word,{margin:40,speed:900,spread:.45}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");});' in js   # traced, about 2.5 s, no hz-litmark: no streak, no glint
+            and 'at(3300,()=>root.classList.add("hz-markout"));' in js and 'at(4700,()=>hzIntroEnd(false));' in js
+            and ".hz.hz-balopen #hz-intro-mark .hz-glint,.hz.hz-balopen #hz-intro-mark .hz-flare{display:none}" in css
+            and 'if(calm){g.classList.remove("shown");void g.offsetWidth;g.textContent=text;g.classList.add("shown");return;}' in js   # one node, the settle once per text
+            and ".hz.hz-bal #hero .greet.shown{animation:hzGreetIn 1.5s var(--hz-ease-out) both}" in css
+            and "@keyframes hzGreetIn{0%{opacity:0;text-shadow:0 0 18px rgba(205,222,255,.75),0 0 60px rgba(140,175,255,.55)}" in css
+            and "100%{opacity:1;text-shadow:0 0 0 rgba(205,222,255,0),0 0 0 rgba(140,175,255,0)}}" in css
+            and ".hz .novideo #hero .greet.shown{animation:none}" in css
+            and ".hz.hz-bal #composer{box-shadow:inset 0 1px 0 rgba(200,222,255,.22)," in css and ".hz.hz-bal #composer:focus-within{box-shadow:inset 0 1px 0 rgba(200,222,255,.45)," in css
+            and ".hz.hz-bal .hz-sl-halo{display:block;animation:none;opacity:calc(.3 + var(--hz-eff-u) * .6);" in css
+            and "transform:translateX(var(--hz-eff-px,0px)) scale(calc(.7 + var(--hz-eff-u) * .7));transition:transform 120ms ease,opacity 120ms ease}" in css
+            and 'if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}' in js and "function hzChipSweep(b){" in js
+            and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);\n}\n// BALANCED (6b542): when the answer lands' in js
+            and ".hz .hz-usweep[hidden],.hz .novideo .hz-usweep{display:none}" in css
+            and "function hzLandSweep(){\n  const c=$(\"#composer\");if(!c||!hzFxBal()||!hzMotionOK()||!c.animate)return;" in js
+            and 'hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},700);' in js
+            and ".hz.hz-bal .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite;opacity:1}" in css      # only while .live
+            and ".hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}" in css
+            and ".hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}" in css
+            and "@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}" in css
+            and bal.count("infinite") == 1 and ".live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite" in bal)   # the one loop: the dot, while working
+check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the landing's one pass, the breathing dot only while working, the lifting hover; nothing else loops; the mutants are caught",
+      _c542_bal(_hz_js, _hz_css)
+      and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .hz-sl-halo{display:block;animation:none;", ".hz.hz-bal .hz-sl-halo{display:block;animation:hzBreathe 8s ease-in-out infinite;"))
+      and not _c542_bal(_hz_js.replace("if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}", "if(!full)return;"), _hz_css)
+      and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .msg.ai.live .who .dot{", ".hz.hz-bal .msg.ai .who .dot{")), "")
 check("6b542 the Horizon rules added stay scoped under .hz and name no outside URL",
       _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
-# ==== calm by default, balance and sting (6b542): end ====
+# ==== calm by default, balanced, balance and sting (6b542): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

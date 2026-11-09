@@ -19130,3 +19130,106 @@ that cuts). Video and stills in `scratchpad/modefx/` (`mode-switch.mp4`, `.gif` 
   privacy line for "Your stuff" (6b530): "Stays on your machines. Cloud only if you allow it." (was "Stays on
   this Mac. Never sent anywhere.", untrue since paired servers may read records, and Mac-only while the app
   goes cross-platform; the owner wants it short).
+
+## 6b542 — Calm by default: Effects Calm / Balanced / Full, Full's show gated, Details folded, one greeting, Balance and Sting (per Patrick)
+
+Patrick, after showing the app to a friend: "we have too much going on ... like an old lady's house with all
+these trinkets everywhere ... let's make this something that people could use every day without being so
+flashy"; the shining logo was "kind of tacky". Then, seeing Calm: "that's definitely cleaner, but it feels
+dry instead of having some effect, but not being overwhelming." And his own direction the same night: "being
+a Libra ... we are visually perfect, but also being a Scorpio where I can sting ... very sharp and fancy."
+Branch `tidy` off beta-1 (c5762a8); 7.0 beta 1 waited on it. Classic is untouched: every rule stays under
+`.hz` (`_hz_scoped`), and nothing here changes a Classic string.
+
+**Effects: Calm | Balanced | Full.** Settings > About > Effects is a three-way select, `millen.fxlevel`
+(`calm` / `balanced` / `full`; unset and a saved "balanced" are Balanced, the default; "full" stays Full).
+The head script marks the root `hz-full`, `hz-bal` or `hz-calm` before the first paint; `hzFxLevel()`,
+`hzCalm()` (Calm or Balanced: the quiet chrome, i.e. everything under `.hz:not(.hz-full)`) and `hzFxBal()`
+read it; `setFxLevel` → `hzFxApply` flips the classes live, resizes the sky, rebuilds the greeting. The
+Visual effects switch (`millen.video`) and reduced motion remain the stills switch under every level, as
+before; Classic hides the levels row (`html:not(.hz) #fx-level-row`). Note: "Balanced is the default. Full
+is the whole show."
+
+**Calm (the tidy list).** 1 Opening: first launch only, the wordmark fades in over ~1 s (`hz-calmopen`),
+rests, the home follows at 2.4 s; no trace, streak, glint or prism. Later launches open straight to the home
+(no quick trace: `hzTraceIn` returns in Calm). 2 Logo: static at EVERY level; the header glint span, its
+rules and `hzGlint` are removed, the drop-shadow too. 3 Greeting: ONE text node, plain white, no text-shadow
+(`hzHeadline` writes `textContent` when `hzCalm()`). 4 Composer: the ring, the breathing glow (`#hz-cglow`)
+and the Max/Ultra shimmer are stilled under `.hz:not(.hz-full)`; the slider's position says the effort. 5
+Mode switch: `hzFxFull()` is now `hzMotionOK()&&hzFxLevel()==="full"`; Calm keeps a 160 ms crisp roll
+(`hzNameRoll(b,text,full,calm)`, no blur), no streak, no sweep. 6 Asking: one status line (the byline's
+word hides while live; the die, the ticking figures and the `em` shimmer are hidden; the prose has no glow;
+no comets, ripple or finish ring: `cometFor`, `rippleAt`, `answerLanded`, `hzBoom`/`hzGlide`/`hzArc` and
+`hzPulse` all ask `hzFxFull()`); the 6b539 draft→polish swap is already an opacity crossfade and stays. 7
+Details: `msgActions` adds a `.hz-details` button under every Horizon answer; the marginalia (`aside.behind`)
+is `display:none` until the message carries `.details` (a delegated click on `#chat-scroll`), the grid one
+column; Full keeps the column and hides the link. Sources stay the numbered row in the prose. 8 Sidebar:
+`renderChats`/`dayRows` write no `.ctok`/`.ctot` and no "~ estimated from length" foot under Horizon (CSS
+hides them and `#telemetry`, `#sb-today` too); Classic keeps its totals and its meter. 9 Machines:
+`hzMachinesPaint` draws one `.hz-mdot` (silver; hollow when every machine is asleep; white while one works)
+whose tooltip names each machine and its state; the dies are Full's. 10 The sky in Calm: no footage
+(`hzVideoBoot` returns: no decode, no `texImage2D` a frame; the owner may reverse this), no neon, NO LOOP:
+`S.once()` draws one still on boot, resize and the three-minute star repaint with the clock held at 0 (dust,
+grain and moon shafts still); the CSS ice rays at .22 on a 56 s drift (the one thing that moves), the wash a
+.06 still. Measured idle in Calm: two running animations (the two rays), no rAF, no video; Off/reduced:
+none. Also fixed regardless: `S.free()` deletes the old render targets before `S.size()` makes new ones (a
+resize used to leak a full set).
+
+**Balanced (the default).** Calm's chrome plus living touches, each soft, from a real input or the hour,
+settling; nothing loops but the slow sky and the status dot while an answer works. Sky: the loop runs at 24
+fps; the footage plays at half (`S.footMul` → .5) with its slow drift; the feedback and blur passes are
+skipped (`boost` 0: no trails, bloom or lens streak); the GPU aurora at .35 of Full's level, never lifted by
+the work, its clock at .4 (a slow curtain); the grain clock (`gt`) held still; the stars twinkle very faintly
+(`twk`, ±35% on a slow sine per 3 px cell); the CSS rays at .3 on a 72 s drift. Opening (first launch only):
+the wordmark traced (speed 900, spread .45: about 2.5 s), no `hz-litmark`, so no streak, glint or prism;
+markout at 3.3 s, home at 3.9 s. Greeting: one node whose `.shown` runs `hzGreetIn` once (1.5 s: a soft ice
+glow settling to transparent shadows); `hzHeadline` re-adds the class per text, so a new greeting settles
+again and never stacks. Composer: a faint top-edge light (`inset 0 1px 0`) that warms on focus. Effort beam:
+the halo returns as a still pool under the diamond, `opacity .3+.6u`, `scale .7+.7u`, no breathing. Mode
+switch: the 160 ms roll plus `hzChipSweep` (a 1 px light under the chip, 300 ms, once). Asking: the byline's
+dot breathes only while `.live`; the status words fade in (`hzFadeIn` on the `em` the repaint replaces);
+`hzLandSweep` runs one gentle pass along the composer's top edge when the answer lands (700 ms). Hover:
+`.cbtn`/`.hz-ib`/`.hz-pick`/`.mab` lift 1 px with a faint light. Costs order: Calm (no loop) < Balanced (24
+fps, no feedback/blur passes, half footage) < Full (60 fps, every pass).
+
+**Balance and Sting (every Horizon level).** Balance: `hzBalance()` (from `hzGlowFit`) sets the home
+wrap's bottom padding from the real heights so the composer's vertical centre sits at the golden point of
+the room under the 72 px header (`hzBalanceFor`: `72+(H-72)*.618`); measured at 1440×900: centre 584 against
+583.7 (fraction .6184), sidebar closed and open; the column mid equals the room mid (720/720 closed, 840/840
+open) and the greeting's mid the same. 8 px grid on the header (24/16) and composer (16/16/16/24, gap 8);
+radii 14 (composer, `--hz-r-composer`), 8 (keys, chip, menu rows), 12 (menu); chevrons and the send arrow
+at 1.5 px. The slider is a balance beam: a 1 px track, 1 px ticks at the five steps, a 10 px diamond thumb
+(rotated square, 1 px white edge) snapping in 120 ms ease with no bounce, the level in mono caps; glow and
+breathing halo gone (the halo returns still in Balanced). Sting: ONE ember, `--hz-ember:#e8415a` (5.17:1 on
+the night, 4.51:1 on the composer's glass, white on it 3.94:1 for the arrow; the gauntlet computes these),
+at: the send strike (`hzStrike`: a 1 px line along the composer's top edge, 300 ms, once, at every level
+with motion), the send key while the composer holds words (`#composer.hastext`; silver outline otherwise;
+the stop key silver), the composer's 1 px border while it holds words AND the focus (deviation: the composer
+has the focus from the first frame, so ember on focus alone would never be a moment; the still proved it), a
+1 px ring on any control reached by the keyboard, and a 1 px left rule on an error. It never loops.
+
+**One greeting ("UpUptate?").** The friend's screen showed two offset copies of "Up late?": the trace
+canvas (`position:fixed`, placed at the rect measured when the trace began) stayed where it was while the
+real text moved, and killed tracers faded out over 700 ms over the moved text. Now: Calm and Balanced have
+one text node; Full's three layers are built from one string in one box at one moment, and `hzHeadline`
+kills any tracer first; `hzTraceKill` (also from `hzSidebarToggle`, the resize handler and `setLook`)
+removes the canvas AT ONCE and releases `hzHeadlineShow`'s await (a killed trace used to leave the promise
+pending and the greeting at opacity 0). "Update?" is no pool entry; `hzGreeting` has four lines by the hour.
+Measured at 2000 and 1440 wide, sidebar open and closed, after a greeting change: one node in Calm and
+Balanced; in Full three layers with identical text and identical left/width, no `.hz-tracefx` left.
+
+**Gauntlet.** Pins MOVED to "present, gated behind Full": `hzFxFull`, the roll's durations. Pins REMOVED
+(the thing is gone): `#hz-mark .hz-glint` from the three still lists, pinned absent now. The Look check names
+Calm/Balanced/Full. The `MEMORY USED` check reads `any(... in page for ...)`, so the pin checker no longer
+flags it. New (each with mutants): the levels; the sky by level (Calm no loop, Balanced no feedback/blur,
+the freed targets); Full's show present and gated, the removals; Details; Balance (`hzBalanceFor` in node);
+Sting (the contrast computed, the strike once, the no-loop rule); one greeting (`hzHeadline` in node on a
+stand-in element); Balanced's touches; scope. Isolated run of the Horizon, 6b528-page, 6b540 and 6b542
+sections against the 9886 copy: 37/37. The full gauntlet was not run (another helper's run held 9901–9903).
+
+**Checks.** `ast.parse` both files; both served scripts `node --check`; pincheck 2,374 pins, 0 hard fails
+(the four hints pre-date this build); Playwright (bundled Chromium, `--use-mock-keychain`, closed) at 1440
+and 390 in Calm, Balanced and Full: zero page errors, zero API responses ≥400; the dev copy on 9886 in
+`MillenAI-dev-tidy`, killed by PID; no chat sent (the asking state is a stand-in built from the page's own
+`addMsg`/`liveLineHTML`). Not verified: WKWebView, and the footage in Balanced (Chromium plays no H.264).
+Stills (before = beta-1 on 9885, after = tidy) and `balanced-walk.mp4` in `scratchpad/tidy/shots/`.
