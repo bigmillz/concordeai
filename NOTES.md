@@ -19575,13 +19575,33 @@ cloud, server, search or memory pass. The chip: name, pages, tokens, the scanned
 reading, "Reading…"; a failure, the reason, with × to remove (never sent). Send waits for a PDF being read and drops
 one that failed. The sent message's chip adds "12 pages". The drop accepts a PDF and reads it the same way.
 
-**Windows and Linux: "PDF needs an update on this computer."** `_pdf_helper_path()` is None off a Mac (and with a
-dev copy's `pdf-none` hook). A reader there needs a package; nothing was installed. Proposed for the owner's OK:
-**pypdf 6.9.2** (pure Python, BSD-3-Clause, wheel 333,744 bytes, 2026-03-23; 7.0.0 is three days old). AES-encrypted
-PDFs would also need its `cryptography` extra. The app's own `_know_pdf_text` (6b530) was not reused: no pages, no
-ToUnicode, Latin-1 only.
+**Windows and Linux: pypdf 6.9.2** (approved by Patrick 2026-11-09, with the copy below). Pure Python,
+BSD-3-Clause, one py3-none-any wheel (333,744 bytes, sha256 `662cf29bcb419a36a1365232449624ab40b7c2d0cfc28e54f42eeecd1fd7e844`, checked against the download).
+- *Pinned in CRYPTO_REQS*, the app's one hash-pinned list, as `pypdf==6.9.2 ; sys_platform != "darwin" and
+  python_version >= "3.11"`. So every installer of those pins takes it off a Mac: the Windows zip's first run, the
+  Windows exe build (`--require-hashes --force-reinstall`, then `--collect-submodules pypdf`, and the exe's
+  `--crypto-selftest` now reports `pypdf`: a build Python of 3.11 or newer without it fails the build), and the
+  app's own `_ensure_crypto_deps`. A Mac's pip skips the line. Not before 3.11: pypdf needs `typing_extensions`
+  there, which isn't pinned, so such a PC keeps "PDF needs an update on this computer."
+- *A venv made before this build* already has PyNaCl, so `_ensure_crypto_deps` never runs pip again:
+  `_ensure_pdf_reader` installs pypdf's pin alone at a start, the MLX engine's way (6b497): the instance-lock
+  holder, its own venv only, one try per build and Python, again 3 days after a failure (`pdf-reader.json`).
+- *The worker.* `millenai.py --pdf-text <file> <max s> <max chars> <out>` (a frozen exe: `MillenAI.exe --pdf-text`)
+  runs before anything else, as `--crypto-selftest` does, and writes the same JSON lines as the Mac's helper to a
+  0600 file under run/ (a windowed frozen exe has no stdout); the server waits 30 s + 10 s, kills it past that,
+  and parses both readers' lines the same way. Its scan test: a picture or form in the page's resources, or a
+  paint operator in its content. On every fixture its output equals PDFKit's, key for key.
+- *Encryption.* An RC4 PDF opens when its user password is empty (pypdf's own RC4); a password PDF is "This PDF
+  is locked." **AES-encrypted PDFs stay refused as locked:** pypdf reads AES only with its `cryptography` extra,
+  which isn't in the pinned set. (pypdf 6.9.2 "decrypts" an AES file with an empty password without it and then
+  fails on every stream, so the worker checks the encryption dictionary first.) On a Mac PDFKit reads AES.
+- `_pdf_reader()` picks: PDFKit on a Mac (never pypdf there), pypdf elsewhere when it imports, else "PDF needs an
+  update on this computer." A dev copy's `pdf-pypdf` hook takes the pypdf path on a Mac; `pdf-none` the no-reader
+  path.
+- Not run on a real Windows or Linux machine: the pypdf path was run on this Mac (the hook, the wheel installed
+  into a scratch folder, never the app's venv), and the exe build's new lines are unexercised until CI builds one.
 
-**Copy** (design/COPY.md; the owner to approve):
+**Copy** (design/COPY.md; approved by Patrick as listed, 2026-11-09):
 - Drop: "can't read X here — text files and images only" → "… text files, PDFs and images only"
 - Chip (new): "12 pages" / "1 page", "First 412 of 900 pages", "3 scanned pages skipped" / "1 scanned page skipped",
   "Reading…"; tooltip "12 pages, 1.2 MB", "Pages 3, 7, 9 are scanned. Scanned pages aren’t read yet." / "Page 2 is
@@ -19590,7 +19610,7 @@ ToUnicode, Latin-1 only.
   text in this PDF. Scanned pages aren’t read yet." · "PDF needs an update on this computer."
 - Sent message chip (new): "12 pages".
 
-**Gauntlet.** `# ==== 6b546 pdf attach` (12 checks, one of them 18 mutants, each caught): the cleaning rules, scanned
+**Gauntlet.** `# ==== 6b546 pdf attach` (16 checks, one of them 28 mutants, each caught; the pypdf path forced on this Mac by the `pdf-pypdf` hook with the pinned wheel installed, hash-checked, into a folder of the run's own (`SMOKE_PDF_WHEELS` names a wheel folder so a run needn't reach PyPI), its output compared key for key with PDFKit's on every fixture, an AES-declared PDF built at run time, an owner-password-only fixture; 6b327's pin check now lists pypdf's line): the cleaning rules, scanned
 vs blank, the lock, a broken file, the caps, page lines and the split on them (through `doc_answer`), the Windows
 path, PDFKit on every fixture in-process (the time cap, a hung helper killed in < 5 s, the copy deleted), local-only
 lints over the section and the Swift source, the page (picker, drop, send), the chips drawn in node, the copy, the
@@ -19603,7 +19623,7 @@ couldn't close `send()`, which has a regex with an open brace since hz-chat; `st
 6b533), so their groups were red and 6b522's mutants were "caught" by a base that already failed. Fixed; all 16 are
 caught for real. The shell bundle's resources pin (6b537) now names both helpers.
 
-**Checked:** the 6b522 and 6b546 blocks alone against a dev copy (44/44; not the full gauntlet, per the brief),
+**Checked:** the 6b522 and 6b546 blocks alone against a dev copy (46/46 with the pypdf path; not the full gauntlet, per the brief),
 `ast.parse`, both page scripts `node --check`, the pin checker (2,446 pins; the one red,
 `"millen.fxlevel","millen.effort"]`, is beta-1's too), and Playwright (Chromium) at 1440 and 390: no page errors,
 no API response ≥ 400, no sideways scroll, every × hit by `elementFromPoint`, the bar over the line on a

@@ -274,6 +274,9 @@ $pyiArgs = @(
 # the exe imports nacl and fails its self-test below
 if ($crypto) {
   $pyiArgs += @("--hidden-import", "_cffi_backend", "--collect-submodules", "nacl")
+  # the PDF reader off a Mac (6b546): pypdf, from the same pins, frozen in
+  # whole (it imports its filters lazily); the self-test below checks it
+  $pyiArgs += @("--collect-submodules", "pypdf")
 }
 # pywebview resolves its backend dynamically, so PyInstaller cannot see it.
 # ARM64 leaves pythonnet out (6b328): pywebview requires it on every
@@ -325,6 +328,12 @@ if ($crypto) {
   $wantPlat = if ($isArm) { "win-arm64" } else { "win-amd64" }
   $gotPlat = (Get-Content -Raw $st | ConvertFrom-Json).platform
   if ($gotPlat -ne $wantPlat) { throw "the exe was built for $gotPlat, not $wantPlat" }
+  # and it reads PDFs (6b546): pypdf at its pin, frozen in (pinned from
+  # Python 3.11; an older build Python says "PDF needs an update")
+  $stj = Get-Content -Raw $st | ConvertFrom-Json
+  if ([version]$stj.python -ge [version]"3.11" -and $stj.pypdf -ne "6.9.2") {
+    throw "the exe carries no PDF reader (pypdf '$($stj.pypdf)', 6b546)"
+  }
 }
 
 # --------------------------------------------------------------- installer
