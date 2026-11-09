@@ -18165,8 +18165,8 @@ def _whisper_repo() -> str:
 _say_proc = None
 
 
-def _voice_supported() -> bool:
-    """Speech-to-text needs MLX on Apple silicon, faster-whisper elsewhere."""
+def _whisper_libs() -> bool:
+    """Whisper's library: MLX on Apple silicon, faster-whisper elsewhere."""
     if IS_ARM:
         try:
             import mlx_whisper  # noqa: F401
@@ -18182,7 +18182,8 @@ def _voice_supported() -> bool:
     return False
 
 
-def _voice_ready() -> bool:
+def _whisper_weights() -> bool:
+    """Whisper's weights, downloaded whole."""
     d = _hf_model_dir(_whisper_repo())
     snaps = glob.glob(os.path.join(d, "snapshots", "*", "config.json"))
     if not snaps:
@@ -18193,6 +18194,17 @@ def _voice_ready() -> bool:
     # blob bricked voice when this gated on carcasses. Seen live.)
     return bool(glob.glob(os.path.join(snap, "weights.*"))
                 or glob.glob(os.path.join(snap, "model.bin")))
+
+
+def _voice_supported() -> bool:
+    """Speech-to-text: the system recognizer (6b541, macOS 26 and later)
+    needs nothing installed; otherwise whisper's library."""
+    return _dict_helper_path() is not None or _whisper_libs()
+
+
+def _voice_ready() -> bool:
+    """...and the system engine needs no download either."""
+    return _dict_helper_path() is not None or (_whisper_libs() and _whisper_weights())
 
 
 VOICE_ROW = "Voice engine"
@@ -18218,12 +18230,11 @@ def _prepare_voice():
     ctx_thread(target=work, daemon=True).start()
 
 
-def _transcribe_wav(wav_bytes: bytes) -> str:
+def _wav_to_f32(wav_bytes: bytes):
+    """A WAV's samples as float32 mono at 16 kHz."""
     import io
     import wave as _wave
     import numpy as np
-    if IS_ARM:
-        import mlx_whisper
     with _wave.open(io.BytesIO(wav_bytes)) as w:
         sr, ch = w.getframerate(), w.getnchannels()
         audio = np.frombuffer(w.readframes(w.getnframes()),
@@ -18234,6 +18245,18 @@ def _transcribe_wav(wav_bytes: bytes) -> str:
         n = int(len(audio) * 16000 / sr)
         audio = np.interp(np.linspace(0, len(audio) - 1, n),
                           np.arange(len(audio)), audio).astype(np.float32)
+    return audio
+
+
+def _transcribe_wav(wav_bytes: bytes) -> str:
+    return _transcribe_audio(_wav_to_f32(wav_bytes))
+
+
+def _transcribe_audio(audio) -> str:
+    """Whisper over float32 mono 16 kHz samples (the model stays loaded in
+    the process after the first call)."""
+    if IS_ARM:
+        import mlx_whisper
     with _whisper_lock:
         if IS_ARM:
             out = mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_REPO)
@@ -18263,6 +18286,360 @@ def _fw_transcribe(audio, gpu: bool) -> str:
     # fails does so inside this call
     segments, _info = _fw_model.transcribe(audio, beam_size=5 if gpu else 1)
     return " ".join(sg.text for sg in segments).strip()
+
+
+# ------------------------------------------------ dictation, live (6b541)
+# @dictate-begin
+# 6b541, per Patrick: "I want the dictation part to work with very low
+# latency, like really fast, not like you have to wait a second for it to
+# start and then like then it pauses." Measured on his M4 Pro before this:
+# whisper-large-v3-turbo on MLX costs ~760 ms a call whatever the clip's
+# length (it pads every clip to a 30 s window), 3.1 s on the first call of
+# the process (the weights), and the page sent one WAV after the release,
+# so "transcribing…" sat on the composer for 0.9-3 s and nothing showed
+# while he spoke. Now the page streams 16 kHz PCM as it is captured and a
+# SESSION on this server feeds a recognizer that answers as it goes:
+#   * on macOS 26 and later, the system's on-device recognizer
+#     (SpeechAnalyzer, Apple's own, the one Notes dictates with) behind a
+#     tiny Swift helper, shell/dictate: partials every ~1 s of speech,
+#     the final ~50-110 ms after the release, ~18 MB resident, no
+#     permission prompt of its own (the microphone's is the page's), and
+#     no download: the engine is the OS's;
+#   * elsewhere whisper, as before, but warmed on the first press and run
+#     once a second over the audio so far for partials (Apple silicon or
+#     an NVIDIA card; a CPU PC gets the final alone).
+# NOTHING LEAVES THIS COMPUTER (the gauntlet lints this region and the
+# helper's source): the audio goes to a pipe into a local process or into
+# whisper in this one, the session is dropped when it ends, no socket is
+# opened here, and a cloud key is never consulted.
+DICT_HELPER = "concorde-dictate"
+DICT_HELPER_MIN_MACOS = 26
+DICT_FINAL_WAIT_S = 4.0     # the final after the end frame; past it, the last partial stands
+DICT_READY_WAIT_S = 8.0     # the helper's "ready" line (70-250 ms measured; the first run loads the model)
+DICT_PARTIAL_EVERY_S = 1.0  # whisper: one partial pass per second of new audio at most
+DICT_MAX_S = 600            # a session holds at most ten minutes of audio
+
+
+def _dict_helper_path():
+    """The system recognizer helper: bundled beside this file (the .app's
+    Resources) or built in the repo (shell/dictate/build.sh). None off a
+    Mac, before macOS 26, or when it isn't built: whisper does the work.
+    A dev copy may name one (MILLENAI_DICT_HELPER; the gauntlet's fake)."""
+    if DEV_HOME and os.environ.get("MILLENAI_DICT_HELPER"):
+        p = os.environ["MILLENAI_DICT_HELPER"]
+        return p if os.path.isfile(p) and os.access(p, os.X_OK) else None
+    if not IS_MAC:
+        return None
+    try:
+        major = int((platform.mac_ver()[0] or "0").split(".")[0])
+    except ValueError:
+        major = 0
+    if major < DICT_HELPER_MIN_MACOS:
+        return None
+    for p in (resource(DICT_HELPER), resource("shell", "dictate", DICT_HELPER)):
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def _dict_engine_name() -> str:
+    if "dict-fake" in TEST_HOOKS:
+        return "fake"
+    return "system" if _dict_helper_path() else "whisper"
+
+
+def _dict_partials_possible() -> bool:
+    """Partials are worth running: the system engine, or whisper with a GPU
+    (MLX, or CUDA). Whisper on a CPU takes seconds a pass: final only."""
+    eng = _dict_engine_name()
+    return eng != "whisper" or IS_ARM or _whisper_cuda()
+
+
+class _DictHelper:
+    """The one resident system-recognizer process. Spawned ahead of the
+    first dictation (the page warms it when the composer takes focus),
+    kept for the next, killed at exit. Frames in: u32 LE length + PCM
+    int16 16 kHz mono; a zero length ends the utterance. Lines out: JSON
+    with ev (ready, listening, partial, final, done, err) and u, the
+    utterance number, so a late line for an old one is dropped."""
+
+    def __init__(self):
+        self.lock = threading.Lock()      # spawn / write
+        self.p = None
+        self.ready = threading.Event()
+        self.sess = None                  # the session the lines belong to
+        self.u = 0                        # utterances started on this process
+
+    def alive(self) -> bool:
+        return self.p is not None and self.p.poll() is None
+
+    def start(self) -> bool:
+        """True once the helper says ready (at once when it already is)."""
+        with self.lock:
+            if self.alive():
+                p = self.p
+            else:
+                path = _dict_helper_path()
+                if not path:
+                    return False
+                try:
+                    p = subprocess.Popen([path], stdin=subprocess.PIPE,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.DEVNULL)
+                except OSError:
+                    return False
+                self.p, self.u = p, 0
+                self.ready.clear()
+                ctx_thread(target=self._read, args=(p,), daemon=True,
+                           bind=False).start()
+        return self.ready.wait(DICT_READY_WAIT_S) and self.alive()
+
+    def _read(self, p):
+        for line in p.stdout:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            ev = d.get("ev")
+            if ev == "ready":
+                self.ready.set()
+                continue
+            s = self.sess
+            if s is None or d.get("u") != s.u:
+                continue                  # a line for an utterance already over
+            if ev == "partial":
+                s.set_partial(d.get("text", ""))
+            elif ev == "final":
+                s.set_final(d.get("text", ""))
+            elif ev == "err":
+                s.set_final(None)
+        # the pipe closed: the helper died; a session waiting gets its partial
+        s = self.sess
+        if s is not None:
+            s.set_final(None)
+        self.ready.clear()
+
+    def _frame(self, b: bytes) -> bool:
+        with self.lock:
+            if not self.alive():
+                return False
+            try:
+                self.p.stdin.write(struct.pack("<I", len(b)) + b)
+                self.p.stdin.flush()
+                return True
+            except (OSError, ValueError):
+                return False
+
+    def begin(self, sess) -> bool:
+        """Bind a session; its first frame starts the helper's utterance."""
+        if not self.start():
+            return False
+        with self.lock:
+            self.u += 1
+            sess.u = self.u
+            self.sess = sess
+        return True
+
+    def feed(self, sess, b: bytes) -> bool:
+        return self.sess is sess and bool(b) and self._frame(b)
+
+    def end(self, sess) -> bool:
+        return self.sess is sess and self._frame(b"")
+
+    def release(self, sess):
+        with self.lock:
+            if self.sess is sess:
+                self.sess = None
+
+    def stop(self):
+        with self.lock:
+            p, self.p, self.sess = self.p, None, None
+        if p is not None and p.poll() is None:
+            try:
+                p.stdin.close()
+            except OSError:
+                pass
+            try:
+                p.wait(1.0)
+            except subprocess.TimeoutExpired:
+                p.kill()
+
+
+_dict_helper = _DictHelper()
+atexit.register(_dict_helper.stop)
+
+
+def _pcm16_to_f32(b: bytes):
+    import numpy as np
+    return np.frombuffer(bytes(b)[:len(b) // 2 * 2], np.int16).astype(np.float32) / 32768.0
+
+
+class _DictSession:
+    """One dictation: the audio so far, the last partial, the final. Dropped
+    the moment it ends or is cancelled; nothing of it is written anywhere."""
+
+    def __init__(self, engine: str):
+        self.sid = secrets.token_hex(8)
+        self.engine = engine
+        self.partials = _dict_partials_possible()
+        self.pcm = bytearray()
+        self.partial = ""
+        self.final = None
+        self.done = threading.Event()
+        self.lock = threading.Lock()
+        self.u = 0
+        self.ended = False
+        self.busy = False                 # whisper: a partial pass is running
+        self.passed = 0                   # whisper: bytes the last pass covered
+        self.t0 = time.time()
+
+    def secs(self) -> float:
+        return len(self.pcm) / 32000.0
+
+    def set_partial(self, text: str):
+        if not self.ended:
+            self.partial = text or self.partial
+
+    def set_final(self, text):
+        self.final = text
+        self.done.set()
+
+    def feed(self, b: bytes):
+        with self.lock:
+            if self.ended or not b:
+                return
+            room = DICT_MAX_S * 32000 - len(self.pcm)
+            if room <= 0:
+                return
+            b = bytes(b[:room])
+            self.pcm += b
+        if self.engine == "system":
+            _dict_helper.feed(self, b)
+        elif self.engine == "fake":
+            self.set_partial("heard %.1f s" % self.secs())
+        elif self.partials and not self.busy \
+                and len(self.pcm) - self.passed >= DICT_PARTIAL_EVERY_S * 32000 \
+                and len(self.pcm) >= 32000:
+            self.busy = True
+            ctx_thread(target=self._whisper_pass, daemon=True).start()
+
+    def _whisper_pass(self):
+        try:
+            n = len(self.pcm)
+            text = _transcribe_audio(_pcm16_to_f32(self.pcm[:n]))
+            self.passed = n
+            self.set_partial(text)
+        except Exception:
+            pass
+        finally:
+            self.busy = False
+
+    def end(self, tail: bytes) -> str:
+        """The final text: the recognizer's, or the last partial if it is late."""
+        self.feed(tail)
+        with self.lock:
+            self.ended = True
+        try:
+            if self.engine == "system":
+                if _dict_helper.end(self):
+                    self.done.wait(DICT_FINAL_WAIT_S)
+                _dict_helper.release(self)
+                if self.final is not None:
+                    return self.final.strip()
+                if self.partial:
+                    return self.partial.strip()
+                # the helper never answered (dead, or not even bound): whisper has the audio
+                return _transcribe_audio(_pcm16_to_f32(self.pcm)).strip() \
+                    if _whisper_libs() and _whisper_weights() else ""
+            if self.engine == "fake":
+                return "heard %.1f s." % self.secs()
+            # whisper: the whole clip, once (a partial pass under way finishes first: the lock)
+            return _transcribe_audio(_pcm16_to_f32(self.pcm)).strip()
+        finally:
+            self.pcm = bytearray()
+
+    def cancel(self):
+        with self.lock:
+            self.ended = True
+        if self.engine == "system":
+            _dict_helper.end(self)
+            _dict_helper.release(self)
+        self.pcm = bytearray()
+
+
+_dict_sessions = {}
+_dict_sess_lock = threading.Lock()
+
+
+def _dict_start():
+    """A new session on the engine this computer has; the one before it,
+    if any, is dropped (there is one microphone)."""
+    engine = _dict_engine_name()
+    if engine == "system" and not _dict_helper.start():
+        engine = "whisper" if _whisper_libs() and _whisper_weights() else "none"
+    if engine == "none":
+        return None
+    s = _DictSession(engine)
+    if engine == "system" and not _dict_helper.begin(s):
+        s.engine = engine = "whisper"
+    if engine == "whisper":
+        _whisper_warm()
+    with _dict_sess_lock:
+        for old in list(_dict_sessions.values()):
+            old.cancel()
+        _dict_sessions.clear()
+        _dict_sessions[s.sid] = s
+    return s
+
+
+def _dict_get(sid: str):
+    with _dict_sess_lock:
+        return _dict_sessions.get(sid or "")
+
+
+def _dict_drop(s):
+    with _dict_sess_lock:
+        _dict_sessions.pop(s.sid, None)
+
+
+def _dict_warm():
+    """Ahead of a press: the helper spawned (the page asks when the composer
+    takes focus). Whisper's weights are not loaded here: 1.6 GB held for a
+    dictation that may not come; the first press loads them instead."""
+    if _dict_engine_name() == "system":
+        ctx_thread(target=_dict_helper.start, daemon=True, bind=False).start()
+
+
+_whisper_warmed = {"v": False}
+
+
+def _whisper_warm():
+    """The weights loaded (and the first call's 3 s paid) while the user is
+    still talking, once per process."""
+    if _whisper_warmed["v"]:
+        return
+    _whisper_warmed["v"] = True
+
+    def work():
+        import numpy as np
+        try:
+            _transcribe_audio(np.zeros(8000, np.float32))
+        except Exception:
+            _whisper_warmed["v"] = False
+    ctx_thread(target=work, daemon=True, bind=False).start()
+
+
+def _dict_oneshot(audio) -> str:
+    """A whole clip at once (the old /api/transcribe): the system engine
+    when it is here, whisper otherwise."""
+    if _dict_engine_name() == "system" and _dict_helper.start():
+        import numpy as np
+        s = _DictSession("system")
+        if _dict_helper.begin(s):
+            pcm = (np.clip(audio, -1, 1) * 32767).astype(np.int16).tobytes()
+            return s.end(pcm)
+    return _transcribe_audio(audio).strip()
+# @dictate-end
 
 
 _say_lock = threading.RLock()
@@ -41226,6 +41603,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _dir_bytes_real(_hf_model_dir(repo)) / est * 100))
             self._send_json({"supported": _voice_supported(),
                              "ready": _voice_supported() and _voice_ready(),
+                             "engine": _dict_engine_name(),      # 6b541
                              "downloading": job.get("status") == "downloading",
                              "pct": pct,
                              "note": job.get("note", "")})
@@ -42894,6 +43272,54 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _prepare_voice()
             self._send_json({"ok": True})
             return
+        if self.path.startswith("/api/dictate/"):
+            # LIVE DICTATION (6b541): start, audio (as it is captured, raw
+            # PCM int16 16 kHz mono; the reply carries the partial so far),
+            # end (the tail, the reply is the final text), cancel, warm.
+            _route, _, _q = self.path.partition("?")
+            _sid = urllib.parse.parse_qs(_q).get("sid", [""])[0]
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            body = self.rfile.read(n) if n else b""
+            if _route == "/api/dictate/warm":
+                _dict_warm()
+                self._send_json({"ok": True, "engine": _dict_engine_name()})
+                return
+            if _route == "/api/dictate/start":
+                if not (_voice_supported() and _voice_ready()):
+                    self._send_json({"ok": False, "ready": False})
+                    return
+                s = _dict_start()
+                if s is None:
+                    self._send_json({"ok": False, "ready": False})
+                    return
+                self._send_json({"ok": True, "sid": s.sid, "engine": s.engine,
+                                 "partials": s.partials})
+                return
+            s = _dict_get(_sid)
+            if s is None:
+                self._send_json({"ok": False, "err": "no session"}, code=404)
+                return
+            if _route == "/api/dictate/audio":
+                s.feed(body)
+                self._send_json({"ok": True, "partial": s.partial,
+                                 "secs": round(s.secs(), 2)})
+                return
+            if _route == "/api/dictate/end":
+                _dict_drop(s)
+                try:
+                    text = s.end(body)
+                except Exception as exc:
+                    self.send_error(500, str(exc)[:100])
+                    return
+                self._send_json({"ok": True, "text": text, "engine": s.engine})
+                return
+            if _route == "/api/dictate/cancel":
+                _dict_drop(s)
+                s.cancel()
+                self._send_json({"ok": True})
+                return
+            self.send_error(404)
+            return
         if self.path == "/api/transcribe":
             n = int(self.headers.get("Content-Length", 0))
             wav = self.rfile.read(n)
@@ -42901,7 +43327,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 self.send_error(503, "Dictation isn’t ready")
                 return
             try:
-                self._send_json({"text": _transcribe_wav(wav)})
+                self._send_json({"text": _dict_oneshot(_wav_to_f32(wav))})
             except Exception as exc:
                 self.send_error(500, str(exc)[:100])
             return
@@ -49033,6 +49459,7 @@ body.gen #chip-model{color:var(--accent)}
   padding:6px 4px;
 }
 #input::placeholder{color:var(--faint)}
+#input.dictating{opacity:.62}         /* a partial, while it may still change (6b541) */
 #cbtns{display:flex;align-items:center;gap:2px;flex-shrink:0;
   margin-left:auto;padding-left:4px}
 .cbtn:active{transform:scale(.94)}
@@ -59297,30 +59724,6 @@ const micBtn=$("#mic");
 let recording=false,recBuf=[];
 let voiceReady=false,voicePoll=null;
 
-function wavEncode(chunks,srIn){
-  let len=0;for(const c of chunks)len+=c.length;
-  let all=new Float32Array(len),o=0;
-  for(const c of chunks){all.set(c,o);o+=c.length;}
-  const sr=16000;
-  if(srIn!==sr){                       // linear resample to 16 kHz
-    const n=Math.round(all.length*sr/srIn),out=new Float32Array(n);
-    for(let i=0;i<n;i++){
-      const x=i*(all.length-1)/(n-1),lo=Math.floor(x),hi=Math.min(lo+1,all.length-1);
-      out[i]=all[lo]+(all[hi]-all[lo])*(x-lo);
-    }
-    all=out;
-  }
-  const buf=new ArrayBuffer(44+all.length*2),v=new DataView(buf);
-  const ws=(off,str)=>{for(let i=0;i<str.length;i++)v.setUint8(off+i,str.charCodeAt(i));};
-  ws(0,"RIFF");v.setUint32(4,36+all.length*2,true);ws(8,"WAVE");ws(12,"fmt ");
-  v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
-  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);
-  v.setUint16(34,16,true);ws(36,"data");v.setUint32(40,all.length*2,true);
-  for(let i=0;i<all.length;i++)
-    v.setInt16(44+i*2,Math.max(-1,Math.min(1,all[i]))*32767,true);
-  return new Blob([buf],{type:"audio/wav"});
-}
-
 async function ensureVoice(){
   if(voiceReady)return true;
   const st=await(await api("/api/voice/status")).json();
@@ -59451,9 +59854,38 @@ const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,
   autoGainControl:false}};
 let micCtx=null,micProc=null,micSrc=null,micStream=null,micGum=null,
     micTimer=null,micCap=false,recHeard=false,dictVoiceP=null;
+/* LIVE DICTATION (6b541, per Patrick: "I want the dictation part to work
+   with very low latency, like really fast, not like you have to wait a
+   second for it to start and then like then it pauses."). Before: the
+   indicator came on with the first audio chunk (200-800 ms after the
+   press), nothing showed while he spoke, and after the release one WAV
+   went to whisper, which took 0.9 s warm and 3 s cold ("transcribing…").
+   Now:
+   - the indicator is lit IN THE KEYDOWN ITSELF (dictLit), before anything
+     is awaited: the mic button and "Listening…" at once;
+   - every chunk is turned to 16 kHz PCM as it is captured and queued
+     (dictQ). Until the session answers the queue is the PRE-ROLL: nothing
+     said while the server was asked is lost, it all goes in the first
+     POST. The queue is bounded by the session's start; the warm window
+     keeps nothing (micCap is false there, unchanged from 6b345);
+   - the queue is pumped to /api/dictate/audio, one request in flight at
+     a time, so chunks batch themselves under load; each reply carries the
+     PARTIAL so far, which lands in the composer in place (dictShow),
+     dimmed while it may still change;
+   - the release sends what is left with /api/dictate/end and the reply is
+     the FINAL text, undimmed; the last audio request is awaited first so
+     the end never overtakes a chunk. A slip (under DICT_MIN_CLIP_S) cancels
+     the session and nothing is transcribed, as before;
+   - the recognizer is readied when the composer takes focus (dictWarm), so
+     a press finds it listening.
+   The engine is the server's business (the system's on-device recognizer,
+   or whisper); the page only ever talks to this app's own /api/. */
+let dictSid=null,dictQ=[],dictInflight=null,dictPartial="",dictSecs=0,dictWarmT=0;
 // dev copies with the dict-trace hook only: the page writes one line to
-// the server's log per dictation, keydown to microphone to first sound
+// the server's log per dictation, keydown to microphone to first sound to
+// the first partial, and release to final
 const dictT={};
+window.dictT=dictT;                    // for the console
 function dictTrace(what){
   const n=Date.now();
   if(what==="down"){
@@ -59461,11 +59893,13 @@ function dictTrace(what){
     dictT.down=n;return;
   }
   if(dictT.down==null||dictT[what]!=null)return;
-  dictT[what]=n-dictT.down;
-  if(what==="chunk"&&DICT_TRACE)
+  if(what==="up"){dictT.upAt=n;dictT.up=n-dictT.down;return;}
+  dictT[what]=what==="final"&&dictT.upAt?n-dictT.upAt:n-dictT.down;
+  if(what==="final"&&DICT_TRACE)
     api("/api/test/trace",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({line:"keydown to microphone "+dictT.gum+" ms, to voice check "
-        +dictT.voice+" ms, to first sound "+dictT.chunk+" ms, "
+      body:JSON.stringify({line:"keydown to indicator "+dictT.lit+" ms, to microphone "+dictT.gum
+        +" ms, to first sound "+dictT.chunk+" ms, to session "+dictT.session
+        +" ms, to first partial "+dictT.partial+" ms; release to final "+dictT.final+" ms, "
         +(dictT.warm?"warm":"cold")})}).catch(()=>{});
 }
 // the warm-microphone setting (6b429): the saved preference "mic_warm", read
@@ -59490,18 +59924,103 @@ function micStreamGet(){
 function micCtxGet(){
   if(!micCtx){
     micCtx=new (window.AudioContext||window.webkitAudioContext)();
-    micProc=micCtx.createScriptProcessor(4096,1,1);
+    micProc=micCtx.createScriptProcessor(2048,1,1);   // ~43 ms at 48 kHz: the first sound shows sooner
     micProc.onaudioprocess=micChunk;
   }
   return micCtx;
 }
+// one chunk of samples to 16 kHz int16 PCM, the recognizers' format
+function pcm16(f,srIn){
+  const sr=16000;let a=f;
+  if(srIn!==sr){                       // linear resample to 16 kHz
+    const n=Math.round(f.length*sr/srIn),out=new Float32Array(n);
+    for(let i=0;i<n;i++){
+      const x=i*(f.length-1)/Math.max(1,n-1),lo=Math.floor(x),hi=Math.min(lo+1,f.length-1);
+      out[i]=f[lo]+(f[hi]-f[lo])*(x-lo);
+    }
+    a=out;
+  }
+  const o=new Int16Array(a.length);
+  for(let i=0;i<a.length;i++)o[i]=Math.max(-1,Math.min(1,a[i]))*32767;
+  return o;
+}
 function micChunk(e){
   if(!micCap)return;                   // the warm window records nothing
-  recBuf.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  const b=pcm16(e.inputBuffer.getChannelData(0),micCtx.sampleRate);
+  dictQ.push(b);dictSecs+=b.length/16000;
   if(!recHeard){recHeard=true;dictTrace("chunk");recPaint();}
+  dictPump();                          // the pre-roll waits here until the session answers
 }
 function recPaint(){
   if(recording&&recHeard)input.placeholder=dictPrompt();
+}
+// the indicator: the mic button and the composer's words, at the keydown
+function dictLit(on){
+  micBtn.classList.toggle("rec",on);
+  if(on)input.placeholder="Listening…";
+  else input.classList.remove("dictating");
+}
+// everything queued, as one body; the queue is left empty
+function dictJoin(){
+  let n=0;for(const b of dictQ)n+=b.length;
+  const all=new Int16Array(n);let o=0;
+  for(const b of dictQ){all.set(b,o);o+=b.length;}
+  dictQ=[];
+  return all.buffer;
+}
+// the queue to the session, one request in flight; the reply's partial shows
+function dictPump(){
+  if(!dictSid||dictInflight||!dictQ.length)return;
+  const sid=dictSid,body=dictJoin();
+  dictInflight=api("/api/dictate/audio?sid="+sid,{method:"POST",
+    headers:{"Content-Type":"application/octet-stream"},body}).then(async r=>{
+    const d=r.ok?await r.json():{};
+    if(d.partial!=null&&dictSid===sid)dictShow(d.partial,false);
+  }).catch(()=>{}).then(()=>{dictInflight=null;dictPump();});
+}
+// text in the composer, in place: dimmed while it is a partial, plain when final
+function dictShow(text,final){
+  if(!final&&!dictSid)return;          // a late partial for a session that is over
+  if(!final&&(!text||text===dictPartial))return;
+  dictPartial=final?"":text;
+  input.value=text;
+  input.classList.toggle("dictating",!final);
+  input.dispatchEvent(new Event("input"));
+  if(!final&&text)dictTrace("partial");
+}
+// the session is let go: cancelled on the server if it began, nothing kept here
+function dictDrop(){
+  const sid=dictSid;dictSid=null;dictQ=[];dictPartial="";
+  if(sid)api("/api/dictate/cancel?sid="+sid,{method:"POST"}).catch(()=>{});
+}
+// the session: one round trip, in parallel with the microphone. True with a
+// session; false when the engine isn't in (ensureVoice has put the download
+// words on the composer); throws when the server can't be reached
+async function dictOpen(){
+  const r=await api("/api/dictate/start",{method:"POST",
+    headers:{"Content-Type":"application/json"},body:"{}"});
+  if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("start "+r.status);}
+  const d=await r.json();
+  if(!d.ok){
+    if(d.ready===false){
+      voiceReady=false;
+      if(await ensureVoice())input.placeholder="Ready. Press "+DICT_KEY+" and talk.";
+      return false;
+    }
+    throw new Error("no session");
+  }
+  dictSid=d.sid;dictPartial="";dictTrace("session");
+  dictPump();                          // the pre-roll goes first
+  return true;
+}
+// readied ahead of a press (the composer taking focus), once a minute at
+// most: the recognizer on the server, and the page's AudioContext, whose
+// construction is synchronous and was the keydown's one long task (213 ms
+// measured in Blink: the indicator could not paint until it was done)
+function dictWarm(){
+  const n=Date.now();if(n-dictWarmT<60000)return;dictWarmT=n;
+  try{micCtxGet();}catch(e){}
+  api("/api/dictate/warm",{method:"POST"}).catch(()=>{});
 }
 // begin capturing; resolves once the processor is wired and micCap is on
 async function micAttach(){
@@ -59515,17 +60034,17 @@ async function micAttach(){
   const stream=await gum;
   if(rs){try{await rs;}catch(e){}}
   if(!micSrc)micSrc=ctx.createMediaStreamSource(stream);
-  recBuf=[];recHeard=false;
+  dictQ=[];dictSecs=0;recHeard=false;
   micSrc.connect(micProc);micProc.connect(ctx.destination);
   micCap=true;
 }
-// stop capturing; the clip is returned and the warm window starts (or, with
-// keep false or the setting off, the microphone is let go at once)
+// stop capturing; the seconds heard are returned and the warm window starts
+// (or, with keep false or the setting off, the microphone is let go at once)
 function micDetach(keep){
   micCap=false;
   try{if(micSrc)micSrc.disconnect();if(micProc)micProc.disconnect();}catch(e){}
-  const out={bufs:recBuf,sr:micCtx?micCtx.sampleRate:0};
-  recBuf=[];recHeard=false;
+  const out={secs:dictSecs};
+  dictSecs=0;recHeard=false;
   if(keep!==false&&micWarmOn()&&micLive()){
     if(micTimer)clearTimeout(micTimer);
     micTimer=setTimeout(micClose,MIC_WARM_S*1000);
@@ -59545,26 +60064,36 @@ function micClose(force){
 }
 
 async function stopRec(){
-  recording=false;micBtn.classList.remove("rec");
+  recording=false;
   dictKey({type:"end"},0);             // however it ended, the hotkey starts clean
   const clip=micDetach();
+  dictTrace("up");
+  const sid=dictSid;
   // under DICT_MIN_CLIP_S is a slip, not speech: never transcribed, and
   // never sent in voice chat (6b338)
-  if(audioSecs(clip.bufs,clip.sr)<DICT_MIN_CLIP_S){
-    input.placeholder="Didn\u2019t catch that. Try again.";return;}
-  input.placeholder="transcribing\u2026";
+  if(clip.secs<DICT_MIN_CLIP_S||!sid){
+    dictDrop();dictLit(false);
+    input.placeholder="Didn’t catch that. Try again.";return;}
+  micBtn.classList.remove("rec");
+  input.placeholder="Finishing…";
   try{
-    const wav=wavEncode(clip.bufs,clip.sr);
-    const r=await api("/api/transcribe",{method:"POST",body:wav});
+    if(dictInflight)await dictInflight;         // the last chunk lands before the end does
+    const body=dictJoin();
+    dictSid=null;                               // no partial may land after this
+    const r=await api("/api/dictate/end?sid="+sid,{method:"POST",
+      headers:{"Content-Type":"application/octet-stream"},body});
     // a 503 is the engine gone from under a cached "ready": ask again next time
     if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("Couldn’t transcribe. Try again.");}
-    const text=(await r.json()).text;
+    const text=((await r.json()).text||"").trim();
+    dictTrace("final");
     input.placeholder="Ask anything";
-    if(text){
-      input.value=text;input.dispatchEvent(new Event("input"));
-      if(voiceChat)send();          // voice chat: straight to the model
-    }
-  }catch(e){input.placeholder="Couldn\u2019t transcribe. Try again.";}
+    dictShow(text,true);
+    if(text&&voiceChat)send();          // voice chat: straight to the model
+  }catch(e){
+    // the words heard so far stand, plain, and the composer says why
+    if(dictPartial)dictShow(dictPartial,true);else input.classList.remove("dictating");
+    input.placeholder="Couldn’t transcribe. Try again.";
+  }
 }
 
 // Settings, Advanced, the palette, the first-run and update dialogs:
@@ -59574,7 +60103,7 @@ function dictModal(){
   return !!((p&&!p.hidden)
     ||[...document.querySelectorAll('[id$="-veil"]')].some(v=>!v.hidden));
 }
-function recSecs(){return recording&&micCtx?audioSecs(recBuf,micCtx.sampleRate):0;}
+function recSecs(){return recording?dictSecs:0;}
 let dictStarting=false,dictPend=false;
 function micMsg(e){
   return e&&e.name==="NotFoundError"?"No microphone found."
@@ -59586,13 +60115,13 @@ async function dictStart(){
   dictStarting=true;dictPend=false;
   let on=false;
   dictTrace("down");
-  input.placeholder="Starting the microphone\u2026";
+  dictLit(true);dictTrace("lit");      // the indicator in the keydown itself, before any await
   try{
     api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in: not awaited
     const cap=micAttach();             // capture starts now...
     cap.catch(()=>{});
-    const vp=dictVoiceP=ensureVoice(); // ...beside the voice check (cached: no call)
+    const vp=dictVoiceP=dictOpen();    // ...beside the session (one round trip; the download words if the engine isn't in)
     vp.catch(()=>{});
     let ok=null;
     try{ok=await vp;dictTrace("voice");}catch(e){}
@@ -59600,17 +60129,17 @@ async function dictStart(){
       // not ready (its own words are on the page now) or the server gone:
       // the clip is discarded, the microphone let go
       const msg=ok===false?input.placeholder
-        :"Couldn\u2019t reach dictation. Try again.";
+        :"Couldn’t reach dictation. Try again.";
       await cap.catch(()=>{});
-      micDetach(false);
+      micDetach(false);dictDrop();dictLit(false);
       input.placeholder=msg;
     }else{
       try{
         await cap;
-        recording=true;micBtn.classList.add("rec");
+        recording=true;
         recPaint();on=true;
       }catch(e){
-        micDetach(false);input.placeholder=micMsg(e);
+        micDetach(false);dictDrop();dictLit(false);input.placeholder=micMsg(e);
       }
     }
   }finally{dictStarting=false;}
@@ -59676,6 +60205,9 @@ function micWarmPaint(){
   t.addEventListener("click",()=>setMicWarm(!micWarmOn()));
   if(IS_PC)$("#micwarm-note").textContent="On for 15 seconds after you dictate.";
 })();
+// the recognizer is readied when the composer takes focus (6b541), so a
+// press finds it listening; once a minute at most
+input.addEventListener("focus",dictWarm);
 
 /* ------------------------------------------------------ find in chat */
 // 6b352, per Patrick: "Command or Control F should open a find box for the
