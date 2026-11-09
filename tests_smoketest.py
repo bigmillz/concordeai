@@ -2795,6 +2795,7 @@ _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Int
 _PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" otherwise; filled before the page is sent
 _PAGE_HOST |= {"Int16Array"}         # 6b543: the page turns captured audio into 16 kHz PCM
 _PAGE_HOST |= {"isNaN"}              # 6b544: the writing star tests its unset position (isNaN is on window in WKWebView, WebView2 and Qt)
+_PAGE_HOST |= {"HTMLSelectElement"}  # 6b550: Settings' controls watch a select's own value and selectedIndex (the prototype's setters)
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -4375,7 +4376,7 @@ check("Pollinations is gone and the Cloud power copy tells the truth",
       # (6b326) the switch decides chats; a saved Gemini key makes
       # pictures and video either way; the switch never removes a key
       and "only while a key is on" not in _MILLENAI_SRC
-      and ("Optional. While on, cloud models answer and your prompts leave this Mac. "
+      and ("Optional. While on, cloud models answer and your prompts leave your machines. "
            "Gemini pictures and video go to Google whenever a Gemini key is saved. "
            "Keys stay saved when off.") in _MILLENAI_SRC
       and '<span>Cloud models</span></label>' in _MILLENAI_SRC
@@ -5332,7 +5333,7 @@ check("settings: descriptions + Account pane + scoped forget",
       and '"/api/forget"' in _MILLENAI_SRC
       and "FORGET ME" in page
       # one kind of account since the web version went (6b320)
-      and "Local account. Everything stays on this Mac." in page
+      and "Local account. Everything stays on your machines." in page
       and "chats follow you between devices" not in page
       and "Guest pass" not in page and 'id="forget-pin"' not in page
       and all('id="fs-%s"' % k in page for k in ("mem", "chats", "prefs")))
@@ -6061,7 +6062,7 @@ def _ros_run(src):
     return subprocess.run(["node", _f], capture_output=True, text=True, timeout=30).stdout
 _ros_ok = _ros_run(_MILLENAI_SRC)
 check("manage roster: this-mac models only, no cloud group or rows",
-      "On this Mac" in _ros_ok and "<ROW Qwen>" in _ros_ok
+      "On this computer" in _ros_ok and "<ROW Qwen>" in _ros_ok
       and "Not downloaded" in _ros_ok and "<ROW Gemma>" in _ros_ok
       and "cloud" not in _ros_ok.lower() and "Gemini" not in _ros_ok
       and "Groq" not in _ros_ok, _ros_ok[:200])
@@ -6078,7 +6079,7 @@ check("cloud still lives where cloud is chosen (cloud power, picker, tier pop)",
 # the release notes (the gh release body now rides /api/update/check)
 check("updates: version, date, notes",
       'id="up-version"' in page and 'id="up-reldate"' in page
-      and '"notes": (rel.get("body")' in _MILLENAI_SRC)
+      and _MILLENAI_SRC.count('"notes": _release_notes(rel),') == 2 and "def _release_notes(rel) -> str:" in _MILLENAI_SRC)
 # 6b257: the name field — placeholder-first, saved with persona,
 # injected once into the system-prompt assembly every model reads
 check("your name reaches every model",
@@ -6503,7 +6504,7 @@ check("wizard: image and video options are two short rows styled like the autocl
       and "#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;" in page
       and "#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}" in page
       and 'z.textContent="("+t.gb+" GB)"' in page
-      and "Pictures from a description, on this Mac" in page)     # the studio card's own line stays
+      and "Pictures from a description, on this computer" in page)     # the studio card's own line stays
 # ==== 6b405 model sets: end ====
 # 6b408, per Patrick: the studio cards' Remove looked unfinished (a thin grey
 # box with the browser's own text). It and "Continue in background" are the
@@ -8553,7 +8554,7 @@ def _upd(tag, frozen=False, mac=False, name="6.2", arm=False, arm_msi=False):
                          {"name": "ConcordeAI-6.2-Windows.zip", "browser_download_url": "https://github.com/x/w.zip", "size": 4e5}]
               + ([{"name": "ConcordeAI-6.2-arm64.msi", "browser_download_url": "https://github.com/x/arm.msi", "size": 7e7}]
                  if arm_msi else [])}}
-    _exec_names(ns, {"_check_update_live"})
+    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line"})
     return ns["_check_update_live"]()
 _u_new, _u_msi, _u_old, _u_mac = _upd("v320"), _upd("v320", frozen=True), _upd("v290"), _upd("v320", mac=True)
 # a higher tag with a LOWER version (6.0.4's v274 against 6.1's build 273)
@@ -11618,8 +11619,8 @@ check("KEY-8: with no key saved, start, Settings and a restart reach no provider
       _k8 == [200] * 4 and not _k8_hits, "%r" % [_k8, _k8_hits[:3]])
 check("KEY-5: with no Gemini key a picture and a video send nothing and say how to add one",
       _img_nokey[0] == 200 and _vid_nokey[0] == 200
-      and "Add a Gemini key in Settings > Cloud, or add image generation in Settings > Models." in _img_nokey[1]
-      and "Add a Gemini key in Settings > Cloud, or add video generation in Settings > Models." in _vid_nokey[1]
+      and "Add a Gemini key in Settings > Models > Cloud, or add image generation in Settings > Models." in _img_nokey[1]
+      and "Add a Gemini key in Settings > Models > Cloud, or add video generation in Settings > Models." in _vid_nokey[1]
       and "Turn on Use cloud power" not in _img_nokey[1] + _vid_nokey[1],
       "%r" % [_img_nokey[1][-220:], _vid_nokey[1][-220:]])
 
@@ -12201,10 +12202,10 @@ check("review fixes: the glitch checks and rests under the lock, `off` removes u
       and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
       and "_last_cloud.get((self.ctx.name, _tcid))" in _MILLENAI_SRC
       and '$("#turbo").checked=!on;' in _MILLENAI_SRC
-      and "Cloud models are off. Turn them on in Settings > Cloud." in _MILLENAI_SRC
+      and "Cloud models are off. Turn them on in Settings > Models > Cloud." in _MILLENAI_SRC
       and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
-      and _sn_mac == ("Add a Gemini key in Settings > Cloud, or add image generation in Settings > Models.",
-                      "Add a Gemini key in Settings > Cloud, or add video generation in Settings > Models.")
+      and _sn_mac == ("Add a Gemini key in Settings > Models > Cloud, or add image generation in Settings > Models.",
+                      "Add a Gemini key in Settings > Models > Cloud, or add video generation in Settings > Models.")
       and _sn_pc.startswith("Pictures on this computer need Apple silicon. Add"),
       "%r" % [_seen26, _sn_mac, _sn_pc])
 
@@ -18270,7 +18271,7 @@ _SG_STATIC = [
     ("the switch in Personality, on by default", lambda p, s: '<div class="toggle-row on" id="sugg-toggle"' in p
      and p.index('id="sugg-toggle"') > p.index('id="p-persona"') and p.index('id="sugg-toggle"') < p.index('id="p-cloud"')),
     ("the switch's name and its note", lambda p, s: "<span>Personal suggestions</span></div>" in p
-     and "From the titles of recent chats. Written on your server or this Mac." in p),
+     and "From the titles of recent chats. Written on your machines." in p),
     ("a Refresh button", lambda p, s: 'id="sugg-refresh" type="button">Refresh</button>' in p),
     ("the switch saved as the person's own setting", lambda p, s: "body:JSON.stringify({suggest_own:on})" in p),
     ("the switch read when Settings opens", lambda p, s: '$("#sugg-toggle").classList.toggle("on",pr.suggest_own!==false);' in p),
@@ -20857,7 +20858,7 @@ def _svc_fail(src):
     ok = all(got[repr(a)] == w for a, w in table)
     msg = str(ns["_srv_fail"](e, 403, {"code": "unpaired"}))
     ok = ok and msg == ("Desktop no longer accepts this computer: the pairing was lost. "
-                        "Pair again in Settings › Your servers.")
+                        "Pair again in Settings › Models › Servers.")
     # the real transport: the Access token, a signature over the exact
     # bytes, the app's own User-Agent
     import nacl.bindings as _nb34
@@ -21821,7 +21822,7 @@ check("servers: %d mutations of how a failed call is told, each caught" % len(_S
 
 
 def _svc_testbtn(src):
-    """Settings > Servers > Test ends in a result (6b367): a green OK with what
+    """Settings > Models > Servers > Test ends in a result (6b367): a green OK with what
     the check found, or the error in the app's own words; held for a few
     seconds or until the next press. The pure function and the card's class in
     node, the handler pinned in the source."""
@@ -26211,7 +26212,7 @@ _sc7 = _svchat(text="after unpair")
 _st7 = _svq("/api/servers/test", "POST", {"id": _sid34})[1].get("server") or {}
 check("servers (live): a device removed at the server (401/403) says the pairing was lost, pair again",
       _sc7[1].strip() == ("⚠️ %s no longer accepts this computer: the pairing was "
-                          "lost. Pair again in Settings › Your servers." % _SVN)
+                          "lost. Pair again in Settings › Models › Servers." % _SVN)
       and _st7.get("status", {}).get("kind") == "auth" and _st7["status"]["reachable"] is True,
       "%r" % [_sc7[1], _st7.get("status")])
 _code34b = _o1("/open", {})["code"]
@@ -26494,7 +26495,7 @@ _svq("/api/test/profile", "POST", {"op": "switch", "to": "local"})
 _vA34 = _svq("/api/servers")[1]
 check("servers (live): a server added in one profile is invisible and unusable in another",
       _pB34 and _vB34.get("servers") == [] and _tB34.get("err") and _rmB34.get("err")
-      and _scB[1].strip() == "⚠️ That server isn’t in Settings › Your servers any "
+      and _scB[1].strip() == "⚠️ That server isn’t in Settings › Models › Servers any "
                              "more. Pick another model."
       and len(_o1("/log")["log"]) == _nlogB
       and not os.path.exists(os.path.join(_SV.home, "accounts", _pB34, "servers.json"))
@@ -26503,7 +26504,7 @@ check("servers (live): a server added in one profile is invisible and unusable i
       "%r" % [_vB34, _scB[1], _tB34, _rmB34, _vA34])
 check("server only (live): profile B has no row for A's server, and A's mode says the server is gone "
       "there without a request leaving",
-      _scBo[1].strip() == "That server isn\u2019t in Settings \u203a Your servers any more. "
+      _scBo[1].strip() == "That server isn\u2019t in Settings \u203a Models \u203a Servers any more. "
                           "Pick another model. Nothing was sent anywhere else."
       and not [k_ for k_ in _tiB if k_.startswith("srv:")] and len(_o1("/log")["log"]) == _nlogB,
       "%r" % [_scBo[1], list(_tiB)])
@@ -26747,7 +26748,7 @@ check("auto sleep (live): minutes are brought into 5..1440 by the gateway, a bad
       "older kit says to update, a server that is off says so, and a refused save changes nothing",
       _z3[1]["sleep"]["minutes"] == 5 and _z3[1]["sleep"]["enabled"] is True
       and all(z_.get("ok") is False and z_.get("kind") == "input" for z_ in _z4)
-      and all(z_ == {"ok": False, "kind": "gone", "err": "That server isn’t in Settings › Your servers any more."}
+      and all(z_ == {"ok": False, "kind": "gone", "err": "That server isn’t in Settings › Models › Servers any more."}
               or z_.get("kind") == "gone" for z_ in _z4g)
       and _z_calls == 1
       and _z5[1] == {"ok": False, "kind": "old", "err": "Needs a newer server kit."}
@@ -27122,7 +27123,7 @@ _prG = _svq("/api/prefs")[1].get("tier")
 check("server only (live): a restart keeps the mode; with its server removed the row is gone and a chat "
       "says so, never answering from another model",
       _prG == _so_tier and not [k_ for k_ in _tiG if k_.startswith("srv:")]
-      and _scG[1].strip() == "That server isn\u2019t in Settings \u203a Your servers any "
+      and _scG[1].strip() == "That server isn\u2019t in Settings \u203a Models \u203a Servers any "
                              "more. Pick another model. Nothing was sent anywhere else."
       and "ANSWER" not in _scG[1],
       "%r" % [_prG, _scG[1], list(_tiG)])
@@ -30615,7 +30616,7 @@ def _w46c_only_wake(src):
     ns["server_take_wake_pending"]()
     r4 = ns["server_only_resolve"](sid, ctx, defer=True)
     out["no card"] = (r4[0] == "" and ns["server_take_wake_pending"]() == ""
-                      and "doesn\u2019t know how to wake it. Open Settings \u203a Servers while it is on." in r4[2])
+                      and "doesn\u2019t know how to wake it. Open Settings \u203a Models \u203a Servers while it is on." in r4[2])
     # the handler: the check before the headers, the wake after them, the page told, Stop ends it
     h0 = src.index("server_only_resolve(\n                    srv_only_id(tier), self.ctx, defer=True)")
     h1 = src.index("self.end_headers()", h0)
@@ -34586,7 +34587,7 @@ def _cm_resolver(src):
     # none
     nn = _cm_ns(src, {})
     got["no keys: every mode empty, the sentence says where to add one"] = all(
-        nn["cloud_mode_plan"](m, "groq")["seats"] == [] and ("Add a key in Settings > Cloud" in nn["cloud_mode_plan"](m, "groq")["why"])     # copy-2 (2b0b902)
+        nn["cloud_mode_plan"](m, "groq")["seats"] == [] and ("Add a key in Settings > Models > Cloud" in nn["cloud_mode_plan"](m, "groq")["why"])     # copy-2 (2b0b902)
         for m in ("Fast", "Thinking", "Pro", "Model"))
     # a resting provider is skipped and shown as resting; a rejected key too
     soon = time.time() + 600
@@ -34605,7 +34606,7 @@ def _cm_resolver(src):
         _cm_names(ns["cloud_mode_plan"]("Model", p)) and ns["cloud_mode_plan"]("Model", p)["spare"] == [] for p in ("gemini", "claude"))
     got["a pick of an unavailable model is empty with its reason"] = (
         rs["cloud_mode_plan"]("Model", "claude")["seats"] == [] and "unavailable: key rejected" in rs["cloud_mode_plan"]("Model", "claude")["why"]
-        and nn["cloud_mode_plan"]("Model", "groq")["why"] == "Groq has no key. Add a key in Settings > Cloud.")
+        and nn["cloud_mode_plan"]("Model", "groq")["why"] == "Groq has no key. Add a key in Settings > Models > Cloud.")
     # /api/tiers rows
     rows = rs["cloud_mode_tiers"]()
     got["rows: modes and one pick per provider"] = (
@@ -42742,6 +42743,152 @@ check("6b544 the writing star: one star at the end of the newest text (aimed onc
       and not _star544(page.replace("s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}", "s.on=false;"))                                                            # the star never retiring
       and not _star544(page.replace("const dt=s.at?Math.min(64,t-s.at):16;s.at=t;", "const dt=s.at?Math.min(64,t-s.at):16;s.at=t;s.ty=s.el.getBoundingClientRect().top;")), "")    # a layout read per frame
 # ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): end ====
+
+# ==== settings-look (6b550): begin ====
+# Settings in the front's look (per Patrick: "It looks perfect as far as layout, but it doesn't match our
+# current look"): the same rail and pane in one neutral glass, Horizon only; no Visual effects beside
+# Effects; few choices drawn as the front's segmented control and many as a glass menu, the selects kept;
+# a nightly's What's new never lists commit subjects.
+_sl_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b550"):_MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
+_sl_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b550, per Patrick). Under Horizon"):_MILLENAI_SRC.index("/* ===================================================== HORIZON end (6b526) */")]
+
+
+def _sl_glass(css):
+    return (".hz #about-veil{background:rgba(3,3,5,.72);" in css                       # a black scrim, never navy
+            and "--sl-dense:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025)),rgba(8,8,10,.86);" in css
+            and "--sl-hair:rgba(241,230,206,.09);--sl-hair2:rgba(241,230,206,.15);" in css   # champagne hairlines
+            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 48px));max-height:none;" in css
+            and "grid-template-columns:216px minmax(0,1fr);border-radius:14px;border:1px solid var(--sl-hair2);background:var(--sl-dense);" in css
+            and "--text:var(--sl-ink);--dim:var(--sl-ink2);--faint:var(--sl-ink3);" in css   # the panes' older rules read the new inks
+            and ".hz #about-veil #up-version{font:500 22px/1.3 var(--sl-ui);letter-spacing:-.012em;text-transform:none;" in css   # no wide display face
+            and "font:400 14px/1.4 var(--sl-ui);font-style:normal;color:var(--sl-ink)}" in css                                  # no italic channel label
+            and ".hz #about-veil .about-btn.primary{margin-left:auto;padding:0 24px;background:rgba(255,255,255,.09);" in css   # Close is a key, not a white pill
+            and "#10204a" not in css and "#070a16" not in css and "--hz-deep" not in css and "--hz-accent" not in css)
+
+
+check("6b550 Settings look: one neutral glass over a black scrim, champagne hairlines, the classic tokens re-set inside, Space Grotesk titles, Close a key; the mutants are caught",
+      _sl_glass(_sl_css) and _hz_scoped(_sl_css)
+      and not _sl_glass(_sl_css.replace(".hz #about-veil{background:rgba(3,3,5,.72);", ".hz #about-veil{background:rgba(7,10,22,.72);"))
+      and not _sl_glass(_sl_css + ".hz #about-veil #set-rail{background:var(--hz-deep)}")
+      and not _sl_glass(_sl_css.replace("letter-spacing:-.012em;text-transform:none;", "letter-spacing:.1em;text-transform:uppercase;"))
+      and not _hz_scoped(_sl_css + "\n#about-veil .snav{color:red}")
+      # the layout stays: the rail's lockup, its spec list, the sections, the pane and its foot
+      and '<nav id="set-rail">' in page and '<dl id="set-spec">' in page and '<div id="about-foot">' in page
+      and '<button class="snav on" data-pane="p-about">About</button>' in page
+      and '<button class="about-btn primary" id="about-close">Close</button>' in page, "")
+
+
+def _sl_onefx(css, js, pg):
+    return ('<div class="toggle-row" id="fx-toggle"' in pg                              # Classic keeps its switch
+            and ".hz #about-veil #p-about #fx-toggle{display:none}" in css
+            and "function slFxFold(lv){\n  if(!slOn()||typeof setVideo!==\"function\")return;\n  if(lv===\"calm\"&&!noVideo)setVideo(false);else if(lv!==\"calm\"&&noVideo)setVideo(true);\n}" in js
+            and 'const lv=hzFxLevel();if(!on&&lv!=="calm")setFxLevel("calm");else if(on&&lv==="calm")setFxLevel("balanced");' in js
+            and 'const fsel=$("#fx-level");if(fsel)fsel.addEventListener("change",()=>slFxFold(fsel.value));' in js
+            and 'if(slOn()&&typeof noVideo!=="undefined"&&noVideo&&hzFxLevel()!=="calm")setFxLevel("calm");' in js
+            and '  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b550)\n' in pg)
+
+
+# run in node: a pick on the Effects control and the palette's switch keep the level and the stills together
+_sl_fx_js = (_jsfn(_MILLENAI_SRC, "function slFxFold(lv){") + _jsfn(_MILLENAI_SRC, "function slFxSync(on){") + r"""
+let noVideo=false,lvl="balanced";const slOn=()=>true;
+function hzFxLevel(){return lvl;}function setFxLevel(v){lvl=v;}
+function setVideo(on){noVideo=!on;slFxSync(on);}
+const out=[];
+function pick(v){setFxLevel(v);slFxFold(v);out.push([v,lvl,noVideo]);}
+pick("calm");pick("full");pick("balanced");
+setVideo(false);out.push(["switch off",lvl,noVideo]);
+setVideo(true);out.push(["switch on",lvl,noVideo]);
+process.stdout.write(JSON.stringify(out));""")
+try:
+    _sl_fx = _node_json(_sl_fx_js, "slfx.js")
+except Exception as _e:
+    _sl_fx = repr(_e)
+check("6b550 no Visual effects beside Effects: under Horizon the switch is hidden and folded in (Calm is the old Off; Balanced and Full bring the backdrop back; the palette's switch moves the one control), Classic keeps it; the mutants are caught",
+      _sl_onefx(_sl_css, _sl_js, page)
+      and _sl_fx == [["calm", "calm", True], ["full", "full", False], ["balanced", "balanced", False],
+                     ["switch off", "calm", True], ["switch on", "balanced", False]]
+      and not _sl_onefx(_sl_css.replace(".hz #about-veil #p-about #fx-toggle{display:none}", ""), _sl_js, page)
+      and not _sl_onefx(_sl_css, _sl_js.replace('if(!on&&lv!=="calm")setFxLevel("calm");', ""), page)
+      and not _sl_onefx(_sl_css, _sl_js, page.replace("  if(typeof slFxSync===\"function\")slFxSync(on);", "", 1)), "%r" % (_sl_fx,))
+
+
+def _sl_segs(css, js):
+    return ('function slSelAll(){if(slOn())$$("#about-veil select").forEach(slSel);}' in js      # the panel's selects, Horizon only
+            and 'sel.classList.add("sl-native");sel.tabIndex=-1;sel.setAttribute("aria-hidden","true");sel.after(host);' in js
+            and 'Object.defineProperty(sel,"value",{configurable:true,get(){return slValP.get.call(this);},set(v){slValP.set.call(this,v);slPaint(this);}});' in js
+            and 'sel.dispatchEvent(new Event("input",{bubbles:true}));sel.dispatchEvent(new Event("change",{bubbles:true}));' in js
+            and '<i class="sl-hi" aria-hidden="true"></i>' in js and 'seg.style.setProperty("--i",Math.max(0,i));' in js
+            # the front's lanes: a glass box radius 6, a lit box radius 4.5 that slides in 200 ms
+            and ".hz .sl-seg{position:relative;display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;height:32px;box-sizing:border-box;border-radius:6px;" in css
+            and "transform:translateX(calc(var(--i,0) * 100%));background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));" in css
+            and "box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(150,165,255,.3),0 0 12px -3px rgba(110,130,255,.45);transition:transform .2s var(--sl-out)}" in css
+            and ".hz #about-veil select.sl-native{display:none!important}" in css and "html:not(.hz) .sl-sel{display:none}" in css
+            and ".hz #sl-pop{position:fixed;z-index:90;" in css)
+
+
+# run in node: which selects become a segmented control and which a menu
+_sl_kind_js = _jsfn(_MILLENAI_SRC, "function slKind(sel){") + r"""
+const mk=a=>({options:a.map(t=>({text:t}))});
+process.stdout.write(JSON.stringify([
+  slKind(mk(["Stable","Prerelease","Nightly"])),slKind(mk(["Horizon","Classic"])),slKind(mk(["Calm","Balanced","Full"])),
+  slKind(mk(["1 hour","1 day","1 week","1 month","1 year","All time"])),
+  slKind(mk(["Gemini (free tier)","Groq (free tier)","Claude (paid)","Kimi K3 (paid)"])),slKind(mk(["All models"]))]));"""
+try:
+    _sl_kind = _node_json(_sl_kind_js, "slkind.js")
+except Exception as _e:
+    _sl_kind = repr(_e)
+check("6b550 segmented controls: Update channel, Look and Effects are the front's control (a lit box that slides), the usage period, the model and the cloud provider glass menus; every select keeps its id, value and handler; the mutants are caught",
+      _sl_segs(_sl_css, _sl_js) and _sl_kind == ["seg", "seg", "seg", "menu", "menu", "menu"]
+      and '<select id="upchan"><option value="stable">Stable</option>' in page and '<select id="fx-level"><option value="calm">Calm</option>' in page
+      and '<select id="look-sel"><option value="horizon">Horizon</option>' in page and '<select id="us-range" aria-label="Time period">' in page
+      and not _sl_segs(_sl_css.replace("transform:translateX(calc(var(--i,0) * 100%));", ""), _sl_js)
+      and not _sl_segs(_sl_css, _sl_js.replace('$$("#about-veil select")', '$$("select")'))
+      and not _sl_segs(_sl_css.replace("border-radius:6px;\n  border:1px solid var(--sl-hair2);background:var(--sl-glass)", "border-radius:999px;\n  border:1px solid var(--sl-hair2);background:var(--sl-glass)"), _sl_js), "%r" % (_sl_kind,))
+
+
+# a nightly's What's new, run for real against stand-in releases: never a commit subject
+_SL_COMMITS = "ConcordeAI 7.0 nightly 38f247b\n\n- beta-1 gauntlet: the MLX engine's boot-order pin follows 6b546's PDF reader thread\n- Release 7.0 beta 1 (build 278)"
+_SL_HUMAN = "ConcordeAI 7.0 beta 1\n\nThe first beta of 7.0: a new look, a native window."
+
+
+def _sl_upd(rel, nightly="7.0 · 38f247b"):
+    ns = {"IS_MAC": True, "IS_WIN_ARM": False, "IS_WIN_EMULATED": False, "sys": sys, "APP_BUILD": 278, "APP_NIGHTLY": nightly,
+          "APP_VERSION": "7.0.0", "re": re, "urllib": __import__("urllib"), "_update": {}, "_gh_time": lambda s: 0,
+          "short_version": lambda: "7.0", "_app_bundle_path": lambda: None, "_build_from_tag": lambda t: int(re.sub(r"\D", "", t) or 0),
+          "_channel_release": lambda: rel}
+    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line"})
+    return ns["_check_update_live"]()
+
+
+def _sl_wn(rels):
+    import io as _io
+    class _R(_io.BytesIO):
+        def __enter__(s): return s
+        def __exit__(s, *a): return False
+    _ur = __import__("types").SimpleNamespace(
+        request=__import__("types").SimpleNamespace(Request=lambda u, headers=None: u, urlopen=lambda u, timeout=8: _R(json.dumps(rels).encode())))
+    ns = {"APP_NIGHTLY": "7.0 · 38f247b", "APP_BUILD": 278, "APP_VERSION": "7.0.0", "UPDATE_API": "https://api.github.com", "UPDATE_REPO": "x/y",
+          "urllib": _ur, "json": json, "re": re, "short_version": lambda: "7.0 · 38f247b", "_whatsnew_cache": {}}
+    _exec_names(ns, {"whats_new", "_nightly_line"})
+    return ns["whats_new"]("7.0 · 1111111")
+
+
+_sl_n1 = _sl_upd({"tag_name": "nightly", "name": "ConcordeAI 7.0 nightly 38f247b", "body": _SL_COMMITS, "_human_notes": _SL_HUMAN, "assets": []})
+_sl_n2 = _sl_upd({"tag_name": "nightly", "name": "ConcordeAI 7.0 nightly 38f247b", "body": _SL_COMMITS, "_human_notes": "", "assets": []})
+_sl_b1 = _sl_upd({"tag_name": "v278", "name": "7.0 beta", "body": _SL_HUMAN, "assets": []}, nightly="")
+_sl_w1 = _sl_wn([{"tag_name": "nightly", "body": _SL_COMMITS}, {"tag_name": "v278", "body": _SL_HUMAN}])
+_sl_w2 = _sl_wn([{"tag_name": "nightly", "body": _SL_COMMITS}])
+check("6b550 a nightly's What's new never lists commit subjects: the last release's notes, else one plain line (About and the post-update card, run against stand-in releases); a numbered release keeps its own notes",
+      _sl_n1.get("notes") == _SL_HUMAN and _sl_n2.get("notes") == "Latest changes from the 7.0 line."
+      and _sl_b1.get("notes") == _SL_HUMAN
+      and _sl_w1.get("notes") == _SL_HUMAN and _sl_w2.get("notes") == "Latest changes from the 7.0 line."
+      and all("gauntlet" not in (x.get("notes") or "") and "(build 278)" not in (x.get("notes") or "") for x in (_sl_n1, _sl_n2, _sl_w1, _sl_w2))
+      and 'rels = ([dict(x, _human_notes=human) for x in rels\n                     if x.get("tag_name") == "nightly"] or rels)' in _MILLENAI_SRC
+      and 'cmp_ = _get("compare/' not in _MILLENAI_SRC and '"- " + x for x in subs' not in _MILLENAI_SRC
+      and '+(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")' in page,
+      "%r" % [_sl_n1.get("notes"), _sl_n2.get("notes"), _sl_w1.get("notes"), _sl_w2.get("notes")])
+# ==== settings-look (6b550): end ====
+
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
