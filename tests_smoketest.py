@@ -41422,7 +41422,7 @@ check("the shell's probe hook (CONCORDE_SHELL_PROBE) is compiled into debug buil
 # SHELL-POLISH (7.0 beta 1, per Patrick: "do better on the Rust version"): the page
 # fades in over the night (no blank or white frame; main frame, the app's origin
 # only, revealed by 2.5 s whatever happens, the style removed after); a sidecar
-# that stops on its own (not the updater's 0, not a refused setting 2 or 4) is
+# that stops on its own (not the updater's 0, not 2, 3 or 4) is
 # started again behind a "Reconnecting…" veil, at most MAX_RESTARTS = 3 times in a
 # row, a run steady for 60 s clearing the tally, then the plain error page; Quit
 # sets QUITTING first so nothing restarts it; the sidecar starts before the window
@@ -41436,7 +41436,11 @@ def _sp_rules(rs):
         "fade script": ".initialization_script(FADE_IN)" in rs and "initialization_script_for_all_frames" not in rs
                        and 'location.hostname !== "127.0.0.1"' in fade and "setTimeout(reveal, 2500)" in fade
                        and "st.remove()" in fade and "prefers-reduced-motion" in fade and "token" not in fade,
-        "restart only what may start": "fn restartable(code: Option<i32>) -> bool {\n    !matches!(code, Some(0) | Some(2) | Some(4))\n}" in rs,
+        "restart only what may start": "fn restartable(code: Option<i32>) -> bool {\n    !matches!(code, Some(0) | Some(2) | Some(3) | Some(4))\n}" in rs,
+        "one window per folder": "    if dev_copy() {" in rs and "data_home().hash(&mut h);" in rs
+                                 and "ctx.config_mut().identifier = id;" in rs
+                                 and rs.index("ctx.config_mut().identifier = id;") < rs.index("tauri_plugin_single_instance::init(")
+                                 and 'std::env::var("MILLENAI_DEV").ok().as_deref() == Some("1")' in rs,
         "capped": "const MAX_RESTARTS: u32 = 3;" in rs and "n > MAX_RESTARTS" in rs
                   and "RESTARTS.store(0, Ordering::SeqCst);" in rs and "since.elapsed() > STEADY" in rs,
         "veil, then a new sidecar": "let _ = w.eval(RECONNECTING);" in rs and "Reconnecting…" in rs
@@ -41450,7 +41454,8 @@ def _sp_rules(rs):
                                      and "show_main(app);\n        }))" in rs,
     }
 _sp = _sp_rules(_rs_main)
-_sp_mut = [("restart on 2", "Some(0) | Some(2) | Some(4)", "Some(0) | Some(4)", "restart only what may start"),
+_sp_mut = [("restart on 2", "Some(0) | Some(2) | Some(3) | Some(4)", "Some(0) | Some(3) | Some(4)", "restart only what may start"),
+           ("dev copies on the bundle's socket", "        ctx.config_mut().identifier = id;\n", "", "one window per folder"),
            ("no cap", "n > MAX_RESTARTS", "n > u32::MAX", "capped"),
            ("quit without the flag", "    QUITTING.store(true, Ordering::SeqCst);\n    let Some(sc)", "    let Some(sc)", "quit stops restarts"),
            ("a fade that never ends", "setTimeout(reveal, 2500)", "void 0", "fade script"),

@@ -19711,14 +19711,13 @@ page loaded 545–605 ms (was 805–835 ms).
   between the page's first paint and its laid-out look.
 
 **A crashed server comes back.** Any stop of the sidecar that is not the updater's clean exit (0, still
-quits the shell, 6b537) and not a refused setting (2) or a launch that wanted its own window (4) — those
+quits the shell, 6b537) and not a refused setting (2), another copy on the folder (3) or a launch that wanted its own window (4) — those
 stop the same way every time — puts a calm veil over the window ("Reconnecting…", the night at .78 with a
 blur; the veil drags the window like the header it covers) and starts a new sidecar after 1 s, 2 s, 4 s;
 the new boot code is loaded and the page comes back. After three restarts in a row, the next stop shows
 the plain error page ("It kept stopping, even after 3 restarts … Quit ConcordeAI and open it again; the
 log below says why." with the log's tail). A run that stays up 60 s clears the tally. A stop before the
-server was ready is retried the same way (a port or the folder's lock still held by the copy that just
-died). Quit sets `QUITTING` before it stops the sidecar, so neither the watcher nor a start under way
+server was ready is retried the same way (a port still held by the copy that just died). Quit sets `QUITTING` before it stops the sidecar, so neither the watcher nor a start under way
 brings it back. Proven on the release bundle (`sp/restart_test.py`): SIGKILL of the sidecar → veil
 captured → new sidecar → page back 1.3 s after the kill; three more kills in a row → restarts 2 and 3,
 then the error page, no sidecar left, the shell alive; Quit then exits 0.
@@ -19760,6 +19759,24 @@ without the flag, a fade that never ends, window first), each caught; it fails a
 Every existing check that reads the shell's files was run standalone against the new source: all pass
 (one command, the origin check, `about:blank`, the night, the shim, SIGTERM and the exit arm, the 6b537
 updater rules, the corner, the menu, the probe hook, the capability). Full gauntlet: the release owner's run.
+
+**The updater's relaunch, and one window per folder (follow-up).** The release owner's updater proof
+(`scratchpad/updproof2/proof.py`: a 277 dev copy offered 278 by a stand-in feed, installs, quits, the helper
+swaps the bundle and `open -n`s it) failed once on e8051bb: no relaunched shell, the old server's pid left in
+the note. Rerun here on the same build it passed 9/9 three times (relaunch 3.1–5.1 s after the install), with a
+watcher on the single-instance socket showing the relaunch claim it cleanly. The likely cause is the plugin
+itself: it keys its socket on the bundle id alone (`/tmp/com_millen_millenai_si.sock`), so any other shell
+with that id that is up at that moment, a dev copy or a test build of another folder (several sessions test
+shells on this Mac), answers the relaunch, and the new process hands off to it and exits 0, which looks
+exactly like that failure. Now a dev copy's identifier, as the process knows it, carries a hash of its data
+folder (`<id>.dev<16 hex>`, set on the context before the plugins load): a second launch on the same folder
+still focuses its window, and nothing else answers it. The identifier feeds only Tauri's own app-data paths,
+which the shell never uses; the bundle's own id (Info.plist, WebKit's storage) is unchanged, and the real app
+keeps the plain id. Proven: the proof passes 9/9 with beta-1's shell running all the while as a dev copy of
+another folder, holding the plain socket (on beta-1 or e8051bb, that squatter would have taken the
+launch); a second launch of the same folder still exits 0 with the window kept. Also: exit 3 (another copy
+holds this folder) no longer restarts. The shell restarts only after the old process is gone, so a 3 is a real
+second copy and goes straight to the error page.
 
 **Not done, for beta 2.** The build in About (a page change, Patrick's call); a real Intel Mac; a cold
 first launch after an update recompiles once (0.3 s, then cached). All proofs ran the release bundle

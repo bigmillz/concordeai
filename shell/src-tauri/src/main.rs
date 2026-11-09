@@ -441,12 +441,19 @@ fn main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
 }
 
 /// Whether a stop is worth a restart: not the updater's clean exit (0,
-/// which quits the shell) and not a setting the server refuses (2) or a
-/// launch that wanted a window of its own (4): those stop the same way
-/// every time. A crash, a signal, a busy port (1) or a folder still held
-/// by the copy that just died (3) may well start the next time.
+/// which quits the shell), not a setting the server refuses (2), not
+/// another copy holding this data folder (3: the shell only restarts once
+/// the old process is gone and its lock with it, so a 3 is a real second
+/// copy) and not a launch that wanted a window of its own (4): those stop
+/// the same way every time. A crash, a signal or a busy port (1) may well
+/// start the next time.
 fn restartable(code: Option<i32>) -> bool {
-    !matches!(code, Some(0) | Some(2) | Some(4))
+    !matches!(code, Some(0) | Some(2) | Some(3) | Some(4))
+}
+
+/// A dev copy (MILLENAI_DEV=1), the server's own rule (6b319).
+fn dev_copy() -> bool {
+    std::env::var("MILLENAI_DEV").ok().as_deref() == Some("1")
 }
 
 fn exit_label(code: Option<i32>) -> String {
@@ -605,8 +612,8 @@ fn start_sidecar(app: AppHandle) {
             }
             if let Ok(Some(status)) = child.try_wait() {
                 // a stop before it was ready is tried again like any other
-                // (a port or the folder's lock still held by the copy that
-                // just died); one that will stop the same way is said at once
+                // (a port still held by the copy that just died); one that
+                // will stop the same way is said at once
                 if !restartable(status.code()) || RESTARTS.load(Ordering::SeqCst) >= MAX_RESTARTS {
                     let why = format!(
                         "The server stopped before it was ready: {} (exit {}).",
@@ -1025,7 +1032,25 @@ fn probe_hook(app: AppHandle) {
 
 fn main() {
     mark("process start");
-    let ctx = tauri::generate_context!();
+    let mut ctx = tauri::generate_context!();
+    // ONE WINDOW PER DATA FOLDER, NOT PER BUNDLE ID (shell-polish). The
+    // single-instance plugin keys its socket on the identifier alone
+    // (/tmp/com_millen_millenai_si.sock), so any shell with that id, a dev
+    // copy or a test build of another folder, would take a launch meant for
+    // another: the new process hands off to it and exits 0, the updater's
+    // `open -n` relaunch included. A dev copy is kept apart from everything
+    // else (6b319), so its identifier, as this process knows it, carries
+    // its folder: a second launch on the same folder still brings that
+    // window forward, and nothing else ever answers it. The identifier
+    // feeds only Tauri's own app-data paths, which the shell never uses;
+    // the bundle's (Info.plist, WebKit's storage) is unchanged.
+    if dev_copy() {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        data_home().hash(&mut h);
+        let id = format!("{}.dev{:016x}", ctx.config().identifier, h.finish());
+        ctx.config_mut().identifier = id;
+    }
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // a second launch brings the window forward, like
