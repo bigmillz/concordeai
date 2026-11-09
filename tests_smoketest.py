@@ -328,6 +328,11 @@ def _prof_sect(tag):
 
 
 _PROF_SRC = _prof_sect("profile caches") + "\n" + _prof_sect("profile")
+# (6b530) the know module in the profile section reads the request's
+# thread-local (know_private_now, which cloud_allowed asks), declared past
+# the sections: its real declaration comes along (a missing line is loud)
+_TL_DECL = next(ln for ln in _MILLENAI_SRC.splitlines()
+                if ln.startswith("_tl_search = profile_cache("))
 
 
 def _prof_in(ns):
@@ -341,6 +346,13 @@ def _prof_in(ns):
     ns.setdefault("TEST_HOOKS", frozenset())
     ns.setdefault("_hook_arg", lambda name: "")
     exec(_PROF_SRC, ns)
+    if "_tl_search" not in _mine:
+        exec(_TL_DECL, ns)
+    # (6b530) no indexer thread in the test process: store_chats kicks it,
+    # and a namespace's indexer (its busy test unreadable, so always busy)
+    # starved this run of its GIL for hours. The live copies run the real one
+    if "know_kick" not in _mine:
+        ns["know_kick"] = lambda *a, **k: None
     for _m in ("os", "json", "threading", "contextlib", "secrets", "tempfile",
                "hashlib", "time", "re", "shutil"):
         ns.pop(_m, None)
@@ -5272,13 +5284,13 @@ check("seamless dark title bar",
 # and Forget Me is scoped + triple-locked. 6b259: About is the
 # exception — the version right under the title says it better than a
 # sentence would. 6b310 retired the Community pane: four descriptions
-# across five panes.
+# across five panes. (6b530) Your stuff opens with its own: six.
 check("settings: descriptions + Account pane + scoped forget",
       # scoped to the settings panel: counting the whole page broke the
       # moment another dialog grew a description (6b303)
       (page.split('id="about-veil"')[1].split('id="gear-veil"')[0]
        if 'id="gear-veil"' in page
-       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 5
+       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 6
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
@@ -5293,12 +5305,13 @@ check("settings: descriptions + Account pane + scoped forget",
 # panel to see) and Account closes it (the exits belong at the foot).
 # The pane ids and the nav must agree on that order, and the first pane
 # is the one that opens. Usage (6b325) comes last, Your servers (6b334)
-# just before it.
+# just before it. Your stuff (6b530) follows Personality: the person's own
+# things together, under Account.
 _nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
-_want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-servers", "p-usage"]
+_want = ["p-about", "p-account", "p-persona", "p-know", "p-cloud", "p-models", "p-servers", "p-usage"]
 # the nav lists Models' three panes as Local, Cloud, Servers (6b350); the panes keep their own order
-_want_nav = ["p-about", "p-account", "p-persona", "p-models", "p-cloud", "p-servers", "p-usage"]
+_want_nav = ["p-about", "p-account", "p-persona", "p-know", "p-models", "p-cloud", "p-servers", "p-usage"]
 _gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
       "Models for 512 GB+ systems" in page and "128 GB+" not in page
@@ -38708,6 +38721,8 @@ _C530_MUT = [
     ("the chunk heading path lost", '            out.append((" > ".join([title] + heads)[:200] if heads else title[:200], body))',
      '            out.append((title[:200], body))'),
     ("a dev copy loading the model unasked", 'if DEV_HOME and "know-embed" not in TEST_HOOKS:\n        return 0', 'if False:\n        return 0'),
+    ("the pause spinning on a kick", '                st["wake"].wait(KNOW_BUSY_S)\n                # a kick',
+     '                # a kick'),
 ]
 
 
@@ -38753,6 +38768,24 @@ def _c530_all(src):
         out["servers_mine"] = ("_kn_away = bool(cloud_only or _max_bench)" in hd
                                and "server_label" not in hd.split("_kn_away = bool(")[1].split("\n")[0])
         out["flag"] = "_tl_search.know_private = True" in hd
+        # the pause holds without spinning, a kick's wake waiting: left set,
+        # it ran the loop flat out for as long as the answer was written
+        busy = [0]
+        ns["know_busy"] = lambda b: busy.__setitem__(0, busy[0] + 1) or True
+        ns["KNOW_BUSY_S"] = ns["KNOW_POLL_S"] = ns["KNOW_IDLE_S"] = 0.2
+        ns["know_pass"] = lambda b, s=None: 0      # the loop's own pace, no pass
+        st = ns["_know_state"](ctx)
+        st["stop"].clear()
+        st["wake"].set()
+        t = __import__("threading").Thread(target=ns["_know_loop"], args=(ctx,), daemon=True)
+        t.start()
+        time.sleep(0.5)
+        st["stop"].set()
+        st["wake"].set()
+        t.join(5)
+        out["pause"] = 1 <= busy[0] <= 8 and not t.is_alive()
+        if not out["pause"]:
+            out["why"] = "pause: %d busy reads in 0.5 s" % busy[0]
     except Exception as exc:
         out["raised"] = False
         out["why"] = str(exc)[:200]

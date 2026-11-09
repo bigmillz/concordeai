@@ -14066,6 +14066,9 @@ def _know_loop(base):
             while know_busy(base) and not st["stop"].is_set():
                 st["state"] = "paused"
                 st["wake"].wait(KNOW_BUSY_S)
+                # a kick's wake is spent here: left set, every wait returned
+                # at once and the pause ran flat out beside the answer
+                st["wake"].clear()
             did = know_pass(base, st)
             st["err"] = ""
             if did:
@@ -14095,8 +14098,10 @@ def _know_loop(base):
 
 def know_kick(base, now: bool = False):
     """Make sure the indexer runs for base (started from a request, so it
-    carries the request's profile); now=True wakes a sleeping one."""
-    if "know-off" in TEST_HOOKS:
+    carries the request's profile); now=True wakes a sleeping one. Only a
+    profile's ctx: the loop watches its cancel, and a bare folder path (an
+    older caller's, or a check's) has none to watch."""
+    if "know-off" in TEST_HOOKS or not isinstance(base, ProfileCtx):
         return
     st = _know_state(base)
     with _know_lock:
