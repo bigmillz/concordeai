@@ -19492,3 +19492,50 @@ retiring, a layout read per frame). Checks: `ast.parse` both files; both served 
 and 6b544 sections in isolation against the 9887 copy: 39/40, the one red pre-existing on beta-1 (the GPU
 night check pins `gap=…(full?0:32)`, a line beta-1's 6b542 merge changed to `…:0` without its pin). The full
 gauntlet was not run (the beta-1 owner's).
+
+## 6b545 — beta-1: the Mac shell's corner, the Recents range that forgot itself, the last two reds (7.0 beta, per Patrick)
+
+**The corner** (per Patrick: the traffic lights crowded the header's sidebar toggle, "too tight"). Before, the
+shell's title bar was Transparent: a 32 pt band above the page, the lights in it at y 9–23, the toggle at
+x 24 under them (`scratchpad/b1corner/out/corner-before-*@2x.png`). Now the content runs under the bar
+(`TitleBarStyle::Overlay`) and `traffic_light_position(TL_X 16, TL_Y 38)` seats the lights on the 72 px
+header row: measured in the debug shell on macOS 27, buttons 14 pt on a 23 pt pitch, ink 16–76 × 29–43,
+centre y 36 = the header's centre in the home and in a conversation; the toggle starts at x 96, 20 px right of
+the green button. The page learns it is in the shell on a Mac from `__SHELL_TL__` (`SHELL and IS_MAC`) and
+marks `html.tl` before the first paint; everything is scoped to it, so pywebview, Windows and the gauntlet's
+copies are untouched. Under `html.tl`: a header that starts at the window's edge (the home with the sidebar
+closed, a conversation with it hidden) reserves 96 px; the conversation's header row is 72 px too (was 56;
+`#chat-inner` already pads 72); the sidebar's top row gives the lights its left and keeps the pen at its
+right, so Horizon's lockup moves to the header whenever the sidebar is open; on the home the two side groups
+share the room (`flex:1 1 0`, the spacers step out) and the right one carries the left's extra 72 px, so the
+lanes sit exactly on the header's centre (measured 0.0 px off, both with the sidebar open and closed; before,
+they sat 54 px right of centre closed and 28 px left of it open). Classic keeps its lockup in the sidebar, padded
+to x 96 and dropped 7 px so its row centres on the lights. Window drag: the bare header, its groups and
+spacers and the sidebar's top row carry `data-tauri-drag-region` (exact element, so no control ever drags),
+the header takes the pointer under `html.tl`, and the capability grants `core:window:allow-start-dragging`
+and `allow-internal-toggle-maximize` (double-click zooms) to the app's origin, nothing more (a `set_title`
+from the page is refused, proven). No scroll-pocket tint seen (the document never scrolls; the chat column
+fades under the header as before). Captures: `corner-after3-*@2x.png`, `corner-after-chat-sbhide@2x.png`,
+`corner-after-classic@2x.png`. **Not verified by a real drag**: synthetic events can't start one; the
+permission and the region hit-test are proven, the drag itself wants a hand on the trackpad.
+
+**The probe hook** (debug builds only, `#[cfg(debug_assertions)]`): `CONCORDE_SHELL_PROBE=<dir>` evaluates
+each `cmd-<n>.js` dropped there in the real WKWebView and writes its JSON value to `out-<n>.json`. The
+scratchpad's `b1corner/shell.py` launches the debug binary as a dev copy, finds its window, captures it and
+drives the page through it; `corner.py` measures lights against the toggle, `sidebar.py` the Recents work.
+
+**The Recents range that forgot itself** (real bug since 6b467). With 40 chats seeded over 60 days and three
+pinned, in the shell: every range cut right (1 → 4, 3 → 8, 7 → 12, 14 → 17, 30 → 24, All time → 40), pinned
+never cut, "N more · Show all" restores All time, a content-only word in a 45-day-old chat is found under a
+3-day cut, both folds work and say their counts, and the day labels follow the cut (1 day: Today, Yesterday;
+3 and 7 days add This week; 14 days on add Earlier). But `storeBoot` sweeps every `millen.*` key that is neither in
+`KEEP_LS` nor moved to prefs.json, and `millen.recentsDays`, `millen.foldPinned`, `millen.foldRecents` and
+`millen.usage.range` were never listed: read at launch, swept, so the second relaunch forgot them. All four
+kept per machine; proven over three launches. A check holds every literal `setItem("millen.…")` key to the
+keep list or the move (20 keys), with a mutant.
+
+**Gauntlet** (run g, 3e22a97): two reds besides the corner's own pins. `isNaN` (6b544's writing star) joins
+the page's host globals. The A → B → A round trip caught root's know-you pass mid-flight (index.db and its
+WAL differed): each root snapshot now waits until `/api/know` reports no pass under way, twice running with
+the same counts; the byte comparison stays whole and the check fails if the indexer never settles. Re-pinned
+by the corner: the shell's capability (three permissions, exact list) and the brand-row slice's anchor.
