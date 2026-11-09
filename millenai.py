@@ -42317,7 +42317,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._bench_held = True
             goal = str(d.get("goal", "")).strip()[:300]
             if not goal:
-                self._send_json({"err": "name the decision first"})
+                self._send_json({"err": "Name the decision first."})
                 return
             reqs = str(d.get("reqs", "")).strip()[:400]
             picks = [str(x)[:90] for x in (d.get("picks") or [])][:20]
@@ -51707,12 +51707,12 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
       </svg>Funnels</span>
   </div>
   <div id="funnel-wrap" hidden>
-    <label class="fq">What do you need to decide on?</label>
+    <label class="fq">What are you deciding?</label>
     <textarea id="fn-goal" rows="2"
-      placeholder="e.g. which neighbourhood to open the studio in"></textarea>
-    <label class="fq">Any requirements?</label>
+      placeholder="Which neighbourhood to open the studio in"></textarea>
+    <label class="fq">Requirements</label>
     <textarea id="fn-reqs" rows="2"
-      placeholder="e.g. under $4k/mo, near an L train stop"></textarea>
+      placeholder="Under $4k a month, near an L stop"></textarea>
     <div class="fgrid">
       <label class="fq">Prompts<select id="fn-type">
         <option value="text">Text</option>
@@ -51725,7 +51725,7 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
     </div>
     <!-- 6b308, per Patrick: "two radio buttons where the user can click
          either fast or normal for effort" -->
-    <div class="fq">Effort<i class="hint" title="Fast: each question on a quick model, in a second or two. Normal: a stronger model, a few seconds per question. With cloud models included (and cloud power on) they go first, and the final recommendation is checked by the strongest one. Without them, your server answers first, then this Mac.">i</i></div>
+    <div class="fq">Effort<i class="hint" title="Fast: a quick model, a second a question. Normal: a stronger model, a few seconds a question.">i</i></div>
     <div id="fn-effort" class="fseg" role="radiogroup" aria-label="Effort">
       <label><input type="radio" name="fn-eff" value="fast"><span>Fast</span></label>
       <label><input type="radio" name="fn-eff" value="normal" checked><span>Normal</span></label>
@@ -51734,7 +51734,7 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
          normal, add a checkbox, include cloud models" -->
     <label id="fn-cloud-row" class="fchk"><input type="checkbox" id="fn-cloud"
       checked><span>Include cloud models</span></label>
-    <button class="about-btn slim" id="fn-go">Start funnel</button>
+    <button class="about-btn slim" id="fn-go">Start</button>
   </div>
   <div id="code-wrap" hidden>
 __CODE_ROWS__
@@ -57454,7 +57454,7 @@ const FUNNEL_SETS=[
 // anyone whose actual decision isn't on any list, and for anyone who
 // can't yet phrase what they're stuck on. One of these is always the
 // last chip, the way "⋯" always survives in the Code lane.
-const FUNNEL_STUCK=["🤷 I can't decide — help me pick.","⚖️ Help me weigh these two options.","🚧 I'm stuck between three things.","🔀 Which of these matters most?","❓ What am I not considering here?","🧊 Help me decide without overthinking it.","🎯 What would you do in my position?","📊 Break this decision down for me.","⏱️ I need to decide by tomorrow.","🪙 Just help me commit to something."];
+const FUNNEL_STUCK=["I can’t decide. Help me pick.","⚖️ Help me weigh these two options.","🚧 I'm stuck between three things.","🔀 Which of these matters most?","❓ What am I not considering here?","🧊 Help me decide without overthinking it.","🎯 What would you do in my position?","📊 Break this decision down for me.","⏱️ I need to decide by tomorrow.","Help me commit to something."];
 // clicking a funnel chip fills the goal and starts the funnel — the
 // chip IS the decision, so there is nothing left to type
 function startFunnel(text){
@@ -58198,7 +58198,7 @@ async function fnStep(pick){
   const box=document.createElement("div");
   box.className="msg ai";
   box.innerHTML='<div class="who">Funnel</div><div class="body">'
-    +'<span class="statusline"><i class="cspin"></i> building stage '
+    +'<span class="statusline"><i class="cspin"></i> Stage '
     +(fnState.picks.length+1)+'…</span></div>';
   inner.appendChild(box);autoScroll();
   let d={};
@@ -58212,7 +58212,7 @@ async function fnStep(pick){
       body:JSON.stringify(Object.assign({},fnState,{chat_id:fid,
         cloud:fnCloudLoaded?fnCloudOn:undefined,
         after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
-  }catch(e){d={err:"couldn\u2019t reach the engine"};}
+  }catch(e){d={err:"Couldn\u2019t reach the model. Try again."};}
   // adopted only while the page still has the chat: one deleted or
   // erased mid-stage stays gone (review of 6b322)
   const fc=chats.find(x=>x.id===fid);
@@ -58237,7 +58237,7 @@ async function fnStep(pick){
   if(d.bench){
     if(pick){fnState.picks.pop();fnState.asked.pop();messages.pop();}
     b.innerHTML=esc(d.err)+'<div class="fopts"><button class="fopt">'
-      +'<b>Send again</b></button></div>';
+      +'<b>Try again</b></button></div>';
     b.querySelector(".fopt").addEventListener("click",async()=>{
       if(!fnState||fnPicking)return;
       fnPicking=true;
@@ -58333,9 +58333,9 @@ function fnCloudPaint(cs){
   cb.disabled=!ok;row.classList.toggle("off",!ok);
   cb.checked=ok&&fnCloudOn;
   // each reason in its own words: no key, or a key with cloud power off
-  row.title=ok?"Cloud models go first; unticked, your server and this Mac answer"
-    :!(cs&&cs.configured)?"no cloud keys saved"
-    :"cloud power is off (Settings \u203a Cloud power)";
+  row.title=ok?"Cloud models go first."
+    :!(cs&&cs.configured)?"No cloud keys saved."
+    :"Cloud models are off.";
 }
 // what the page holds wins once the person has touched the box: a late answer
 // from /api/prefs (this runs again when a key is saved) can't flip it back
