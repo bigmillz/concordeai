@@ -19539,3 +19539,76 @@ the page's host globals. The A → B → A round trip caught root's know-you pas
 WAL differed): each root snapshot now waits until `/api/know` reports no pass under way, twice running with
 the same counts; the byte comparison stays whole and the check fails if the indexer never settles. Re-pinned
 by the corner: the shell's capability (three permissions, exact list) and the brand-row slice's anchor.
+
+## 6b546 — pdf-attach: a PDF is read on this Mac, page by page, and rides the .md/.txt path (7.0 beta, per Patrick)
+
+Patrick chose PDF as the next attach type after .md and .txt (6b522). Before: the picker didn't offer .pdf, and a
+dropped one was refused (6b317: a PDF read as text reached the model as garbage framed as real data).
+
+**Reading.** The page posts the file's bytes to `POST /api/doc/pdf` (behind the cookie and the token like every
+route; no name is sent, the page keeps it). The server writes them to a 0600 `run/.pdf-*.pdf` (deleted at once
+after; a crash's leftover is swept at the next start, `RUN_FILE_KINDS`) and runs **concorde-pdftext**, a 60-line
+Swift helper over Apple's PDFKit (`shell/pdftext/`, built like the dictation helper, 6b543: `build.sh` makes it
+universal for macOS 11+, `build_shell_dmg.sh` builds it, copies it into Resources and signs it on its own, and
+checks it is there; nightly and release both go through that script). No download, no network code (linted), the
+reader is the OS's. It prints one JSON line per page as it goes; the server reads them and kills it past
+`DOC_PDF_READ_S` (30 s) + 10 s. Measured here: a 3-page PDF 0.06 s; a 20,000-page one stopped by the character cap
+(2,000,000, at a page boundary) after 8,408 pages in 9.9 s; with a 0.05 s cap, the time cap.
+
+- **Page lines.** Each page opens with `— page N —` on its own line; the model sees them. A line inside a page that
+  looks like one is written `- page N -`, so only the real ones cut. `doc_split` takes `bounds=`: a PDF is split on
+  its page lines first (then paragraphs, then tokens, as 6b522), so a summary part holds whole pages where they fit.
+- **Scanned pages.** A page with no text is rendered at 64 × 64 in grey; any ink makes it a scan, none a blank page.
+  A scan is said to the model (`[Scanned page: no text, skipped]`) and on the chip ("3 scanned pages skipped", the
+  page numbers in its tooltip); no OCR yet. A PDF with no text at all: "No text in this PDF. Scanned pages aren’t
+  read yet."
+- **Locked.** A password PDF (PDFKit's `isLocked`): "This PDF is locked." An owner-password-only PDF opens and reads.
+- **Huge.** Read until 30 s or 2,000,000 characters; the chip says "First 412 of 900 pages" and the text ends
+  `[Only the first 412 of 900 pages were read.]`. Bigger than 64 MB: "This PDF is too big. The most is 64 MB."
+- **Unicode and right to left.** NFC; Arabic and Hebrew presentation forms and the Latin ligatures folded (NFKC on
+  those ranges only); controls, BOMs and non-characters dropped; bidi marks kept. PDFKit gives right-to-left text
+  back in logical order from the visual order PDF makers write (checked on the fixture: שלום עולם, مرحبا).
+
+**The pipeline, unchanged.** `.pdf` joins `DOC_LOCAL_RX`, so a turn carrying a PDF's text is a 6b522 document turn:
+the model's own tokenizer, the 70% line with Truncate / Split & summarize / Remove, one model of this computer, no
+cloud, server, search or memory pass. The chip: name, pages, tokens, the scanned count (size in the tooltip); while
+reading, "Reading…"; a failure, the reason, with × to remove (never sent). Send waits for a PDF being read and drops
+one that failed. The sent message's chip adds "12 pages". The drop accepts a PDF and reads it the same way.
+
+**Windows and Linux: "PDF needs an update on this computer."** `_pdf_helper_path()` is None off a Mac (and with a
+dev copy's `pdf-none` hook). A reader there needs a package; nothing was installed. Proposed for the owner's OK:
+**pypdf 6.9.2** (pure Python, BSD-3-Clause, wheel 333,744 bytes, 2026-03-23; 7.0.0 is three days old). AES-encrypted
+PDFs would also need its `cryptography` extra. The app's own `_know_pdf_text` (6b530) was not reused: no pages, no
+ToUnicode, Latin-1 only.
+
+**Copy** (design/COPY.md; the owner to approve):
+- Drop: "can't read X here — text files and images only" → "… text files, PDFs and images only"
+- Chip (new): "12 pages" / "1 page", "First 412 of 900 pages", "3 scanned pages skipped" / "1 scanned page skipped",
+  "Reading…"; tooltip "12 pages, 1.2 MB", "Pages 3, 7, 9 are scanned. Scanned pages aren’t read yet." / "Page 2 is
+  scanned. …"
+- Errors (new): "This PDF is locked."; "This PDF can’t be read."; "This PDF is too big. The most is 64 MB."; "No
+  text in this PDF. Scanned pages aren’t read yet." · "PDF needs an update on this computer."
+- Sent message chip (new): "12 pages".
+
+**Gauntlet.** `# ==== 6b546 pdf attach` (12 checks, one of them 18 mutants, each caught): the cleaning rules, scanned
+vs blank, the lock, a broken file, the caps, page lines and the split on them (through `doc_answer`), the Windows
+path, PDFKit on every fixture in-process (the time cap, a hung helper killed in < 5 s, the copy deleted), local-only
+lints over the section and the Swift source, the page (picker, drop, send), the chips drawn in node, the copy, the
+release wiring, and the route live. Fixtures: `tests/fixtures/pdf/` (text, scanned, locked with RC4 rev. 2, unicode
+through a ToUnicode map), written byte for byte by `tests/fixtures/make_pdf_samples.py`, stdlib only; the huge one
+is built at run time. The gauntlet builds the helper for this machine when it isn't built.
+
+**Two old reds fixed on the way.** 6b522's `_c522_page` and `_c522_paths` had been raising on beta-1 (`_js522`
+couldn't close `send()`, which has a regex with an open brace since hz-chat; `stream_ollama` needs `MUSE_ROWS` since
+6b533), so their groups were red and 6b522's mutants were "caught" by a base that already failed. Fixed; all 16 are
+caught for real. The shell bundle's resources pin (6b537) now names both helpers.
+
+**Checked:** the 6b522 and 6b546 blocks alone against a dev copy (44/44; not the full gauntlet, per the brief),
+`ast.parse`, both page scripts `node --check`, the pin checker (2,446 pins; the one red,
+`"millen.fxlevel","millen.effort"]`, is beta-1's too), and Playwright (Chromium) at 1440 and 390: no page errors,
+no API response ≥ 400, no sideways scroll, every × hit by `elementFromPoint`, the bar over the line on a
+3,000-page PDF (185K tokens needed, 24K fit) and Split & summarize by a real click. No chat was sent.
+
+**Risks left.** Not seen in WKWebView. The time cap counts from the helper's start; one pathological page can run
+past it until the 10 s kill. A PDF whose fonts have no ToUnicode map can give PDFKit garbage text that isn't
+flagged. Chars/4 (a model with no MLX build here) undercounts dense scripts, as 6b522 says.

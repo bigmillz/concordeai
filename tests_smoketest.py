@@ -38675,7 +38675,9 @@ check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each questio
       and 'en.classList.toggle("spectral",i===4);' in _hz_js
       and 'root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);' in _hz_js
       and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
-      and "hz-ody" not in page and '"millen.fxlevel","millen.effort"]' in page, "")
+      and "hz-ody" not in page
+      # the effort is kept through storeBoot's sweep: in KEEP_LS (which grew past it: the Recents range and folds)
+      and '"millen.effort"' in re.search(r"const KEEP_LS=\[(.*?)\];", page, re.S).group(1), "")
 
 # THE MODE PICKER (OVERRIDE 3): the name only; a glass menu of the four modes, what each is for,
 # its machines' dies, its real models sliding out on hover, Escape and arrows; no hint in the composer
@@ -40345,7 +40347,7 @@ def _c522_paths(src):
     so = {"json": json, "time": time, "urllib": _ty522.SimpleNamespace(request=_ty522.SimpleNamespace(
         Request=urllib.request.Request, urlopen=_uo)), "ollama_url": lambda p: "http://127.0.0.1:1" + p,
         "usage_note": lambda *a, **k: None, "GIANT_CTX": 32768, "GIANT_KEEP_ALIVE": "30m", "GIANT_LOAD_TIMEOUT": 3600,
-        "OLLAMA_THINK_OFF": set()}
+        "OLLAMA_THINK_OFF": set(), "MUSE_ROWS": frozenset()}   # Muse's rows (6b533) reached stream_ollama after this check
     exec(_def522(src, "stream_ollama"), so)
     so["stream_ollama"]("local-o:9b", [{"role": "user", "content": "x"}], [].append, num_ctx=74752)
     so["stream_ollama"]("big:70b", [{"role": "user", "content": "x"}], [].append, big=True, num_ctx=59392)
@@ -40418,14 +40420,19 @@ def _c522_paths(src):
 
 
 def _js522(src, name):
-    """A page function's text, by its braces."""
+    """A page function's text, by its braces; a function whose braces don't balance (send since hz-chat: a
+    regex that matches an open brace) ends at its first column-0 closing brace (6b546)."""
     i = src.index("function %s(" % name)
     j = src.index("{", i)
     d = 0
     for k in range(j, len(src)):
         d += {"{": 1, "}": -1}.get(src[k], 0)
         if d == 0:
-            return src[i:k + 1]
+            e = src.find("\n}\n", i)
+            return src[i:k + 1] if e < 0 or k <= e + 1 else src[i:e + 2]
+    e = src.find("\n}\n", i)
+    if e >= 0:
+        return src[i:e + 2]
     raise KeyError(name)
 
 
@@ -40611,6 +40618,326 @@ check("6b522 the measure route (live): behind the cookie and the token; the turn
                                                     "need", "over")}, {k: _e522.get(k) for k in ("label", "tokens",
                                                                                                  "ctx_max")}])
 # ==== 6b522 doc attach: end ====
+# ==== 6b546 pdf attach: begin ====
+# A PDF IS READ ON THIS MAC (6b546, per Patrick): PDFKit through the Swift helper shell/pdftext reads it page by
+# page; each page opens with a page line the model sees; a page with ink and no text is a scan, said on the chip
+# and skipped; a locked PDF is refused; a huge one is read until 30 s or 2,000,000 characters; off a Mac it says
+# "PDF needs an update on this computer."; the text then rides 6b522 unchanged (measured, the 70% line, the chips,
+# one local model). Fixtures: tests/fixtures/pdf/, written by tests/fixtures/make_pdf_samples.py. NOTES 6b546.
+print("== a PDF is read on this Mac (6b546) ==")
+import importlib.util as _iu546, shutil as _sh546
+_spec546 = _iu546.spec_from_file_location("_mkpdf546", os.path.join("tests", "fixtures", "make_pdf_samples.py"))
+_mk546 = _iu546.module_from_spec(_spec546)
+_spec546.loader.exec_module(_mk546)
+_FX546 = {n: open(os.path.join("tests", "fixtures", "pdf", n), "rb").read() for n in _mk546.FIXTURES}
+_HELPER546 = os.path.join("shell", "pdftext", "concorde-pdftext")
+if sys.platform == "darwin" and not os.access(_HELPER546, os.X_OK) and _sh546.which("swiftc"):
+    # a fresh checkout: the helper is a build output (.gitignore); built for this machine
+    _sp522.run(["./shell/pdftext/build.sh"], env=dict(os.environ, CONCORDE_PDFTEXT_ARCH="native"),
+               capture_output=True, timeout=300)
+_SWIFT546 = open(os.path.join("shell", "pdftext", "pdftext.swift"), encoding="utf-8").read()
+
+
+def _ns546(src, mac=True, hooks=(), hook_args=None):
+    """The doc section (6b522's stand-ins) and the pdf section, exec'd together; app_dir a temp folder."""
+    ns = _ns522(src)
+    d = _tf522.mkdtemp()
+    ha = dict(hook_args or {})
+    ns.update({"subprocess": _sp522, "tempfile": _tf522, "IS_MAC": mac, "TEST_HOOKS": frozenset(hooks),
+               "resource": lambda *p: os.path.join(os.getcwd(), *p), "app_dir": lambda: d,
+               "_hook_arg": lambda n: ha.get(n, ""), "_app546": d})
+    exec(_def522(src, "drop_run_file"), ns)
+    exec(src[src.index("# ==== pdf attach (6b546): begin ===="):src.index("# ==== pdf attach (6b546): end ====")], ns)
+    return ns
+
+
+_NET546_PY = ("urllib", "socket", "http.client", "requests", "ollama_url", "cloud_", "server_", "run_model",
+              "ensure_mlx_engine", "_extract_memory", "run_search", "make_title", "open_url", "webbrowser")
+_NET546_SW = ("URLSession", "NSURLConnection", "URL(string", "import Network", "CFNetwork", "http:", "https:",
+              "NWConnection", "Process(", "posix_spawn")
+
+
+def _lint546(sec, swift):
+    """No network, no engine, no other path, in the pdf section and the helper's source."""
+    return (not any(n in sec for n in _NET546_PY) and not any(n in swift for n in _NET546_SW)
+            and "import PDFKit" in swift and "PDFDocument(url: URL(fileURLWithPath: args[1]))" in swift)
+
+
+def _c546_units(src, swift):
+    got = {}
+    ns = _ns546(src)
+    E = ns["DOC_PDF_MARK"]
+    # the extraction rules
+    raw = ("Cafe\u0301 \ufb01ne \ufe8d\ufedf\ufe92\ufe8e\ufe8f \uff21\r\nline two   \r\r\r\rthree\x00\x07\ufeff\n"
+           "\u2014 page 9 \u2014\n\u05e9\u05dc\u05d5\u05dd\u200f end\n\n\n\n")
+    cl = ns["pdf_clean"](raw)
+    got["the rules: NFC, presentation forms and ligatures folded (nothing else), \\n line ends, controls and BOMs "
+        "dropped, blank lines one, a look-alike page line disarmed, right to left kept"] = (
+        cl == ("Caf\u00e9 fine \u0627\u0644\u0628\u0627\u0628 \uff21\nline two\n\nthree\n- page 9 -\n"
+               "\u05e9\u05dc\u05d5\u05dd\u200f end")
+        and not ns["DOC_PDF_MARK_RX"].search(cl) and ns["DOC_PDF_MARK_RX"].search(E % 9))
+    # scanned, blank, text; the lock; an error; nothing but scans
+    L = lambda *evs: [json.dumps(e) for e in evs]
+    pp = ns["pdf_parse"](L({"ev": "open", "pages": 4}, {"ev": "page", "n": 1, "text": "words", "ink": False},
+                           {"ev": "page", "n": 2, "text": " \n ", "ink": True},
+                           {"ev": "page", "n": 3, "text": "", "ink": False},
+                           {"ev": "page", "n": 4, "text": "more", "ink": True}, {"ev": "done", "read": 4, "why": "end"}))
+    got["scanned pages: ink and no text is a scan (said, skipped), no ink a blank, text is text"] = (
+        pp["ok"] and pp["scanned"] == 1 and pp["scanned_pages"] == [2] and pp["blank"] == 1 and not pp["partial"]
+        and pp["text"] == "\n\n".join([E % 1 + "\nwords", E % 2 + "\n" + ns["DOC_PDF_SCAN_LINE"], E % 3, E % 4 + "\nmore"])
+        and ns["pdf_parse"](L({"ev": "open", "pages": 2}, {"ev": "page", "n": 1, "text": "", "ink": True},
+                              {"ev": "page", "n": 2, "text": "", "ink": True}, {"ev": "done", "why": "end"}))
+        == {"ok": False, "err": ns["DOC_PDF_EMPTY"], "pages": 2, "scanned": 2})
+    got["a locked PDF is refused in plain words; a broken one is said; neither carries text"] = (
+        ns["pdf_parse"](L({"ev": "locked"})) == {"ok": False, "err": "This PDF is locked.", "locked": True}
+        and ns["pdf_parse"](L({"ev": "err", "why": "open"})) == {"ok": False, "err": ns["DOC_PDF_BAD"]}
+        and ns["pdf_parse"](["not json", "[]"]) == {"ok": False, "err": ns["DOC_PDF_BAD"]}
+        and ns["pdf_extract"](b"hello")["err"] == ns["DOC_PDF_BAD"])
+    # huge: the character cap at a page boundary, the time cap, a helper that hangs
+    many = L({"ev": "open", "pages": 900}, *[{"ev": "page", "n": i, "text": "x" * 1000, "ink": False}
+                                            for i in range(1, 901)], {"ev": "done", "why": "end"})
+    pc = ns["pdf_parse"](many, max_chars=50_000)
+    pt = ns["pdf_parse"](many[:13])            # no done line: stopped
+    got["huge: cut at a page within the cap, said to the model and the chip; a reading stopped is partial"] = (
+        pc["ok"] and pc["why"] == "chars" and pc["partial"] and pc["read"] < 50 and pc["chars"] <= 50_000
+        and pc["text"].endswith("\n\n[Only the first %d of 900 pages were read.]" % pc["read"])
+        and pc["text"].count("\u2014 page ") == pc["read"]
+        and pt["why"] == "time" and pt["read"] == 12 and pt["partial"]
+        and ns["pdf_extract"](b"%PDF-1.4\n" + b"0" * (64 * 1024 * 1024))["err"] == "This PDF is too big. The most is 64 MB.")
+    # the split: on the pages, a part holds whole pages
+    pages = [{"n": i, "text": "\n\n".join("Shelf %d, row %d of the catalogue." % (i, k) for k in range(5 + i * 7 % 11)),
+              "scan": False} for i in range(1, 31)]
+    T = ns["pdf_assemble"](pages, 30)
+    c = ns["DocCounter"]("Local O")
+    one = c.count(T) // 30
+    parts = ns["doc_split"](T, one * 4, c, ns["DOC_PDF_MARK_RX"])
+    calls = []
+    _run522(ns, "Local A", [{"name": "Report.PDF", "text": T, "mode": "split"}], calls, use=(one * 30, True))
+    sums = [m[-1]["content"] for _l, m, _k in calls if "That is part" in str(m[-1]["content"])]
+    inner = [s_[s_.index('">\n') + 3:] for s_ in sums]
+    got["page lines: one per page, in order; Split & summarize cuts on them, so each part is whole pages"] = (
+        [int(x) for x in re.findall(r"(?m)^\u2014 page (\d+) \u2014$", T)] == list(range(1, 31))
+        and len(parts) > 3 and all(p.startswith("\u2014 page ") for p in parts)
+        and re.sub(r"\s+", "", "".join(parts)) == re.sub(r"\s+", "", T)
+        and all(p.rstrip().endswith("of the catalogue.") for p in parts)
+        and len(sums) > 1 and all(i_.startswith("\u2014 page ") for i_ in inner)
+        and not all(p.startswith("\u2014 page ") for p in ns["doc_split"](T, one * 4, c))   # headings alone would cut mid-page
+        and ns["doc_is_pdf"]("a.PDF ") and not ns["doc_is_pdf"]("pdf.md") and ns["doc_is_local"]("x.pdf"))
+    # the Windows path: no helper off a Mac (and with the pdf-none hook), and said so
+    nw, nh = _ns546(src, mac=False), _ns546(src, hooks=("pdf-none",))
+    got["off a Mac a PDF says it needs an update, and nothing is read"] = (
+        nw["_pdf_helper_path"]() is None and nh["_pdf_helper_path"]() is None
+        and nw["pdf_extract"](_FX546["text.pdf"]) == {"ok": False, "err": "PDF needs an update on this computer.",
+                                                       "needs": True}
+        and (sys.platform != "darwin" or ns["_pdf_helper_path"]() is not None))
+    # the real helper, in this process: the fixtures, the time cap, a hang killed, the copy gone
+    if sys.platform == "darwin":
+        rx = {n: ns["pdf_extract"](b) for n, b in _FX546.items()}
+        nt = _ns546(src, hook_args={"pdf-read-s": "0.05"})
+        big = nt["pdf_extract"](_mk546.big(20000))
+        hang = os.path.join(_tf522.mkdtemp(), "concorde-pdftext")
+        with open(hang, "w") as fh:
+            fh.write('#!/bin/sh\necho \'{"ev":"open","pages":5}\'\necho \'{"ev":"page","n":1,"text":"one","ink":false}\'\n'
+                     "exec sleep 8\n")
+        os.chmod(hang, 0o755)
+        nk = _ns546(src, hook_args={"pdf-read-s": "0.2"})
+        nk["DOC_PDF_GRACE_S"] = 1
+        nk["_pdf_helper_path"] = lambda: hang
+        t0 = time.time()
+        hg = nk["pdf_extract"](_FX546["text.pdf"])
+        hs = time.time() - t0
+        left = [f for d_ in (ns["_app546"], nt["_app546"], nk["_app546"])
+                for f in (os.listdir(os.path.join(d_, "run")) if os.path.isdir(os.path.join(d_, "run")) else [])]
+        tx = rx["text.pdf"].get("text", "")
+        got["PDFKit reads the fixtures: page lines, the scan, the lock, right to left; a time cap; a hang killed; "
+            "the copy deleted"] = (
+            rx["text.pdf"]["ok"] and rx["text.pdf"]["pages"] == 3 and tx.startswith(E % 1 + "\nRiverside Library")
+            and tx.index("PDF-MARK-ALPHA") < tx.index(E % 2) < tx.index(E % 3) < tx.index("PDF-MARK-OMEGA")
+            and "Caf\u00e9 corner" in tx and "Gr\u00fc\u00dfe" in tx
+            and rx["scanned.pdf"]["scanned"] == 1 and rx["scanned.pdf"]["scanned_pages"] == [2]
+            and rx["scanned.pdf"]["blank"] == 1 and "SCAN-MARK-END" in rx["scanned.pdf"]["text"]
+            and rx["locked.pdf"] == {"ok": False, "err": "This PDF is locked.", "locked": True,
+                                     "secs": rx["locked.pdf"].get("secs")}
+            and all(ln in rx["unicode.pdf"]["text"] for ln in
+                    ["\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd", "\u0645\u0631\u062d\u0628\u0627",
+                     "\u0627\u0644\u0628\u0627\u0628", "\u039a\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1",
+                     "\u3053\u3093\u306b\u3061\u306f", "file and floor"])
+            and big["ok"] and big["partial"] and big["why"] == "time" and 0 < big["read"] < 20000
+            and big["text"].endswith("pages were read.]") and big["secs"] < 8
+            and hg["ok"] and hg["read"] == 1 and hg["partial"] and hs < 5
+            and not [f for f in left if f.endswith(".pdf")])
+    # local only
+    sec = src[src.index("# ==== pdf attach (6b546): begin ===="):src.index("# ==== pdf attach (6b546): end ====")]
+    rt = src[src.index('        if self.path == "/api/doc/pdf":'):src.index('        if self.path == "/api/doc/measure":')]
+    got["local only: no network, engine or other path in the section or the helper; the route reads and answers"] = (
+        _lint546(sec, swift) and not _lint546(sec + "\nimport urllib.request\n", swift)
+        and not _lint546(sec, swift + "\nlet s = URLSession.shared\n")
+        and "self._send_json(pdf_extract(self.rfile.read(n) if n > 0 else b\"\"))" in rt
+        and "n > DOC_PDF_MAX_BYTES" in rt and rt.count("(") <= 12
+        and ns["doc_request_docs"]({"docs": [{"name": "report.pdf", "text": E % 1 + "\nx"}]})[0]["local"] is True
+        and "(\".pdf-\", \".pdf\")" in src[src.index("RUN_FILE_KINDS = "):src.index("def sweep_run_files")])
+    return got
+
+
+def _c546_page(src):
+    got = {}
+    h0 = src.index('HTML_CONTENT = r"""')
+    pg = src[h0:src.index('\n"""\n', h0)]
+    ap = _js522(pg, "addPdfFile")
+    sd = _js522(pg, "send")
+    got["the page: .pdf in the picker and the drop, read through api() before the 2 MB text cap; send waits for "
+        "a PDF being read and never sends one that failed"] = (
+        'accept="image/*,.pdf,.txt,.md,' in pg
+        and "    else if(DOC_PDF.test(f.name))addPdfFile(f);\n    else if(f.size<2_000_000)addDocFile(f);" in pg
+        and "    else if(DOC_PDF.test(f.name))addPdfFile(f);      // read on this computer (6b546)\n"
+            "    else if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);" in pg
+        and 'api("/api/doc/pdf",{method:"POST",headers:{"Content-Type":"application/pdf"},' in ap
+        and "fetch(" not in ap and "if(f.size>DOC_PDF_MAX)d.err=DOC_PDF_BIG;" in ap
+        and "if(pendingDocs.includes(d)){paintChips();if(d.local)docMeasure();}" in ap
+        and "await Promise.all(pendingDocs.filter(d=>d.busy).map(d=>d.wait));" in sd
+        and "pendingDocs=pendingDocs.filter(d=>!d.err);" in sd
+        and sd.index("d=>d.busy") < sd.index("if(docAsks()){paintDocWarn(true);return;}")
+        and sd.index("d=>!d.err") < sd.index("const sentDocs=pendingDocs.slice();")
+        and 'const DOC_PDF_BIG="This PDF is too big. The most is 64 MB.";' in pg
+        and 'const DOC_PDF_BAD="This PDF can\\u2019t be read.";' in pg
+        and "const DOC_PDF_MAX=64*1048576;" in pg)
+    # the chips as the page draws them (node): composer and sent message
+    cst = lambda n: pg[pg.index("const %s=" % n):pg.index(";", pg.index("const %s=" % n)) + 1]
+    js = ("const els={};const $=q=>els[q]||(els[q]={hidden:true,innerHTML:'',classList:{add(){},remove(){}},"
+          "offsetWidth:0});\nlet pendingImages=[],docErr='',input={value:'When?'};const ICO={file:'<svg></svg>'};\n"
+          "const document={createElement:()=>({className:'',innerHTML:''})};\n"
+          + "\n".join(cst(n) for n in ("DOC_MODE_TXT", "DOC_PDF_BIG", "DOC_PDF_BAD")) + "\n"
+          + "\n".join(_js522(pg, n) for n in ("esc", "docSize", "docPl", "docPages", "docK", "docTip", "paintChips",
+                                                "docNeed", "docAsks", "paintDocWarn", "fmtTok", "userBody")) + "\n"
+          "let docBudget={label:'Gemma 4 26B',ctx_note:'Reads up to 131,072 tokens here.',limit70:9000,fixed:600,"
+          "ctx_use:131072,capped:false};\n"
+          "let pendingDocs=[{name:'report.pdf',pdf:true,local:true,text:'x',tok:8400,exact:true,bytes:1258291,pages:12,"
+          "read:12,scanned:3,scanPages:[3,7,9],mode:'full'}];paintChips();const o=[$('#imgchips').innerHTML];"
+          "pendingDocs=[{name:'atlas.pdf',pdf:true,local:true,text:'x',tok:400000,exact:false,bytes:9e6,pages:900,"
+          "read:412,partial:true,scanned:1,scanPages:[5],mode:'full'}];paintChips();"
+          "o.push($('#imgchips').innerHTML,$('#docwarn').innerHTML);"
+          "pendingDocs=[{name:'a.pdf',pdf:true,busy:true,text:''},{name:'b.pdf',pdf:true,err:'This PDF is locked.',"
+          "text:''}];paintChips();o.push($('#imgchips').innerHTML,$('#docwarn').hidden);"
+          "const body={textContent:'',appendChild(x){this.kid=x;}};"
+          "userBody(body,'Sum it up\\n\\ud83d\\udcc4 report.pdf',[{name:'report.pdf',tok:8400,exact:true,mode:'',pages:12}]);"
+          "o.push(body.textContent,body.kid.innerHTML);process.stdout.write(JSON.stringify(o));")
+    fj = os.path.join(_tf522.mkdtemp(), "c546.js")
+    with open(fj, "w") as fh:
+        fh.write(js)
+    try:
+        o = json.loads(_sp522.run(["node", fj], capture_output=True, text=True, timeout=30).stdout)
+    except Exception:
+        o = [""] * 6 + [True, "", ""]
+    txt = lambda h: re.sub(r"\s+", " ", _html522.unescape(re.sub(r"<[^>]+>", " ", h))).strip()
+    tips = lambda h: [_html522.unescape(t) for t in re.findall(r'title="([^"]*)"', h)]
+    got["the chips (node): report.pdf, 12 pages, 8.4K tokens, 3 scanned pages skipped; how far a huge one was "
+        "read; Reading\u2026; why it can't be read; the sent message says the pages"] = (
+        txt(o[0]) == "\U0001f4c4 report.pdf 12 pages 8.4K tokens 3 scanned pages skipped \u00d7"
+        and "12 pages, 1.2 MB" in tips(o[0])[0]
+        and "Pages 3, 7, 9 are scanned. Scanned pages aren\u2019t read yet." in tips(o[0])[0]
+        and txt(o[1]).startswith("\U0001f4c4 atlas.pdf First 412 of 900 pages \u2248400K tokens 1 scanned page skipped")
+        and "Page 5 is scanned." in tips(o[1])[0]
+        and "atlas.pdf is too long for the model on" in txt(o[2]) and "Split &amp; summarize" in o[2]
+        and txt(o[3]) == "\U0001f4c4 a.pdf Reading\u2026 \u00d7 \U0001f4c4 b.pdf This PDF is locked. \u00d7"
+        and 'data-k="d" data-i="1"' in o[3] and o[4] is True
+        and o[5] == "Sum it up" and "12 pages" in txt(o[6]) and "8,400" in txt(o[6]))
+    # the words: short, plain, cross-platform; no middle dots, please, just, simply or we, no exclamation marks
+    ns = _ns546(src)
+    words = [ns[k] for k in ("DOC_PDF_LOCKED", "DOC_PDF_NEEDS", "DOC_PDF_BAD", "DOC_PDF_BIG", "DOC_PDF_EMPTY",
+                             "DOC_PDF_SCAN_LINE", "DOC_PDF_PART_LINE")] + [txt(h) for h in o[:4]] + tips(o[0])
+    lint = " ".join(str(w) for w in words)
+    got["the words: no middle dots, please, just, simply or we, no exclamation marks, no Mac in the errors"] = (
+        "\u00b7" not in lint and not re.search(r"\b(?:please|just|simply|easily|we)\b", lint, re.I)
+        and "!" not in lint and not any("Mac" in ns[k] for k in ("DOC_PDF_LOCKED", "DOC_PDF_NEEDS", "DOC_PDF_BAD",
+                                                                   "DOC_PDF_BIG", "DOC_PDF_EMPTY"))
+        and ns["DOC_PDF_BIG"] == "This PDF is too big. The most is 64 MB." and ns["DOC_PDF_MAX_BYTES"] == 64 * 1048576)
+    return got
+
+
+def _c546_build():
+    sh = open("build_shell_dmg.sh", encoding="utf-8").read()
+    gi = open(".gitignore", encoding="utf-8").read()
+    bs = open(os.path.join("shell", "pdftext", "build.sh"), encoding="utf-8").read()
+    return {"release builds compile the helper, put it in Resources, sign it on its own, and check it is there": (
+        "./shell/pdftext/build.sh\n[[ -x shell/pdftext/concorde-pdftext ]]" in sh
+        and 'ditto shell/pdftext/concorde-pdftext "$BUNDLE/Contents/Resources/concorde-pdftext"\n'
+            'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-pdftext"' in sh
+        and sh.index("Resources/concorde-pdftext\"\ncodesign") < sh.index('codesign --force --sign "$IDENTITY" "$BUNDLE"\n')
+        and "concorde-dictate concorde-pdftext; do" in sh and "shell/pdftext/concorde-pdftext\n" in gi
+        and "-target arm64-apple-macos11" in bs and "-target x86_64-apple-macos11" in bs and "lipo -create" in bs)}
+
+
+def _c546_all(src, swift):
+    out = {}
+    for fn, args in ((_c546_units, (src, swift)), (_c546_page, (src,)), (_c546_build, ())):
+        try:
+            for k, v in fn(*args).items():
+                out[k] = bool(v)
+        except Exception as e_:
+            out[fn.__name__ + ": raised " + type(e_).__name__ + ": " + str(e_)[:80]] = False
+    return out
+
+
+_r546 = _c546_all(_MILLENAI_SRC, _SWIFT546)
+for _n546, _o546 in _r546.items():
+    check("6b546 " + _n546, _o546, "")
+_C546_MUT = [
+    ("presentation forms not folded", '    s = _DOC_PDF_FOLD_RX.sub(lambda m: unicodedata.normalize("NFKC", m.group(0)), s)\n', ""),
+    ("a look-alike page line kept", '    s = DOC_PDF_MARK_RX.sub(lambda m: m.group(0).replace("\\u2014", "-"), s)\n', ""),
+    ("control characters kept", "    s = _DOC_PDF_CTRL_RX.sub(\"\", s)\n", ""),
+    ("a scan not flagged", '"scan": not t and bool(ev.get("ink"))}', '"scan": False}'),
+    ("a blank page called a scan", '"scan": not t and bool(ev.get("ink"))}', '"scan": not t}'),
+    ("a locked PDF read on", '        if kind == "locked":', '        if False:'),
+    ("no page lines", '        out.append(DOC_PDF_MARK % p["n"] + ("\\n" + body if body else ""))', "        out.append(body)"),
+    ("a partial read not said", "    if why != \"end\" and len(pages) < total:", "    if False:"),
+    ("the character cap ignored", "            if got and size > cap:", "            if False:"),
+    ("split not on the pages", 'DOC_PDF_MARK_RX if doc_is_pdf(d["name"]) else None)', "None)"),
+    ("a PDF not a local document", 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt|pdf)$", re.I)', 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt)$", re.I)'),
+    ("read off a Mac", '    if "pdf-none" in TEST_HOOKS or not IS_MAC:', '    if "pdf-none" in TEST_HOOKS:'),
+    ("a hung helper waited for", "        killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)", "        killer = threading.Timer(3600, p.kill)"),
+    ("the copy left behind", "    finally:\n        drop_run_file(path)\n    out = pdf_parse(lines)", "    finally:\n        pass\n    out = pdf_parse(lines)"),
+    ("a PDF sliced as text", "    else if(DOC_PDF.test(f.name))addPdfFile(f);\n    else if(f.size<2_000_000)addDocFile(f);", "    else if(f.size<2_000_000)addDocFile(f);"),
+    ("sent while being read", "    try{await Promise.all(pendingDocs.filter(d=>d.busy).map(d=>d.wait));}finally{sendAsking=false;}", "    sendAsking=false;"),
+    ("the scanned count off the chip", "+(d.scanned?'<i class=\"dcm dcbad\">'+docPl(d.scanned,\"scanned page\")+' skipped</i>':'')", ""),
+    ("the server asked", "    helper = _pdf_helper_path()\n", "    helper = _pdf_helper_path()\n    ollama_url('/api/show')\n"),
+]
+_c546_caught = []
+for _mn, _ma, _mb in _C546_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c546_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c546_all(_ms, _SWIFT546).values()):
+        _c546_caught.append((_mn, "not caught"))
+check("6b546's rules each break a check when broken (%d mutants)" % len(_C546_MUT), not _c546_caught,
+      "%r" % _c546_caught)
+# the route, live, over the copy's own gate: the fixtures, the lock, the gate, nothing left under run/, and the
+# text measured as 6b522 measures a .md
+_pdf546 = lambda b, **kw: req("/api/doc/pdf", "POST", b, headers={"Content-Type": "application/pdf"}, timeout=60, **kw)
+_l546 = {n: _pdf546(b) for n, b in _FX546.items()}
+_j546 = {n: (json.loads(r[2] or b"{}") if r[0] == 200 else {}) for n, r in _l546.items()}
+_t546 = _j546.get("text.pdf", {}).get("text", "")
+_m546 = (json.loads(req("/api/doc/measure", "POST", {"docs": [{"name": "report.pdf", "text": _t546}], "tier": "Fast"},
+                        timeout=120)[2] or b"{}") if _t546 else {})
+_run546 = os.path.join(INST.home, "run")
+check("6b546 the PDF route (live): behind the cookie and the token; the text with its page lines, the scan said, "
+      "the lock refused, right to left read; nothing left under run/; measured like a .md",
+      sys.platform != "darwin"
+      or (all(r[0] == 200 for r in _l546.values())
+          and _j546["text.pdf"].get("ok") and _j546["text.pdf"].get("pages") == 3
+          and _t546.startswith("\u2014 page 1 \u2014\nRiverside Library") and "PDF-MARK-OMEGA" in _t546
+          and _j546["scanned.pdf"].get("scanned") == 1 and _j546["scanned.pdf"].get("blank") == 1
+          and _j546["locked.pdf"].get("err") == "This PDF is locked." and "text" not in _j546["locked.pdf"]
+          and b"LOCK-MARK" not in _l546["locked.pdf"][2]
+          and "\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd" in _j546["unicode.pdf"].get("text", "")
+          and json.loads(_pdf546(b"not a pdf")[2]).get("err") == "This PDF can\u2019t be read."
+          and _pdf546(_FX546["text.pdf"], token=False)[0] == 403 and _pdf546(_FX546["text.pdf"], cookie=False)[0] == 403
+          and not [f for f in os.listdir(_run546) if f.endswith(".pdf")]
+          and _m546.get("docs", [{}])[0].get("name") == "report.pdf" and _m546.get("tokens", 0) > 50
+          and _m546.get("label") and " \u00b7 " not in _m546["label"]),
+      "%r" % [{n: r[0] for n, r in _l546.items()}, {k: _j546.get("scanned.pdf", {}).get(k) for k in ("scanned", "blank")},
+              {k: _m546.get(k) for k in ("label", "tokens", "exact", "limit70")}])
+# ==== 6b546 pdf attach: end ====
 
 # ==== native shell (6b532): begin ====
 print("== the native shell's sidecar mode, MILLENAI_SHELL=tauri (6b532) ==")
@@ -41545,7 +41872,7 @@ def _c36_bundle(f):
                                                    and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign --force --sign'),
         "read back": '[[ "$GOT_BUILD" == "$BUILD" ]] ||' in b and '[[ "$GOT_VER" == "$VER" ]] ||' in b
                      and '[[ "$GOT_ID" == "com.millen.millenai" ]]' in b and '[[ "$GOT_EXE" == "ConcordeAI" ]]' in b
-                     and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx; do" in b
+                     and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do" in b   # the two helpers (6b543, 6b546)
                      and 'cmp -s millenai.py "$BUNDLE/Contents/Resources/millenai.py"' in b,
         "universal": 'TARGET="universal-apple-darwin"' in b and "expected a universal binary" in b,
         "the image is build_dmg.sh's": "DMG_APP_READY=1 ./build_dmg.sh" in b
