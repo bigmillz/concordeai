@@ -14,7 +14,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::webview::DownloadEvent;
 use tauri::{AppHandle, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
 use url::Url;
@@ -494,12 +494,9 @@ fn stop_sidecar(app: &AppHandle) {
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let name = app.package_info().name.clone();
     let nightly = app.config().identifier.ends_with(".nightly");
-    let about = AboutMetadata {
-        name: Some(name.clone()),
-        version: Some(app.package_info().version.to_string()),
-        comments: Some("Local-first AI. Models run on your own machine.".into()),
-        ..Default::default()
-    };
+    // About opens the page's own About (Settings opens there): no native panel, so no
+    // standard title bar anywhere (per Patrick: one window, its title bar hidden)
+    let about = MenuItem::with_id(app, "about", format!("About {}", name), true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings\u{2026}", true, Some("CmdOrCtrl+,"))?;
     let import = MenuItem::with_id(app, "import", "Import Chats\u{2026}", true, None::<&str>)?;
     let updates = MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", !nightly, None::<&str>)?;
@@ -508,7 +505,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &name,
         true,
         &[
-            &PredefinedMenuItem::about(app, Some(&format!("About {}", name)), Some(about))?,
+            &about,
             &PredefinedMenuItem::separator(app)?,
             &settings,
             &import,
@@ -559,7 +556,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 /// About's button, the sidebar folds the one way the header's button does).
 fn menu_action(id: &str) -> Option<&'static str> {
     match id {
-        "settings" => Some("typeof openAbout==='function'&&openAbout()"),
+        "settings" | "about" => Some("typeof openAbout==='function'&&openAbout()"),
         "updates" => Some(
             "typeof openAbout==='function'&&(openAbout(),document.getElementById('about-check')&&document.getElementById('about-check').click())",
         ),
