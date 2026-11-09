@@ -1,30 +1,45 @@
-# The native shell (shell/, Tauri 2) on every desktop target (6b532).
-# NOT WIRED TO RELEASES YET: this builds and uploads the bundles as run
-# artifacts so the Windows and Linux builds are proven before the shell
-# becomes the shipped app (RUST_PLAN.md, step 1 → packaging). The
-# Python-app workflow (windows-installer.yml) is untouched.
+# The native shell (shell/, Tauri 2) for Windows and Linux (6b532, 6b537).
+#
+# WIRED TO RELEASES, NOT TO THE UPDATER: on every published release this
+# builds the shell's Windows MSI + NSIS installer and the Linux .deb +
+# AppImage from the release's own tag and keeps them as RUN ARTIFACTS. It
+# attaches nothing to the release on purpose: the Windows updater
+# (millenai.py, _check_update_live) offers the first ".msi" asset without
+# "arm64" in its name, so a shell MSI on the release would be offered to
+# every Windows install of the Python app — and the shell has no Python of
+# its own on Windows yet (RUST_PLAN.md step 3). The Python app's MSI
+# (windows-installer.yml) stays the Windows asset until then.
+#
+# The macOS asset is NOT built here: release.sh builds and signs the
+# shell's ConcordeAI-<version>.dmg on the Mac that cuts the release
+# (build_shell_dmg.sh), and nightly.yml builds the same for the nightly.
 name: shell-build
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "release tag to build from (empty = this branch)"
+        required: false
+        default: ""
   push:
-    branches: [rust-shell]
+    branches: [rust-shell, shell-beta]
     paths:
       - "shell/**"
+      - "packaging/shell_stamp.py"
       - ".github/workflows/shell-build.yml"
+  release:
+    types: [published]
 
 jobs:
   build:
+    # nightlies ship the Python zip + the shell DMG; a Windows/Linux shell
+    # build per commit is noise (as windows-installer.yml skips them, 6b285)
+    if: ${{ (github.event.release.tag_name || '') != 'nightly' }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
-            target: aarch64-apple-darwin
-            bundles: app,dmg
-          - os: macos-13
-            target: x86_64-apple-darwin
-            bundles: app,dmg
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             bundles: msi,nsis
@@ -33,7 +48,14 @@ jobs:
             bundles: deb,appimage
     runs-on: ${{ matrix.os }}
     steps:
+      # the release's own tag (or the one asked for), else this branch
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -55,6 +77,12 @@ jobs:
       - name: Install tauri-cli
         run: cargo install tauri-cli --version "^2" --locked
 
+      # the shell's version from APP_VERSION, the sidecar's first-run files
+      # (packaging/shell_stamp.py, the same step build_shell_dmg.sh runs)
+      - name: Stamp the shell from millenai.py
+        shell: bash
+        run: python packaging/shell_stamp.py
+
       - name: Build
         working-directory: shell/src-tauri
         run: cargo tauri build --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
@@ -63,8 +91,6 @@ jobs:
         with:
           name: shell-${{ matrix.target }}
           path: |
-            shell/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
-            shell/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             shell/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.msi
             shell/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.exe
             shell/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.deb

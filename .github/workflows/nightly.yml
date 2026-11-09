@@ -1,13 +1,16 @@
 # NIGHTLY (6b285, per Patrick): every push to main becomes a prerelease
 # rebuilt under the single tag `nightly`, built here so nothing depends on a laptop being
 # open. Beta and stable stay hand-cut by release.sh on Patrick's word.
+# THE DMG IS THE NATIVE SHELL'S (6b537): the same build_shell_dmg.sh
+# release.sh runs, universal, so a nightly-channel install on the shell
+# is never offered the Python app back. The Windows zip is unchanged.
 # Roll back: git revert the channels commit (tag pre-channels), delete
 # this file, and `gh release delete nightly --cleanup-tag`.
 name: nightly
 on:
   push:
     branches: [main]
-    paths: [millenai.py, build_dmg.sh, build_macos_app.sh, packaging/macos_launcher.m, build_windows.sh, ci_smoke.sh, packaging/crypto_reqs.py, MillenAI.icns, fonts/**, vfx/**, .github/workflows/nightly.yml]
+    paths: [millenai.py, build_dmg.sh, build_macos_app.sh, build_shell_dmg.sh, packaging/shell_stamp.py, shell/**, packaging/macos_launcher.m, build_windows.sh, ci_smoke.sh, packaging/crypto_reqs.py, MillenAI.icns, fonts/**, vfx/**, .github/workflows/nightly.yml]
   workflow_dispatch:
 concurrency: { group: nightly, cancel-in-progress: true }
 permissions: { contents: write }
@@ -41,11 +44,19 @@ jobs:
       # errors AND boots headless with no models and no keys
       - name: Compile and boot check
         run: ./ci_smoke.sh
-      - name: Build the macOS DMG and the Windows zip
+      # the shell's toolchain (6b537): both Apple targets for the universal
+      # binary, tauri-cli, and the cargo cache so a warm run is minutes
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "aarch64-apple-darwin,x86_64-apple-darwin" }
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: shell/src-tauri }
+      - name: tauri-cli
+        run: cargo install tauri-cli --version "^2" --locked
+      - name: Build the macOS DMG (the native shell) and the Windows zip
         run: |
           mkdir -p "$HOME/Library/Application Support/MillenAI"
           python3 -m venv "$HOME/Library/Application Support/MillenAI/venv"
-          ./build_dmg.sh
+          ./build_shell_dmg.sh
           ./build_windows.sh
           ls -la *.dmg *.zip
       - name: Publish the nightly prerelease
