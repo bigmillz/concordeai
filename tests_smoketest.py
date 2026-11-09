@@ -24677,7 +24677,7 @@ def _smc_seats(src):
     _so_seen(ns, e, [M("x:70b", "gpu+ram", 40), M("y:7b", "unknown", 4)])
     sm = st("Pro")
     got["smallest, alone"] = (seats("Pro") == ([L("y:7b")], "smallest", 1) and sm["ok"] and sm["models"] == [L("y:7b")]
-                              and "smallest model, alone" in sm["note"])
+                              and "smallest model answers alone" in sm["note"])
     # the bubble: the title, the seats, and the promise
     _so_seen(ns, e, ms)
     s3, sf, sp = st("Thinking"), st("Fast"), st("Pro")
@@ -24685,8 +24685,8 @@ def _smc_seats(src):
     got["state"] = (s3["ok"] and s3["mode"] == "Thinking" and s3["title"] == "Thinking · Pat’s Lab only"
                     and s3["models"] == t[0] and s3["label"] == t[0][0] and s3["server"] == "Pat’s Lab"
                     # one writer, a critic, a checked final (6b515)
-                    and s3["note"] == "The strongest model on Pat’s Lab drafts, a second reviews it, then Pat’s Lab "
-                                      "writes the final answer there and a quick model checks its facts. " + dry
+                    and s3["note"] == "Pat’s Lab’s strongest model drafts, a second reviews, Pat’s Lab writes the "
+                                      "final and a quick model checks facts. " + dry
                     and sf["note"].endswith(dry) and "second pass" in sf["note"] and sf["models"] == f[0]
                     and "It seats" not in sp["note"] and sp["note"].startswith("5 models on Pat’s Lab draft")
                     and sp["note"].endswith(dry))
@@ -24738,7 +24738,7 @@ def _smc_seats(src):
     a0, a1 = ns["server_only_state"](_ent(**wk)), ns["server_mode_state"](_ent(**wk), "Thinking")
     got["asleep: pickable"] = (a0["asleep"] is True and not a0["ok"] and a1["asleep"] is True and a1["models"] == []
                                and "asleep" in a0["note"] and a0["note"].endswith(dry)
-                               and a1["note"].startswith("Pat’s Lab is asleep: it wakes when you ask"))
+                               and a1["note"].startswith("Pat’s Lab is asleep. It wakes when you ask"))
     # not wakeable (no card known, or sleep off): greyed with the reason, as before
     nw = [ns["server_only_state"](_ent(**kw_)) for kw_ in (
         {}, dict(wk, wake=[]), dict(wk, sleep={"enabled": False}))]
@@ -24993,9 +24993,9 @@ def _smc_page(src):
         and o["subOn"].count(" on\"") == 1 and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o["menuOn"]
         and " on\"" not in o["subAdv"] and " on\"" not in sub,
         "off": o["off"] == ["srv:b1b2c3d4", "srv:b1b2c3d4:fast", "srv:b1b2c3d4:max", "srv:b1b2c3d4:pro", "srv:b1b2c3d4:think"],
-        # asleep and wakeable: "asleep · wakes when you ask", never greyed, never "not answering"
-        "asleep": '<span class="enm">Zzz</span><span class="edsc">your server · asleep · wakes when you ask</span>'
-        in o["asleepMenu"] and "Lab</span><span class=\"edsc\">your server · not answering" in o["asleepMenu"]
+        # asleep and wakeable: "Asleep. Wakes when you ask." (copy-2), never greyed, never "Not answering"
+        "asleep": '<span class="enm">Zzz</span><span class="edsc">Asleep. Wakes when you ask.</span>'
+        in o["asleepMenu"] and "Lab</span><span class=\"edsc\">Not answering</span>" in o["asleepMenu"]
         and " off" not in o["asleepSub"]
         and o["asleepSub"].count('class="engrow mode srvmode"') == 4
         and o["asleepSub"].startswith('<div class="engnote">asleep · wakes when you ask</div>')
@@ -25005,8 +25005,8 @@ def _smc_page(src):
         "kept while off": o["kept"] == [],
         "gone": o["gone"] == ["setTier:Fast"] and o["bad"] == ["setTier:Fast"],
         # the bubble: the seats with "your server", or why not; "<name> Only" keeps its one line
-        "bubble": o["pop"][0] == ('<b>Thinking · Desk &lt;b&gt; only</b><div class="mline">Desk · a:8b <i>· your server</i>'
-                                  '</div><div class="mline">Desk · b:14b <i>· your server</i></div>'
+        "bubble": o["pop"][0] == ('<b>Thinking · Desk &lt;b&gt; only</b><div class="mline">Desk · a:8b <i>your server</i>'
+                                  '</div><div class="mline">Desk · b:14b <i>your server</i></div>'
                                   '<span class="note">N &lt;i&gt;</span>')
         and o["pop"][1] == ('<b>Pro · Desk only</b><div class="mline">Desk didn’t answer.</div>'
                             '<span class="note">When</span>')
@@ -25690,7 +25690,7 @@ _devs34 = _o1("/devices")["devices"]
 check("servers (live): pairing through the real gateway: no window and a wrong code said, the right code "
       "pairs this device and no other, servers.json 0600",
       "no pairing window open" in _sp0[1].get("err", "")
-      and _sp1[1].get("err", "").startswith("That code is wrong. 4 more tries")
+      and _sp1[1].get("err", "").startswith("Wrong code. 4 tries left")
       and _sp2[1].get("ok") is True and _sp2[1]["server"]["paired"] is True
       and _sp2[1]["server"]["status"].get("auth") is True
       # the stub's models as the gateway lists them (no embeddings), and
@@ -25743,9 +25743,9 @@ _sc3 = _svchat(text="again 334")
 _o1("/next", {"path": "/api/chat", "status": 507, "body": {"error": "no fit", "code": "gpu_fit"}})
 _sc4 = _svchat(text="fit?")
 check("servers (live): busy and a model that doesn't fit are said; a replay refusal is signed again once",
-      _sc2[1].strip() == "⚠️ %s is busy with other requests. Try again in a moment." % _SVN
+      _sc2[1].strip() == "⚠️ %s is busy. Try again in a moment." % _SVN
       and "ANSWER-again 334" in _sc3[1] and "⚠" not in _sc3[1]
-      and _sc4[1].strip() == "⚠️ small:8b doesn’t fit in %s’s graphics memory." % _SVN,
+      and _sc4[1].strip() == "⚠️ small:8b doesn’t fit on %s’s card." % _SVN,
       "%r" % [_sc2[1], _sc3[1], _sc4[1]])
 # ---- a plain server pick keeps this Mac quiet (6b339): Patrick's hotels question with web search on, then a
 # server that can't run the model. Nothing runs on a model of this Mac (no usage record of a local call),
@@ -25948,6 +25948,9 @@ def _modes_live39(inst, sid, svn, only=None):
             # (Pro also seats this computer's own models, and warms the first of those: nothing else)
             got["Pro: no engine warmed here but a seat of its own"] = (
                 {c[1] for c in pr["loc"] if c[0] == "ensure"} <= {m for m in tiers["Pro"]["models"] if not m.startswith(lab)})
+            det["pro"] = {"six": len(srv("Pro")) == 6, "order": [m for m in pr["models"] if m.startswith(lab)] == srv("Pro"),
+                          "same": sorted(pr["models"]) == sorted(tiers["Pro"]["models"]), "tiers": tiers["Pro"]["models"],
+                          "drafted": sorted(pr["drafted"]), "status": pr["status"]}
             det["modes"] = [f["loc"], th["loc"], pr["loc"], f["models"], th["models"], pr["models"], tiers["Pro"].get("srvcap"),
                             th["merged"], th["resident"], pr["merged"], pr["resident"]]
             # the switch off: the same request runs on this computer, as before, and the server isn't asked
@@ -25978,7 +25981,7 @@ def _modes_live39(inst, sid, svn, only=None):
             got["a merge the server refuses: said, this computer's pen or the best draft writes it, never another server"] = (
                 bad["status"] == 200 and len(bad["merged"]) == 1 and "\u26a0" not in bad["text"]
                 and ("LOCAL-ANSWER" in bad["text"] or "ANSWER-" in bad["text"]) and bad["text"].strip() != ""
-                and any("write the merge" in x_ for x_ in stat)
+                and any("didn’t write the final" in x_ for x_ in stat)
                 and len([f_ for f_ in bad["frames"] if f_[0] == "RUN" and '"w": "mix"' in f_[1]]) >= 1)
             det["bad"] = [bad["loc"], bad["text"][:80], stat[-2:], bad["merged"]]
         if only in (None, "pic"):
