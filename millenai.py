@@ -47121,6 +47121,8 @@ if(hzLook==="horizon"){
   try{hzReduced=!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}catch(e){}
   var hzSeen=__HZ_SEEN__;   // the full opening plays on the first launch only (the seen_opening pref)
   if(!hzFxOff&&!hzIntroDone&&!hzReduced&&!hzSeen)document.documentElement.classList.add("hz-intro");
+  // Effects Full (6b542) is marked before the first paint; Calm (the default) and Off are the quiet page
+  try{if(!hzFxOff&&localStorage.getItem("millen.fxlevel")==="full")document.documentElement.classList.add("hz-full");}catch(e){}
   // DEAD-MAN'S SWITCH: should the main script die, the finished home shows anyway
   // (a dev copy's deliberately frozen intro says it is alive, and keeps its moment)
   setTimeout(function(){if(!window.hzFrozen&&!window.hzReady)document.documentElement.classList.remove("hz-intro","hz-markin","hz-markout");},5000);
@@ -51113,15 +51115,10 @@ __HZ_FONTS__
 .hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible{
   outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz #hz-brand{display:flex;align-items:center;gap:10px;min-width:0}
-/* the wordmark is the app's own lockup, unchanged, with a soft ice glow and a glint every 11 s */
-.hz #hz-mark{margin-right:0;position:relative;overflow:visible;filter:drop-shadow(0 0 8px rgba(159,192,255,.4))}
-.hz #hz-vmark,.hz #hz-vmark2,.hz #hz-vmark3{width:12.4px;height:10.4px;margin-right:4px;vertical-align:-.8px}
-.hz #hz-mark .hz-glint{position:absolute;left:0;top:0;white-space:nowrap;color:#fff;pointer-events:none;
-  -webkit-mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);mask-image:linear-gradient(105deg,transparent 42%,#000 49%,#000 51%,transparent 58%);
-  -webkit-mask-size:300% 100%;mask-size:300% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:100% 0;mask-position:100% 0;
-  filter:drop-shadow(0 0 4px #fff) drop-shadow(0 0 9px rgba(255,143,196,.85)) drop-shadow(0 0 16px rgba(159,168,255,.75));animation:hzGlint 11s var(--hz-ease-out) 2s infinite}
-.hz #hz-mark .hz-glint svg g{stroke:#fff}
-@keyframes hzGlint{0%{-webkit-mask-position:100% 0;mask-position:100% 0}16%,100%{-webkit-mask-position:0 0;mask-position:0 0}}
+/* the wordmark is the app's own lockup, unchanged and STATIC (6b542, per Patrick: the shining
+   logo was "kind of tacky"): no glow, no glint, no animation, at any Effects level */
+.hz #hz-mark{margin-right:0;position:relative;overflow:visible}
+.hz #hz-vmark,.hz #hz-vmark2{width:12.4px;height:10.4px;margin-right:4px;vertical-align:-.8px}
 .hz.hz-sbopen #main:has(#hero) #hz-mark,.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:none}
 .hz #hz-title{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:none}
 .hz #main:not(:has(#hero)) #hz-title{display:block}
@@ -51419,14 +51416,14 @@ __HZ_FONTS__
 @keyframes hzRowPop{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(159,192,255,0)}35%{transform:scale(1.035);box-shadow:0 0 0 1px rgba(170,200,255,.55),0 0 26px rgba(159,192,255,.4)}100%{transform:none;box-shadow:0 0 0 0 rgba(159,192,255,0)}}
 @keyframes hzFadeIn{from{opacity:0}to{opacity:1}}
 /* ---- stillness: effects off, reduced motion, hidden or long unfocused */
-.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
+.hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
 .hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
 .hz .novideo #composer::before{animation:none;opacity:0!important}
 .hz .novideo .hz-streak,.hz .novideo .hz-sweep{display:none}
-.hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}
+.hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen{animation-play-state:paused!important}
 .hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
-  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz #hz-mark .hz-glint,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
+  .hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}
   .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
   .hz .hz-elevel.shim{animation:none}
   .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
@@ -51477,6 +51474,151 @@ __HZ_FONTS__
 .hz #main:not(:has(#hero)) #imgchips,.hz #main:not(:has(#hero)) #docwarn{max-width:var(--hz-read-w);margin-left:calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2)}
 @media (max-width:860px){.hz #main:not(:has(#hero)) #imgchips,.hz #main:not(:has(#hero)) #docwarn{max-width:none;margin-left:0}}
 .hz .novideo #docwarn.nudge{animation:none}
+/* ==================================================== CALM, BALANCE AND STING (6b542) */
+/* CALM BY DEFAULT (6b542, per Patrick: "too much going on ... like an old lady's house with all
+   these trinkets everywhere ... something that people could use every day without being so
+   flashy"). Effects has three levels: Calm (the default), Full (today's whole show, by choice;
+   html.hz-full) and Off (stills, the old Visual effects switch). What is Full's hangs off
+   .hz-full; what Calm takes away is stilled or hidden under .hz:not(.hz-full), so Calm and Off
+   share one quiet page. Every rule stays under .hz: Classic sees none of it.
+   BALANCE AND STING (the owner's own direction, the same night: "being a Libra ... visually
+   perfect, but also being a Scorpio where I can sting ... very sharp and fancy"): one centred
+   axis with the composer at the golden-ratio point (hzBalance), an 8 px grid, four type sizes,
+   silver hairlines in place of glows, tight radii (composer 14, keys 8), a balance-beam slider
+   with a diamond thumb, and ONE accent, ember, that appears only at a moment of decision: the
+   send strike, the focus hairline, an error's left rule. It never loops and it never glows. */
+:root{--hz-r-composer:14px;--hz-ember:#e8415a;--hz-hair-3:rgba(255,255,255,.22)}
+/* ---- the sky in Calm: the stars, the moonlight and the hour's gradient as a still (hzSky's
+   S.once), the ice rays dimmer and slower, the wash a faint still; no footage, no neon */
+.hz:not(.hz-full) #hz-aurw{opacity:.22;--hz-t-drift:56s}
+.hz:not(.hz-full).hz-busy #hz-aurw{opacity:.3}
+.hz:not(.hz-full).hz-busy #hz-aur1{animation-duration:var(--hz-t-drift)}
+.hz:not(.hz-full).hz-busy #hz-aur2{animation-duration:calc(var(--hz-t-drift) * 1.32)}
+.hz:not(.hz-full) #hz-washw{animation:none}
+.hz:not(.hz-full) #hz-wash,.hz:not(.hz-full) #hz-wash.bloom,.hz:not(.hz-full).hz-busy #hz-wash{animation:none;opacity:.06}
+.hz:not(.hz-full).hz-intro.hz-markin #hz-aurw{opacity:.22}
+/* ---- the opening in Calm: the wordmark fades in over a second, rests and lifts; no trace,
+   no streak, no glint, no prism; the wing's lines are simply there */
+.hz.hz-calmopen #hz-intro-mark{transition:opacity 1s var(--hz-ease-out)}
+.hz.hz-calmopen #hz-intro-mark .vghost svg{filter:none}
+.hz.hz-calmopen #hz-intro-mark .hz-word{text-shadow:none;transition:opacity 1s var(--hz-ease-out)}
+.hz.hz-calmopen #hz-intro-mark line,.hz.hz-calmopen.hz-markin #hz-intro-mark line{animation:none!important;stroke-dasharray:none;stroke-dashoffset:0;opacity:1}
+.hz.hz-calmopen #hz-intro-mark .hz-glint,.hz.hz-calmopen #hz-intro-mark .hz-flare{display:none}
+.hz.hz-calmopen.hz-markout #hz-intro-mark{transition:opacity .5s var(--hz-ease-out),transform .5s var(--hz-ease-out)}
+/* ---- the greeting in Calm: plain white text, one node (hzHeadline), no glow, no layers */
+.hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}
+.hz:not(.hz-full) #hero .greet .bloom,.hz:not(.hz-full) #hero .greet .sheen{display:none}
+/* ---- the composer in Calm: no light ring, no breathing glow, no shimmer at Max or Ultra */
+.hz:not(.hz-full) #composer::before,.hz:not(.hz-full) #composer.finish::before{animation:none;opacity:0!important}
+.hz:not(.hz-full) #hz-cglow{display:none}
+.hz:not(.hz-full) .hz-elevel.shim,.hz:not(.hz-full) .hz-elevel.shim.soft{background:none;color:var(--hz-ink-2);animation:none}
+/* ---- asking in Calm: one quiet status line; the words simply appear. No die, no ticking figures
+   (they wait in Details), no shimmer, no glowing prose, no breathing dot */
+.hz:not(.hz-full) .liveline .die,.hz:not(.hz-full) .liveline .lstats{display:none}
+.hz:not(.hz-full) .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2);animation:none}
+.hz:not(.hz-full) .msg.ai.live .body,.hz:not(.hz-full) .msg.ai.live .body>*:last-child{color:var(--hz-ink-read);text-shadow:none}
+.hz:not(.hz-full) .msg.ai .body{transition:none}
+.hz:not(.hz-full) .msg.ai .who b.shim,.hz:not(.hz-full) .msg.ai .who b.shim.soft{background:none;color:#e2e7f5;animation:none}
+.hz:not(.hz-full) .msg.ai .who .dot{box-shadow:none;opacity:.7;animation:none}
+.hz:not(.hz-full) .msg.ai.live .who .st{display:none}   /* the status line below says it; one line, not two */
+.hz:not(.hz-full) .behind .spine li.live .node{animation:none;box-shadow:none}
+.hz:not(.hz-full) .chat-item .hz-ldie{display:none}
+.hz:not(.hz-full) .chat-item.hz-live .ct{background:none;color:inherit;animation:none}
+.hz:not(.hz-full) .chat-item.hz-landed,.hz:not(.hz-full) #hz-sb.ping{animation:none}
+.hz:not(.hz-full) .msg{animation:none}
+/* ---- Details (6b542): the marginalia folds behind one small link under the answer, closed by
+   default; Full keeps the column beside the answer */
+.hz:not(.hz-full) .msg.ai{grid-template-columns:minmax(0,640px)}
+.hz:not(.hz-full) .msg.ai>aside.behind{display:none;grid-column:1;grid-row:auto;padding-top:0;margin-top:8px;order:6}
+.hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}
+.hz:not(.hz-full) .msg.ai>.ans-foot{order:5}
+.hz .hz-details{font:12.5px var(--hz-font-ui);color:var(--hz-ink-3);background:none;border:0;padding:0 4px;height:28px;border-radius:4px;cursor:pointer;transition:color var(--hz-t-fast)}
+.hz .hz-details:hover{color:var(--hz-ink)}
+.hz.hz-full .hz-details,.hz .msg.ai:not(:has(>aside.behind)) .hz-details{display:none}
+.hz:not(.hz-full) .ans-foot .mact{opacity:1}
+/* ---- the sidebar (6b542): no token counts beside the chats (renderChats writes none under
+   Horizon), no estimate note, no memory meter or telemetry cluster, no token total in the foot */
+.hz #telemetry,.hz #sb-today,.hz .cfoot,.hz .ctok,.hz .ctot{display:none}
+/* ---- the machines (6b542): Calm shows one small status dot whose tooltip names each machine
+   and its state; Full shows the dies */
+.hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}
+.hz .hz-mdot{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;cursor:default;outline:0}
+.hz .hz-mdot:hover{background:rgba(255,255,255,.06)}
+.hz .hz-mdot .dot{width:6px;height:6px;border-radius:50%;background:#cfd6e6}
+.hz .hz-mdot.asleep .dot{background:transparent;box-shadow:inset 0 0 0 1px #cfd6e6}
+.hz .hz-mdot.working .dot{background:#fff}
+.hz .hz-mdot .tip{position:absolute;top:44px;right:0;min-width:188px;padding:12px 14px;border-radius:8px;display:grid;gap:6px;font-size:12.5px;line-height:1.3;
+  background:rgba(10,14,28,.92);border:1px solid var(--hz-glass-line);box-shadow:0 18px 50px rgba(0,0,0,.5);
+  opacity:0;transform:translateY(-4px);transition:opacity .2s,transform .2s var(--hz-ease-out);pointer-events:none;z-index:6}
+.hz .hz-mdot:hover .tip,.hz .hz-mdot:focus-visible .tip{opacity:1;transform:none}
+.hz .hz-mdot .mr{display:flex;justify-content:space-between;gap:16px;white-space:nowrap}
+.hz .hz-mdot .mr strong{font-weight:500;color:var(--hz-ink)}
+.hz .hz-mdot .mr .st{color:var(--hz-ink-2)}
+.hz .hz-mdot .mr .st.off{color:var(--hz-ink-3)}
+/* ---- Settings (6b542): Horizon's Effects row carries Off, so the old Visual effects switch
+   hides under it; Classic has no levels and keeps its switch alone */
+.hz #fx-toggle{display:none}
+html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
+/* ---- BALANCE: the 8 px grid on the header and the composer; tight radii; crisp 1.5 px arrows */
+.hz #hz-top{gap:16px;padding:0 24px}
+.hz #hz-lanes{gap:24px}
+.hz #hz-right{gap:16px}
+.hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}
+.hz #composer{padding:16px 16px 16px 24px;gap:8px}
+.hz #main:not(:has(#hero)) #composer,.hz #main:not(:has(#hero)) #composer::before{border-radius:14px}
+.hz #main:has(#hero) #hz-history:not([hidden]){margin-top:32px}
+.hz #hz-menu{border-radius:12px}
+.hz .hz-opt{border-radius:8px}
+.hz .hz-opt[aria-checked=true]>b::after{box-shadow:none}
+.hz .hz-pick{height:40px;border-radius:8px;gap:8px;padding:0 10px 0 12px}
+.hz #hz-effort.compact .hz-pick{height:32px;padding:0 8px 0 10px}
+/* ---- the slider is a balance beam: one hairline, a tick at each of the five steps, a sharp
+   diamond thumb that snaps to its step in 120 ms with no bounce; the level in mono caps */
+.hz .hz-sl-glow,.hz .hz-sl-halo{display:none}
+.hz .hz-sl-track{top:20px;height:1px;border-radius:0;background:var(--hz-hair-3)}
+.hz .hz-sl-fill{top:20px;height:1px;border-radius:0;background:#fff;box-shadow:none;transition:transform 120ms ease}
+.hz .hz-sl-dot{top:17px;width:1px;height:6px;margin-left:-.5px;border-radius:0;background:var(--hz-hair-3)}
+.hz .hz-sl-dot.passed{background:#fff}
+.hz .hz-sl-dot.last{background:var(--hz-hair-3);box-shadow:none}
+.hz .hz-sl-dot.last.passed{background:#fff}
+.hz .hz-sl-thumbw{top:15px;height:10px}
+.hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;
+  transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}
+.hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);box-shadow:none;transition:none}
+.hz #hz-effort.compact .hz-sl-track,.hz #hz-effort.compact .hz-sl-fill{top:14px}
+.hz #hz-effort.compact .hz-sl-dot{top:11px;width:1px;height:6px;margin-left:-.5px}
+.hz #hz-effort.compact .hz-sl-thumbw{top:9px;height:10px}
+.hz #hz-effort.compact .hz-sl-thumb{width:10px;height:10px;margin-left:-5px}
+.hz .hz-elevel{font-family:var(--hz-font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--hz-ink-2);min-width:60px}
+.hz #hz-effort.compact .hz-elevel{font-size:10.5px}
+/* ---- the send key: a crisp square with a 1.5 px arrow; silver outline until there are words,
+   ember while there are (#composer.hastext); the stop key is silver */
+.hz #send{width:40px;height:40px;border-radius:8px;background:transparent;color:var(--hz-ink-2);box-shadow:inset 0 0 0 1px var(--hz-hair-3);
+  transition:background var(--hz-t-fast) ease,color var(--hz-t-fast) ease,box-shadow var(--hz-t-fast) ease}
+.hz #send svg{stroke-width:1.5}
+.hz #send:hover{background:rgba(255,255,255,.06);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);transform:none}
+.hz #send:disabled{background:transparent;color:var(--hz-ink-3);box-shadow:inset 0 0 0 1px var(--hz-hair)}
+.hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:#fff;box-shadow:none}
+.hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ef5069;color:#fff}
+.hz #send.stop,.hz #composer.hastext #send.stop{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 0 0 1px var(--hz-hair-3)}
+/* ---- the sting: on send, one 1 px ember line strikes along the composer's top edge (hzStrike,
+   about 300 ms, once); still under reduced motion and with the effects off */
+.hz .hz-strike{position:absolute;left:14px;right:14px;top:-1px;height:1px;pointer-events:none;background:var(--hz-ember);transform-origin:0 50%;transform:scaleX(0);opacity:0}
+.hz .hz-strike[hidden],.hz .novideo .hz-strike{display:none}
+/* ---- the focus hairline: 1 px ember on any control reached by the keyboard, in place of the
+   ice ring; on the composer only while it holds words and the focus (the composer has the focus
+   from the first frame, so an ember border on focus alone would never be a moment) */
+.hz #composer:focus-within{border-color:rgba(255,255,255,.22);border-bottom-color:rgba(200,222,255,.6);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35)}
+.hz #composer.hastext:focus-within{border-color:var(--hz-ember);border-bottom-color:var(--hz-ember);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 80px rgba(0,0,0,.35)}
+.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
+.hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-sl:focus-within,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
+.hz #newchat:focus-visible,.hz .srcchip:focus-visible,.hz .showm:focus-visible,.hz .retrybtn:focus-visible,.hz #sb-foot #settings-btn:focus-visible,.hz #sb-foot #rail-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
+/* ---- an error: a small ember rule at its left, nothing else */
+.hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}
+.hz .retrybtn{border-radius:8px}
+@media (prefers-reduced-motion:reduce){.hz .hz-strike{display:none}}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -51848,7 +51990,7 @@ __CODE_ROWS__
     </div>
     <div id="hz-scrim"></div>
   </div>
-  <!-- THE HEADER (6b526): the chats button and the lockup (a glint passes it);
+  <!-- THE HEADER (6b526): the chats button and the lockup (static since 6b542, per Patrick: the shining logo was "kind of tacky");
        the chat's title in a conversation; the lanes as text on the home; the
        machines as dies in their makers' colours; Settings -->
   <header id="hz-top" aria-label="Window">
@@ -51856,7 +51998,7 @@ __CODE_ROWS__
       <button id="hz-sb" type="button" class="hz-ib" aria-label="Show chats" aria-pressed="false">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
-      <span id="hz-mark" class="vghost" title="MillenAI"><svg id="hz-vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b><span class="hz-glint" aria-hidden="true"><svg id="hz-vmark3" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg3" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg3)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span></span>
+      <span id="hz-mark" class="vghost" title="MillenAI"><svg id="hz-vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
       <span id="hz-title"></span>
     </div>
     <span class="hz-sp"></span>
@@ -52152,12 +52294,14 @@ __CODE_ROWS__
       <label id="look-row"><span>Look</span>
         <select id="look-sel"><option value="horizon">Horizon</option>
           <option value="classic">Classic</option></select></label>
-      <!-- EFFECTS (6b526): Full when a server does the thinking and this
-           Mac's GPU is free; Balanced when this Mac does it too -->
+      <!-- EFFECTS (6b526; 6b542, per Patrick: calm by default): Calm is the
+           quiet page and the default; Full is the whole show, by choice; Off
+           is stills (the Visual effects switch above, which Horizon hides) -->
       <label id="fx-level-row"><span>Effects</span>
-        <select id="fx-level"><option value="balanced">Balanced</option>
-          <option value="full">Full</option></select></label>
-      <div id="fx-level-note">Full is best when a server does the thinking.</div>
+        <select id="fx-level"><option value="calm">Calm</option>
+          <option value="full">Full</option>
+          <option value="off">Off</option></select></label>
+      <div id="fx-level-note">Calm is quiet and light. Full is the whole show.</div>
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
@@ -52992,7 +53136,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
-  if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();}   // Horizon's sky follows the switch (6b526)
+  if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
   else if(typeof bootSkyline==="function"){
@@ -55392,6 +55536,13 @@ function msgActions(div,role,text){
         +mk("good","Good",ICO.good)+mk("bad","Not good",ICO.bad)
       :mk("edit","Edit and resend",ICO.edit));
   foot.appendChild(bar);
+  // DETAILS (6b542, per Patrick: calm by default): under Horizon the marginalia ("Behind this
+  // answer": the steps, the machines, the tokens, the timings) folds behind one small link,
+  // closed by default; Full keeps the column beside the answer. The sources stay in the prose.
+  if(role==="assistant"&&isHz()&&!foot.querySelector(".hz-details")){
+    const d=document.createElement("button");d.type="button";d.className="hz-details";d.setAttribute("aria-expanded","false");d.textContent="Details";
+    foot.insertBefore(d,bar);
+  }
 }
 inner.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest(".mab[data-act]");
@@ -55855,6 +56006,7 @@ function liveTarget(div){
 }
 function cometFor(label,div){
   if(!cometsEl||hzStill()||document.hidden||!isHz())return;
+  if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the comets are Full's (6b542)
   const to=liveTarget(div);if(!to)return;
   const col=machineColours(label),chip=machineChip(label);
   let from;
@@ -55866,6 +56018,7 @@ function cometFor(label,div){
 }
 function rippleAt(div,col){
   if(!cometsEl||hzStill()||document.hidden||!isHz())return;
+  if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the ripple is Full's (6b542)
   const to=liveTarget(div);if(!to)return;
   rings.push({x:to[0],y:to[1],t0:performance.now(),col:col||"#ffffff",big:true});
   if(!cometRaf)cometRaf=requestAnimationFrame(cometsDraw);
@@ -55874,6 +56027,7 @@ function rippleAt(div,col){
 function answerLanded(){
   try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
   const cb=$("#composer");if(!cb||hzStill()||!isHz())return;
+  if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the light round the composer is Full's (6b542)
   cb.classList.remove("finish");void cb.offsetWidth;cb.classList.add("finish");
   setTimeout(()=>cb.classList.remove("finish"),1700);
 }
@@ -57925,8 +58079,10 @@ function dayRows(rows,row,now){
     cur.rows.push(c);
     const tk=chatTokens(c);cur.n+=tk.n;if(tk.est&&tk.n)cur.est=true;
   });
+  // Horizon's sidebar carries no token counts (6b542, per Patrick: calm by default); Classic keeps its totals
+  const hzq=typeof isHz==="function"&&isHz();
   return groups.map(g=>'<div class="cday"><span>'+g.l+'</span>'
-    +(g.n?'<span class="ctot"'+(g.est?' title="estimated from length"':'')+'>'+(g.est?"~":"")+fmtTok(g.n)+'</span>':"")
+    +(g.n&&!hzq?'<span class="ctot"'+(g.est?' title="estimated from length"':'')+'>'+(g.est?"~":"")+fmtTok(g.n)+'</span>':"")
     +'</div>'+g.rows.map(row).join("")).join("");
 }
 function renderChats(flip){
@@ -57958,10 +58114,11 @@ function renderChats(flip){
   // reduced motion or with the effects off
   const before={};
   if(flip&&!hzStill())el.querySelectorAll(".chat-item").forEach(it=>{before[it.dataset.id]=it.getBoundingClientRect().top;});
+  const hzq=isHz();   // no token counts beside Horizon's chats, and no "~ estimated" foot (6b542)
   const row=c=>{
     const v=q?chatHitView(window.chatQHits,c.id,window.chatQ,c.lane,uiMode):null;
     const sn=!!(v&&(v.snip||v.lane));if(sn)views.set(c.id,v);
-    const tk=chatTokens(c);if(tk.est&&tk.n)anyEst=true;
+    const tk=hzq?{n:0,est:false}:chatTokens(c);if(tk.est&&tk.n)anyEst=true;
     return '<div class="chat-item'+(c.id===curChat?" active":"")
     +(c.pin?" pinned":"")+(c.unread&&c.id!==curChat?" unread":"")+(sn?" has-snip":"")+'" data-id="'+esc(c.id)+'" tabindex="0">'
     +(c.unread&&c.id!==curChat?'<span class="cdot" role="img" aria-label="unread"></span>':'')
@@ -64127,7 +64284,16 @@ function hzBlur(gl,prog,quad,src,srcW,srcH,dst,dx,dy){gl.useProgram(prog);quad(p
 const HZ_GRADE=[[0,.68,.80,1.06,.92,0],[5,.68,.80,1.06,.92,0],[6.5,.86,.82,1.0,1.0,.85],[8,.80,.89,1.06,1.1,.1],[16.5,.80,.89,1.06,1.1,.1],[18.5,.88,.80,.98,1.0,.9],[20.5,.68,.80,1.06,.92,.05],[24,.68,.80,1.06,.92,0]];
 const HZ_SKYCOL=[[0,3,4,10,6,11,28,16,34,79],[5,3,4,10,6,11,28,16,34,79],[6.5,8,10,26,24,26,58,52,46,96],[8,6,14,38,14,34,84,34,74,150],[16.5,6,14,38,14,34,84,34,74,150],[18.5,6,8,22,22,22,56,64,46,96],[20.5,3,4,10,6,11,28,16,34,79],[24,3,4,10,6,11,28,16,34,79]];
 function hzKeyed(keys,h){for(let i=0;i<keys.length-1;i++){const a=keys[i],b=keys[i+1];if(h>=a[0]&&h<=b[0]){const t=(h-a[0])/(b[0]-a[0]||1);return a.map((v,k)=>v+(b[k]-v)*t);}}return keys[0];}
-function hzFxLevel(){try{return localStorage.getItem("millen.fxlevel")==="full"?"full":"balanced";}catch(e){return "balanced";}}
+// THE EFFECTS LEVEL (6b542, per Patrick: "too much going on ... like an old lady's house
+// with all these trinkets everywhere"): Calm is the default and quiet; Full is today's whole
+// show, by choice; Off is stills (the app's old Visual effects switch, millen.video). A saved
+// "balanced" reads as Calm. The root carries hz-full while Full is on; every Full-only rule
+// hangs off it, so Calm and Off share one quiet page.
+function hzFxLevel(){
+  if(typeof noVideo!=="undefined"&&noVideo)return "off";
+  try{return localStorage.getItem("millen.fxlevel")==="full"?"full":"calm";}catch(e){return "calm";}
+}
+function hzCalm(){return hzFxLevel()!=="full";}          // Calm or Off: the quiet page
 function hzSkyBoot(){
   const cv=$("#hz-gl"),vid=$("#hz-vid");if(!cv||!vid||hzS.sky!==undefined)return;
   hzS.sky=null;
@@ -64191,8 +64357,12 @@ function hzSkyBoot(){
   const quad=hzQuad(gl),vtex=hzTex(gl),stex=hzTex(gl);
   const S={gl:gl,cv:cv,vid:vid,quad:quad,vtex:vtex,stex:stex,pF:pF,pS:pS,pA:pA,pB:pB,W:0,H:0,last:0,ready:false,
     boost:1,boostTo:1,neon:.25,neonTo:.25,lvl:.25,busy:false,par:[0,0],parTo:[0,0],t0:performance.now(),raf:0,footMul:0,footTo:0};
+  // the old render targets are freed before new ones are made: a resize used to leak a
+  // full set of textures and framebuffers every time (6b542)
+  S.free=function(){["A","B","h1","v1","h2","v2","sk","au"].forEach(k=>{const T=S[k];if(T){gl.deleteTexture(T.t);gl.deleteFramebuffer(T.f);S[k]=null;}});};
   S.size=function(){
     const d=hzFxLevel()==="full"?Math.min(devicePixelRatio||1,1.5):.75;
+    S.free();
     S.W=Math.max(2,Math.round(innerWidth*d));S.H=Math.max(2,Math.round(innerHeight*d));cv.width=S.W;cv.height=S.H;
     S.A=hzTarget(gl,S.W,S.H);S.B=hzTarget(gl,S.W,S.H);
     const w2=Math.max(2,S.W>>1),h2=Math.max(2,S.H>>1),w4=Math.max(2,S.W>>2),h4=Math.max(2,S.H>>2);
@@ -64219,7 +64389,10 @@ function hzSkyBoot(){
     if(gap&&nowT-S.last<gap)return;S.last=nowT;
     const hasVid=vid.readyState>=2&&!!vid.dataset.i;
     if(!S.ready){S.ready=true;cv.classList.add("on");}
-    const t=(nowT-S.t0)/1000,m=S.vmap(t);
+    // CALM (6b542): one still, drawn by S.once, never a loop: the clock is held at zero so the
+    // dust, the grain and the moon shafts never move; no footage, no trails, no neon
+    const calm=hzCalm(),t=calm?0:(nowT-S.t0)/1000,m=S.vmap(t);
+    if(calm){S.neon=S.neonTo=0;S.boost=1;S.footMul=0;}
     S.boost+=(S.boostTo-S.boost)*.03;
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);
     if(hasVid){try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,vid);}catch(e){hzS.mediaOn=false;document.documentElement.classList.add("hz-novfx");return;}}
@@ -64257,7 +64430,7 @@ function hzSkyBoot(){
     gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     const A=S.A;S.A=S.B;S.B=A;
   };
-  S.setNeon=function(){S.neonTo=S.lvl+(S.busy?.28:0);};
+  S.setNeon=function(){S.neonTo=hzCalm()?0:S.lvl+(S.busy?.28:0);};   // Calm has no neon (6b542)
   // the neon follows the mode and the effort, with a lift at Ultra (the reference's level(m,e)), and the work
   S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};
   S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};
@@ -64265,7 +64438,9 @@ function hzSkyBoot(){
   S.reset=function(){[S.A,S.B].forEach(T=>{gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);});gl.bindFramebuffer(gl.FRAMEBUFFER,null);};
   // one frame, for a still sky (reduced motion) whose footage just arrived
   S.still=function(){if(S.raf)return;S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}};
-  addEventListener("resize",()=>{S.size();});
+  // Calm's sky: one frame now (the stars moved, the window resized, the hour turned); no loop ever runs
+  S.once=function(){if(S.raf||!hzS.mediaOn)return;S.last=0;S.still();};
+  addEventListener("resize",()=>{S.size();if(hzCalm())S.once();});
   S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
 }
 function hzHourNow(){const d=new Date(hzNow());return d.getHours()+d.getMinutes()/60;}
@@ -64305,6 +64480,7 @@ function hzMediaOK(){return document.documentElement.classList.contains("hz")&&!
 async function hzVideoBoot(){
   const v=$("#hz-vid");if(!v||!hzMediaOK()||v.dataset.i||typeof api!=="function")return;
   if(hzS.debug&&hzS.debug.media==="0")return;
+  if(hzCalm())return;      // Calm plays no footage: no decode, no texture upload a frame (6b542; the owner may reverse this)
   const tag=hzS.mediaGen;
   let ch=null;
   if(hzS.debug&&hzS.debug.clip!=null){const c=HZ_CLIPS.find(x=>x.i===+hzS.debug.clip);if(c)ch={play:c,later:null};}   // a dev copy may name one
@@ -64326,7 +64502,7 @@ function hzClipLoad(c){
   api("/api/sky/seen",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({i:c.i})}).catch(()=>{});
 }
 function hzClipCheck(){
-  if(!hzS.clip||!hzMediaOK())return;
+  if(!hzS.clip||!hzMediaOK()||hzCalm())return;
   const b=hzBucket(hzHourNow());if(b===hzS.clipBucket)return;
   hzS.clipBucket=b;
   if(hzS.clip.when.split(" ").indexOf(b)>=0)return;
@@ -64343,9 +64519,11 @@ function hzMediaSync(){
   const on=hzMediaOK()&&!document.hidden&&!hzS.blurred;
   hzS.mediaOn=on;
   if(v&&v.src){if(on&&!hzS.reduced){const p=v.play();if(p&&p.catch)p.catch(()=>{});}else if(!v.paused)v.pause();}
-  if(S){if(on&&!S.raf&&!hzS.reduced)S.raf=requestAnimationFrame(S.frame);
-    if((!on||hzS.reduced)&&S.raf){cancelAnimationFrame(S.raf);S.raf=0;}
-    if(hzS.reduced&&!S.ready&&on){S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}}}
+  const calm=hzCalm();
+  if(S){if(on&&!S.raf&&!hzS.reduced&&!calm)S.raf=requestAnimationFrame(S.frame);
+    if((!on||hzS.reduced||calm)&&S.raf){cancelAnimationFrame(S.raf);S.raf=0;}
+    if(hzS.reduced&&!S.ready&&on){S.frame(performance.now());if(S.raf){cancelAnimationFrame(S.raf);S.raf=0;}}
+    if(calm&&on)S.once();}     // Calm: a still, redrawn only when something real changed (6b542)
 }
 function hzMediaBoot(){
   hzS.mediaGen=(hzS.mediaGen||0)+1;
@@ -64359,6 +64537,7 @@ function hzSkyPaint(){
   if(hzS.dayKey!==day){hzS.dayKey=day;hzS.seed=hzHash(day+":"+hzS.salt);hzS.rnd=hzRng(hzS.seed);hzSeedDay();}
   hzMoonNow();hzDrawStars();hzDrawAuroras();hzClipCheck();
   hzS.skyAt=performance.now();
+  if(hzS.sky&&hzCalm())hzS.sky.once();   // the stars moved: Calm's one frame (6b542)
   const g=$("#hz-moonglow");if(g){g.style.opacity=(0.08+0.62*(hzS.moon?hzS.moon.lit:.5)).toFixed(3);g.classList.toggle("left",!!(hzS.moon&&!hzS.moon.waxing));}
 }
 function hzSeedDay(){
@@ -64408,7 +64587,7 @@ function hzDrawAuroras(){
 }
 // the wash flowers on arriving home (the intro has its own moment)
 function hzWashBloom(){
-  const w=$("#hz-wash");if(!w||!hzMotionOK()||document.documentElement.classList.contains("hz-intro"))return;
+  const w=$("#hz-wash");if(!w||!hzMotionOK()||hzCalm()||document.documentElement.classList.contains("hz-intro"))return;
   w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");
   clearTimeout(hzS.washT);hzS.washT=setTimeout(()=>w.classList.remove("bloom"),4700);
 }
@@ -64426,10 +64605,11 @@ function hzDrawWash(){
 // ---- TRACED IN LIGHT (the reference's tracer): the same letters are drawn
 // into a mask; sparks leave the top of each outline and run both ways round
 // it; light floods inward; a small GPU pass blooms it; the real text follows
-function hzTraceKill(){if(hzS&&hzS.tracers){hzS.tracers.forEach(k=>k());hzS.tracers.clear();}}
+function hzTraceKill(){if(hzS&&hzS.tracers){hzS.tracers.forEach(k=>k(true));hzS.tracers.clear();}}
 async function hzTraceIn(el,opts){
   opts=Object.assign({margin:44,speed:640,spread:.85,ink:[.97,.98,1]},opts||{});
   if(!hzMotionOK()||hzS.reduced)return;
+  if(hzCalm())return;      // the tracer is Full's (6b542): Calm shows the words plainly
   try{await document.fonts.ready;}catch(e){}
   const r=el.getBoundingClientRect();if(!r.width||!r.height)return;
   const dpr=hzFxLevel()==="full"?Math.min(devicePixelRatio||1,2):1,M=opts.margin;
@@ -64485,10 +64665,17 @@ async function hzTraceIn(el,opts){
   const RI=hzTarget(gl,w,h),w2=Math.max(2,w>>1),h2=Math.max(2,h>>1),w4=Math.max(2,w>>2),h4=Math.max(2,h>>2);
   const X1=hzTarget(gl,w2,h2),Y1=hzTarget(gl,w2,h2),X2=hzTarget(gl,w4,h4),Y2=hzTarget(gl,w4,h4);
   document.body.appendChild(cv);
-  let alive=true,raf=0;
-  const kill=()=>{if(!alive)return;alive=false;cancelAnimationFrame(raf);cv.style.opacity=0;setTimeout(()=>{cv.remove();try{const x=gl.getExtension("WEBGL_lose_context");x&&x.loseContext();}catch(e){}},700);};
+  let alive=true,raf=0,settle=null;
+  // killed from outside (hzTraceKill: the text changed, the window resized, the sidebar moved):
+  // the canvas goes AT ONCE, never a fade over text that has moved (6b542, the "UpUptate?"
+  // overlap), and the caller's await is released so the real text is shown
+  const kill=now=>{if(!alive)return;alive=false;cancelAnimationFrame(raf);
+    const drop=()=>{cv.remove();try{const x=gl.getExtension("WEBGL_lose_context");x&&x.loseContext();}catch(e){}};
+    if(now)drop();else{cv.style.opacity=0;setTimeout(drop,700);}
+    if(settle)settle();};
   hzS.tracers.add(kill);
   return new Promise(res=>{
+    settle=res;
     const start=performance.now(),total=TE+.65;let told=false;
     function f(n){if(!alive)return res();
       let t=(n-start)/1000;if(hzS.freezeAt!=null)t=Math.min(t,Math.max(0,hzS.freezeAt-(start-hzS.introT0)/1000));
@@ -64518,10 +64705,18 @@ function hzGreeting(){
 }
 // the headline: three copies of the same words (a blurred prism copy under it,
 // the white fill, a passing sheen); traced in light the first time it shows
+// ONE GREETING (6b542, per Patrick, from the friend's screen: "UpUptate?", two copies of
+// "Up late?" offset from each other: a trace layer left standing over text that had moved).
+// Calm and Off: the greeting is ONE text node, nothing layered. Full: the three layers are
+// built from the same string in the same box at the same moment, and any tracer still
+// running is killed first; a resize, a sidebar toggle or a Look switch kills it too.
 function hzHeadline(g,text){
   g.setAttribute("aria-label",text);
-  if(g.dataset.hzText===text)return;
-  g.dataset.hzText=text;g.innerHTML="";
+  const calm=hzCalm(),mode=calm?"one":"layers";
+  if(g.dataset.hzText===text&&g.dataset.hzMode===mode)return;
+  hzTraceKill();
+  g.dataset.hzText=text;g.dataset.hzMode=mode;g.innerHTML="";
+  if(calm){g.textContent=text;g.classList.add("shown");return;}
   const mk=(c,t)=>{const s=document.createElement("span");s.className=c;s.setAttribute("aria-hidden","true");s.textContent=t;return s;};
   g.appendChild(mk("bloom",text));g.appendChild(mk("fill",text));g.appendChild(mk("sheen",text));
   g.classList.remove("shown");
@@ -64530,6 +64725,7 @@ async function hzHeadlineShow(g){
   if(!g||g.classList.contains("shown")||g.dataset.hzBusy)return;
   g.dataset.hzBusy="1";
   const fill=g.querySelector(".fill");
+  if(!fill){g.classList.add("shown");delete g.dataset.hzBusy;return;}   // Calm: one text node, shown plainly
   if(fill&&hzMotionOK()&&!hzS.reduced&&!document.documentElement.classList.contains("hz-intro"))
     await hzTraceIn(fill,HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9});   // a quick trace after the first launch
   g.classList.add("shown");delete g.dataset.hzBusy;
@@ -64583,7 +64779,12 @@ function hzMachines(){
 function hzMachinesPaint(){
   const el=$("#hz-machines");if(!el)return;
   const ms=hzMachines();
-  el.innerHTML=ms.map(m=>'<div class="hz-rig rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'" data-machine="'+m.esc(m.name)+'">'
+  // CALM (6b542): one small status dot for all the machines; its tooltip names each one and
+  // its state. Full shows the dies. Both are drawn; the Effects level picks one in CSS.
+  const esc_=ms.length?ms[0].esc:(s=>String(s)),working=ms.some(m=>m.working),awake=ms.some(m=>!m.asleep);
+  const dot='<div class="hz-mdot'+(working?" working":"")+(awake?"":" asleep")+'" role="listitem" tabindex="0" aria-label="'+esc_(ms.map(m=>m.name+", "+m.st.toLowerCase()).join("; "))+'">'
+    +'<i class="dot"></i><span class="tip">'+ms.map(m=>'<span class="mr"><strong>'+esc_(m.name)+'</strong><span class="st'+(m.asleep?" off":"")+'">'+esc_(m.st)+'</span></span>').join("")+'</span></div>';
+  el.innerHTML=dot+ms.map(m=>'<div class="hz-rig rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'" data-machine="'+m.esc(m.name)+'">'
     +'<i class="die"></i><b>'+m.esc(m.label)+'</b><span class="tip"><strong>'+m.esc(m.name)+'</strong>'+(m.hw?'<span>'+m.esc(m.hw)+'</span>':'')+'<span class="st">'+m.esc(m.st)+'</span></span></div>').join("");
   if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
 }
@@ -64639,7 +64840,7 @@ function hzModesPaint(){
   host.hidden=false;
   if(!host.querySelector(".hz-pick")){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
-      +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
+      +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
       +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===HZ_EMAX?" last":"")+'" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
       +'<i class="hz-sl-halo"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
@@ -64792,10 +64993,13 @@ function hzFxTask(ctl,anims,end,ms){
 // the switch rule: a target already in hand is a no-op (a repaint during a roll never cuts
 // it); a different one finishes whatever is in flight at once, then starts
 function hzFxSwitch(ctl,text,start){if(ctl.to===text)return false;ctl.cancel();ctl.to=text;start();return true;}
-function hzFxFull(){return hzMotionOK();}   // Balanced gets the roll too (owner: impressive); still under reduced motion and effects off
-// the name: a roll (full) or a crossfade (still); the width morphs with it. The first
-// paint, or a page without the animation API, writes the name plainly.
-function hzNameRoll(b,text,full){
+// Full's show (the streak, the sweep, the comets, the arc, the rings) runs only at Effects Full
+// with motion allowed (6b542); Calm keeps the quick name roll alone
+function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}
+// the name: a roll (full: 260 ms with a touch of blur; calm: 160 ms, crisp) or a crossfade
+// (still); the width morphs with it. The first paint, or a page without the animation API,
+// writes the name plainly.
+function hzNameRoll(b,text,full,calm){
   const from=b.textContent;
   if(from===text)return;
   if(!from||!b.animate){b.textContent=text;return;}
@@ -64803,10 +65007,11 @@ function hzNameRoll(b,text,full){
   const o=document.createElement("span"),n=document.createElement("span");
   o.textContent=from;n.textContent=text;
   b.textContent="";b.append(o,n);b.classList.add("roll");b.style.width=w0+"px";
-  const ms=full?260:120,F={duration:ms,fill:"forwards"},out={...F,easing:"cubic-bezier(.65,0,.35,1)"},inn={...F,easing:"cubic-bezier(.16,1,.3,1)"};
-  const anims=full?[
-    o.animate([{transform:"translateY(0)",opacity:1,filter:"blur(0)"},{transform:"translateY(-110%)",opacity:0,filter:"blur(2px)"}],out),
-    n.animate([{transform:"translateY(110%)",opacity:0,filter:"blur(2px)"},{transform:"translateY(0)",opacity:1,filter:"blur(0)"}],inn),
+  const roll=full||calm,ms=full?260:calm?160:120,F={duration:ms,fill:"forwards"},out={...F,easing:"cubic-bezier(.65,0,.35,1)"},inn={...F,easing:"cubic-bezier(.16,1,.3,1)"};
+  const bl=full?"blur(2px)":"blur(0)";
+  const anims=roll?[
+    o.animate([{transform:"translateY(0)",opacity:1,filter:"blur(0)"},{transform:"translateY(-110%)",opacity:0,filter:bl}],out),
+    n.animate([{transform:"translateY(110%)",opacity:0,filter:bl},{transform:"translateY(0)",opacity:1,filter:"blur(0)"}],inn),
     b.animate([{width:w0+"px"},{width:w1+"px"}],inn)]
   :[o.animate([{opacity:1},{opacity:0}],F),n.animate([{opacity:0},{opacity:1}],F),b.animate([{width:w0+"px"},{width:w1+"px"}],F)];
   hzFxTask(hzS.fx,anims,()=>{b.classList.remove("roll");b.style.width="";b.textContent=text;},ms);
@@ -64818,8 +65023,8 @@ function hzModeFx(b,text){
   // Classic keeps the chip hidden and has none of these rules: the name is written plainly
   if(!document.documentElement.classList.contains("hz")){hzS.fx.cancel();hzS.fx.to=text;b.textContent=text;return;}
   hzFxSwitch(hzS.fx,text,()=>{
-    const full=hzFxFull()&&!!b.animate&&!!b.textContent;
-    hzNameRoll(b,text,full);
+    const can=!!b.animate&&!!b.textContent,full=hzFxFull()&&can,calm=!full&&hzMotionOK()&&can;
+    hzNameRoll(b,text,full,calm);
     if(!full)return;
     if(row)hzStreak(row,b);
     hzSweep(b);
@@ -64855,6 +65060,7 @@ function hzSweep(b){
 // opened, open in a conversation unless hidden; the drawer under 760px
 function hzSidebarToggle(){
   const root=document.documentElement;
+  hzTraceKill();      // the greeting moves: no trace layer may stay where it was (6b542)
   if(innerWidth<=760){document.body.classList.toggle("sbopen");return;}
   if($("#hero")){root.classList.toggle("hz-sbopen");}
   else{const hide=!root.classList.contains("sbhide");root.classList.toggle("sbhide",hide);
@@ -64868,11 +65074,29 @@ function hzSidebarLabel(){
   const rb=$("#rail-btn");if(rb){rb.title=open?"Hide chats":"Show chats";rb.setAttribute("aria-label",rb.title);}
 }
 function hzGlowFit(){
+  hzBalance();
   const g=$("#hz-cglow"),c=$("#composer");if(!g||!c)return;
   const r=c.getBoundingClientRect();if(!(r.height>0)){g.hidden=true;return;}
   g.hidden=false;
   g.style.transform="translate("+(r.left+24).toFixed(0)+"px,"+(r.top+10).toFixed(0)+"px)";
   g.style.width=(r.width-48).toFixed(0)+"px";g.style.height=(r.height-4).toFixed(0)+"px";
+}
+// BALANCE (6b542, per Patrick: "being a Libra ... visually perfect"): on the home the composer's
+// vertical centre sits at the golden-ratio point of the room under the header (61.8% of the
+// way down), whatever the window's height or the composer's; the greeting is centred in the
+// room above it. Measured, not guessed: the wrap's bottom padding is set from the real
+// heights, and only on the home.
+const HZ_PHI=0.618,HZ_HEAD=72;
+function hzBalanceFor(H,compH,histH,gap){
+  const room=H-HZ_HEAD,cy=HZ_HEAD+room*HZ_PHI;
+  return Math.max(16,Math.round(H-cy-compH/2-(histH>0?histH+gap:0)));
+}
+function hzBalance(){
+  const w=$("#composer-wrap"),c=$("#composer");if(!w||!c)return;
+  if(!$("#hero")||!document.documentElement.classList.contains("hz")){w.style.paddingBottom="";return;}
+  const h=$("#hz-history"),hr=h&&!h.hidden?h.getBoundingClientRect().height:0;
+  const pb=hzBalanceFor(innerHeight,c.getBoundingClientRect().height,hr,32);
+  if(w.style.paddingBottom!==pb+"px")w.style.paddingBottom=pb+"px";
 }
 // ---- the send: two ice rings from the button; the night brightens while it
 // thinks (longer trails, the neon aurora up), the machine at work pulses.
@@ -64897,8 +65121,23 @@ function hzOnSend(){
   if(hzS.sky)hzS.sky.setBusy(true);
   hzMachinesPaint();hzSideLive();
   const from=hzS.sendFrom;hzS.sendFrom=null;
-  if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}
-  if(from&&from.home)hzArc(from,hzS.liveChat);
+  // Full's send: the rings, the glide and the arc. Calm's: the one ember strike (6b542)
+  if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}
+    if(from&&from.home)hzArc(from,hzS.liveChat);}
+  else hzStrike();
+}
+// THE STING (6b542, per Patrick: "a Scorpio where I can sting"): the one moment of decision.
+// On send a 1 px ember line strikes along the composer's top edge, left to right, about
+// 300 ms, then it is gone. It never loops and it never glows. Still under reduced motion
+// and with the effects off.
+function hzStrike(){
+  const c=$("#composer");if(!c||!hzMotionOK()||!c.animate)return;
+  let s=c.querySelector(":scope>.hz-strike");
+  if(!s){s=document.createElement("i");s.className="hz-strike";s.setAttribute("aria-hidden","true");c.appendChild(s);}
+  s.hidden=false;
+  const a=s.animate([{transform:"scaleX(0)",opacity:1},{transform:"scaleX(1)",opacity:1,offset:.7},{transform:"scaleX(1)",opacity:0}],
+    {duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
+  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);
 }
 function hzGlide(from){
   const c=$("#composer");if(!c||!from)return;
@@ -64977,7 +65216,7 @@ function hzTele(kind,v){
   else if(kind==="step"||kind==="draft")hzPulse();
 }
 function hzPulse(){
-  const a=$("#hz-aur2");if(!a||!hzMotionOK())return;
+  const a=$("#hz-aur2");if(!a||!hzFxFull())return;   // Calm's sky does not pulse with the frames (6b542)
   a.classList.remove("hz-pulse");void a.offsetWidth;a.classList.add("hz-pulse");
   clearTimeout(hzS.pulseT);hzS.pulseT=setTimeout(()=>a.classList.remove("hz-pulse"),800);
 }
@@ -65020,6 +65259,17 @@ function hzIntroKick(){
   const at=(ms,fn)=>{if(frozen&&ms>dbg.intro*1000)return;hzS.introTimers.push(setTimeout(fn,ms));};
   const mark=$("#hz-intro-mark"),word=mark&&mark.querySelector(".hz-word");
   if(mark)mark.hidden=false;      // the lockup's stage (hidden again by hzIntroEnd)
+  // CALM (6b542): the wordmark fades in over about a second, rests, and the home follows. No
+  // trace, no streak, no glint, no glow; the first launch only, like the full opening
+  if(hzCalm()){
+    root.classList.add("hz-calmopen");
+    at(120,()=>{root.classList.add("hz-markin");if(word)word.classList.add("shown");});
+    at(1900,()=>root.classList.add("hz-markout"));
+    at(2400,()=>{root.classList.add("hz-home");const g=$("#hero .greet");if(g){root.classList.remove("hz-intro");hzHeadlineShow(g);}});
+    at(2600,()=>{hzS.rigsOn=true;$$("#hz-machines .hz-rig").forEach(r=>r.classList.add("on"));});
+    at(3000,()=>hzIntroEnd(false));
+    return;
+  }
   // traced; then the streak (2.8 s), the glint (2.5 s, .55 s after the trace) and the prism glow (9 s)
   at(300,()=>{root.classList.add("hz-markin");if(word)hzTraceIn(word,{margin:40,speed:520,spread:.7}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");root.classList.add("hz-litmark");});});
   at(1500,()=>{const w=$("#hz-wash");if(w){w.classList.remove("bloom");void w.offsetWidth;w.classList.add("bloom");}});
@@ -65034,7 +65284,7 @@ function hzIntroEnd(skipped){
   if(hzS&&hzS.introSkip){["keydown","pointerdown","wheel","touchstart"].forEach(k=>removeEventListener(k,hzS.introSkip,{capture:true}));hzS.introSkip=null;}
   if(skipped)hzTraceKill();
   const mark=$("#hz-intro-mark");if(mark){mark.hidden=true;const w=mark.querySelector(".hz-word");if(w)w.classList.add("shown");}
-  root.classList.remove("hz-intro","hz-markin","hz-markout","hz-litmark");root.classList.add("hz-ready","hz-home");
+  root.classList.remove("hz-intro","hz-markin","hz-markout","hz-litmark","hz-calmopen");root.classList.add("hz-ready","hz-home");
   if(hzS&&hzS.intro&&typeof prefSet==="function"&&!(hzS.debug&&hzS.debug.intro!=null))prefSet({seen_opening:true});   // the full opening plays on the first launch only
   if(hzS){hzS.intro=false;hzS.rigsOn=true;hzS.freezeAt=null;}
   const g=$("#hero .greet");if(g){if(skipped){hzTraceKill();g.classList.add("shown");}else hzHeadlineShow(g);}
@@ -65044,6 +65294,7 @@ function hzIntroEnd(skipped){
 // ---- the Look and the Effects settings
 function setLook(v,quiet){
   v=v==="classic"?"classic":"horizon";
+  hzTraceKill();
   try{localStorage.setItem("millen.look",v);}catch(e){}
   const sel=$("#look-sel");if(sel&&sel.value!==v)sel.value=v;
   const root=document.documentElement,was=root.classList.contains("hz");
@@ -65055,11 +65306,25 @@ function setLook(v,quiet){
     const g=$("#hero .greet");if(g&&typeof greeting==="function"){g.innerHTML="";g.textContent=greeting();delete g.dataset.hzText;}
     if(!quiet&&typeof bootSkyline==="function"){skyBooted=false;bootSkyline();}}
 }
+// Effects: Calm (the default), Full or Off (6b542). Off is the app's old Visual effects
+// switch (millen.video), so Classic's rules and the head script keep reading one key; Calm
+// and Full are kept in millen.fxlevel (a saved "balanced" reads as Calm). The root's hz-full
+// class carries the level to the sheet; the sky resizes to its new pixel ratio and, in
+// Calm, draws its one still.
 function setFxLevel(v){
-  v=v==="full"?"full":"balanced";
-  try{localStorage.setItem("millen.fxlevel",v);}catch(e){}
-  const sel=$("#fx-level");if(sel&&sel.value!==v)sel.value=v;
-  if(hzS&&hzS.sky)hzS.sky.size();
+  v=v==="full"?"full":v==="off"?"off":"calm";
+  if(v==="off"){if(typeof setVideo==="function"&&!noVideo)setVideo(false);}
+  else{try{localStorage.setItem("millen.fxlevel",v);}catch(e){}
+    if(typeof setVideo==="function"&&typeof noVideo!=="undefined"&&noVideo)setVideo(true);}
+  hzFxApply();
+}
+function hzFxApply(){
+  const lv=hzFxLevel(),root=document.documentElement;
+  root.classList.toggle("hz-full",lv==="full");
+  const sel=$("#fx-level");if(sel&&sel.value!==lv)sel.value=lv;
+  if(hzS&&hzS.sky){hzS.sky.size();hzS.sky.setNeon();if(lv==="calm")hzS.sky.once();}
+  if(hzS&&lv==="full"&&hzReady)hzVideoBoot();        // Full brings the footage back
+  if(hzReady){hzMachinesPaint();const g=$("#hero .greet");if(g&&root.classList.contains("hz")){hzHeadline(g,hzGreeting());hzHeadlineShow(g);}}   // the greeting is rebuilt for the level: one node, or the layers
 }
 function hzStart(){
   hzS.place=hzFindPlace();
@@ -65130,7 +65395,7 @@ function hzInit(){
     const tabs=[...lanes.querySelectorAll("[role=tab]")],i=tabs.indexOf(document.activeElement);if(i<0)return;
     const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:-1;
     if(j<0)return;e.preventDefault();tabs[j].focus();tabs[j].click();});
-  const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
+  const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig,.hz-mdot")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
   const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
   const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{
     const row=e.target.closest(".hz-row");if(row&&row.dataset.id&&typeof loadChat==="function")loadChat(row.dataset.id);});
@@ -65142,11 +65407,19 @@ function hzInit(){
   if(clist&&window.MutationObserver)new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});
   const fsel=$("#fx-level");
   if(fsel){fsel.value=hzFxLevel();fsel.addEventListener("change",()=>setFxLevel(fsel.value));}
+  try{if(localStorage.getItem("millen.fxlevel")==="balanced")localStorage.setItem("millen.fxlevel","calm");}catch(e){}   // Balanced became Calm (6b542)
+  root.classList.toggle("hz-full",hzFxLevel()==="full");
   const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything";
+  // the send key is ember only while there are words to send (6b542)
+  if(inp){const ht=()=>{const c=$("#composer");if(c)c.classList.toggle("hastext",!!inp.value.trim());};inp.addEventListener("input",ht);ht();hzS.hasText=ht;}
+  // the Details fold under an answer (6b542): the marginalia opens on its link
+  const scrl=$("#chat-scroll");if(scrl)scrl.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".hz-details");if(!b)return;
+    const m=b.closest(".msg");if(!m)return;const open=!m.classList.contains("details");m.classList.toggle("details",open);
+    b.setAttribute("aria-expanded",open?"true":"false");b.textContent=open?"Hide details":"Details";});
   addEventListener("visibilitychange",hzPauseSync);
   addEventListener("blur",()=>{clearTimeout(hzS.blurT);hzS.blurT=setTimeout(()=>{hzS.blurred=true;hzPauseSync();},60000);});
   addEventListener("focus",()=>{clearTimeout(hzS.blurT);if(hzS.blurred){hzS.blurred=false;hzPauseSync();}});
-  let rz=0;addEventListener("resize",()=>{clearTimeout(rz);rz=setTimeout(()=>{if(root.classList.contains("hz")){hzSkyPaint();hzDrawWash();hzModesPaint();hzGlowFit();}},150);});
+  let rz=0;addEventListener("resize",()=>{hzTraceKill();clearTimeout(rz);rz=setTimeout(()=>{if(root.classList.contains("hz")){hzSkyPaint();hzDrawWash();hzModesPaint();hzGlowFit();}},150);});
   if(window.ResizeObserver&&$("#composer"))new ResizeObserver(()=>{if(root.classList.contains("hz"))hzGlowFit();}).observe($("#composer"));
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(root.classList.contains("hz"))hzGlowFit();});
   const inner=$("#chat-inner");
