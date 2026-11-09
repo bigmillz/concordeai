@@ -26292,7 +26292,10 @@ check("server only (live): a pulled or dropped model moves the pick; a chat stre
       and urllib.parse.unquote(_SVH.get("X-Models", "")) == _so_lab
       and "retrying on" not in json.dumps(_scS[2]) and "stopped responding" not in _scS[1]
       and _lgS and all(r["access"] and "X-O1-Signature" in r["headers"] for r in _lgS),
-      "%r" % [_so_want, _scS[0], _scS[1][:120], _scS[2][-3:], [(c[2]["model"]) for c in _stS]])
+      "%r" % [_so_want, _scS[0], _scS[1][:120], _scS[2][-3:], [(c[2]["model"]) for c in _stS],
+              {"want": _so_l2["only"]["model"] == _so_want, "content": _stS and _stS[0][2]["messages"][-1]["content"],
+               "run": [f_ for f_ in _scS[2] if f_[0] == "RUN"], "xm": urllib.parse.unquote(_SVH.get("X-Models", "")),
+               "signed": bool(_lgS) and all(r["access"] and "X-O1-Signature" in r["headers"] for r in _lgS)}])
 # the chat's title goes to the same server's model, never a local one
 _cidS = "c" + os.urandom(6).hex()
 _scT = _svchat(text="what is a lighthouse for 337", tier=_so_tier, models=["Llama 3.2 3B"], chat_id=_cidS)
@@ -26338,9 +26341,10 @@ time.sleep(4.0)
 _new339 = _mdl(_o1("/stub")["calls"])[_nstP:]
 check("server only (live): \"<name> Only\" makes no picture or video and runs no agent: one line each, and nothing "
       "reached the server or any model of this Mac",
-      _scPic[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
-      and _scVid[1].strip() == "\u26a0\ufe0f %s Only can\u2019t make pictures or videos, and nothing was made." % _SVN
-      and _scAg[1].strip().startswith("\u26a0\ufe0f %s Only can\u2019t run the Coding agent, and nothing was run." % _SVN)
+      # copy-2's words (2b0b902), said without the sign as its direct emits are
+      _scPic[1].strip() == "%s Only can\u2019t make pictures or video. Nothing was made." % _SVN
+      and _scVid[1].strip() == "%s Only can\u2019t make pictures or video. Nothing was made." % _SVN
+      and _scAg[1].strip().startswith("%s Only can\u2019t run the Coding agent. Nothing ran." % _SVN)
       and not [c for c in _new339 if re.search(r"bicycle|video of a dog|fix my script", json.dumps(c[2]))]
       and len([r_ for r_ in _ul34() if r_.get("w") == "local"]) == _ulP,
       "%r" % [_scPic[1][:160], _scVid[1][:160], _scAg[1][:160],
@@ -35479,7 +35483,8 @@ def _w461(src):
     out["didn't wake"] = (w == [] and "didn" in steps[-1][1] and steps[-1][2] == "done" and "going on without it" in stats[-1])
     steps.clear(); stats.clear(); ns["_srv_wake_at"].clear(); ev.set()
     w = ns["server_wake_ask"]([sid], ctx, st, sp, ev)
-    out["skipped"] = (w == [] and steps[-1] == ("wake", "Skipped waking " + name, "done", "") and "going on without it" in stats[-1])
+    out["skipped"] = (w == [] and steps[-1] == ("wake", "Skipped waking " + name, "done", "")
+                      and stats[-1] == "Skipped waking %s. Going on without it." % name)        # copy-2
     return all(out.values()), out
 
 _r461 = _w461(_MILLENAI_SRC)
@@ -35688,7 +35693,7 @@ def _w482(src):
                                and ("wake", "Woke Desktop", "done", "") in w["steps"]
                                and w["steps"][-1][:2] == ("srvgen", "Made the picture on Desktop")
                                and "Desktop is awake." in w["stats"] and w["stats"][0] == "Waking Desktop..."
-                               and len(w["emitted"]) == 1 and "made on Desktop" in w["emitted"][0])
+                               and len(w["emitted"]) == 1 and ". Made on Desktop." in w["emitted"][0])
     v = _w482_case(src, {"image": False, "video": True}, kind="video")
     out["a video too"] = v["r"] is True and v["udp"] and v["steps"][0] == ("wake", "Waking Desktop", "run", "10 s")
     for nm, g, u in (("can't make it", {"image": False, "video": True}, None), ("never said", None, None),
@@ -35698,7 +35703,7 @@ def _w482(src):
                                        and n["emitted"] == [] and n["t"] == 0)
     s = _w482_case(src, {"image": True, "video": True}, wake_after=None, skip=True)
     out["Skip"] = (s["r"] is False and s["steps"][-1] == ("wake", "Skipped waking Desktop", "done", "")
-                   and "Skipped waking Desktop, going on without it" in s["stats"] and s["jobs"] == []
+                   and "Skipped waking Desktop. Going on without it." in s["stats"] and s["jobs"] == []
                    and s["t"] < 1.5 and s["emitted"] == [])
     n = _w482_case(src, {"image": True, "video": True}, wake_after=None)
     out["no answer in 10 s"] = (n["r"] is False and n["steps"][-1] == ("wake", "Desktop didn’t wake in 10 s", "done", "")
@@ -36672,7 +36677,7 @@ def _c96_page(src):
   {name:"llama3.2:1b",gb:1.3}],rm:[],keep:0,empty:false})}));''')
     o = _node_json(js, "s96.js")
     h = o.get("h", "")
-    return ("qwen3-coder:30b · card + memory, slower</span>" in h
+    return ("qwen3-coder:30b. Card and memory; slower</span>" in h          # copy-2's words
             and "llama3.2:1b</span>" in h), o
 
 
@@ -37400,7 +37405,7 @@ def _c515_helpers(src):
     r_t = ns["verify_pass"](long, rep, [], emit, [].append, step, False)
     got["verify_pass: hurried and short skip it; over budget keeps the answer and says so"] = (
         r_h == {"ran": False} and r_s == {"ran": False} and not frames and not texts and r_t.get("timeout")
-        and steps[-1][1].startswith("Couldn’t check the facts in time"))
+        and steps[-1][1] == "Fact check ran out of time. Answer kept.")          # copy-2
     ns["fast_cloud_ladder"] = lambda: [{"name": "Groq", "model": "x"}]
     srv_rep = dict(rep, writer="Desk · gpt-oss:20b", merger="Desk · gpt-oss:20b", critic="Desk · ministral-3:14b")
     got["the pick: the cloud when open, the server's critic model, the writer here, none for a closed cloud writer"] = (
@@ -37495,7 +37500,7 @@ def _c515_council(src):
                        lambda c: (fr3 if isinstance(c, _RcCtl) else out3).append(c), [].append, craft=True)
     got["over budget: the answer ships as it is, said in the step, within the budget"] = (
         not any("RESET" in f for f in fr3) and out3 == [LONG] and _tm515.time() - t0 < 4
-        and any('"id": "verify"' in f and "in time" in f and "answer kept" in f for f in fr3))
+        and any('"id": "verify"' in f and "Fact check ran out of time. Answer kept." in f for f in fr3))
     R.clear(), got_msgs.clear()
     go(["Desk · a", "Desk · b", "Desk · c"])
     got["without craft every seat drafts, no critic, and the brief still rides the final"] = (
@@ -41153,7 +41158,11 @@ _shbody = _shpage[1].decode("utf-8", "replace")
 check("a shell-mode copy writes its one-time boot code to run/boot.json (0600, its own pid) and the page carries neither token nor key",
       _shbd.get("pid") == _SH.proc.pid and len(_shbd.get("code", "")) >= 40 and _shb_mode == 0o600
       and _shpage[0] == 200 and _SH.token not in _shbody and _SH.key not in _shbody
-      and _shbd.get("code", "x") not in _shbody and 'if("0"==="1")' in _shbody,
+      and _shbd.get("code", "x") not in _shbody
+      # the window wipe is off under the shell (6b526 made its line Classic-only, hence the longer pin)
+      and 'if("0"==="1"&&hzLook==="classic")' in _shbody
+      # and the Mac shell's corner is on there, off everywhere else (the traffic lights' zone)
+      and ('if("%s"==="1")document.documentElement.classList.add("tl");' % ("1" if sys.platform == "darwin" else "0")) in _shbody,
       "%r" % [_shbd.get("pid"), _SH.proc.pid, _shb_mode, _shpage[0]])
 
 
