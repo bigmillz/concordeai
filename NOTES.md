@@ -19372,3 +19372,121 @@ dictation blocks against a dev copy, not the full gauntlet (tonight's beta run o
   signs it with the rest). The release machine needs the Xcode command-line tools' `swiftc`.
 - WKWebView's own getUserMedia time is unverified in this session (no real microphone was opened);
   the `dict-trace` line gives it in one dictation on a dev copy.
+
+## 6b544 — names-ultra: the plain mode names, the Ultra moment and the living ULTRA, the keyboard-only focus hairline, the writing star (7.0 beta, per Patrick)
+
+Branch `names-ultra` off beta-1 (f9461ac), for the beta-1 owner to merge. Four owner calls in one branch:
+the Greek names go; "that's where I want to use VFX to have it pull something off to show you're using
+something special" (Ultra); "make the Ultra switch rival … whatever Claude has" (the living ULTRA); "clean up
+how it writes and delivers the final result of a query … I like the star effect, but rethink it" (the writing
+star). The values and timings are the friend page's (`scratchpad/preview-site/beta`, DESIGN.md at b15a835).
+
+**The names (old -> new).** Modes: Alpha -> **Fast**, Gamma -> **Thinking**, Sigma -> **Pro**, Max -> **Max**
+(now in the picker, out of More modes), Omega -> **Deep**. The picker shows the five in that order. Descriptions,
+each checked against what the tier does: Fast "Fast answers"; Thinking "Thinks it through"; Pro "Every model on
+your machines" (resolve_tier's `all` is this machine's models that fit plus a paired server's, `_TIER_ROLE`; the
+cloud joins only with the turbo pref, so not "every model"); Max "Every model, every machine" (the servers and
+every cloud key); Deep "Keeps going until you stop it". Effort: Low · Medium · High · **Extra** (was Max, which
+clashed with the mode) · Ultra. **Back-compatibility:** the tier keys stay `Fast / Thinking / Pro / Max / Vera
+Rubin / Cloud Only`; `MODE_NAMES` is now just `{"Vera Rubin":"Deep"}` and `modeName()` passes every other key
+through; the effort wire keys stay `low/medium/high/max/ultra` (Muse's strength map, 6b533, reads them) and
+`millen.effort` keeps its 0–4; `MODE_ALIASES` adds `Deep` and keeps Alpha/Gamma/Sigma/Omega and Flare/Zenith/
+Meridian/Odyssey, so an older page's name still lands on its tier. Bylines read "Concorde Thinking", "Concorde
+Deep". **Where the Greek names were replaced:** `MODE_NAMES` and the comments round it; `hzModes()` (Max added)
+and `hzModeIndex` (five modes; `S.level` has a fifth value, .68, for Deep); `HZ_MODE_DESC`; `HZ_EFFORT`; the
+Python error lines "Switch to Alpha, Gamma or Sigma" (x3) -> "Fast, Thinking or Pro"; the council ledger's
+"Gamma seats one writer and one critic" -> Thinking; the Settings server switch "Use for Alpha, Gamma, Sigma and
+Code" -> "Fast, Thinking, Pro and Code"; the tier note "Now on Gamma, cloud only" -> Thinking; the cloud chip's
+"Alpha, cloud only:" -> Fast; the server note ". Alpha answered." -> Fast; and the JS/CSS comments that named
+them. Python comments naming "Gamma's writer" (6b533) are history and stay. The served page carries no Greek
+display name at all (a gauntlet regex pins it); `MODE_ALIASES` is the one table that still has them, server-side.
+
+**The Ultra moment (CSS block "ULTRA" at the end of the Horizon css; `hzIgnite`/`hzUltraOut` beside
+`hzEffortPaint`).** Arriving at Ultra from another step (never a page that opens at Ultra: it just rests
+there) sets `html.hz-ignite` for 2 s (the moment is 900 ms; the aurora's breath settles within 2 s): the
+diamond ignites (white core; `0 0 6px 2px #fff, 0 0 22px 8px violet .75, 0 0 44px 16px rose .45` at 18 %,
+gone by 900 ms); a 22 px spark runs from the diamond back along the beam to its start (160 ms); from there a
+line of light runs all the way round the composer's border (600 ms from 160 ms, `cubic-bezier(.45,0,.2,1)`:
+a conic reveal on **`#composer::after`**, whose mask is `conic(from --hz-a0, #000 --hz-rev, transparent)`
+subtracted by the content box, with a 16° white head at the edge; `--hz-a0` is the beam start's angle from
+the composer's centre, set by `hzUltraAngle`) and settles into a still 1.5 px spectral rim at .9,
+`conic-gradient(from a0, #cfe0ff, #b9a8ff 28%, #f2a6b4 56%, #e8415a 78%, #cfe0ff)`; the rays brighten +.45
+at 200 ms and settle; ULTRA is lit (a white text glow settling over 900 ms). `::after` because
+`.hz:not(.hz-full) #composer::before{opacity:0!important}` (6b542, pinned) owns `::before`; at Ultra Full's
+rotating ring is off (`opacity:0`), the rim replaces it. **The living ULTRA:** while at Ultra the label's
+spectral gradient (`.hz-elevel.spectral`: ice, violet, rose, ember, gold `#f1dcb2`, ice; `background-size
+300%`) flows across the crisp letters, one cycle in 3.5 s, `hzFlow` linear infinite: the one approved loop
+on text, only here; the diamond carries a faint glow of the same hue (`hzDiamondFlow`, 3.5 s). The rim stays
+still. **Leaving** (`html.hz-ultra-out`, 300 ms, `cubic-bezier(.65,0,.35,1)`): the class goes so the flow
+stops at once, the rim drains back the way it came (`--hz-rev` 360 -> 0), the spark runs back out to the
+diamond. **Calm and reduced motion:** the still rim (Calm: a 300 ms fade in and out) and the still gradient
+label, no spark, no bloom, no flow, no breath. A page without `@property` (`hz-ring-static`) has no run
+either; the rim simply shows. Extra keeps 6b534's soft ring in Full only, as before; the label's looping
+shimmer (`.hz-elevel.shim`) is removed at every level.
+
+**The focus-ring bug.** The owner's screenshot showed a red box round the whole beam at Ultra: `.hz
+.hz-sl:focus-within{box-shadow:0 0 0 1px var(--hz-ember)}` (6b542), which a mouse click satisfies (the range
+input takes focus). Now `.hz .hz-sl:has(input:focus-visible)::after`: a 1 px ember pill (`border-radius
+999px`, 15 px tall, 3 px in from the beam's ends) that hugs the beam with the diamond inside, only when the
+range has keyboard focus. Measured in Chromium: no ring after a click, the pill after ArrowRight. (WebKit's
+`:focus-visible` has the same mouse rule for a range input; not verified in the shipped app.)
+
+**The writing star (CSS block "THE WRITING STAR"; `hzStar*` where the comets were).** One idea for the
+answer's delivery. While it streams, one star (a 4 px white point, a 14 px four-point glint) rides at the
+end of the newest text, 5 px after the last word's edge, like a pen of light; the characters painted in the
+last 200 ms are wrapped in `.hz-new` spans with their age as a negative animation delay (160 ms fade, a 2 px
+rise via `position:relative; top`, no transform so the inline flow never changes; no blur, no glow), so the
+drip's repaint of `body.innerHTML` never restarts a fade. **Layout discipline:** `hzStarPaint` runs after
+each paint: the wrap, then `hzStarAim`, which reads ONE Range rect (the last character) against the
+message's rect (`hzStar.reads` counts it: 416 reads over 416 paints in the headed run); `hzStarFrame` moves
+the star with a transform alone, eased on the clock (`1-exp(-dt/55)`, the same at 60 and 120 Hz), and reads
+nothing. (The first cut aimed from the pre-wrap node list, whose tail node `splitText` had truncated, and the
+star sat a line up: caught by the rect comparison, fixed before commit.) The star is `position:absolute` in
+`.msg.ai` (now `position:relative`), so it scrolls with its text. **Draft -> polish (6b539):** at the swap
+`hzStarSweep` makes one pass down the answer's left edge (10 px outside, 350 ms) while the text crossfades
+(6b539's 170 + 280 ms, unchanged). **Landing:** `hzStarLand(aiDiv)` runs on every ending, aborted or not:
+the loop stops, the star lifts from the last word to the byline's dot and becomes it (400 ms, `fill:
+forwards`, then the element goes and the dot wears `.lit`: 1.0 for 500 ms, then rest); the message is
+`.landing` while it flies (Details and the actions hidden) and `.landed` after (Details fades in at +120 ms,
+the actions at +240 ms, 300 ms each, `backwards` fill so the hover rule keeps the actions afterwards). The
+sources stay in the prose from the first line (6b528). **Gone:** the comets (`cometFor`, `rippleAt`,
+`cometsDraw`, the `#comets` canvas), the glowing live prose (`.msg.ai.live .body` text-shadow), the light
+round the composer (`#composer.finish`) and Balanced's `hzLandSweep`; `answerLanded` now only dispatches
+`hz-answer-done`. **By level:** Full and Balanced the star; Calm the plain 160 ms fade (`hzNewCalm`), no star;
+reduced motion no motion (`.hz-new` and the landing fades stilled, the star hidden). The live status line is
+unchanged (one line in Calm and Balanced, 6b542).
+
+**Measured** (Playwright's bundled Chromium, `--use-mock-keychain`, closed after; the dev copy on 9887 in
+`MillenAI-dev-names`, windowless, killed by its own recorded PID; no chat sent; the asking state is a
+stand-in built from the page's own `addMsg`/`renderMD`/`hzStar*`):
+- **headed, on this Mac's GPU at 1440×900 (a 120 Hz display):** the ignition 108 frames in 900 ms, 120 fps,
+  p50 8.3 ms, p95 9.2 ms, max 9.4 ms, three runs alike; the stand-in stream (6.5 s, a swap at 2.6 s) 781
+  frames, 120 fps, p50 8.3 ms, p95 9.3 ms, max 9.4 ms, while the star aimed once per paint.
+- headless at 1440 and 390 in Calm, Balanced, Full and Balanced with reduced motion: zero page errors, zero
+  API responses ≥ 400, no horizontal scroll at 390; the five names in order with their lines; the efforts
+  Low…Extra…Ultra with the wire keys unchanged; the bylines; no ring after a click, the pill after a key
+  (radius 999 px, 15 px, ember); at Ultra: the rim `display:block` at .9, `hzUltraRun` mid-ignition, at rest
+  only `hzFlow` and `hzDiamondFlow` running (Calm: nothing); leaving: `hzUltraDrain`, then the rim
+  `display:none`; the star present in Balanced and Full, absent in Calm and reduced motion, retired after the
+  landing (`raf` 0, `on` false, no element left), the dot lit, no `#comets`, no text-shadow on the prose.
+- stills and films in `scratchpad/ultra/`: `picker-five-modes.png`, `picker-crop.png`, `step-0-low` …
+  `step-4-ultra-rest.png`, `ignite-120ms.png`, `ignite-420ms.png`, `ultra-rest-composer.png`,
+  `ultra-rest-page.png`, `answer-landed.png`, `slider-low-ultra-high-ultra.mp4` (10 s, headed) and
+  `answer-writing-landing.mp4` (10 s, headed).
+- **Not verified:** WKWebView (the shipped app): the `mask-composite: subtract` / `-webkit-mask-composite:
+  source-out` pair on `::after`, `@property` animation of `--hz-rev`, and `:focus-visible` on the range.
+
+**Gauntlet.** Re-pinned at the same strength: the alias table (Deep first), `MODE_NAMES`, `HZ_MODE_DESC`,
+`HZ_EFFORT`, the bylines in node, `S.level` (five), the stilled lists, the 6b528 asking-flow check (comets,
+ripple, glow and composer light pinned absent), 6b542's gates (same), Balanced's css slice now ends before
+the ULTRA block, the ember count is 7 (the beam's keyboard pill). Three new checks with mutants: the plain
+names (no Greek display name in the page; every old name resolves into TIERS; mutants: a Greek name back,
+Deep not an alias, Max out of the picker, Max for Extra); the Ultra moment (the timings, the still rim, the
+3.5 s flow as the one `infinite` on the label and the diamond, the drain, the keyboard-only pill; mutants: a
+looping rim, Calm flowing, a ring from a click, igniting on every paint); the writing star (aimed once per
+paint, no layout read in the frame, retired at the landing; mutants: a comet left in, the star never
+retiring, a layout read per frame). Checks: `ast.parse` both files; both served scripts `node --check`;
+`pincheck.py` 2,431 literal pins, 0 hard fails, the four known hints; the Horizon, 6b528-page, 6b540, 6b542
+and 6b544 sections in isolation against the 9887 copy: 39/40, the one red pre-existing on beta-1 (the GPU
+night check pins `gap=…(full?0:32)`, a line beta-1's 6b542 merge changed to `…:0` without its pin). The full
+gauntlet was not run (the beta-1 owner's).
