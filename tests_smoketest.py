@@ -8023,7 +8023,8 @@ def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
           "threading": __import__("threading")}
     _exec_names(ns, {"WHISPER_REPO", "WHISPER_REPO_CPU", "_whisper_lock",
                      "_fw_model", "_fw_cuda", "_whisper_cuda", "_whisper_repo",
-                     "_transcribe_wav", "_fw_transcribe"})
+                     "_transcribe_wav", "_transcribe_audio", "_wav_to_f32",   # 6b542 split the WAV decode out
+                     "_fw_transcribe"})
     return ns, log
 _wbuf = _io17.BytesIO()
 with _wv17.open(_wbuf, "wb") as _w:
@@ -8046,7 +8047,7 @@ _mac_ns, _ = _voice_ns(True, 1, _both, False)
 _L, _S = "faster-whisper-large-v3-turbo-ct2", "Systran/faster-whisper-small"
 _cpu_run = [("load", _S, "cpu", "int8"), ("beam", 1), ("beam", 1)]
 _big = "deepdml/" + _L
-_voice_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _voice_ready("):
+_voice_src = _MILLENAI_SRC[_MILLENAI_SRC.index("def _whisper_libs("):     # 6b542: the weights check moved up
                            _MILLENAI_SRC.index("def _transcribe_wav(")]
 check("voice on a PC: the small model greedy on the CPU, the big one only on a usable card",
       _vr["cpu"] == ("faster-whisper-small", True, _cpu_run)
@@ -17119,9 +17120,9 @@ try:
         capture_output=True, text=True, timeout=30).stdout)
 except Exception as e_:
     _pn9 = {"err": repr(e_)}
-check("the Account pane: 'Open the account window' only when the build says it has one (the "
+check("the Account pane: 'Open account' only when the build says it has one (the "
       "shipped app's /api/me doesn't), and it asks open_account('status')",
-      _pn9.get("out") == [None, ["Open the account window", "button"], None]
+      _pn9.get("out") == [None, ["Open account", "button"], None]
       and _pn9.get("opened") == ["status"]
       and '            if ACCOUNTS:\n                # (M9) a build with the account window says so' in _S9,
       "%r" % _pn9)
@@ -17343,7 +17344,7 @@ globalThis.localStorage={getItem:k=>store.has(k)?store.get(k):null,
   setItem:(k,v)=>{sets.push(k);store.set(k,String(v));}};
 const $=()=>({textContent:""}),$$=()=>[];let tier="";
 function tierLabel(){return tier||model;}
-function paintCloudChip(){}
+function paintCloudChip(){}function chipNameFade(){}   // 6b540: the Classic chip's fade, a no-op here
 """ + _pmseg9 + r"""
 paintModels();console.log(JSON.stringify({model,council,sets}));
 """)
@@ -18242,9 +18243,8 @@ _SG_STATIC = [
     ("only the first answer repaints", lambda p, s: 'if(first&&suggOwn.length&&uiMode==="ai"&&$("#hero")&&!generating)paintSuggest();' in p),
     ("the switch in Personality, on by default", lambda p, s: '<div class="toggle-row on" id="sugg-toggle"' in p
      and p.index('id="sugg-toggle"') > p.index('id="p-persona"') and p.index('id="sugg-toggle"') < p.index('id="p-cloud"')),
-    ("the switch's name and its note", lambda p, s: "<span>Personalise suggestions</span></div>" in p
-     and "Reads the titles of your recent chats, nothing else. Your server writes the chips, else this computer; "
-     "the cloud only in Cloud Only." in p),
+    ("the switch's name and its note", lambda p, s: "<span>Personal suggestions</span></div>" in p
+     and "From the titles of recent chats. Written on your server or this Mac." in p),
     ("a Refresh button", lambda p, s: 'id="sugg-refresh" type="button">Refresh</button>' in p),
     ("the switch saved as the person's own setting", lambda p, s: "body:JSON.stringify({suggest_own:on})" in p),
     ("the switch read when Settings opens", lambda p, s: '$("#sugg-toggle").classList.toggle("on",pr.suggest_own!==false);' in p),
@@ -18823,7 +18823,7 @@ def _pl_unit(src):
         _rd_ok = False
     o["a redirect onto this computer refused, one to a public page followed"] = _rd_bad and _rd_ok
     _f = ns["_link_fetch"]("http://127.0.0.1:8889/api/chats")
-    o["a private link is never fetched, and says why"] = _f[0] is None and "private network" in _f[1]
+    o["a private link is never fetched, and says why"] = _f[0] is None and "private address" in _f[1]
     # reading a page
     p = ns["link_read"](_PL_FIX, "https://www.airbnb.com/rooms/1001", "text/html; charset=utf-8")
     o["the title, entities decoded"] = p["title"].startswith("Casa azul near Joaquina dunes - Houses for Rent in Florianópolis")
@@ -18922,9 +18922,10 @@ def _pl_unit(src):
     _two = [{"n": 1, "url": "u1", "ok": False, "why": "the site refused to send it (HTTP 403)"},
             {"n": 2, "url": "u2", "ok": False, "why": "the site refused to send it (HTTP 403)"}]
     o["none read: one line that says so and why, and that it won't make them up"] = (
-        nl(_two).startswith("I couldn’t read any of the 2 links you pasted — the site refused to send it (HTTP 403).")
-        and "would be made up" in nl(_two)
-        and nl(_two[:1]).startswith("I couldn’t read the link you pasted — "))
+        nl(_two).startswith("I couldn’t read any of the 2 links you pasted: the site refused to send it (HTTP 403).")
+        and "Nothing about them is described here." in nl(_two)
+        and nl(_two[:1]).startswith("I couldn’t read the link you pasted: ")
+        and "Nothing about it is described here." in nl(_two[:1]))
     # the chat handler (source text: it runs only with a live model)
     o["read only where the web is on, never for the Remote agent, never on /search"] = (
         "        _lk_urls = (pasted_links(str(prompt))\n"
@@ -18948,7 +18949,10 @@ def _pl_unit(src):
         and "self.send_header(\"X-Web-Search\", \"1\" if (query or _links) else \"0\")" in src)
     o["none read: the line, and no model"] = (
         "            if not _links_n:\n                emit(AppText(links_none_line(_links)))\n"
-        "                hb_stop.set()\n                return\n\n        kind, target = route" in src)
+        "                hb_stop.set()\n                return\n\n"
+        "        # IT KNOWS YOUR LIFE (6b530, per Patrick): a question about the" in src
+        and src.index("                emit(AppText(links_none_line(_links)))\n")
+        < src.index("\n        kind, target = route\n"))
     o["read pages skip research and the rewrite pass"] = (
         "                  or ag_research) and not _links_n:" in src
         and src.count("                            and not _links\n") == 1
@@ -18976,7 +18980,8 @@ _PL_MUT = [
     ("more than eight links", "            if len(out) >= limit:\n                break\n", ""),
     ("a closing bracket kept", "        while u.endswith(\")\") and u.count(\")\") > u.count(\"(\"):\n            u = u[:-1]\n", ""),
     ("the same link twice", "        if u not in out and _link_shape_ok(u):", "        if _link_shape_ok(u):"),
-    ("entities left encoded", "    s = html.unescape(s)\n", ""),
+    ("entities left encoded", "    s = re.sub(r\"(?s)<[^>]*>\", \" \", s)\n    s = html.unescape(s)\n",
+     "    s = re.sub(r\"(?s)<[^>]*>\", \" \", s)\n"),
     ("tags left in", "    s = re.sub(r\"(?s)<[^>]*>\", \" \", s)\n", ""),
     ("ld+json not read", "                    page[\"ld\"] += _ld_lines(t, page, seen)", "                    pass"),
     ("an ld+json address not read", "        add(\"address\", \", \".join(", "        add(\"addr\", \", \".join("),
@@ -19162,10 +19167,10 @@ def _bm_skip(src):
     notes = [w("Tiny", True, 1e9, T), w("GLM 5.3", False, 400e9, 512 << 30),
              w("GPT-OSS 120B", False, 40e9, T), w("Gemma 4 26B", False, 18e9, T),
              w("Qwen 3.6 35B MoE", False, 18e9, T)]
-    want = [None, "Skipped: the largest models are off (Settings \u203a Models).",
-            "Skipped: it needs about 60 GB, more than a model may use on this computer (80% of 48 GB).",
-            "Skipped: it needs about 24 GB free; 17 GB is free now.",
-            "Skipped: it needs about 24 GB free; 17 GB is free now."]
+    want = [None, "Skipped. The largest models are off in Settings > Models.",
+            "Skipped. Needs about 60 GB; the limit here is 38 GB.",
+            "Skipped. Needs 24 GB free; 17 GB free now.",
+            "Skipped. Needs 24 GB free; 17 GB free now."]
     # the MLX engine: another copy's engine, an owner it can't read, a
     # model that doesn't fit, one that does; a giant on Ollama
     seen = []
@@ -19187,11 +19192,11 @@ def _bm_skip(src):
     d = M("Tiny").prepare()
     ns3 = _bm_ns(src, MODEL_ROUTES={"Big": ("ollama", "big:1")}, slow_giant=lambda l: True)
     e = ns3["_BenchOllama"]("Big").prepare()
-    ok = (notes == want and a == "Skipped: another copy of ConcordeAI is running this model."
-          and b == "Skipped: couldn't tell who runs its engine."
-          and c and c.startswith("Skipped: it needs about 2 GB free")
+    ok = (notes == want and a == "Skipped. Another ConcordeAI is running this model."
+          and b == "Skipped. Couldn’t tell who runs its engine."
+          and c and c.startswith("Skipped. Needs 2 GB free")
           and d is None and seen.count(("stop", "")) == 4
-          and e and e.startswith("Skipped: a model this size loads from disk"))
+          and e and e.startswith("Skipped. A model this size takes minutes to load"))
     return ok, [notes, a, b, c, d, e, seen]
 
 
@@ -19271,7 +19276,7 @@ def _bm_worker(src):
           and ("close", "A", False) in log and ("close", "B", False) in log
           and ("close", "P", True) in log and not any(x[0] == "close" and x[1] == "C" for x in log)
           and run["state"] == "done"
-          and run["restore"] == "P is loaded again, as it was before the benchmark."
+          and run["restore"] == "P is loaded again."
           and len(hist) == 1 and hist[0]["id"] == run["id"] and hist[0]["test"] == "b1"
           and [m["status"] for m in hist[0]["models"]] == ["done", "failed", "skipped", "done"]
           and "tok" not in hist[0]["models"][0] and hist[0]["hw"]["line"] == "Test machine"
@@ -19316,7 +19321,8 @@ def _bm_gate(src):
           and s2[0] is True and s3 == (False, "A benchmark is already running.")
           and h2 is False and g2 == ns["BENCH_BUSY"] and calls == [(1,)]
           and fin and h3 is True and ns["_bench_busy"]["n"] == 0)
-    return ok, [h1, s1, s2[0], s3, h2, g2, fin, h3, s4, s5, s6[0], ns["_bench_busy"]]
+    return ok, [h1, s1, s2[0], s3, h2, g2, fin, h3, s4, s5, s6[0], ns["_bench_busy"],
+                guarded_while_chat, calls, fin2]
 
 
 def _bm_stop(src):
@@ -19771,9 +19777,9 @@ def _bm_restore(src):
         raise RuntimeError("no answer")
     ns["_bench_json"] = boom
     c = ns["_bench_restore"]("P", rows, False)
-    ok = (a == "P is loaded again, as it was before the benchmark."
+    ok = (a == "P is loaded again."
           and calls == [("http://127.0.0.1:7/v1/chat/completions", 1)]
-          and b == c == "P will load again on your next question.")
+          and b == c == "P loads again on your next question.")
     return ok, [a, b, c, calls]
 
 
@@ -19860,7 +19866,7 @@ console.log(JSON.stringify(out));
           and '<span class="bm-f">memory pressure</span>' in o[0]
           and '<span class="bm-f sw">swapped 120 MB</span>' in o[0]
           and "Skipped: it needs &lt;b&gt;" in o[1] and "bm-v" not in o[1]
-          and "writing, 128 of 256 tokens" in o[2] and 'style="width:50%"' in o[2]
+          and "Writing, 128 of 256 tokens" in o[2] and 'style="width:50%"' in o[2]
           and abs(float(o[3]) - (1 + 0.4 + 0.6 * 0.5) / 3) < 1e-9
           and o[4] == "3,120|9.9|0.31 s|1.9 s|123 s|—"
           and 'class="bm-d" title="Was 200.0 tok/s">+1.0%</span>' in o[5]
@@ -19923,28 +19929,28 @@ def _bm_hiccup(src):
     w = lambda st, js: b.why(F(e, st, js, "qwen3.5:9b"))
     spill = "model did not fit entirely in VRAM (85% on GPU); it was unloaded"
     out["spill, older kit"] = w(0, {"code": "gpu_spill", "error": spill}) == (
-        "Ollama1 loaded only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded "
-        "(an older kit: a newer one empties the card first); its GPU-only rule unloaded it")
+        "Ollama1 fit only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded "
+        "(an older kit: a newer one empties the card first), so it unloaded it")
     out["spill, alone after unloading"] = w(0, {"code": "gpu_spill", "status": 507, "gpu_pct": 59, "loaded_with": ["small:8b"],
                                               "error": "model did not fit entirely in VRAM (59% on GPU, alone on the card); it was unloaded"}) == (
-        "Ollama1 loaded only 59% of qwen3.5:9b on the card, even alone after it unloaded small:8b; its GPU-only rule unloaded it")
+        "Ollama1 fit only 59% of qwen3.5:9b on the card, even alone after it unloaded small:8b, so it unloaded it")
     out["spill, unload didn't take"] = w(0, {"code": "gpu_spill", "gpu_pct": 85, "loaded_with": ["ministral-3:14b"],
                                             "error": "model did not fit entirely in VRAM (85% on GPU; ministral-3:14b was still loaded and could not be unloaded); it was unloaded"}) == (
-        "Ollama1 loaded only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded and couldn\u2019t be unloaded; its GPU-only rule unloaded it")
+        "Ollama1 fit only 85% of qwen3.5:9b on the card because ministral-3:14b was still loaded and couldn\u2019t be unloaded, so it unloaded it")
     b.still = []
     out["spill, alone"] = w(0, {"code": "gpu_spill", "gpu_pct": 59, "loaded_with": [], "error": "model did not fit entirely in VRAM (59% on GPU); it was unloaded"}) == (
-        "Ollama1 loaded only 59% of qwen3.5:9b on the card, alone; its GPU-only rule unloaded it")
-    out["spill at 0%: the old words"] = "graphics card isn\u2019t in use" in w(0, {"code": "gpu_spill", "error": "model did not fit entirely in VRAM (0% on GPU); it was unloaded"})
+        "Ollama1 fit only 59% of qwen3.5:9b on the card, alone, so it unloaded it")
+    out["spill at 0%: the old words"] = "Ollama1\u2019s card isn\u2019t in use" in w(0, {"code": "gpu_spill", "error": "model did not fit entirely in VRAM (0% on GPU); it was unloaded"})
     out["no fit, the figures"] = (w(507, {"code": "gpu_fit", "need_bytes": 17_200_000_000, "budget_bytes": 12_000_000_000,
                                            "error": "model does not fit in VRAM at num_ctx 4096: needs about 16.0 GiB, 11.2 GiB available"})
-                                  == "Ollama1 won\u2019t load it: it needs about 17.2 GB and the card has 12.0 GB free"
+                                  == "Ollama1 can\u2019t load it: needs 17.2 GB, the card has 12.0 GB free"
                                   and w(507, {"code": "gpu_fit", "need_bytes": 60_000_000_000, "budget_bytes": 40_000_000_000,
                                               "error": "model does not fit in free system memory (the whole model, since weight repacking is on) at num_ctx 4096: needs about 55.9 GiB, 37.3 GiB available"})
-                                  == "Ollama1 won\u2019t load it: it needs about 60.0 GB and the server\u2019s memory has 40.0 GB free"
+                                  == "Ollama1 can\u2019t load it: needs 60.0 GB, the server\u2019s memory has 40.0 GB free"
                                   and w(507, {"code": "gpu_fit", "error": "model does not fit"}) == "Ollama1 won\u2019t load it: model does not fit")
     out["busy, the server's reason"] = (w(503, {"code": "busy", "error": "the server could not unload another model first; try again"})
-                                        == "Ollama1 won\u2019t run it right now: the server could not unload another model first; try again"
-                                        and w(503, {"code": "busy"}) == "Ollama1 won\u2019t run it right now: it is busy with other requests")
+                                        == "Ollama1 is busy: the server could not unload another model first; try again"
+                                        and w(503, {"code": "busy"}) == "Ollama1 is busy: other requests are running")
     out["ollama away"] = (w(502, {"code": "ollama", "error": "Ollama stopped while loading the model"})
                           == "On Ollama1, Ollama stopped while loading the model")
     out["key scrubbed"] = "***" in ns["_bench_why"](F(e, 503, {"code": "busy", "error": "sk-ant-api03-" + "A" * 40}), b)
@@ -19973,9 +19979,8 @@ def _bm_hiccup(src):
     out["what the last line lacked"] = (n2["est"] is True and n2["missing"] == ["eval_count", "eval_duration", "prompt_eval_duration"]
                                         and n2["prompt_tps"] is None and n2["gen_tokens"] == 3
                                         and n2["note"].startswith("Ollama\u2019s last line carried no eval_count or eval_duration or "
-                                                                  "prompt_eval_duration, so the writing speed is this computer\u2019s "
-                                                                  "count of the 3 pieces that arrived over the time they took, "
-                                                                  "network included; reads weren\u2019t measured."))
+                                                                  "prompt_eval_duration; the writing speed is counted here from the "
+                                                                  "3 pieces that arrived, network included; reads weren\u2019t measured."))
     out["no final: no missing list"] = "missing" not in ns["bench_numbers"]({"t_send": 1.0, "t_first": 1.5, "t_last": 2.0, "chunks": 4})
     # Ollama's own cache copy never runs; a model the fresh list lacks neither
     try:
@@ -20007,7 +20012,7 @@ def _bm_hiccup(src):
     polls[:] = []
     t0 = time.time()
     out["gave up"] = b.wait_back(0.3) is False and 3 <= len(polls) <= 8 and 0.25 <= time.time() - t0 < 1.5
-    out["hook"] = ns["_hook_arg"]("bench-back") == "" and b.back_line() == "waiting for Ollama1 to come back\u2026"
+    out["hook"] = ns["_hook_arg"]("bench-back") == "" and b.back_line() == "Waiting for Ollama1\u2026"
     ns["_bench_stop"].set()
     try:
         b.wait_back(5)
@@ -20130,7 +20135,7 @@ def _bm_load(src):
                           and rows["C"]["status"] == "done"
                           and ("close", "A", False) in log and ("close", "B", False) in log)
     out["crowded: a word, no figures"] = (rows["C"].get("crowded") is True and rows["C"]["mem_rise"] is None
-                                          and "Other programs were using memory." in rows["C"]["note"])
+                                          and "Other apps were using memory." in rows["C"]["note"])
     out["nothing loading: skip does nothing"] = ns3["bench_skip"]() is False
     out["pinned"] = ('"/api/bench/skip"' in src and "Skip this model" in src
                      and "BENCH_LOAD_S = 90.0" in src)
@@ -20358,7 +20363,7 @@ check("benchmark (live): a run on the stand-in engine gives the known figures an
       and _brows.get("Gemma 4 E2B", {}).get("gen_tps") == 50.0
       and _brows["Gemma 4 E2B"].get("src") == "engine" and _brows["Gemma 4 E2B"].get("load_s") == 1.5
       and _brows.get("GPT-OSS 120B", {}).get("status") == "skipped"
-      and "(80% of 48 GB)" in _brows["GPT-OSS 120B"].get("note", "")
+      and "the limit here is 38 GB" in _brows["GPT-OSS 120B"].get("note", "")
       and all(isinstance(r.get("mem_rise"), int) for l_, r in _brows.items() if l_ != "GPT-OSS 120B"),
       "%r" % [_bs1, _brun])
 check("benchmark (live): while it runs a second start, a chat and a funnel are refused, and nothing is saved",
@@ -20640,7 +20645,7 @@ def _svc_pairing(src):
     out["closed"] = "no pairing window open" in ns["server_pair"](ctx, sid, _SV_CODE).get("err", "")
     s2 = _sv_fake(ns, [_sv_pair_server("ZZZZZZZZZZZZ")])
     w = ns["server_pair"](ctx, sid, _SV_CODE)
-    out["wrong"] = w.get("err") == "That code is wrong. 4 more tries before the server closes the window."
+    out["wrong"] = w.get("err") == "Wrong code. 4 tries left."
     out["malformed"] = "12 letters" in ns["server_pair"](ctx, sid, "abc").get("err", "")
     out["unsent"] = not s1[0]["signed"] and not s2[0]["signed"] and len(s2) == 1
     # a tampered proof, and another device's id: discarded, nothing saved
@@ -20785,7 +20790,7 @@ def _svc_stream(src):
                         lambda *a: None)
     ns["server_stream"] = _ss
     out["catch-all"] = "".join(x for x in said if not isinstance(x, ns["Ctl"])) == (
-        "\u26a0\ufe0f Desktop couldn\u2019t answer (ValueError). Nothing was sent anywhere else.")
+        "Desktop couldn\u2019t answer. Nothing was sent anywhere else.")
     # (review) an answer past SRV_MAX_CHARS is cut there, said
     ns["SRV_MAX_CHARS"] = 8
     _sv_fake(ns, [_SvResp(200, lines=[{"message": {"content": "Hello"}},
@@ -20796,7 +20801,7 @@ def _svc_stream(src):
                         lambda *a: None)
     ns["SRV_MAX_CHARS"] = 2_000_000
     out["size cap"] = "".join(x for x in said if not isinstance(x, ns["Ctl"])) == (
-        "Hello\n\n\u26a0\ufe0f Desktop\u2019s answer passed 8 characters, so it was cut there.")
+        "Hello\n\n\u26a0\ufe0f Desktop\u2019s answer was cut at 8 characters.")
     # a server removed, or not paired: said, nothing sent, no other model
     ns["_RAN"].clear()
     s4 = _sv_fake(ns, [])
@@ -21087,12 +21092,12 @@ def _svc_page(src):
         and "qwen3:14b</div>" in o[0] and "old:7b</div>" in o[0]
         and 'data-a="repair">Pair again' in o[0] and 'class="srv-code"' not in o[0],
         "card unpaired": 'class="srv warn"' in o[1] and 'class="srv-code"' in o[1]
-        and "Open a pairing window at the server, then type the code its screen shows." in o[1] and "Not paired · Studio didn’t answer." in o[1],
+        and "Type the code from the server’s pairing window." in o[1] and "Not paired · Studio didn’t answer." in o[1],
         "card lost": 'class="srv bad"' in o[2],
         # (6b337) ONE row per paired server in the menu; its models are in the flyout it opens
         "menu": o[3].count('data-sv="') == 2 and "data-s=" not in o[3] and "Studio" not in o[3]
         and '<span class="enm">Desktop</span><span class="edsc"></span>' in o[3]
-        and '<span class="enm">Lost</span><span class="edsc">your server · not answering</span>' in o[3]
+        and '<span class="enm">Lost</span><span class="edsc">Not answering</span>' in o[3]
         and 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o[3],
         # 6b442: the sub-menu holds the server's Fast, Thinking, Pro and Max; its models are picked in Advanced
         "flyout": o[5].startswith('<div class="engrow mode srvmode') and o[5].count('data-t="srv:a1b2c3d4:') == 4
@@ -21105,8 +21110,8 @@ def _svc_page(src):
                           "this Mac", "cloud + Desktop", "Desktop \u00b7 llava:7b"]
         and "    const where=whereBadge(lastModels,srvWho);" in src,
         # (review) the Access token: said on the card, changed from it
-        "token": ">Access token saved<" in o[0] and ">no Access token<" in o[1]
-        and 'data-a="tok">Change Access token' in o[0] and 'data-a="tok"' not in o[1]
+        "token": ">Token saved<" in o[0] and ">No token<" in o[1]
+        and 'data-a="tok">Change token' in o[0] and 'data-a="tok"' not in o[1]
         and 'data-k="aid"' in o[1] and 'data-k="asec"' in o[1] and 'data-a="toksave"' in o[1]
         and 'srvPost("access",{id:id,access_id:v("aid").trim(),access_secret:v("asec").trim()});' in src,
         # (review) a repaint keeps what was typed, the cursor and the card's line
@@ -21170,7 +21175,7 @@ def _svc_vision(src):
                        _SvResp(200, {"capabilities": ["completion"]})])
     ns["_RAN"].clear()
     t3, f3 = run(pic)
-    out["none reads it"] = (t3 == "\u26a0\ufe0f Desktop has no model that reads pictures. "
+    out["none reads it"] = (t3 == "Desktop has no vision model. "
                             "Nothing was sent anywhere else."
                             and "/api/chat" not in [r["path"] for r in s3] and not ns["_RAN"])
     # no picture: no question asked
@@ -21225,7 +21230,7 @@ def _svc_timing(src):
             r = str(se)
         took = time.monotonic() - t0
         srv.shutdown()
-        out[key] = (r == "Desktop sent nothing for 1 seconds, so the answer stopped there."
+        out[key] = (r == "Desktop went quiet for 1 seconds. The answer stopped there."
                     and took < 1.9 and "".join(got) == ("Hel" if first else ""), r, round(took, 2))
     # a check: one at a time per server, a second waits for the first
     ns, ctx, d = _sv_ns(src)
@@ -21310,14 +21315,13 @@ def _svc_review(src):
     shown = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", pane))
     msgs = _sv_sect(src, "servers")
     msgs = msgs[msgs.index("SRV_GONE = "):]
-    out["copy"] = (("For advanced users. Connect a dedicated server you run yourself, so it can "
-                    "take on queries and speed up answers. Instructions for setting one up are "
-                    "available here") in shown
-                   and pane.index("For advanced users.") < pane.index('id="srv-list"')
+    out["copy"] = (("Advanced. A server you run answers faster and keeps more local. "
+                    "Setup guide &middot; Scripts") in shown
+                   and pane.index("Advanced. A server you run") < pane.index('id="srv-list"')
                    and 'href="https://github.com/bigmillz/concordeai/blob/main/docs/your-own-server.md"\n'
-                       '      target="_blank" rel="noopener">here</a>' in pane
+                       '      target="_blank" rel="noopener">Setup guide</a>' in pane
                    and 'href="https://github.com/bigmillz/concordeai/tree/main/ollama1"\n'
-                       '      target="_blank" rel="noopener">Setup scripts</a>' in pane
+                       '      target="_blank" rel="noopener">Scripts</a>' in pane
                    and "ollama1" not in shown and "ollama1" not in re.sub(r'href="[^"]*"', "", pane)
                    and "ollama1" not in src[src.index("function srvWhere(m){"):
                                             src.index("function paintEngMenuServers(){")]
@@ -21507,7 +21511,7 @@ _SV_MUT = [
     ("the whole turn sent", '        t = {"role": m["role"], "content": str(m.get("content") or "")}', '        t = dict(m)'),
     ("keep_alive sent", '"stream": True,\n             "options": dict({"temperature": 0.75},',
      '"stream": True, "keep_alive": "45s",\n             "options": dict({"temperature": 0.75},'),
-    ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0)', 'usage_note(label, "local", messages, sent[0], last, t0)'),
+    ("counted as local", 'usage_note(label, "server", messages, sent[0], last, t0,', 'usage_note(label, "local", messages, sent[0], last, t0,'),
     ("a guess for an unknown placement", '"placement": pl if pl in ("gpu", "gpu+ram") else "unknown",', '"placement": pl if pl in ("gpu", "gpu+ram") else "gpu",'),
     ("embeddings offered", ' or "embed" in n.lower() \\\n', ' \\\n'),
     ("http anywhere", '    return "server-http-loopback" in TEST_HOOKS and u.hostname == "127.0.0.1"', '    return True'),
@@ -21549,7 +21553,7 @@ _SV_MUT = [
      '  return base||"this Mac";'),
     ("a server's name read as the cloud", "    if(i<0){rest.push(p);return;}", "    rest.push(p);if(i<0)return;"),
     ("typed values lost on a repaint", "      if(k[i.dataset.k]!=null)i.value=k[i.dataset.k];});", "      });"),
-    ("no Change Access token", "    +(srvTokOpen[s.id]?\"\":'<button class=\"about-btn slim\" data-a=\"tok\">Change Access token</button>')",
+    ("no Change Access token", "    +(srvTokOpen[s.id]?\"\":'<button class=\"about-btn slim\" data-a=\"tok\">Change token</button>')",
      "+''"),
     ("the card's line lost on a repaint", "esc(srvMsgs[s.id]||\"\")+'</div></div>';",
      "''+'</div></div>';"),
@@ -21564,7 +21568,7 @@ _SV_MUT = [
     ("any model name taken", "        if isinstance(known, list) and known and m not in known:\n            continue\n", ""),
     ("an Ollama cloud tag taken", "                or _SRV_CLOUD_TAG.search(m) or ollama_internal(m):\n            continue",
      "                or ollama_internal(m):\n            continue"),
-    ("ollama1 in the pane", "      <p class=\"tdesc\">For advanced users.", "      <p class=\"tdesc\">For ollama1 users."),
+    ("ollama1 in the pane", "      <p class=\"tdesc\">Advanced. A server you run", "      <p class=\"tdesc\">Advanced. An ollama1 server you run"),
     ("a card guessed", '    if not isinstance(g, dict) or g.get("vendor") not in ("amd", "nvidia", "intel"):\n        return None',
      '    if not isinstance(g, dict):\n        return None'),
     ("no /v1/info asked", '            if gpu is None and time.monotonic() < end - 1:', '            if False:'),
@@ -21728,7 +21732,7 @@ def _svw_wire(src):
     sl = out["slow"]
     P = {
         "slow: offline kind, said as slow, not marked down": sl[0] == "offline" and sl[2] is True
-        and sl[1] == "Desktop took longer than 1 second to start answering.",
+        and sl[1] == "Desktop didn’t start answering within 1 second.",
         "a long wait for the first byte, a short connect": out["slow, waited for"][:2] == ("ok", 200),
         "a closed line": out["closed"][0] == "offline" and out["closed"][2] is False
         and out["closed"][1] == "Desktop’s connection dropped before it answered.",
@@ -21832,7 +21836,7 @@ process.stdout.write(JSON.stringify(R));
         "the error in the app's words": R["off"] == {"kind": "bad", "text": "Desk didn\u2019t answer. It may be off, asleep or offline."}
         and R["slow"]["kind"] == "bad" and "took longer than 12 seconds" in R["slow"]["text"]
         and "certificate" in R["cert"]["text"] and R["lost"]["text"] == "Desk no longer accepts this computer.",
-        "not paired is said, not OK": R["unpaired"] == {"kind": "warn", "text": "Reachable (9 ms), but not paired yet. Pair it first."},
+        "not paired is said, not OK": R["unpaired"] == {"kind": "warn", "text": "Reachable (9 ms). Pair it first."},
         "no answer yet": R["never"]["kind"] == "warn" and R["none"]["kind"] == "warn",
         "the card carries the kind": '<div class="srv-msg ok">OK</div>' in R["cardOk"]
         and '<div class="srv-msg bad">x</div>' in R["cardBad"] and '<div class="srv-msg"></div>' in R["cardNone"],
@@ -22134,10 +22138,10 @@ def _soc_answer(src):
         return "".join(x for x in said if not isinstance(x, ns["Ctl"])), sent
     # nothing to run on: said, and nothing is sent anywhere
     t, sent = run("Desktop · unavailable", refuse="Desktop lists no models.")
-    got["refused"] = (t == "⚠️ Desktop lists no models. Nothing was sent anywhere else."
+    got["refused"] = (t == "Desktop lists no models. Nothing was sent anywhere else."
                       and sent == [] and not ns["_RAN"])
     t, sent = run("Desktop · unavailable", refuse="Desktop didn’t answer. Nothing was sent anywhere else.")
-    got["refused, said once"] = (t == "⚠️ Desktop didn’t answer. Nothing was sent anywhere else.")
+    got["refused, said once"] = (t == "Desktop didn’t answer. Nothing was sent anywhere else.")
     # the placeholder is a server label and no server model: no vision takeover, no local warm-up
     got["placeholder"] = (ns["server_label"]("Desktop · unavailable")
                           and ns["server_pick"]("Desktop · unavailable", ctx)[0] is None)
@@ -22159,7 +22163,7 @@ def _soc_answer(src):
     ns["_srv_seen"][e["id"]]["models"] = [_so_model("small:8b")]
     ns["server_answer"](L, pic, said.append, said.append, [].append, lambda *a: None)
     got["picture: a plain refusal"] = ("".join(x for x in said if not isinstance(x, ns["Ctl"]))
-                                       == "⚠️ Desktop has no model that reads pictures. "
+                                       == "Desktop has no vision model. "
                                           "Nothing was sent anywhere else.")
     # the title: the mode's server or nowhere; never a local engine or a cloud one
     ms = src[src.index("def make_title(text: str, conf=None, server=None"):]
@@ -22379,8 +22383,8 @@ def _soc_menu(src):
         and "<b>&" not in plain and "Desk &lt;b&gt;&amp;" in plain and plain.count("›</span>") == 3
         and plain.count("\U0001f5a5️") == 3,
         "desc": "your server · 3 models" not in plain and 'class="edsc"></span>' in plain
-        and 'class="edsc">your server · not answering</span>' in plain
-        and 'class="edsc">your server · no models listed</span>' in plain,
+        and 'class="edsc">Not answering</span>' in plain
+        and 'class="edsc">No models</span>' in plain,
         # the row says where the selection is
         "on": 'class="engrow srvmenu on" data-sv="a1b2c3d4"' in o["onMode"] and "srvmenu on" in o["onModel"]
         and "srvmenu on" not in o["plain"] and "srvmenu on" not in o["advOn"],
@@ -22531,9 +22535,9 @@ def _soc_adv(src):
         and 'data-l="Desk &lt;b&gt; · qwen3:14b" checked>' in rows
         and 'data-l="Desk &lt;b&gt; · big:70b">' in rows and "card + memory, slower" in rows
         and "<b>Desk &lt;b&gt; · qwen3:14b</b>" in rows and 'data-l="Llama' not in rows,
-        "treatment": '<p class="advp">not answering right now</p>' in rows
-        and '<p class="advp">no models listed</p>' in rows
-        and "draft one after another on that server, never here or in the cloud" in rows
+        "treatment": '<p class="advp">Not answering</p>' in rows
+        and '<p class="advp">No models</p>' in rows
+        and "Server models draft on the server, one at a time." in rows
         and "can’t be one of them" in rows and o["none"] == "",
         # a server's model is never a compositor, whatever it is called
         "never a compositor": [c[0] for c in o["comps"]] == ["", "gemini", "Gemma 4 26B"]
@@ -22549,7 +22553,7 @@ def _soc_adv(src):
         "ghosts": o["ghost"] == [True, False, False, False, False, False]
         and o["send"] == ["Desk <b> \u00b7 qwen3:14b", "Lab \u00b7 any:1b"] and o["onlyGhosts"] == []
         and '<label class="advrow off"><input type="checkbox" data-l="Desk &lt;b&gt; \u00b7 dropped:7b" checked>' in o["ghostRows"]
-        and ">no longer on Desk &lt;b&gt;</span>" in o["ghostRows"]
+        and ">Not on Desk &lt;b&gt; any more</span>" in o["ghostRows"]
         and o["kept2"] == ["Lab \u00b7 any:1b"],
         "ghost send": "  const advList=advOn&&adv?advSendList():[];\n  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);" in src
         and '        :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,\n          tier:advGhostOnly?"Fast":tier,' in src
@@ -23105,7 +23109,7 @@ def _p2c_first(src):
                          and any("RESET" in f for f in fr) and fr.index([f for f in fr if "RESET" in f][0])
                          < fr.index([f for f in fr if '"w": "local"' in f][0])
                          and any('"m": "Gemma 4 26B"' in f for f in fr)
-                         and any("Desk didn’t answer, so Gemma 4 26B answers here" in x for x in st))
+                         and any("Desk didn’t answer. Gemma 4 26B answers here." in x for x in st))
     # and the server is marked down: skipped by the modes and funnels for a minute, its memory and pin passes not asked,
     # until a check that succeeds clears it
     got["marked down"] = (ns["server_label_down"](ctx, L) and [m["label"] for m in ns["server_mode_candidates"](ctx)] == ["Lab · lab:70b"]
@@ -23172,8 +23176,8 @@ def _p2c_first(src):
             r_ = str(se)
         res2[key] = (r_, round(time.monotonic() - t0, 1))
     srv.shutdown()
-    got["first-word deadline"] = (res2["seat"][0] == "Desktop sent nothing for 1 seconds, so the answer stopped there." and res2["seat"][1] < 1.9
-                                  and res2["pick"][0] == "Desktop sent nothing for 2 seconds, so the answer stopped there."
+    got["first-word deadline"] = (res2["seat"][0] == "Desktop went quiet for 1 seconds. The answer stopped there." and res2["seat"][1] < 1.9
+                                  and res2["pick"][0] == "Desktop went quiet for 2 seconds. The answer stopped there."
                                   and res2["pick"][1] >= 1.9)
     return all(got.values()), got
 
@@ -23500,9 +23504,9 @@ def _p2c_funpage(src):
     html = src[src.index('<div id="fn-effort" class="fseg"'):src.index('<button class="about-btn slim" id="fn-go">')]
     got = {
         # each reason in its own words
-        "greyed with no cloud": o["nokey"] == [True, False, True, "no cloud keys saved"]
-        and o["power"] == [True, False, True, "cloud power is off (Settings › Cloud power)"]
-        and o["none"][:2] == [True, False] and o["none"][3] == "no cloud keys saved",
+        "greyed with no cloud": o["nokey"] == [True, False, True, "No cloud keys saved."]
+        and o["power"] == [True, False, True, "Cloud models are off."]
+        and o["none"][:2] == [True, False] and o["none"][3] == "No cloud keys saved.",
         "ticked with cloud": o["ok"][0] is False and o["ok"][1] is True and o["ok"][2] is False and o["off"][:2] == [False, False],
         # the saved choice is read once; after the person touches the box a late answer can't flip it back
         "no race": o["loaded"] == [False, True, False] and o["touched"] == [True, True],
@@ -23729,7 +23733,7 @@ def _p5c_nodes(src):
         "pin, close": o["pin"] == [[], False] and o["close"] == ["close"],
         "switch": o["pref"] == ["post", "put", "paint", "modes", "avail", "menu"],
         "chip": o["chip"] == ["Fast", "Thinking \u00b7 A"] and o["chip2"] == "Fast \u00b7 Desk gpt-oss:20b",
-        "bubble": "seats 4 of the 6 models on your server" in o["pro"] and "seats" not in o["th"],
+        "bubble": "4 of 6 server models fit the time a blend has" in o["pro"] and "server models fit" not in o["th"],
         # the switch's words: the Code lane's agents read a folder, and what they read goes to the model that answers
         "label": "<span>Use for Alpha, Gamma, Sigma and Code</span></label>'" in src
         and "      +'<div class=\"srv-hint\">Code agents may send a folder you choose to this server.</div>':\"\")"
@@ -23876,7 +23880,7 @@ def _p6c_merge(src):
     f1 = go(True, server_compositor=comp, _stream_guarded=sg, **kw)
     got["refused: this computer's pen"] = (
         seen == ["Desk · b", "Gemma 4 26B"] and "LOCAL MERGE" in f1[2]
-        and "Desk didn’t write the merge, so Gemma 4 26B writes it here" in f1[4]
+        and "Desk didn’t write the final. Gemma 4 26B writes it here." in f1[4]
         and f1[0]["_downs"] == [("Desk", "Desk didn’t answer.")]
         and len([f for f in f1[3] if "RUN:" in f and '"w": "mix"' in f]) == 2
         and any("RUN:" in f and '"w": "mix"' in f and "Gemma 4 26B" in f for f in f1[3])
@@ -23886,7 +23890,7 @@ def _p6c_merge(src):
     f2 = go(True, server_compositor=comp, _stream_guarded=sg, model_cached=lambda l, p=None: l != "Gemma 4 26B", **kw)
     got["refused: the best draft"] = (seen == ["Desk · b"] and "LOCAL MERGE" not in f2[2]
                                       and any(x.startswith("answer from") for x in f2[2])
-                                      and "Desk didn’t write the merge, so the best single answer is shown" in f2[4])
+                                      and "Desk didn’t write the final. The best single draft is shown." in f2[4])
     # a Stop, a closed window or a profile switch while the server writes it (the review of 6b344): not the server's
     # failure (no mark down), and no compositor of this computer's for a client that is gone
     for exc_name in ("StaleProfile", "BrokenPipeError"):
@@ -24130,7 +24134,7 @@ def _p7c_passes(src):
     res["run_research"](["Gemma 4 26B"], msgs, out.append, st.append)
     got["research: a refusal, this computer writes it"] = (
         any("BRIEF by Gemma 4 26B" in x for x in out) and "R:Desk" in downs
-        and any("didn’t answer, so Gemma 4 26B writes it here" in x for x in st))
+        and any("didn’t answer. Gemma 4 26B writes it here." in x for x in st))
     out.clear(), st.clear(), seen2.clear()
     pick["rfail"] = "late"
     res["run_research"](["Gemma 4 26B"], msgs, out.append, st.append)
@@ -24282,10 +24286,10 @@ def _p3c_spill(src):
     f = lambda code, err, m="gemma4:12b": ns["_srv_fail"](e, 507, {"code": code, "error": err}, m)
     zero = f("gpu_spill", "model did not fit entirely in VRAM (0% on GPU); it was unloaded")
     got = {
-        "zero": str(zero) == "Ollama1’s graphics card isn’t in use right now, so the model would have run on its CPU. "
+        "zero": str(zero) == "Ollama1’s card isn’t in use, so the model would have run on CPU. "
                              "It stopped." and zero.kind == "fit" and zero.code == "gpu_spill",
         "partial": str(f("gpu_spill", "model did not fit entirely in VRAM (45% on GPU); it was unloaded"))
-        == "Ollama1 couldn’t keep gemma4:12b in its memory, so it stopped.",
+        == "Ollama1 couldn’t keep gemma4:12b in memory. It stopped.",
         # 10% and 100% are not 0%
         "not 10%": str(f("gpu_spill", "model did not fit entirely in VRAM (10% on GPU); it was unloaded")).startswith("Ollama1 couldn’t keep")
         and str(f("gpu_spill", "x (100% on GPU) y")).startswith("Ollama1 couldn’t keep"),
@@ -26595,7 +26599,7 @@ check("benchmark servers (live): the card is emptied before each model (an unloa
       and _ev5c == [("unload", "small:8b"), ("load", "small:8b"), ("chat", "small:8b"),
                     ("unload", "small:8b"), ("load", "sneaky:14b"), ("unload", "sneaky:14b")]
       and _ev5.index(("load", "small:8b")) > _ev5.index(("ps", "")) + 1
-      and _bm5[1].get("note") == "Failed: %s loaded only 59%% of sneaky:14b on the card, alone; its GPU-only rule unloaded it." % _SVN
+      and _bm5[1].get("note") == "Failed: %s fit only 59%% of sneaky:14b on the card, alone, so it unloaded it." % _SVN
       and not _o1("/stub")["loaded"],
       "%r" % [_bs5, _br5.get("state"), _bm5, _ev5])
 # Ollama away for the first chat (a 503 through the gateway, after the stream's headers): the row waits for the
@@ -26619,7 +26623,7 @@ check("benchmark servers (live): Ollama away for a chat (503 through the gateway
       "it is waiting for the server, the model is asked once more, and the figures are the second answer's",
       _bs6[0] == 200 and _br6.get("state") == "done" and _bm6.get("status") == "done" and _bm6.get("gen_tps") == 50.0
       and _bm6.get("src") == "engine" and len(_ch6) == 2 and _seen6
-      and all(n_ == "waiting for %s to come back…" % _SVN for n_ in _seen6) and not (_bm6.get("note") or "").strip(),
+      and all(n_ == "Waiting for %s…" % _SVN for n_ in _seen6) and not (_bm6.get("note") or "").strip(),
       "%r" % [_bs6, _br6.get("state"), _bm6, len(_ch6), _seen6[:2]])
 # away for both: failed, with the server's words, and that it was asked twice
 _o1("/stub-set", {"fail_count": 2, "fail_status": 503})
@@ -26631,7 +26635,7 @@ _ch7 = [c_ for c_ in _o1("/stub")["calls"][_nsb7:] if c_[1] == "/api/chat"]
 _o1("/stub-set", {"fail_count": 0, "fail_status": 0})
 check("benchmark servers (live): away for both askings: the row fails with the server's own words and says it was asked twice",
       _bs7[0] == 200 and _bm7.get("status") == "failed" and len(_ch7) == 2
-      and _bm7.get("note") == "Failed: %s won’t run it right now: Ollama: stub away. It was asked twice." % _SVN,
+      and _bm7.get("note") == "Failed: %s is busy: Ollama: stub away. It was asked twice." % _SVN,
       "%r" % [_bs7, _bm7, len(_ch7)])
 # a profile's own: B sees none of A's runs or server, and can't start A's
 _pB41 = _svq("/api/test/profile", "POST", {"op": "create"})[1].get("name", "")
@@ -33250,12 +33254,12 @@ def _b41_server_fail(src):
         out["off"] = [[x["status"], x["note"]] for x in W.rows()]
         P = {
             "every run started and ended": all(started),
-            "full": out["fit"][:3] == ["failed", "Failed: Desk won’t load it: it needs about 9.0 GB and "
+            "full": out["fit"][:3] == ["failed", "Failed: Desk can’t load it: needs 9.0 GB, "
                                                "the card has 8.0 GB free.", "done"],
             "missing": out["fit"][3:] == ["failed", "Failed: ghost:1b isn’t installed on Desk."],
-            "spilled": out["spill"][0] == "failed" and "its GPU-only rule unloaded it" in out["spill"][1]
+            "spilled": out["spill"][0] == "failed" and ", so it unloaded it" in out["spill"][1]
             and "small:8b" in out["spill"][1],
-            "busy": out["busy"] == ["failed", "Failed: Desk won’t run it right now: queue. It was asked twice."],
+            "busy": out["busy"] == ["failed", "Failed: Desk is busy: queue. It was asked twice."],
             "pairing lost": "no longer accepts this computer" in out["unpaired"],
             "off": [x[0] for x in out["off"]] == ["failed", "failed"] and all(
                 x[1].startswith("Failed: Desk didn’t answer") for x in out["off"]),
