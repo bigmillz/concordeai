@@ -53519,7 +53519,10 @@ const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   // the model names behind an answer
   "millen.codeLines","millen.showModels",
   // the Horizon look's own (6b526): the look, the sidebar, the intro's day, its seed
-  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort"];
+  "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort",
+  // the sidebar's Recents range and folds (6b467, 6b470) and the Usage pane's range: per machine.
+  // Left off this list they were read at launch, then swept here, so the next launch forgot them
+  "millen.recentsDays","millen.foldPinned","millen.foldRecents","millen.usage.range"];
 let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();

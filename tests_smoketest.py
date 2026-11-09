@@ -40794,6 +40794,23 @@ check("the Tauri shell hands the token over through one command that checks sche
       and '.env("MILLENAI_SHELL", "tauri")' in _rs_main
       and "libc::SIGTERM" in _rs_main and "RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app)" in _rs_main,
       "")
+# EVERY BROWSER-STORAGE KEY THE PAGE WRITES SURVIVES ITS OWN BOOT. storeBoot (accounts
+# step 5) sweeps every millen.* key that is neither in KEEP_LS nor a setting it moves to
+# prefs.json; 6b467's Recents range, 6b470's folds and the Usage pane's range were never
+# listed, so they lasted one relaunch: read at launch, swept, gone at the next (found in
+# the beta app with 43 seeded chats). Each literal setItem key must be kept or moved.
+def _ls_unkept(src):
+    pg = src[src.index('HTML_CONTENT = r"""'):]
+    keys = set(re.findall(r'localStorage\.setItem\(\s*"(millen\.[\w.]+)"', pg))
+    keep = set(re.findall(r'"(millen\.[\w.]+)"', re.search(r"const KEEP_LS=\[(.*?)\];", pg, re.S).group(1)))
+    moved = set(re.findall(r'"(millen\.[\w.]+)":"', re.search(r"const PREF_OF=\{(.*?)\};", pg, re.S).group(1)))
+    return sorted(keys - keep - moved), len(keys)
+_lsu, _lsn = _ls_unkept(_MILLENAI_SRC)
+_lsu_m, _ = _ls_unkept(_MILLENAI_SRC.replace('"millen.recentsDays","millen.foldPinned",', '"millen.foldPinned",', 1))
+check("every millen.* key the page writes to browser storage is kept by storeBoot's sweep or moved to prefs.json (the Recents range and folds outlive the second relaunch); a mutant without the range is caught",
+      _lsu == [] and _lsn >= 20 and _lsu_m == ["millen.recentsDays"]
+      and "lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF)" in _MILLENAI_SRC,
+      "%r" % [_lsu, _lsn, _lsu_m])
 # ==== native shell (6b532): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
