@@ -519,7 +519,10 @@ _KNOWN_ENV = frozenset((
     "MILLENAI_SYNC_URL", "MILLENAI_PORT", "MILLENAI_TESTBUILD",
     "MILLENAI_NO_PACKAGE", "MILLENAI_SHELL",
     # a dev copy's measuring knobs (6b518, 6b520): honoured only when DEV_HOME is set
-    "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"))
+    "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF",
+    # a dev copy's release feed (6b537): the updater proven against a local
+    # stand-in for api.github.com; honoured only when DEV_HOME is set
+    "MILLENAI_UPDATE_API"))
 
 
 def _dev_home(env, real):
@@ -881,6 +884,13 @@ except Exception:
 # Release whose tag ends in the build number (e.g. "v5") with the .dmg
 # attached; the app then offers a one-click in-place update.
 UPDATE_REPO = "bigmillz/concordeai"
+# THE FEED IS A DEV COPY'S TO POINT (6b537): a dev copy (DEV_HOME set) may
+# name a local stand-in for GitHub's API with MILLENAI_UPDATE_API, so the
+# whole update — the check, the download, the swap and the relaunch — is
+# proven against a fake release before a real one is cut. The app a person
+# opened reads GitHub and nothing else, whatever its environment says.
+UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")
+               if DEV_HOME else "") or "https://api.github.com")
 
 # MILLENAI_PORT names the port to try first; a dev copy uses it to pick
 # its own. It changes nothing else (6b319).
@@ -9972,10 +9982,21 @@ def studio_needs(kind: str) -> str:
 _update = {"state": "idle", "pct": 0, "note": "", "latest": "", "url": "",
            "size": 0}
 
+# THE SWAP KNOWS BOTH BUNDLES (6b537): the Python app's main executable is
+# Contents/MacOS/MillenAI (6b443); the native shell's is
+# Contents/MacOS/ConcordeAI (shell/, 6b532), and from 7.0 the .dmg a
+# release carries is the shell's. The helper waits for whichever of the
+# two owns the bundle to be gone (the shell quits when its sidecar exits
+# with 0, which _do_update's os._exit is), swaps the bundle whole, and
+# `open -n` relaunches whatever the new bundle's executable is — so a
+# Python install updates into the shell and a shell install into the
+# next shell by the one path. Resources/millenai.py sits at the same
+# place in both layouts, so _app_bundle_path needs no second rule.
 _SWAP_SCRIPT = """#!/bin/zsh
-# Wait for MillenAI to quit so its bundle can be replaced safely.
+# Wait for the app (its launcher or its shell) to quit so its bundle can
+# be replaced safely.
 for i in $(seq 1 60); do
-  pgrep -f "%(app)s/Contents/MacOS/MillenAI" >/dev/null || break
+  pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break
   sleep 0.5
 done
 MP=$(mktemp -d)
@@ -10053,7 +10074,7 @@ def _channel_release():
     ch = update_channel()
     if ch in ("beta", "nightly"):
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/releases?per_page=20"
+            UPDATE_API + "/repos/%s/releases?per_page=20"
             % UPDATE_REPO, headers=hdrs)
         with urllib.request.urlopen(req, timeout=8) as r:
             rels = json.loads(r.read().decode("utf-8"))
@@ -10071,7 +10092,7 @@ def _channel_release():
                 UPDATE_REPO, 404, "no releases", None, None)
         return rels[0]                    # GitHub lists newest first
     req = urllib.request.Request(
-        "https://api.github.com/repos/%s/releases/latest" % UPDATE_REPO,
+        UPDATE_API + "/repos/%s/releases/latest" % UPDATE_REPO,
         headers=hdrs)
     with urllib.request.urlopen(req, timeout=8) as r:
         return json.loads(r.read().decode("utf-8"))
@@ -10130,11 +10151,14 @@ def _check_update_live():
     # is the name, and appending a build would put the number back.
     if re.search(r"beta$", shown):
         shown = "%s %d" % (shown, _build_from_tag(tag))
-    # and the numeric part obeys the same trailing-.0 truncation
+    # and the numeric part obeys the same trailing-.0 truncation: ONE .0,
+    # as short_version does (6b242). The loop here kept going (6b537,
+    # seen against a fake feed): the release named "7.0 beta 2" was
+    # offered as "7 beta 2", a major line rather than a version
     mnum = re.match(r"^([\d.]+)(.*)$", shown)
     if mnum:
         num = mnum.group(1)
-        while num.count(".") >= 1 and num.endswith(".0"):
+        if num.count(".") >= 2 and num.endswith(".0"):
             num = num[:-2]
         shown = num + mnum.group(2)
     dmg = next((a for a in rel.get("assets", [])
@@ -10222,7 +10246,7 @@ def whats_new(prev: str) -> dict:
 
     def _get(path):
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/%s" % (UPDATE_REPO, path),
+            UPDATE_API + "/repos/%s/%s" % (UPDATE_REPO, path),
             headers=hdrs)
         with urllib.request.urlopen(req, timeout=8) as r:
             return json.loads(r.read().decode("utf-8"))
