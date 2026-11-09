@@ -31538,8 +31538,8 @@ def pdf_read_s() -> float:
 def pdf_extract(data: bytes) -> dict:
     """A PDF's text, read on this computer (6b546). The bytes go to a 0600
     file under run/ (deleted at once after), the helper reads it page by
-    page and is killed past its cap; nothing else is started and no socket
-    is opened."""
+    page and is killed past its cap; nothing else is started and nothing
+    leaves the computer."""
     if not data or b"%PDF-" not in data[:1024]:
         return {"ok": False, "err": DOC_PDF_BAD}
     if len(data) > DOC_PDF_MAX_BYTES:
@@ -49371,8 +49371,9 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .docchip.dbad{border-color:rgba(255,190,90,.55)}
 .docchip .dcbad{color:#ffbe5a}
 /* a PDF's chip (6b546): pages, tokens and the scanned count need more room */
-.docchip.dloc.dpdf{max-width:min(560px,100%)}
+.docchip.dloc.dpdf{max-width:min(560px,calc(100vw - 48px))}
 .docchip.dpdf .dcm{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:600px){.docchip.dloc.dpdf{flex-wrap:wrap;height:auto;min-height:30px;row-gap:2px;padding-top:4px;padding-bottom:4px}}
 #docwarn{max-width:780px;margin:0 auto 8px;padding:10px 12px;border-radius:12px;
   border:1px solid rgba(255,190,90,.45);background:rgba(40,32,18,.72);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
