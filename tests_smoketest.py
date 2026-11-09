@@ -14399,6 +14399,9 @@ def _pm8(src_prof=None, hooks=frozenset()):
               "time", "re", "shutil", "functools", "copy"):
         ns[m] = __import__(m)
     exec(_prof_sect("profile caches") + "\n" + (src_prof or _prof_sect("profile")), ns)
+    # (6b530) no indexer thread in the test process: every chat store write kicks one, and a
+    # namespace's loop (its busy test unreadable there) never ends; the live copies run the real one
+    ns["know_kick"] = lambda *a, **k: None
     ns["_INSTANCE_HELD"][0] = True
     root = ns["profile_boot"]()
     return ns, d, root
@@ -14796,6 +14799,7 @@ def _rvns8(src, names, **extra):
                    ("_say_lock", _t8.RLock()), ("_chats_lock", _t8.Lock()),
                    ("_chat_finalize_held", lambda base, now=None: None)):
         ns.setdefault(k_, v_)
+    ns["know_kick"] = lambda *a, **k: None   # (6b530) no indexer thread in the test process
     ns.update(extra)
     ns["_INSTANCE_HELD"][0] = True
     return ns, d
