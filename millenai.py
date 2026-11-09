@@ -1192,7 +1192,7 @@ def drop_run_file(path):
 
 
 RUN_FILE_KINDS = (("ssh-", ".conf"), ("say-", ".txt"), ("prompt-", ".json"),
-                  ("stage-", ""))
+                  ("stage-", ""), (".pdf-", ".pdf"))   # a PDF being read (6b546)
 
 
 def sweep_run_files() -> int:
@@ -30787,7 +30787,12 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
 # the same budget itself and never trusts the page alone. Other text files
 # (.csv, .json, code...) keep the old path unless they ride with a .md or
 # .txt. NOTES 6b522 has the numbers and the audit of every side path.
-DOC_LOCAL_RX = re.compile(r"\.(?:md|txt)$", re.I)
+DOC_LOCAL_RX = re.compile(r"\.(?:md|txt|pdf)$", re.I)   # a .pdf arrives as its text, page lines in it (6b546)
+# a PDF's text (6b546, the pdf attach section reads it): each page opened by
+# its page line, which Split & summarize cuts on
+DOC_PDF_RX = re.compile(r"\.pdf$", re.I)
+DOC_PDF_MARK = "\u2014 page %d \u2014"
+DOC_PDF_MARK_RX = re.compile(r"(?m)^\u2014 page \d+ \u2014[ \t]*$")
 DOC_MAX_DOCS = 2             # files a turn carries, as before
 DOC_MAX_CHARS = 2_000_000    # the page's 2 MB file cap, in characters
 DOC_OTHER_CHARS = 50_000     # any other text file, as before (the page slices it too)
@@ -30831,8 +30836,13 @@ class DocStopped(Exception):
 
 
 def doc_is_local(name) -> bool:
-    """A .md or .txt file: read on this Mac (6b522)."""
+    """A .md or .txt file, or a PDF's text (6b546): read on this Mac (6b522)."""
     return bool(DOC_LOCAL_RX.search(str(name or "").strip()))
+
+
+def doc_is_pdf(name) -> bool:
+    """A PDF, whose text came from /api/doc/pdf (6b546)."""
+    return bool(DOC_PDF_RX.search(str(name or "").strip()))
 
 
 def doc_request_docs(req):
@@ -31188,12 +31198,13 @@ _DOC_HEAD_RX = re.compile(r"(?m)^#{1,6}[ \t]")     # a markdown heading opens a 
 _DOC_PARA_RX = re.compile(r"\n[ \t]*\n")           # a blank line ends a paragraph
 
 
-def doc_split(text, limit, counter):
+def doc_split(text, limit, counter, bounds=None):
     """text in parts of at most `limit` tokens each, in order, together the
     whole text (whitespace-only parts left out): split at markdown headings,
     a section still too long at its paragraphs (blank lines), a paragraph
     still too long at token boundaries; then neighbours are packed together
-    while they fit."""
+    while they fit. `bounds` replaces the headings as the first cut: a PDF's
+    page lines (6b546), so a part holds whole pages where they fit."""
     from bisect import bisect_right
     text = str(text or "")
     ends = counter.ends(text)
@@ -31224,7 +31235,7 @@ def doc_split(text, limit, counter):
         return out
 
     pieces = []
-    for a, b in cuts(0, len(text), _DOC_HEAD_RX, True):
+    for a, b in cuts(0, len(text), bounds or _DOC_HEAD_RX, True):
         if ntok(a, b) <= cap:
             pieces.append((a, b))
             continue
@@ -31335,7 +31346,8 @@ def doc_answer(label, docs, question, history, system, emit, step, status,
             if d.get("mode") != "split":
                 continue
             shell = sum(c.count(m["content"]) for m in doc_sum_prompt(d["name"], 99, 99, "", q))
-            parts = doc_split(d["text"], max(256, min(DOC_CHUNK_MAX, limit - shell - DOC_SUM_ROOM)), c)
+            parts = doc_split(d["text"], max(256, min(DOC_CHUNK_MAX, limit - shell - DOC_SUM_ROOM)), c,
+                              DOC_PDF_MARK_RX if doc_is_pdf(d["name"]) else None)   # a PDF on its pages (6b546)
             n, sums, t0 = len(parts), [], time.time()
             for i, part in enumerate(parts, 1):
                 if gone():
@@ -31391,6 +31403,180 @@ def doc_answer(label, docs, question, history, system, emit, step, status,
                     "kept the part before it wandered", run_kw=run_kw)
     return info
 # ==== doc attach (6b522): end ====
+
+
+# ==== pdf attach (6b546): begin ====
+# A PDF IS READ ON THIS MAC TOO (6b546, per Patrick). Its text is pulled out
+# page by page by the system's own PDF reader (PDFKit, through the tiny
+# Swift helper shell/pdftext: no download, nothing leaves the computer),
+# each page opened by a "— page N —" line the model sees, and the text then
+# rides the 6b522 path unchanged: measured with the model's own tokenizer,
+# the 70% line and its three choices, one model of this computer, the
+# chips. Split & summarize splits on the page lines. A page with no text
+# but something drawn on it is a scan: it is said ("3 scanned pages
+# skipped"), never read (no OCR yet). A locked PDF is refused. A huge one
+# is read until DOC_PDF_READ_S or DOC_MAX_CHARS, whichever comes first, and
+# the chip and the model are told how far it got. Off a Mac (and on a Mac
+# whose helper isn't built) a PDF says DOC_PDF_NEEDS: a pure-Python reader
+# for Windows and Linux waits for the owner's OK (NOTES 6b546).
+DOC_PDF_HELPER = "concorde-pdftext"
+DOC_PDF_MAX_BYTES = 64 * 1024 * 1024    # what the page may hand over
+DOC_PDF_READ_S = 30                     # reading time, then what was read stands
+DOC_PDF_GRACE_S = 10                    # past the helper's own cap, it is killed
+DOC_PDF_SCAN_LINE = "[Scanned page: no text, skipped]"
+DOC_PDF_PART_LINE = "[Only the first %s of %s pages were read.]"
+# the words follow design/COPY.md: what happened, then what to do
+DOC_PDF_LOCKED = "This PDF is locked."
+DOC_PDF_NEEDS = "PDF needs an update on this computer."
+DOC_PDF_BAD = "This PDF can\u2019t be read."
+DOC_PDF_BIG = "This PDF is too big. The most is 64 MB."
+DOC_PDF_EMPTY = "No text in this PDF. Scanned pages aren\u2019t read yet."
+# characters a PDF hands back in a form the model reads worse: Arabic and
+# Hebrew presentation forms and the Latin ligatures, folded to their plain
+# letters (NFKC, these ranges only: the rest of the text is left as it is)
+_DOC_PDF_FOLD_RX = re.compile("[\ufb00-\ufb4f\ufb50-\ufdff\ufe70-\ufefe]+")
+_DOC_PDF_CTRL_RX = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ufeff\ufffe\uffff]")
+
+
+def _pdf_helper_path():
+    """The PDFKit helper: bundled beside this file (the .app's Resources) or
+    built in the repo (shell/pdftext/build.sh). None off a Mac, when it
+    isn't built, or with a dev copy's `pdf-none` hook (the Windows path)."""
+    if "pdf-none" in TEST_HOOKS or not IS_MAC:
+        return None
+    for p in (resource(DOC_PDF_HELPER), resource("shell", "pdftext", DOC_PDF_HELPER)):
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    return None
+
+
+def pdf_clean(text) -> str:
+    """One page's text as the model reads it: NFC; presentation forms and
+    ligatures folded; line ends made \\n; control characters (but tab and
+    newline), byte-order marks and non-characters dropped; spaces at line
+    ends trimmed; at most one blank line in a row; and a line that looks
+    like a page line written "- page N -", so only the real ones split.
+    Right-to-left text is kept in the order the reader gives it (logical,
+    PDFKit's own reordering) and the bidi marks with it."""
+    s = unicodedata.normalize("NFC", str(text or ""))
+    s = _DOC_PDF_FOLD_RX.sub(lambda m: unicodedata.normalize("NFKC", m.group(0)), s)
+    s = s.replace("\r\n", "\n").replace("\r", "\n").replace("\u2028", "\n")
+    s = _DOC_PDF_CTRL_RX.sub("", s)
+    s = "\n".join(ln.rstrip() for ln in s.split("\n"))
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    s = DOC_PDF_MARK_RX.sub(lambda m: m.group(0).replace("\u2014", "-"), s)
+    return s.strip()
+
+
+def pdf_assemble(pages, total, why="end") -> str:
+    """The document's text: each page opened by its page line, a scanned
+    page said in one line, a blank page its line alone, and when the
+    reading stopped early, a last line saying how far it got."""
+    out = []
+    for p in pages:
+        body = p["text"] or (DOC_PDF_SCAN_LINE if p.get("scan") else "")
+        out.append(DOC_PDF_MARK % p["n"] + ("\n" + body if body else ""))
+    if why != "end" and len(pages) < total:
+        out.append(DOC_PDF_PART_LINE % (_doc_fmt(len(pages)), _doc_fmt(total)))
+    return "\n\n".join(out)
+
+
+def pdf_parse(lines, max_chars=None):
+    """The helper's JSON lines to what the page shows: {ok, pages, read,
+    scanned, blank, why, text} or {ok: False, err}. The text stops at a
+    page boundary within max_chars (DOC_MAX_CHARS)."""
+    cap = DOC_MAX_CHARS if max_chars is None else int(max_chars)
+    total, got, why, size = 0, [], "", 0
+    for ln in lines:
+        try:
+            ev = json.loads(ln)
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(ev, dict):
+            continue
+        kind = ev.get("ev")
+        if kind == "locked":
+            return {"ok": False, "err": DOC_PDF_LOCKED, "locked": True}
+        if kind == "err":
+            return {"ok": False, "err": DOC_PDF_BAD}
+        if kind == "open":
+            total = _doc_int(ev.get("pages"))
+        elif kind == "page" and not why:
+            t = pdf_clean(ev.get("text"))
+            page = {"n": _doc_int(ev.get("n")) or len(got) + 1, "text": t,
+                    "scan": not t and bool(ev.get("ink"))}
+            size += len(t) + 24
+            if got and size > cap:
+                why = "chars"
+                continue
+            got.append(page)
+        elif kind == "done" and not why:
+            why = str(ev.get("why") or "end")
+    if not total and not got:
+        return {"ok": False, "err": DOC_PDF_BAD}
+    why = why or "time"          # no done line: the helper was stopped
+    scanned = [p["n"] for p in got if p["scan"]]
+    blank = [p["n"] for p in got if not p["text"] and not p["scan"]]
+    if not any(p["text"] for p in got):
+        return {"ok": False, "err": DOC_PDF_EMPTY, "pages": total,
+                "scanned": len(scanned)}
+    text = pdf_assemble(got, total, why)
+    return {"ok": True, "pages": total, "read": len(got), "why": why,
+            "partial": len(got) < total, "scanned": len(scanned),
+            "scanned_pages": scanned[:50], "blank": len(blank),
+            "chars": len(text), "text": text[:cap]}
+
+
+def pdf_read_s() -> float:
+    hook = _hook_arg("pdf-read-s")      # a dev copy's test hook: a shorter cap
+    try:
+        return float(hook) if hook else DOC_PDF_READ_S
+    except ValueError:
+        return DOC_PDF_READ_S
+
+
+def pdf_extract(data: bytes) -> dict:
+    """A PDF's text, read on this computer (6b546). The bytes go to a 0600
+    file under run/ (deleted at once after), the helper reads it page by
+    page and is killed past its cap; nothing else is started and no socket
+    is opened."""
+    if not data or b"%PDF-" not in data[:1024]:
+        return {"ok": False, "err": DOC_PDF_BAD}
+    if len(data) > DOC_PDF_MAX_BYTES:
+        return {"ok": False, "err": DOC_PDF_BIG}
+    helper = _pdf_helper_path()
+    if not helper:
+        return {"ok": False, "err": DOC_PDF_NEEDS, "needs": True}
+    d = os.path.join(app_dir(), "run")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    fd, path = tempfile.mkstemp(dir=d, prefix=".pdf-", suffix=".pdf")
+    lines, t0, cap = [], time.time(), pdf_read_s()
+    p = None
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        p = subprocess.Popen([helper, path, "%g" % cap, str(DOC_MAX_CHARS)],
+                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.DEVNULL)
+        killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)
+        killer.daemon = True
+        killer.start()
+        try:
+            for raw in p.stdout:
+                lines.append(raw.decode("utf-8", "replace"))
+        finally:
+            killer.cancel()
+            p.wait(timeout=5)
+    except Exception:
+        if p is not None and p.poll() is None:
+            p.kill()
+        return {"ok": False, "err": DOC_PDF_BAD}
+    finally:
+        drop_run_file(path)
+    out = pdf_parse(lines)
+    out["secs"] = round(time.time() - t0, 2)
+    return out
+# ==== pdf attach (6b546): end ====
 
 
 # ================================================ the hardware benchmark
@@ -43579,6 +43765,18 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/import/"):
             self._import_post()              # bring your chats (6b529)
+        if self.path == "/api/doc/pdf":
+            # A PDF'S TEXT, READ ON THIS COMPUTER (6b546): the page posts the
+            # file's bytes, the PDFKit helper reads them page by page, and the
+            # text comes back to ride the .md/.txt path (6b522). No name is
+            # sent (the page keeps it), nothing is kept, nothing leaves.
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            if n > DOC_PDF_MAX_BYTES:
+                self.close_connection = True       # the body is left unread
+                self._send_json({"ok": False, "err": DOC_PDF_BIG}, code=413)
+                return
+            self._send_json(pdf_extract(self.rfile.read(n) if n > 0 else b""))
+            return
         if self.path == "/api/doc/measure":
             # A FILE'S TOKENS AND THE MODEL'S CONTEXT (6b522): what the chip
             # and the warning bar show, for the model of this Mac the turn
@@ -49172,6 +49370,9 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   cursor:pointer}
 .docchip.dbad{border-color:rgba(255,190,90,.55)}
 .docchip .dcbad{color:#ffbe5a}
+/* a PDF's chip (6b546): pages, tokens and the scanned count need more room */
+.docchip.dloc.dpdf{max-width:min(560px,100%)}
+.docchip.dpdf .dcm{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #docwarn{max-width:780px;margin:0 auto 8px;padding:10px 12px;border-radius:12px;
   border:1px solid rgba(255,190,90,.45);background:rgba(40,32,18,.72);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
@@ -52738,7 +52939,7 @@ __CODE_ROWS__
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
-        accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
+        accept="image/*,.pdf,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
       <textarea id="input" rows="1" placeholder="Ask anything"></textarea>
       <div id="crow">
       <!-- Horizon's mode picker and effort slider (6b526, 6b534): the mode's
@@ -56517,6 +56718,7 @@ function userBody(body,text,docs){
   row.innerHTML=m[1].split(", ").map(n=>{
     const d=(docs||[]).find(x=>x.name===n);
     return '<span class="docchip2" title="'+esc(n)+'">'+ICO.file+'<span>'+esc(n)+'</span>'
+      +(d&&d.pages?'<span class="mono">'+d.pages+(d.pages===1?" page":" pages")+'</span>':"")   // a PDF's pages (6b546)
       +(d&&d.tok?'<span class="mono">'+(d.exact?"":"~")+fmtTok(d.tok)+'</span>':"")   // measured (6b522) or estimated
       +(d&&d.mode&&d.mode!=="full"?'<span class="mono">'+(d.mode==="split"?"summarized":"truncated")+'</span>':"")+'</span>';}).join("");
   body.appendChild(row);
@@ -56990,10 +57192,20 @@ let pendingImages=[],pendingDocs=[];
 // summarize, Remove. Other text files keep the old path. Clicks are taken by
 // one listener on each container: a repaint replaces the chips' HTML.
 const DOC_LOCAL=/\.(md|txt)$/i;
+// A PDF (6b546): its bytes go to /api/doc/pdf, read on this computer page
+// by page, and its text joins the same path: measured, the 70% line, the
+// chips. Its chip says "Reading…" until then, or why it can't be read
+const DOC_PDF=/\.pdf$/i;
+const DOC_PDF_MAX=64*1048576;
+const DOC_PDF_BIG="This PDF is too big. The most is 64 MB.";
+const DOC_PDF_BAD="This PDF can\u2019t be read.";
 const DOC_MODE_TXT={truncate:"Truncated",split:"Summarized"};
 let docBudget=null,docErr="",docSeq=0;
 function docSize(n){
   return n<1024?n+" B":n<1048576?(n/1024).toFixed(n<10240?1:0)+" KB":(n/1048576).toFixed(1)+" MB";}
+function docPl(n,w){return n+" "+w+(n===1?"":"s");}
+// a PDF's pages on its chip: "12 pages", or how far a huge one was read
+function docPages(d){return d.partial?"First "+d.read+" of "+docPl(d.pages,"page"):docPl(d.pages||0,"page");}
 function docK(n){n=Math.max(0,Math.round(n||0));
   return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?(n/1000).toFixed(n<1e4?1:0)+"K":String(n);}
 // the tooltip adds what the chip can't show: the whole name, who counted,
@@ -57002,6 +57214,9 @@ function docTip(d){
   const t=[d.name,d.exact&&docBudget
     ?(d.tok||0).toLocaleString()+" tokens, counted by "+docBudget.label
     :"About "+(d.tok||0).toLocaleString()+" tokens"];
+  if(d.pdf)t.push(docPages(d)+", "+docSize(d.bytes||0));
+  if(d.scanned)t.push((d.scanned===1?"Page "+d.scanPages[0]+" is":"Pages "+d.scanPages.join(", ")+" are")
+    +" scanned. Scanned pages aren\u2019t read yet.");
   if(docBudget&&docBudget.ctx_note)t.push(docBudget.ctx_note);
   else if(docErr)t.push(docErr);
   if(d.bad)t.push("Some characters couldn\u2019t be read.");
@@ -57013,10 +57228,17 @@ function paintChips(){
   w.innerHTML=pendingImages.map((d,i)=>
     '<span class="imgchip"><img src="'+d+'">'+
     '<b data-k="i" data-i="'+i+'" title="Remove">×</b></span>').join("")
-   +pendingDocs.map((d,i)=>d.local
-    ?'<span class="docchip dloc'+(d.bad?' dbad':'')+'" title="'+esc(docTip(d))+'">📄 '
-      +'<span class="dcn">'+esc(d.name)+'</span><i class="dcm">'+docSize(d.bytes||0)+'</i>'
+   +pendingDocs.map((d,i)=>d.busy||d.err
+    // a PDF still being read, or one that can't be (6b546): never sent
+    ?'<span class="docchip dloc dpdf'+(d.err?' dbad dperr':' dpbusy')+'" title="'+esc(d.name+(d.err?"\n"+d.err:""))+'">📄 '
+      +'<span class="dcn">'+esc(d.name)+'</span>'
+      +(d.err?'<i class="dcm dcbad">'+esc(d.err)+'</i>':'<i class="dcm">Reading\u2026</i>')
+      +'<b data-k="d" data-i="'+i+'" title="Remove">×</b></span>'
+    :d.local
+    ?'<span class="docchip dloc'+(d.bad?' dbad':'')+(d.pdf?' dpdf':'')+'" title="'+esc(docTip(d))+'">📄 '
+      +'<span class="dcn">'+esc(d.name)+'</span><i class="dcm">'+(d.pdf?docPages(d)+'</i>':docSize(d.bytes||0)+'</i>')
       +'<i class="dcm">'+(d.exact?'':'\u2248')+docK(d.tok)+' tokens</i>'
+      +(d.scanned?'<i class="dcm dcbad">'+docPl(d.scanned,"scanned page")+' skipped</i>':'')
       +(d.bad?'<i class="dcm dcbad">Not UTF-8</i>':'')
       +(DOC_MODE_TXT[d.mode]?'<i class="dcmode" data-k="m" data-i="'+i+'" title="Undo">'
         +DOC_MODE_TXT[d.mode]+'</i>':'')
@@ -57128,6 +57350,26 @@ function addImageFile(f){
   };
   img.src=URL.createObjectURL(f);
 }
+async function addPdfFile(f){
+  if(pendingDocs.length>=2)return;
+  const d={name:f.name,text:"",bytes:f.size,pdf:true,busy:true,mode:"full",tok:0,exact:false};
+  pendingDocs.push(d);paintChips();
+  d.wait=(async()=>{
+    try{
+      if(f.size>DOC_PDF_MAX)d.err=DOC_PDF_BIG;
+      else{
+        const r=await api("/api/doc/pdf",{method:"POST",headers:{"Content-Type":"application/pdf"},
+          body:await f.arrayBuffer()});
+        const j=await r.json().catch(()=>({}));
+        if(!j.ok||!j.text)d.err=j.err||DOC_PDF_BAD;
+        else Object.assign(d,{text:j.text,local:true,pages:j.pages||0,read:j.read||0,partial:!!j.partial,
+          scanned:j.scanned||0,scanPages:j.scanned_pages||[],tok:Math.ceil(j.text.length/4)});
+      }
+    }catch(e){d.err=DOC_PDF_BAD;}
+    d.busy=false;delete d.wait;
+    if(pendingDocs.includes(d)){paintChips();if(d.local)docMeasure();}
+  })();
+}
 async function addDocFile(f){
   if(pendingDocs.length>=2)return;
   try{
@@ -57153,6 +57395,7 @@ $("#attach").addEventListener("click",()=>$("#fpick").click());
 $("#fpick").addEventListener("change",()=>{
   [...$("#fpick").files].forEach(f=>{
     if(f.type.startsWith("image/"))addImageFile(f);
+    else if(DOC_PDF.test(f.name))addPdfFile(f);
     else if(f.size<2_000_000)addDocFile(f);
   });
   $("#fpick").value="";
@@ -57162,7 +57405,8 @@ $("#fpick").addEventListener("change",()=>{
 // gone and nothing led back. Only a drag that carries FILES is taken
 // (review: taking every drop stopped text and links landing in the
 // composer), and only what the attach button accepts: a PDF read as
-// text reached the model as garbage framed as real data.
+// text reached the model as garbage framed as real data. A PDF goes to
+// addPdfFile since 6b546, read on this computer as the button reads it.
 const DROP_TEXT=/\.(txt|md|markdown|csv|json|js|ts|py|html|css|log|sh|ya?ml|xml|toml|rtf)$/i;
 const hasFiles=e=>!!(e.dataTransfer&&[...(e.dataTransfer.types||[])].includes("Files"));
 addEventListener("dragover",e=>{
@@ -57174,11 +57418,12 @@ addEventListener("drop",e=>{
   const skipped=[];
   [...(e.dataTransfer.files||[])].forEach(f=>{
     if(f.type.startsWith("image/"))addImageFile(f);
+    else if(DOC_PDF.test(f.name))addPdfFile(f);      // read on this computer (6b546)
     else if(DROP_TEXT.test(f.name)&&f.size<2_000_000)addDocFile(f);
     else skipped.push(f.name);
   });
   if(skipped.length)input.placeholder="can't read "+skipped[0]
-    +" here \u2014 text files and images only";
+    +" here \u2014 text files, PDFs and images only";
 });
 input.addEventListener("paste",e=>{
   const items=[...(e.clipboardData||{}).items||[]]
@@ -57301,6 +57546,15 @@ async function send(){
   if(benchOn||generating)return;
   const text=input.value.trim();
   if(!text&&!pendingImages.length&&!pendingDocs.length)return;
+  // A PDF STILL BEING READ IS WAITED FOR (6b546); one that can't be read
+  // is never sent (its chip said why)
+  if(pendingDocs.some(d=>d.busy)){
+    sendAsking=true;
+    try{await Promise.all(pendingDocs.filter(d=>d.busy).map(d=>d.wait));}finally{sendAsking=false;}
+    if(generating)return;
+  }
+  if(pendingDocs.some(d=>d.err)){pendingDocs=pendingDocs.filter(d=>!d.err);paintChips();
+    if(!text&&!pendingImages.length&&!pendingDocs.length)return;}
   // A FILE OVER THE LINE ASKS FIRST (6b522): measured again when the pick
   // changed since, and while the bar waits for a choice nothing is sent
   if(pendingDocs.some(d=>d.local)){
@@ -57376,7 +57630,7 @@ async function send(){
   // the attached files ride as chips with their size in tokens (6b528)
   const uDiv=addMsg("user",shown,null,null,null,null,null,null,
     {docs:sentDocs.map(d=>({name:d.name,tok:d.local&&d.tok?d.tok:Math.ceil(String(d.text||"").length/4),   // the model's own count (6b522) when it was measured
-      exact:!!(d.local&&d.exact),mode:d.mode||""}))});
+      exact:!!(d.local&&d.exact),mode:d.mode||"",pages:d.pdf?d.pages||0:0}))});
   if(sentImages.length){
     const row=document.createElement("div");row.className="sentimgs";
     sentImages.forEach(d=>{const im=new Image();im.src=d;row.appendChild(im);});

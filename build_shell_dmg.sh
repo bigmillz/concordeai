@@ -19,7 +19,8 @@
 #   * Resources/ carries millenai.py, fonts/, vfx/, the first-run launch.sh,
 #     crypto-requirements.txt (the sidecar's venv bootstrap, 6b537) and
 #     concorde-dictate, the on-device speech helper (6b543, built here by
-#     shell/dictate/build.sh and signed on its own);
+#     shell/dictate/build.sh and signed on its own) and concorde-pdftext,
+#     the on-device PDF reader (6b546, shell/pdftext/build.sh, the same way);
 #   * the bundle verifies (ad hoc until a Developer ID is in the keychain:
 #     CONCORDE_SIGN_IDENTITY names one).
 set -e
@@ -52,6 +53,9 @@ TARGS=(); [[ -n "$TARGET" ]] && TARGS=(--target "$TARGET")
 # the on-device speech helper (6b543) goes in beside millenai.py
 ./shell/dictate/build.sh
 [[ -x shell/dictate/concorde-dictate ]] || { echo "shell/dictate/concorde-dictate wasn't built"; exit 1; }
+# and the PDF reader (6b546)
+./shell/pdftext/build.sh
+[[ -x shell/pdftext/concorde-pdftext ]] || { echo "shell/pdftext/concorde-pdftext wasn't built"; exit 1; }
 ( cd shell/src-tauri && cargo tauri build --bundles app "${TARGS[@]}" )
 BUNDLE="shell/src-tauri/target/${TARGET:+$TARGET/}release/bundle/macos/ConcordeAI.app"
 [[ -d "$BUNDLE" ]] || { echo "expected $BUNDLE but it wasn't built"; exit 1; }
@@ -72,6 +76,8 @@ IDENTITY="${CONCORDE_SIGN_IDENTITY:--}"
 # before the bundle's seal is written over it
 ditto shell/dictate/concorde-dictate "$BUNDLE/Contents/Resources/concorde-dictate"
 codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"
+ditto shell/pdftext/concorde-pdftext "$BUNDLE/Contents/Resources/concorde-pdftext"
+codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-pdftext"
 codesign --force --sign "$IDENTITY" "$BUNDLE"
 codesign --verify --strict "$BUNDLE"
 [[ "$IDENTITY" == "-" ]] && echo "  ad-hoc signed (no Developer ID; set CONCORDE_SIGN_IDENTITY to sign for Gatekeeper)" \
@@ -86,7 +92,7 @@ GOT_EXE="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST")"
 [[ "$GOT_VER" == "$VER" ]] || { echo "CFBundleShortVersionString is $GOT_VER, not $VER"; exit 1; }
 [[ "$GOT_ID" == "com.millen.millenai" ]] || { echo "bundle id is $GOT_ID"; exit 1; }
 [[ "$GOT_EXE" == "ConcordeAI" ]] || { echo "executable is $GOT_EXE"; exit 1; }
-for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate; do
+for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do
   [[ -e "$BUNDLE/Contents/Resources/$f" ]] || { echo "Resources/$f is missing from the bundle"; exit 1; }
 done
 # the bundled server is this source, build and all

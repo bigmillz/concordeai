@@ -51,3 +51,6 @@ shell/src-tauri/sidecar/
 # the on-device speech helper (6b541): built by shell/dictate/build.sh
 shell/dictate/concorde-dictate
 shell/dictate/concorde-dictate.*
+# the on-device PDF reader (6b546): built by shell/pdftext/build.sh
+shell/pdftext/concorde-pdftext
+shell/pdftext/concorde-pdftext.*
