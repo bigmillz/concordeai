@@ -17380,6 +17380,23 @@ time.sleep(1.5)
 _imgA9 = [f for f in os.listdir(os.path.join(_P9.home, "images")) if f.endswith(".png")]
 _expA9 = [f for f in os.listdir(os.path.join(_P9.home, "exports")) if not f.endswith(".meta")]
 _hk9(_P9, op="fill", tag=_cA9["chat"] + "-cache")
+# root's own index (know-you, 6b530) at rest before each snapshot: the canary chat just
+# written is indexed by root's own pass, and a pass that a switch cut short (ISO-7)
+# finishes for root once root is back. Both are root's own work on root's own data, and
+# the byte comparison below is meant to catch anything else; run g caught the pass
+# mid-flight (index.db and its WAL differed). Settled = the indexer reports no pass
+# under way, twice running, with the same counts.
+def _know_settle9(inst, timeout=60.0):
+    t_, last_ = time.time() + timeout, None
+    while time.time() < t_:
+        st_ = _q9(inst, "/api/know")[1] or {}
+        cur_ = (st_.get("state"), json.dumps(st_.get("counts"), sort_keys=True))
+        if cur_[0] in ("idle", "downloading") and cur_ == last_:
+            return True
+        last_ = cur_
+        time.sleep(1.0)
+    return False
+_settleA9 = _know_settle9(_P9)
 _rootA9 = _root9(_P9.home)
 _sinB9 = _hk9(_P9, op="signin")
 _stB9 = _hk9(_P9, op="status")
@@ -17397,6 +17414,7 @@ time.sleep(1.2)
 _bdirB9 = os.path.join(_P9.home, "accounts", _sinB9.get("dir") or "x")
 _inB9 = bool(_bytegrep(_bdirB9, _cB9))
 _sout9 = _hk9(_P9, op="signout")
+_settleA9b = _know_settle9(_P9)
 _rootA9b = _root9(_P9.home)
 check("two profiles, A -> B -> A: B's GETs, media ids, exports and caches show nothing of A's; "
       "B's data goes with B; root comes back byte-identical but for profile.json, run/ and the "
@@ -17405,10 +17423,11 @@ check("two profiles, A -> B -> A: B's GETs, media ids, exports and caches show n
       and _mediaB9 and all(c == 404 for c in _mediaB9) and _stB9.get("dirty") == []
       and [c.get("title") for c in json.loads(_seenB9["/api/chats"][2])["chats"]] == []
       and _inB9 and _sout9.get("ok") is True and not _bytegrep(_P9.home, _cB9)
-      and _rootA9b == _rootA9
+      and _settleA9 and _settleA9b and _rootA9b == _rootA9
       and all(_q9(_P9, "/api/image/" + f, raw=True)[0] == 200 for f in _imgA9),
       "%r" % [_sinB9, {p: v[0] for p, v in _seenB9.items()}, _leakB9, _mediaB9, _stB9.get("dirty"),
-              _inB9, _sout9, sorted(set(_rootA9b.items()) ^ set(_rootA9.items()))[:4]])
+              _inB9, _sout9, _settleA9, _settleA9b,
+              sorted(set(_rootA9b.items()) ^ set(_rootA9.items()))[:4]])
 
 # ---- ISO-7 with real switches: writes started under one profile and landing after the
 # sign-in or sign-out land nowhere
