@@ -21326,7 +21326,8 @@ def _svc_review(src):
                    and "ollama1" not in src[src.index("function srvWhere(m){"):
                                             src.index("function paintEngMenuServers(){")]
                    and not re.search(r'"[^"\n]*ollama1[^"\n]*"', re.sub(r'"ollama1-(req|pair|pair-key|pair-ok)-v1', "", msgs))
-                   and "a cloud compositor, the\n      server&rsquo;s drafts go to that cloud provider" in pane)
+                   # the disclosure (6b334), in copy-2's voice at the owner's call
+                   and "nothing answers in its place. With a cloud compositor, its drafts go to that provider to be combined.</p>" in pane)
     # a council of server models only: their reason, no local rescue
     out["council"] = ('        raise ServerError("council", "None of the picked models answered. "' in src
                       and "        except ServerError as exc:\n            # a council of your own servers'" in src

@@ -19015,6 +19015,14 @@ second site now sweep every occurrence (docattach brought a second `network erro
 found no other docattach string a row covers; its new strings keep their words. Prerelease (6b318) and the
 Cloud pane's disclosure sentence stay as before.
 
+- **On beta-1 (per Patrick):** the Servers pane's disclosure, which row `set-srv-about` (marked
+  `pinned: false`) had dropped against 6b334's pin, is restored at the owner's call, in the short voice:
+  "With a cloud compositor, its drafts go to that provider to be combined." (a server's drafts leave for the
+  cloud provider only when an Advanced council has a cloud compositor). The 6b334 pin follows it at the same
+  strength, so the servers' 68-mutation check is green again. Also found on beta-1: six rows marked
+  `pinned: true` left computed pins stale (a concatenation, a `pc_words` render, a helper's body); the 89
+  pin edits reached literal pins only, and the merged gauntlet's ~90 computed ones were re-pinned there.
+
 ## 6b539 — The first draft shows as it is written; idle engines stay while there is room (per Patrick)
 
 Two of 6b531's levers, decided for the 7.0 beta ("faster feels smarter"), branch beta-1.

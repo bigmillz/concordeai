@@ -52988,7 +52988,10 @@ __CODE_ROWS__
       target="_blank" rel="noopener">Setup guide</a> &middot; <a class="srv-link"
       href="https://github.com/bigmillz/concordeai/tree/main/ollama1"
       target="_blank" rel="noopener">Scripts</a></p>
-      <p class="srv-about">Pair with the code on the server&rsquo;s screen. Its models answer when you pick them. A server that can&rsquo;t answer says so; nothing answers in its place.</p>
+      <!-- the disclosure (6b334, per Patrick; restored at his call after 6b538's row dropped it): a
+           server's drafts leave for the cloud provider only when an Advanced council has a cloud
+           compositor -->
+      <p class="srv-about">Pair with the code on the server&rsquo;s screen. Its models answer when you pick them. A server that can&rsquo;t answer says so; nothing answers in its place. With a cloud compositor, its drafts go to that provider to be combined.</p>
       <div id="srv-list"></div>
       <div id="srv-add">
         <div class="srv-h">Add a server</div>
