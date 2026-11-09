@@ -42486,11 +42486,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # a key /models answered for isn't rejected (review)
                     auth=(cloud_failure_kind(exc.code, raw or detail) == "auth"
                           and not found))
+                # the hints end in a full stop and the kept note starts with
+                # one, so the stop is the note's when there is a note
+                _kn = _kept_note(name, _kept)
                 self._send_json({"ok": False,
                                  "err": "That key didn’t work: %s%s%s"
                                         % (detail or ("HTTP %s"
-                                           % exc.code), hint,
-                                           _kept_note(name, _kept))})
+                                           % exc.code),
+                                           hint.rstrip(".") if _kn else hint,
+                                           _kn)})
                 return
             except Exception as exc:
                 _kept = _cloud_save_failed(which, {

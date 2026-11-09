@@ -25758,8 +25758,9 @@ check("servers (live): a plain server pick with web search on keeps this Mac qui
       and len(_ulW) == _ul0, "%r" % [_scW[1][:120], _stW, _ttW, _ulW[-2:]])
 check("servers (live): a server pick the server couldn't run is said in words about the card, asks the "
       "server once, titles nothing, and loads nothing on this Mac",
-      _scF[1].strip() == ("⚠️ %s’s graphics card isn’t in use right now, so the model "
-                          "would have run on its CPU. It stopped." % _SVN)
+      # (6b538) the short voice of _srv_fail's fit line, under the except path's ⚠️
+      _scF[1].strip() == ("⚠️ %s’s card isn’t in use, so the model would have run on CPU. "
+                          "It stopped." % _SVN)
       and len(_lgF) == 1 and _ttF[1].get("title") == "" and len(_ulF) == len(_ulW),
       "%r" % [_scF[1][:200], len(_lgF), _ttF, len(_ulF), len(_ulW)])
 # Cloud Only never seats a server model; no tier lists one
