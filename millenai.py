@@ -51515,7 +51515,6 @@ body.gen #chip-model{color:var(--accent)}
   .hz .hz-rig b{display:none}
   .hz .hz-rig{padding:0 8px}
   .hz #main:has(#hero) #chat-inner{padding-top:120px}
-  .hz .hz-sl{width:120px}
   .hz #main:has(#hero) #composer-wrap{padding:0 12px 24px}
   .hz #composer{padding:16px 12px 12px 18px}
   .hz #main:not(:has(#hero)) #composer{margin-left:auto}
@@ -52212,33 +52211,70 @@ __HZ_FONTS__
   background:currentColor;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat;
           mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat}
 .hz .gen #chip-model{color:inherit}
-/* ---- the effort slider (NORTHSTAR 24-30) over a real range input */
+/* ---- THE EFFORT SLIDER (6b549, per Patrick: "Remember how we had it? It looked beautiful when it was very
+   slim and very fluid, not just a bunch of dots"): the friend page's slider (beta/DESIGN.md, The effort slider),
+   ported over 6b542's balance beam. A slim pill, 220 x 16 on the home (radius 4.5) and 200 x 12 in a conversation
+   (radius 4), 88 x 16 under 600 px: a faint frosted channel and a luminous fill from the left round the knob, blue
+   #4f8cff > violet #9b72ff > rose #f07aa6, fixed to the track so each level has its own colour, with a blurred copy
+   beneath it (the bloom) that grows with the effort. The knob is a near-white rounded square (14 px, 11 in a
+   conversation) with a soft halo in the fill's colour where it stands, rising while hovered or held. NO DOTS AT REST:
+   five faint notches show only while the slider is hovered, dragged or keyboard-focused. Fluid: held, the knob and
+   the fill follow the pointer continuously (--hz-eff-u fractional, hzControlsWire; no transition while held) and the
+   level name changes as each stop is crossed; let go, or step with a key, and it snaps to the stop in 140 ms on
+   cubic-bezier(.22,1,.36,1), no bounce. Click anywhere to jump, arrows step.
+   The whole 36 px height (32 on a phone) is the hit area: the real range input on top, its own thumb as wide as the
+   pill is tall so its steps fall exactly under the drawn ones. The level's name beside it in normal case (Low, Medium,
+   High, Extra, Ultra), 12 px off the track, in a box as wide as "Medium" so the pill never shifts, no explanation. Calm: the same look, no transitions (the spec); reduced
+   motion the same. Geometry from --hz-sw (the track's width), --hz-ph (its height), --hz-ob (the knob), --hz-sr and
+   --hz-kr (their radii) and --hz-eff-u (where the knob stands, 0 to 1). Ultra's knob, stars and label are in the
+   ULTRA block below. */
 #hz-effort{display:none}
-.hz #hz-effort{display:flex;align-items:center;gap:14px;min-width:0}
+.hz #hz-effort{display:flex;align-items:center;gap:12px;min-width:0}
 .hz #hz-effort[hidden]{display:none}
 .hz .hz-vh{position:absolute;left:-9999px}
-.hz .hz-sl{position:relative;width:170px;height:40px;flex:none;border-radius:999px;--hz-eff-u:.25}
-.hz .hz-sl-glow{position:absolute;left:9px;right:9px;top:16px;height:8px;border-radius:4px;pointer-events:none;
-  background:linear-gradient(90deg,rgba(159,192,255,0) 0%,rgba(159,192,255,.22) 45%,rgba(159,192,255,.62) 100%);filter:blur(7px)}
-.hz .hz-sl-track{position:absolute;left:9px;right:9px;top:19px;height:2px;border-radius:1px;pointer-events:none;
-  background:linear-gradient(90deg,rgba(255,255,255,.18) 0%,rgba(159,192,255,.34) 55%,rgba(176,204,255,.75) 100%)}
-.hz .hz-sl-fill{position:absolute;left:9px;top:19px;height:2px;width:calc(100% - 18px);border-radius:1px;pointer-events:none;
-  background:#cfe0ff;box-shadow:0 0 8px rgba(159,192,255,.7);transform-origin:0 50%;transform:scaleX(var(--hz-eff-u));transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
-.hz .hz-sl-dot{position:absolute;top:17px;width:6px;height:6px;margin-left:-3px;border-radius:50%;pointer-events:none;background:rgba(214,226,255,.45);left:calc(9px + (100% - 18px) * var(--hz-u))}
-.hz .hz-sl-dot.passed{background:#cfe0ff}
-.hz .hz-sl-dot.last{background:rgba(176,204,255,.85);box-shadow:0 0 8px rgba(159,192,255,.7)}
-.hz .hz-sl-halo{position:absolute;top:6px;left:9px;width:28px;height:28px;margin-left:-14px;border-radius:50%;pointer-events:none;
-  background:radial-gradient(circle,rgba(159,192,255,.55) 0%,rgba(159,192,255,0) 70%);transform:translateX(var(--hz-eff-px,0px));
-  transition:transform var(--hz-t-mid) var(--hz-ease-spring);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
-.hz .hz-sl-thumbw{position:absolute;left:9px;right:9px;top:11px;height:18px;pointer-events:none}
-.hz .hz-sl-thumb{position:absolute;top:0;left:0;width:18px;height:18px;margin-left:-9px;border-radius:50%;
-  background:radial-gradient(circle at 40% 35%,#ffffff 0%,#dde7ff 70%,#bfd0ff 100%);
-  box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 14px rgba(159,192,255,.9),0 2px 4px rgba(0,0,0,.45);
-  transform:translateX(var(--hz-eff-px,0px));transition:transform var(--hz-t-mid) var(--hz-ease-spring)}
-.hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-halo{transition:none}
-.hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) scale(1.08);box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 18px rgba(159,192,255,1),0 3px 6px rgba(0,0,0,.45)}
-.hz .hz-sl input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none}
+.hz .hz-sl{position:relative;width:var(--hz-sw);height:36px;flex:none;--hz-sw:220px;--hz-ph:16px;--hz-ob:14px;--hz-sr:4.5px;--hz-kr:4px;--hz-eff-u:.25;
+  --hz-snap:140ms cubic-bezier(.22,1,.36,1);--hz-eff-px:calc((var(--hz-sw) - var(--hz-ph)) * var(--hz-eff-u));
+  --hz-ks:0 1px 2px rgba(4,8,30,.45),0 2px 6px rgba(4,8,30,.35);--hz-halo:#4f8cff;--hz-bloom:.32}
+.hz .hz-sl[data-lv="1"]{--hz-halo:#6f80ff;--hz-bloom:.4}
+.hz .hz-sl[data-lv="2"]{--hz-halo:#9b72ff;--hz-bloom:.5}
+.hz .hz-sl[data-lv="3"]{--hz-halo:#c776d2;--hz-bloom:.62}
+.hz .hz-sl[data-lv="4"]{--hz-halo:#f07aa6;--hz-bloom:.78}
+.hz .hz-sl-track,.hz .hz-sl-fill,.hz .hz-sl-bloom{position:absolute;left:0;top:calc(50% - var(--hz-ph) / 2);height:var(--hz-ph);border-radius:var(--hz-sr);pointer-events:none}
+.hz .hz-sl-track{right:0;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.085));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),inset 0 1px 2px rgba(0,0,0,.25)}
+.hz .hz-sl-fill,.hz .hz-sl-bloom{width:calc(var(--hz-ph) + (100% - var(--hz-ph)) * var(--hz-eff-u));overflow:hidden;transition:width var(--hz-snap);
+  background:linear-gradient(90deg,#4f8cff,#9b72ff 55%,#f07aa6) 0 0/var(--hz-sw) 100% no-repeat}
+.hz .hz-sl-fill{box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -1px 2px rgba(20,10,60,.18)}
+.hz .hz-sl-bloom{filter:blur(8px);opacity:var(--hz-bloom);transition:width var(--hz-snap),opacity .32s var(--hz-ease-out)}
+/* the five notches: none at rest; faint, fading in over 200 ms, only while the slider is hovered, dragged or
+   keyboard-focused; .18, passed ones .5, no glow */
+.hz .hz-sl-dot{position:absolute;top:calc(50% - 1.25px);left:calc(var(--hz-ph) / 2 + (100% - var(--hz-ph)) * var(--hz-u));width:2.5px;height:2.5px;margin-left:-1.25px;border-radius:.5px;pointer-events:none;
+  background:rgba(255,255,255,.18);opacity:0;transition:opacity .2s var(--hz-ease-out)}
+.hz .hz-sl-dot.passed{background:rgba(255,255,255,.5)}
+.hz .hz-sl:hover .hz-sl-dot,.hz .hz-sl.dragging .hz-sl-dot,.hz .hz-sl:has(input:focus-visible) .hz-sl-dot{opacity:1}
+/* the knob: a near-white rounded square lit from above, a crisp edge, a soft shadow; its halo in the fill's colour */
+.hz .hz-sl-thumb{position:absolute;top:calc(50% - var(--hz-ob) / 2);left:calc(var(--hz-ph) / 2 + (100% - var(--hz-ph)) * var(--hz-eff-u));width:var(--hz-ob);height:var(--hz-ob);margin-left:calc(var(--hz-ob) / -2);pointer-events:none;transition:left var(--hz-snap)}
+.hz .hz-sl-halo{position:absolute;left:50%;top:50%;width:calc(var(--hz-ob) * 1.5);height:calc(var(--hz-ob) * 1.5);margin:calc(var(--hz-ob) * -.75) 0 0 calc(var(--hz-ob) * -.75);border-radius:calc(var(--hz-kr) * 1.6);
+  background-color:var(--hz-halo);filter:blur(6px);opacity:.45;transform:scale(.85);transition:opacity .3s var(--hz-ease-out),transform .3s var(--hz-ease-out),background-color .2s var(--hz-ease-out)}
+.hz .hz-sl:hover .hz-sl-halo{opacity:.7;transform:scale(1.05)}
+.hz .hz-sl.dragging .hz-sl-halo{opacity:.85;transform:scale(1.22)}
+.hz .hz-sl-core{position:absolute;inset:0;border-radius:var(--hz-kr);box-sizing:border-box;border:1px solid rgba(255,255,255,.95);
+  background:radial-gradient(110% 90% at 50% 25%,#fff 0%,#f4f7ff 45%,#dde5fa 100%);box-shadow:var(--hz-ks);transition:transform 120ms var(--hz-ease-out),opacity .2s var(--hz-ease-out)}
+.hz .hz-sl:hover .hz-sl-core{transform:scale(1.05)}
+.hz .hz-sl.dragging .hz-sl-core{transform:scale(1.1)}
+/* held, the knob, the fill and the bloom follow the pointer with no transition; let go (or step with a key) and they
+   snap together in 140 ms */
+.hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-bloom{transition:none}
+/* the hit area: the real range input over the whole 36 px; its thumb as wide as the pill is tall, so the native steps
+   and the drawn ones agree (WebKit and Blink both take ::-webkit-slider-thumb) */
+.hz .hz-sl input[type=range]{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none;background:transparent}
+.hz .hz-sl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:var(--hz-ph);height:36px;border:0;background:transparent}
 .hz .hz-sl input[type=range]:focus{outline:0}
+.hz .hz-elevel{position:relative;font:500 13px var(--hz-font-ui);color:var(--hz-ink-2);min-width:56px;letter-spacing:.005em;white-space:nowrap}   /* wide enough for Medium: the pill never shifts as the name changes */
+/* in a conversation: slimmer, the hit area unchanged */
+.hz #hz-effort.compact .hz-sl{--hz-sw:200px;--hz-ph:12px;--hz-ob:11px;--hz-sr:4px;--hz-kr:3.5px}
+/* Calm: the same look, still; reduced motion the same */
+.hz.hz-calm .hz-sl *,.hz.hz-calm .hz-sl *::before,.hz.hz-calm .hz-sl *::after{transition:none}
+@media (prefers-reduced-motion:reduce){.hz .hz-sl *,.hz .hz-sl *::before,.hz .hz-sl *::after{transition:none!important}}
 /* the picker: the mode's name only; a glass menu opens over the sky */
 .hz .hz-pick{display:flex;align-items:center;gap:7px;height:36px;padding:0 11px 0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
   cursor:pointer;color:var(--hz-ink);font:inherit;flex:none;transition:background var(--hz-t-fast) ease}
@@ -52247,7 +52283,6 @@ __HZ_FONTS__
 .hz .hz-pick b{font-size:14px;font-weight:500;white-space:nowrap}
 .hz .hz-pick svg{opacity:.7;transform:rotate(180deg);transition:transform .35s var(--hz-ease-out)}
 .hz .hz-pick[aria-expanded=true] svg{transform:none}
-.hz .hz-elevel{font-size:13px;color:var(--hz-ink-2);min-width:60px;white-space:nowrap}
 #hz-menu{display:none}
 .hz #hz-menu{display:block;position:fixed;left:0;top:0;width:min(340px,calc(100vw - 32px));padding:6px;border-radius:18px;z-index:40;
   background:rgba(12,16,32,.8);border:1px solid rgba(255,255,255,.12);-webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);
@@ -52288,17 +52323,8 @@ __HZ_FONTS__
   transition:max-width .5s var(--hz-ease-out),padding .5s var(--hz-ease-out),margin .5s var(--hz-ease-out),opacity .35s var(--hz-ease-out),transform .55s var(--hz-ease-spring),filter .4s var(--hz-ease-out)}
 .hz .hz-mdl.in{max-width:260px;padding-inline:10px 12px;border-width:1px;margin-right:0;opacity:1;transform:none;filter:none}
 .hz .hz-mdl b{font-size:13px;font-weight:500;color:var(--hz-ink)}
-.hz #hz-effort.compact{gap:10px}
-.hz #hz-effort.compact .hz-sl{width:120px;height:28px;margin:0}
-.hz #hz-effort.compact .hz-sl-glow{top:11px;height:6px}
-.hz #hz-effort.compact .hz-sl-track,.hz #hz-effort.compact .hz-sl-fill{top:13px}
-.hz #hz-effort.compact .hz-sl-dot{top:11.5px;width:5px;height:5px;margin-left:-2.5px}
-.hz #hz-effort.compact .hz-sl-halo{top:3px;width:22px;height:22px;margin-left:-11px}
-.hz #hz-effort.compact .hz-sl-thumbw{top:7px;height:14px}
-.hz #hz-effort.compact .hz-sl-thumb{width:14px;height:14px;margin-left:-7px}
 .hz #hz-effort.compact .hz-pick{height:30px;padding:0 9px 0 11px}
 .hz #hz-effort.compact .hz-pick b{font-size:13px}
-.hz #hz-effort.compact .hz-elevel{min-width:0;font-size:12.5px}
 /* ---- a mode switch (6b540): the name rolls like a slot while the chip's width morphs (the two
    names share one clipped cell); the chosen row's light travels into the chip, which lights for
    a moment; one sweep runs along the composer's top edge. Nothing of this exists while idle. */
@@ -52399,7 +52425,7 @@ __HZ_FONTS__
   .hz #hz-wash,.hz #hz-wash.bloom{animation:none!important;opacity:.1}
   .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
   .hz #composer::before{animation:none;opacity:0!important}
-  .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
+  .hz #hz-aurw{transition:none!important}
   .hz .hz-streak,.hz .hz-sweep{display:none}
 }
 /* ---- the Look and Effects rows in Settings > About, in the pane's own row style */
@@ -52410,13 +52436,13 @@ __HZ_FONTS__
 @media (max-width:600px){
   .hz #main:not(:has(#hero)) #hz-top{padding:0 14px;gap:10px}
   .hz #main:not(:has(#hero)) #hz-right{gap:8px;flex:0 0 auto}
-  .hz #main:not(:has(#hero)) #hz-effort-slot .hz-sl{width:84px}
+  .hz #main:not(:has(#hero)) #hz-effort-slot .hz-sl,.hz #hz-effort:not(.compact) .hz-sl{--hz-sw:88px;--hz-ph:16px;--hz-ob:14px;--hz-sr:4.5px;--hz-kr:4px;height:32px}
+  .hz #hz-effort,.hz #hz-effort.compact{gap:10px}
   .hz #main:not(:has(#hero)) #hz-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hz #hz-mark{display:none}
   .hz #hz-lanes{gap:14px}
   .hz #crow{row-gap:10px}
-  .hz #hz-effort:not(.compact){order:9;flex:1 1 100%;gap:10px}
-  .hz #hz-effort:not(.compact) .hz-sl{width:120px}
+  .hz #hz-effort:not(.compact){order:9;flex:1 1 100%}
 }
 /* ---- attached files (6b522) in the Horizon composer: glass chips with the digits in mono, the
    70% bar as glass lit from below with pill buttons; aligned with the composer in a conversation */
@@ -52456,7 +52482,7 @@ __HZ_FONTS__
    perfect, but also being a Scorpio where I can sting ... very sharp and fancy"): one centred
    axis with the composer at the golden-ratio point (hzBalance), an 8 px grid, four type sizes,
    silver hairlines in place of glows, tight radii (composer 14, keys 8), a balance-beam slider
-   with a diamond thumb, and ONE accent, ember, that appears only at a moment of decision: the
+   with a diamond thumb (gone in 6b549: the slim luminous pill), and ONE accent, ember, that appears only at a moment of decision: the
    send strike, the focus hairline, an error's left rule. It never loops and it never glows. */
 :root{--hz-r-composer:14px;--hz-ember:#e8415a;--hz-hair-3:rgba(255,255,255,.22)}
 /* ---- the sky in Calm: the stars, the moonlight and the hour's gradient as a still (hzSky's
@@ -52539,25 +52565,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .hz-opt[aria-checked=true]>b::after{box-shadow:none}
 .hz .hz-pick{height:40px;border-radius:8px;gap:8px;padding:0 10px 0 12px}
 .hz #hz-effort.compact .hz-pick{height:32px;padding:0 8px 0 10px}
-/* ---- the slider is a balance beam: one hairline, a tick at each of the five steps, a sharp
-   diamond thumb that snaps to its step in 120 ms with no bounce; the level in mono caps */
-.hz .hz-sl-glow,.hz .hz-sl-halo{display:none}
-.hz .hz-sl-track{top:20px;height:1px;border-radius:0;background:var(--hz-hair-3)}
-.hz .hz-sl-fill{top:20px;height:1px;border-radius:0;background:#fff;box-shadow:none;transition:transform 120ms ease}
-.hz .hz-sl-dot{top:17px;width:1px;height:6px;margin-left:-.5px;border-radius:0;background:var(--hz-hair-3)}
-.hz .hz-sl-dot.passed{background:#fff}
-.hz .hz-sl-dot.last{background:var(--hz-hair-3);box-shadow:none}
-.hz .hz-sl-dot.last.passed{background:#fff}
-.hz .hz-sl-thumbw{top:15px;height:10px}
-.hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;
-  transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}
-.hz .hz-sl.dragging .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);box-shadow:none;transition:none}
-.hz #hz-effort.compact .hz-sl-track,.hz #hz-effort.compact .hz-sl-fill{top:14px}
-.hz #hz-effort.compact .hz-sl-dot{top:11px;width:1px;height:6px;margin-left:-.5px}
-.hz #hz-effort.compact .hz-sl-thumbw{top:9px;height:10px}
-.hz #hz-effort.compact .hz-sl-thumb{width:10px;height:10px;margin-left:-5px}
-.hz .hz-elevel{font-family:var(--hz-font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--hz-ink-2);min-width:60px}
-.hz #hz-effort.compact .hz-elevel{font-size:10.5px}
+/* ---- the slider: 6b542's balance beam (a hairline, five ticks, a diamond, the level in spaced mono caps) gave way in
+   6b549 to the friend page's slim luminous pill, per Patrick ("not just a bunch of dots"); see THE EFFORT SLIDER */
 /* ---- the send key: a crisp square with a 1.5 px arrow; silver outline until there are words,
    ember while there are (#composer.hastext); the stop key is silver */
 .hz #send{width:40px;height:40px;border-radius:8px;background:transparent;color:var(--hz-ink-2);box-shadow:inset 0 0 0 1px var(--hz-hair-3);
@@ -52602,11 +52611,6 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* a faint light along the composer's top edge that warms on focus */
 .hz.hz-bal #composer{box-shadow:inset 0 1px 0 rgba(200,222,255,.22),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.35)}
 .hz.hz-bal #composer:focus-within{box-shadow:inset 0 1px 0 rgba(200,222,255,.45),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35)}
-/* the effort beam: a still pool of light under the diamond that grows with the effort */
-.hz.hz-bal .hz-sl-halo{display:block;animation:none;opacity:calc(.3 + var(--hz-eff-u) * .6);
-  background:radial-gradient(circle,rgba(159,192,255,.5) 0%,rgba(159,192,255,0) 70%);
-  transform:translateX(var(--hz-eff-px,0px)) scale(calc(.7 + var(--hz-eff-u) * .7));transition:transform 120ms ease,opacity 120ms ease}
-.hz.hz-bal .hz-sl.dragging .hz-sl-halo{transition:none}
 /* the mode switch: one soft light under the chip as the name rolls */
 .hz .hz-pick{position:relative;overflow:hidden}
 .hz .hz-usweep{position:absolute;left:0;bottom:0;width:40%;height:1px;pointer-events:none;opacity:0;
@@ -52624,18 +52628,20 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
    look stays restrained; this is the one place the effects perform. Values and timings are the friend
    page's (scratchpad/preview-site/beta, DESIGN.md "The Ultra moment").
-   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the diamond ignites (a white core; a small
-   violet bloom at 18 %, within 9 px of the diamond, gone by 900 ms); a 22 px spark runs from the diamond back along the beam to its
+   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the knob clicks into place as a star (6b549: it unfolds
+   from .45 and overshoots to 1.12 in 320 ms); a 22 px spark runs from the knob back along the track to its
    start (160 ms); from there a line of light runs all the way round the composer's border (a conic reveal
    from that point's angle, --hz-a0, 600 ms from 160 ms, a white head at its edge) and settles into a still
    1.5 px spectral rim, ice > violet > rose > ember, at .9; the aurora takes one breath (+.45 at 200 ms,
-   settled within 2 s); ULTRA is lit (a white glow that settles over 900 ms).
-   AT ULTRA (html.hz-ultra): the rim still, the diamond white, and THE LIVING ULTRA: the label's spectral
-   gradient flows across the crisp letters, ice > violet > rose > ember > gold and round again, one cycle in
-   3.5 s (the one approved loop on text, and only here); the diamond carries a faint glow of the same hue.
-   The rim stays still: the life is in the word and the diamond. LEAVING (html.hz-ultra-out) stops the flow
-   at once and drains the rim back the way it came in 300 ms. Calm and reduced motion: the still rim (a
-   300 ms fade in Calm) and the still gradient label. Arrivals ease on cubic-bezier(.16,1,.3,1), the drain on
+   settled within 2 s); "Ultra" is lit (a white glow that settles over 900 ms).
+   AT ULTRA (html.hz-ultra), the friend page's slider (6b549, per Patrick: keep its Ultra): the knob is a LIVING
+   STAR (crisp vector, white at its core, blue > violet light) stepping through four, six, eight and six points, one
+   form every 140 ms (hzKnobStar); seven tiny four-point stars drift left to right through the filled track
+   (3.2-5 s each, twinkling, clipped to it); the fill flows (one 2 x width period per 4 s) and the halo turns to the
+   cool spectrum; the label "Ultra" wears the cool tints with a white-blue highlight that glides across it once every
+   2.5 s (the one loop on text). The rim stays still. LEAVING (html.hz-ultra-out) folds the star back into the
+   rounded square in 200 ms and drains the rim back the way it came in 300 ms. Calm and reduced motion: plain (the
+   rounded-square knob, no drift, no flow, the label's gradient still) and the still rim (a 300 ms fade in Calm). Arrivals ease on cubic-bezier(.16,1,.3,1), the drain on
    cubic-bezier(.65,0,.35,1), the run on cubic-bezier(.45,0,.2,1). Full's rotating ring (::before) is off at Ultra. */
 @property --hz-rev{syntax:'<angle>';initial-value:360deg;inherits:false}
 .hz #composer{--hz-a0:230deg}
@@ -52652,29 +52658,41 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 @keyframes hzUltraRun{0%{--hz-rev:0deg;--hz-head:1}90%{--hz-head:1}100%{--hz-rev:360deg;--hz-head:0}}
 .hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}
 @keyframes hzUltraDrain{from{--hz-rev:360deg}to{--hz-rev:0deg}}
-/* the diamond: white at Ultra, with the faint flowing glow; on arrival the white core and the bloom */
-.hz.hz-ultra .hz-sl-thumb{background:#fff}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}
-.hz.hz-ignite .hz-sl-thumb,.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-sl-thumb{animation:hzIgnite .9s cubic-bezier(.16,1,.3,1) both,hzDiamondFlow 3.5s linear .9s infinite}
-/* the bloom stays small (per Patrick: no big circles or ovals in any effect): at its peak it reaches
-   about 9 px past the diamond's edge, a white core and a violet edge; no wide radial halo */
-@keyframes hzIgnite{0%{box-shadow:0 0 0 0 #fff}18%{box-shadow:0 0 6px 2px #fff,0 0 9px 2px rgba(185,168,255,.7)}
-  100%{box-shadow:0 0 0 0 rgba(255,255,255,0),0 0 0 0 rgba(185,168,255,0)}}
-@keyframes hzDiamondFlow{0%,100%{box-shadow:0 0 7px 1px rgba(207,224,255,.5)}25%{box-shadow:0 0 7px 1px rgba(185,168,255,.5)}50%{box-shadow:0 0 7px 1px rgba(242,166,180,.5)}
-  70%{box-shadow:0 0 7px 1px rgba(232,65,90,.45)}85%{box-shadow:0 0 7px 1px rgba(241,220,178,.5)}}
-/* the spark: 22 px, from the diamond back to the beam's start in 160 ms; leaving, back out to the diamond */
-.hz .hz-sl-spark{display:none;position:absolute;top:19px;left:9px;width:22px;height:3px;margin-left:-11px;border-radius:2px;pointer-events:none;opacity:0;
+/* the knob becomes the star (Balanced and Full); the rounded square folds away */
+.hz .hz-sl-star{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;overflow:visible;pointer-events:none;opacity:0;transform:scale(.45) rotate(-35deg);
+  filter:drop-shadow(0 0 2px rgba(220,232,255,.95)) drop-shadow(0 0 5px rgba(79,140,255,.85)) drop-shadow(0 0 9px rgba(155,114,255,.6));transition:opacity .2s var(--hz-ease-out),transform .2s var(--hz-ease-out)}
+.hz #hz-effort.compact .hz-sl-star{width:18px;height:18px;margin:-9px 0 0 -9px}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;transform:none}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-core{opacity:0;transform:scale(.55) rotate(45deg)}
+.hz.hz-ultra .hz-sl-halo{background:conic-gradient(from 0deg,#4f8cff,#9b72ff,#f07aa6,#dce8ff,#4f8cff)}
+.hz.hz-ignite:not(.hz-calm) .hz-sl-star{animation:hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both}
+@keyframes hzKnobClick{0%{opacity:0;transform:scale(.45) rotate(-35deg)}60%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:none}}
+/* the stars in the track: seven, drifting left to right through the fill, twinkling, clipped to it */
+.hz .hz-sl-tst{position:absolute;z-index:1;left:0;top:var(--y);width:7px;height:7px;margin:-3.5px 0 0 -3.5px;opacity:0;pointer-events:none;
+  background:radial-gradient(circle,#fff 0 1px,rgba(255,255,255,0) 1.6px),linear-gradient(90deg,transparent,rgba(255,255,255,.95),transparent) center/100% 1px no-repeat,linear-gradient(0deg,transparent,rgba(255,255,255,.95),transparent) center/1px 100% no-repeat}
+.hz #hz-effort.compact .hz-sl-tst{width:5px;height:5px;margin:-2.5px 0 0 -2.5px}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-tst{animation:hzTDrift var(--du) linear var(--dl) infinite}
+@keyframes hzTDrift{0%{transform:translateX(-8px) scale(.6);opacity:0}12%{opacity:.95}35%{opacity:.4;transform:translateX(calc(var(--hz-sw) * .3)) scale(1)}55%{opacity:.9}80%{opacity:.35}100%{transform:translateX(var(--hz-sw)) scale(.7);opacity:0}}
+/* the fill flows at Ultra: one 2 x width period every 4 s, the bloom with it; still in Calm */
+.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s var(--hz-ease-in-out);
+  background:linear-gradient(90deg,#4f8cff,#9b72ff 30%,#f07aa6 50%,#fff 56%,#9b72ff 64%,#4f8cff) 0 0/calc(var(--hz-sw) * 2) 100% repeat-x}
+.hz.hz-ultra .hz-sl-fill::after,.hz.hz-ultra .hz-sl-bloom::after{opacity:1;transition:opacity .3s var(--hz-ease-out)}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 4s linear infinite}
+@keyframes hzFillFlow{to{background-position:calc(var(--hz-sw) * -2) 0}}
+/* the spark: 22 px, from the knob back to the track's start in 160 ms; leaving, back out to the knob */
+.hz .hz-sl-spark{display:none;position:absolute;z-index:2;top:calc(50% - 1.5px);left:calc(var(--hz-ph) / 2);width:22px;height:3px;margin-left:-11px;border-radius:2px;pointer-events:none;opacity:0;
   background:linear-gradient(90deg,rgba(255,255,255,0),#fff);box-shadow:0 0 8px rgba(207,224,255,.9)}
-.hz #hz-effort.compact .hz-sl-spark{top:13px}
 .hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}
 .hz.hz-ultra-out .hz-sl-spark{display:block;animation:hzSpark .3s cubic-bezier(.65,0,.35,1) reverse both}
 @keyframes hzSpark{0%{transform:translateX(var(--hz-eff-px,0px));opacity:1}85%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
-/* the label: the spectral gradient on crisp letters; flowing at Ultra (3.5 s a cycle), still in Calm; lit on arrival */
-.hz .hz-elevel.spectral{background:linear-gradient(90deg,#cfe0ff,#b9a8ff,#f2a6b4,#e8415a,#f1dcb2,#cfe0ff);background-size:300% 100%;
-  -webkit-background-clip:text;background-clip:text;color:transparent}
-.hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}
-.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
-@keyframes hzFlow{from{background-position:150% 0}to{background-position:0% 0}}
+/* the label: "Ultra" in the cool tints (AA on the glass), a white-blue highlight gliding across it once every 2.5 s;
+   still in Calm; lit on arrival */
+.hz .hz-elevel.lum{letter-spacing:.01em;
+  background:linear-gradient(100deg,rgba(235,243,255,0) 40%,rgba(240,246,255,.95) 50%,rgba(235,243,255,0) 60%) 150% 0/250% 100% no-repeat,linear-gradient(90deg,#9cc0ff,#c4b0ff 55%,#f7a3c3);
+  -webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 6px rgba(155,114,255,.4))}
+.hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) infinite}
+.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.lum{animation:hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) .6s infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzLumSweep{0%{background-position:150% 0,0 0}45%,100%{background-position:-50% 0,0 0}}
 @keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}
   100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
 /* the sky answers once: the rays brighten +.45 at 200 ms and settle within 2 s */
@@ -52683,20 +52701,23 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* Calm: the rim fades in and out over 300 ms, no run, no spark, no bloom, no flow; a page without
    @property (hz-ring-static) has no run either, the rim simply shows */
 .hz.hz-calm.hz-ignite #composer::after,.hz.hz-ring-static.hz-ignite #composer::after,.hz.hz-calm.hz-ultra-out #composer::after,.hz.hz-ring-static.hz-ultra-out #composer::after,
-.hz.hz-calm.hz-ignite .hz-sl-thumb,.hz.hz-calm.hz-ignite .hz-elevel.spectral,.hz.hz-calm.hz-ignite #hz-aurw{animation:none}
+.hz.hz-calm.hz-ignite .hz-elevel.lum,.hz.hz-calm.hz-ignite #hz-aurw{animation:none}
 .hz.hz-calm.hz-ultra #composer::after{animation:hzRimIn .3s cubic-bezier(.16,1,.3,1) both}
 .hz.hz-calm.hz-ultra-out #composer::after{animation:hzRimOut .3s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzRimIn{from{opacity:0}to{opacity:.9}}
 @keyframes hzRimOut{from{opacity:.9}to{opacity:0}}
-.hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark{display:none!important}
+.hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark,.hz .novideo .hz-sl-star{display:none!important}
+.hz .novideo .hz-sl-tst,.hz .novideo .hz-sl-fill::after,.hz .novideo .hz-sl-bloom::after,.hz .novideo .hz-elevel.lum{animation:none!important}
+.hz.hz-ultra .novideo .hz-sl-core{opacity:1;transform:none}
+.hz.hz-pause .hz-sl-tst,.hz.hz-pause .hz-sl-fill::after,.hz.hz-pause .hz-sl-bloom::after,.hz.hz-pause .hz-elevel.lum{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
-  .hz #composer::after,.hz .hz-sl-thumb,.hz .hz-elevel.spectral,.hz.hz-ignite #hz-aurw{animation:none!important}
-  .hz .hz-sl-spark{display:none!important}
+  .hz #composer::after,.hz .hz-sl-tst,.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after,.hz .hz-elevel.lum,.hz.hz-ignite #hz-aurw{animation:none!important}
+  .hz .hz-sl-spark,.hz .hz-sl-star{display:none!important}
+  .hz.hz-ultra .hz-sl-core{opacity:1;transform:none}
 }
-/* ---- the focus hairline on the beam (6b544): keyboard-only (:focus-visible on the range, never a click),
-   a 1 px ember pill that hugs the beam with the diamond inside, with rounded ends; never a box */
-.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:3px;right:3px;top:13px;height:15px;border-radius:999px;pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}
-.hz #hz-effort.compact .hz-sl:has(input:focus-visible)::after{top:7px}
+/* ---- the focus ring on the slider (6b544; round the pill since 6b549): keyboard-only (:focus-visible on the range,
+   never a click), a 1 px ember ring 2 px off the track with the knob inside, following its radius; never a box */
+.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:-2px;right:-2px;top:calc(50% - var(--hz-ph) / 2 - 2px);height:calc(var(--hz-ph) + 4px);border-radius:calc(var(--hz-sr) + 2px);pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}
 /* ---- THE WRITING STAR (6b544, per Patrick: "clean up how it writes and delivers the final result of a
    query ... I like the star effect, but rethink it"): one idea. While the answer streams, one small star
    (a soft white point, a faint four-point glint) rides at the end of the newest text like a pen of light,
@@ -66216,9 +66237,13 @@ function hzModesPaint(){
   if(!host.querySelector(".hz-pick")){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
-      +'<div class="hz-sl"><i class="hz-sl-glow"></i><i class="hz-sl-track"></i><i class="hz-sl-fill"></i>'
-      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot'+(i===HZ_EMAX?" last":"")+'" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
-      +'<i class="hz-sl-halo"></i><i class="hz-sl-spark"></i><div class="hz-sl-thumbw"><b class="hz-sl-thumb"></b></div>'
+      // the slim pill (6b549): the channel, the bloom, the fill (Ultra's seven drifting stars inside it), the
+      // notches (shown only on hover and drag), the spark, and the knob: its halo, the rounded square, Ultra's star
+      +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill">'
+      +[[32,0,3.6],[66,-.7,4.4],[48,-1.5,3.2],[24,-2.2,4.8],[72,-2.9,3.9],[40,-3.4,4.2],[58,-1.1,5]].map(([y,dl,du])=>'<i class="hz-sl-tst" style="--y:'+y+'%;--dl:'+dl+'s;--du:'+du+'s"></i>').join("")+'</i>'
+      +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
+      +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i>'
+      +'<svg class="hz-sl-star" viewBox="-11 -11 22 22" aria-hidden="true"><defs><radialGradient id="hz-ksg"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#e6efff"/><stop offset="1" stop-color="#a99bff"/></radialGradient></defs><path fill="url(#hz-ksg)" d="'+hzKForms()[0]+'"/></svg></span>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
@@ -66232,15 +66257,16 @@ function hzModesPaint(){
 }
 function hzEffortPaint(){
   const host=$("#hz-effort"),sl=host&&host.querySelector(".hz-sl");if(!sl)return;
-  const inp=sl.querySelector("input"),i=hzEffort(),u=i/HZ_EMAX,pad=9;
-  const width=sl.getBoundingClientRect().width||(host.classList.contains("compact")?120:170);
-  sl.style.setProperty("--hz-eff-u",u.toFixed(4));
-  sl.style.setProperty("--hz-eff-px",(u*(width-pad*2)).toFixed(1)+"px");
+  // where the knob stands (6b549): the level, or while it is pressed or dragged the pointer's own place (hzS.effDrag,
+  // 0 to 1) so it glides with the hand; the css draws everything from --hz-eff-u and data-lv, no layout is read here
+  const inp=sl.querySelector("input"),i=hzEffort(),u=hzS.effDrag!=null?hzS.effDrag:i/HZ_EMAX;
+  sl.style.setProperty("--hz-eff-u",u.toFixed(4));sl.dataset.lv=String(i);
   sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
   if(+inp.value!==i)inp.value=String(i);
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
-  // the label: plain, or at Ultra the spectral gradient (flowing, the one loop on text; the ULTRA css, 6b544)
-  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("spectral",i===4);
+  // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b549)
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);
+  hzKnobStar(i===4);
   const root=document.documentElement,was=hzS.effI;hzS.effI=i;
   root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
   // arriving at Ultra ignites it once; leaving drains it (a page that opens at Ultra just rests there)
@@ -66253,6 +66279,17 @@ function hzEffortPaint(){
 // (--hz-a0: the beam's start, seen from the composer's centre). Calm, reduced motion, a hidden or
 // long-unfocused window: no ignition, the still rim and label alone (Calm's rim fades, in the css).
 function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
+// THE LIVING STAR (6b549, the friend page's): at Ultra the knob is a crisp star that steps through four, six, eight
+// and six points, one form every 140 ms, like Claude Code's thinking glyph; it rests while the window is hidden, in
+// Calm and under reduced motion (the css shows the plain knob there). The forms are made on first use, never at load.
+function hzStarPath(n,R){const r=R*(n===4?.34:n===6?.44:.5);let d="";for(let k=0;k<n*2;k++){const a=-Math.PI/2+k*Math.PI/n,rr=k%2?r:R;d+=(k?"L":"M")+(Math.cos(a)*rr).toFixed(2)+" "+(Math.sin(a)*rr).toFixed(2);}return d+"Z";}
+function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,9.5)));}
+function hzKnobStar(on){
+  if(on&&hzS.kT)return;
+  clearInterval(hzS.kT);hzS.kT=0;hzS.kI=0;
+  const p=$("#hz-effort .hz-sl-star path");if(p)p.setAttribute("d",hzKForms()[0]);
+  if(on)hzS.kT=setInterval(()=>{if(!hzUltraFx())return;const q=$("#hz-effort .hz-sl-star path");if(!q)return;hzS.kI=(hzS.kI+1)%4;q.setAttribute("d",hzKForms()[hzS.kI]);},140);
+}
 function hzUltraAngle(){
   const cb=$("#composer"),tr=$("#hz-effort .hz-sl-track");if(!cb||!tr)return;
   const c=cb.getBoundingClientRect(),t=tr.getBoundingClientRect();if(!c.width||!t.width)return;
@@ -66275,9 +66312,15 @@ function hzUltraOut(){
 function hzControlsWire(host){
   const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),pick=host.querySelector(".hz-pick");
   inp.addEventListener("input",()=>hzEffortSet(inp.value));
-  inp.addEventListener("pointerdown",()=>sl.classList.add("dragging"));
-  const up=()=>sl.classList.remove("dragging");
-  inp.addEventListener("pointerup",up);inp.addEventListener("pointercancel",up);inp.addEventListener("blur",up);
+  // fluid (6b549): held, the knob and the fill follow the pointer continuously, (x - left - track/2) / (width - track)
+  // clamped 0 to 1; the native input still sets the level (the nearest stop: its thumb is as wide as the pill is
+  // tall, so its steps fall under the drawn ones); let go and it snaps to the stop in 140 ms
+  const at=x=>{const r=sl.getBoundingClientRect(),ph=parseFloat(getComputedStyle(sl).getPropertyValue("--hz-ph"))||16;
+    return Math.max(0,Math.min(1,(x-r.left-ph/2)/Math.max(1,r.width-ph)));};
+  inp.addEventListener("pointerdown",e=>{if(e.button)return;sl.classList.add("dragging");hzS.effDrag=at(e.clientX);hzEffortPaint();});
+  addEventListener("pointermove",e=>{if(hzS.effDrag==null)return;hzS.effDrag=at(e.clientX);hzEffortPaint();});
+  const up=()=>{sl.classList.remove("dragging");if(hzS.effDrag==null)return;hzS.effDrag=null;hzEffortPaint();};
+  addEventListener("pointerup",up);addEventListener("pointercancel",up);inp.addEventListener("blur",up);
   pick.addEventListener("click",e=>{e.stopPropagation();const m=$("#hz-menu");if(m&&m.classList.contains("open"))hzMenuClose(false);else hzMenuOpen();});
   pick.addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();hzMenuOpen();}});
 }

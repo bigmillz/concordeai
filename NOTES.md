@@ -19672,3 +19672,64 @@ re-pinned at the same strength; the KEEP_LS pin reads the list. New checks: the 
 mutant), the corner's full-screen rule, the home pill's absence, the menu's Import Chats, the drop's
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
+
+## 6b549 — slider-port: the effort slider slim and fluid again, the friend page's pill in place of the balance beam (7.0 beta, per Patrick)
+
+*Numbering: the next free after main's 6b547; shell-polish and signing share 6b548, and dict-hold and
+settings-look are in flight, so this may be renumbered at the merge.*
+
+**The ask** (per Patrick, seeing the app: "Remember how we had it? It looked beautiful when it was very slim
+and very fluid, not just a bunch of dots"). The app still showed 6b542's balance beam: a hairline, five tick
+marks, a diamond thumb and a spaced mono-caps "ULTRA". The friend page (`preview-site/beta`, DESIGN.md "The
+effort slider", commit 52a21a1) had moved on; the app had not. Lesson, again: a design that lands on the
+preview is not done until it is ported.
+
+**The slider now** (the friend page's values). A slim pill: 220 × 16 on the home (radius 4.5), 200 × 12 in a
+conversation's header (radius 4), 88 × 16 under 600 px. A frosted channel and a luminous fill from the left
+round the knob, `#4f8cff → #9b72ff → #f07aa6` fixed to the track (each level its own colour), with a blurred
+copy beneath (the bloom, .32 → .78 by level). The knob is a near-white rounded square (14 px; 11 in a
+conversation) with a halo in the fill's colour where it stands, rising on hover and while held. **No dots
+at rest**: five faint notches (.18, passed .5, no glow) fade in over 200 ms only while the slider is
+hovered, dragged or keyboard-focused. **Fluid**: held, the knob and the fill follow the pointer with no
+transition (`hzS.effDrag`, (x − left − track/2) ÷ (width − track), clamped); the level name changes as each
+stop is crossed; let go, or step with a key, and it snaps in 140 ms on `cubic-bezier(.22,1,.36,1)`, no
+bounce. The native range input still sets the level: its `::-webkit-slider-thumb` is as wide as the pill is
+tall, so its steps fall exactly under the drawn ones. Hit area 36 px (32 on a phone); click anywhere to jump;
+arrows step. The level beside it in normal case, Space Grotesk 13/500, in a box as wide as "Medium" (the
+header's pill used to shift as the name changed). The keyboard ring is a 1 px ember ring 2 px round the pill,
+`:focus-visible` only. Calm and reduced motion: the same look with no transitions (the spec).
+
+**Ultra** (Balanced and Full; the friend page's): the knob folds into a living star (four, six, eight, six
+points, one form every 140 ms, `hzKnobStar`; the forms are made on first use, not at load, so no TDZ), it
+clicks into place on arrival (.45 → 1.12 → 1, 320 ms), seven tiny stars drift through the filled track,
+the fill flows (one 2 × width period per 4 s) and the halo turns to the cool spectrum; "Ultra" wears the
+cool tints (`#9cc0ff → #c4b0ff → #f7a3c3`) with a white-blue highlight gliding across it every 2.5 s. The
+6b544 moment around it is unchanged (the rim's run and still rim, the spark, the aurora's breath, the lit
+label, the drain). Calm, reduced motion and effects off: plain (the rounded-square knob, no drift, no flow,
+the label's gradient still).
+
+**Removed**: the NORTHSTAR slider's glow, dots, thumb wrapper and breathing halo; the old compact geometry;
+the 6b542 beam (ticks, diamond, mono caps); Balanced's still pool under the diamond; the diamond's flow and
+ignition; the spectral ULTRA flow; a dead narrow-window `.hz .hz-sl{width:120px}`. `hzEffortPaint` reads no
+layout now (it measured the slider every paint). The wire is unchanged: Low · Medium · High · Extra · Ultra,
+sent as low/medium/high/max/ultra in the question's `effort`.
+
+**Gauntlet.** The 6b542 Sting check now asserts the beam is gone (its diamond mutant re-adds it); Balanced
+asserts the pool is gone; the 6b544 Ultra check pins the star knob, the drifting stars, the flowing fill and
+the gliding label, its loop count re-reasoned (still four), with new mutants (Calm gliding, Calm's knob a
+star, a pulsing star, a wide halo). New "6b549 the effort slider, slim and fluid", eight mutants: dots at
+rest (the base opacity), passed dots lit at rest, the notches shown always by the back door, a lagging
+drag, a slow bouncing snap, spaced caps back, stepping instead of following, the star's clock restarted on
+every paint. "No dots at rest" is a CSS parse: the base notch rule says `opacity:0`, and any rule that could
+show a notch applies only under `:hover`, `.dragging` or `:focus-visible`. Run against a dev copy: the
+HORIZON, 6b540, 6b542, 6b544 and 6b549 sections (37 checks) all pass; `pincheck.py` shows only three
+pre-existing false hits in the import section's negative helper. The full gauntlet was not run.
+
+**Verified** in a windowless dev copy (headless Chromium, `--use-mock-keychain`, nice 15): stills of the home
+composer and the conversation header at every level, Balanced and Calm, 1440 and 390 wide; the knob is hit
+(`elementFromPoint` at its centre and at the hit area's top and bottom rows is the range input); the
+notches' opacity is 0 at rest at every level and 1 on hover, drag and keyboard focus; held, the thumb's
+transition is 0 s and its `left` moves continuously (29 → 212 px); a click at 74 % lands on Extra; Tab
+then → steps; no page errors. A drag clip, Low to Ultra. **Not verified in WKWebView** (the shipped app):
+`:has()`, `-webkit-background-clip:text` over two backgrounds, `var()` inside `@keyframes` and the styled
+`::-webkit-slider-thumb` are all WebKit features, but nothing here ran in WebKit.

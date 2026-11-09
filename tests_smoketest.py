@@ -38692,9 +38692,9 @@ check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each questio
       and 'const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
       and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in _hz_js
       and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js
-      and 'en.classList.toggle("spectral",i===4);' in _hz_js
+      and 'en.classList.toggle("lum",i===4);' in _hz_js
       and 'root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);' in _hz_js
-      and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
+      and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in _hz_css and ".hz .hz-sl{position:relative;width:var(--hz-sw);height:36px;" in _hz_css
       and "hz-ody" not in page
       # the effort is kept through storeBoot's sweep: in KEEP_LS (which grew past it: the Recents range and folds)
       and '"millen.effort"' in re.search(r"const KEEP_LS=\[(.*?)\];", page, re.S).group(1), "")
@@ -42403,7 +42403,7 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
 # glide, the greeting's bloom and sheen, the composer's ring and glow, the Max/Ultra shimmer,
 # the dies. REMOVED outright: the header wordmark's glint and glow, the sidebar's token counts
 # and estimate note, the memory meter and telemetry cluster under Horizon. Balance and Sting:
-# the composer at the golden-ratio point, a balance-beam slider with a diamond thumb, tight
+# the composer at the golden-ratio point, a balance-beam slider with a diamond thumb (6b549: the slim pill), tight
 # radii, one ember accent (contrast computed here) at the send strike, the focus hairline and
 # an error's left rule. The greeting is ONE node in Calm; Full's layers share one string and
 # one box, and a trace is killed at once when the text or the box moves.
@@ -42552,19 +42552,14 @@ def _c542_sting(css, js, ember):
             and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
             and css.count("var(--hz-ember)") == 7 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the seventh use: the beam's keyboard pill, 6b544)
             and ':root{--hz-r-composer:14px;--hz-ember:' in css
-            and ".hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;" in css
-            and "transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}" in css
-            and ".hz .hz-sl-track{top:20px;height:1px;border-radius:0;background:var(--hz-hair-3)}" in css
-            and ".hz .hz-sl-dot{top:17px;width:1px;height:6px;margin-left:-.5px;border-radius:0;background:var(--hz-hair-3)}" in css
-            and ".hz .hz-sl-glow,.hz .hz-sl-halo{display:none}" in css
-            and ".hz .hz-elevel{font-family:var(--hz-font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--hz-ink-2);min-width:60px}" in css
+            and "rotate(45deg);transition:transform 120ms ease}" not in css and ".hz .hz-elevel{font-family:var(--hz-font-mono)" not in css   # the beam's diamond and caps went in 6b549
             and ".hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}" in css and ".hz .hz-pick{height:40px;border-radius:8px;" in css
             and 'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/>' in js)
-check("6b542 Sting: one ember (%s), AA on the night and the glass, at the send strike (once, 300 ms), the text-and-focus composer hairline, the full send key, an error's left rule and the keyboard focus ring, never looping; the balance-beam slider with its diamond; 8 px keys, a 14 px composer; the mutants are caught" % _c542_ember,
+check("6b542 Sting: one ember (%s), AA on the night and the glass, at the send strike (once, 300 ms), the text-and-focus composer hairline, the full send key, an error's left rule and the keyboard focus ring, never looping; no balance beam left (6b549); 8 px keys, a 14 px composer; the mutants are caught" % _c542_ember,
       _c542_sting(_hz_css, _hz_js, _c542_ember)
       and not _c542_sting(_hz_css, _hz_js, "#8a1c2b")                                                     # too dark on the night
       and not _c542_sting(_hz_css.replace("transform:scaleX(0);opacity:0}", "transform:scaleX(0);opacity:0;animation:hzRing 2s linear infinite}"), _hz_js, _c542_ember)
-      and not _c542_sting(_hz_css.replace("rotate(45deg);transition:transform 120ms ease}", "rotate(45deg);transition:transform 260ms var(--hz-ease-spring)}"), _hz_js, _c542_ember), "")
+      and not _c542_sting(_hz_css + ".hz .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}", _hz_js, _c542_ember), "")   # the diamond back
 # ONE GREETING: hzHeadline run in node on a stand-in element: Calm writes one text node; Full
 # builds three layers from the same string at the same moment; a tracer in flight is killed first
 _c542_hl_js = _jsfn(_hz_js, "function hzHeadline(g,text){")
@@ -42619,8 +42614,7 @@ def _c542_bal(js, css):
             and "100%{opacity:1;text-shadow:0 0 0 rgba(205,222,255,0),0 0 0 rgba(140,175,255,0)}}" in css
             and ".hz .novideo #hero .greet.shown{animation:none}" in css
             and ".hz.hz-bal #composer{box-shadow:inset 0 1px 0 rgba(200,222,255,.22)," in css and ".hz.hz-bal #composer:focus-within{box-shadow:inset 0 1px 0 rgba(200,222,255,.45)," in css
-            and ".hz.hz-bal .hz-sl-halo{display:block;animation:none;opacity:calc(.3 + var(--hz-eff-u) * .6);" in css
-            and "transform:translateX(var(--hz-eff-px,0px)) scale(calc(.7 + var(--hz-eff-u) * .7));transition:transform 120ms ease,opacity 120ms ease}" in css
+            and ".hz.hz-bal .hz-sl-halo" not in css      # the still pool under the diamond went with it (6b549: the bloom grows with the effort instead)
             and 'if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}' in js and "function hzChipSweep(b){" in js
             and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);\n}\n// one soft sweep along the composer' in js
             and ".hz .hz-usweep[hidden],.hz .novideo .hz-usweep{display:none}" in css
@@ -42630,9 +42624,9 @@ def _c542_bal(js, css):
             and ".hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}" in css
             and "@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}" in css
             and bal.count("infinite") == 1 and ".live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite" in bal)   # the one loop: the dot, while working
-check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the breathing dot only while working, the lifting hover; nothing else loops (the landing's pass went with the writing star, 6b544); the mutants are caught",
+check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the chip's 300 ms sweep, the breathing dot only while working, the lifting hover; nothing else loops (the landing's pass went with the writing star, 6b544); the mutants are caught",
       _c542_bal(_hz_js, _hz_css)
-      and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .hz-sl-halo{display:block;animation:none;", ".hz.hz-bal .hz-sl-halo{display:block;animation:hzBreathe 8s ease-in-out infinite;"))
+      and not _c542_bal(_hz_js, _hz_css + ".hz.hz-bal .hz-sl-halo{display:block;animation:none}")
       and not _c542_bal(_hz_js.replace("if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}", "if(!full)return;"), _hz_css)
       and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .msg.ai.live .who .dot{", ".hz.hz-bal .msg.ai .who .dot{")), "")
 check("6b542 the Horizon rules added stay scoped under .hz and name no outside URL",
@@ -42667,10 +42661,11 @@ check("6b544 plain names: Fast, Thinking, Pro, Max, Deep in the picker (Max out 
       and not _names544(page, _MILLENAI_SRC, _hz_js, {k: v for k, v in _hz_alias["MODE_ALIASES"].items() if k != "Deep"})                   # Deep not an alias
       and not _names544(page, _MILLENAI_SRC, _hz_js.replace('"Pro","Max","Vera Rubin"]', '"Pro","Vera Rubin"]'), _hz_alias["MODE_ALIASES"])   # Max out of the picker
       and not _names544(page, _MILLENAI_SRC, _hz_js.replace('"High","Extra","Ultra"]', '"High","Max","Ultra"]'), _hz_alias["MODE_ALIASES"]), "")
-# THE ULTRA MOMENT and THE LIVING ULTRA: once per arrival, the ignition (the diamond, the spark, the rim's
-# 600 ms reveal from 160 ms, the aurora's breath, the lit label); at Ultra the label flows (3.5 s) and the
-# diamond glows, the rim still; leaving drains in 300 ms; Calm and reduced motion still
-def _ultra_css544(css): return css[css.index("/* ---- ULTRA (6b544"):css.index("/* ---- the focus hairline on the beam (6b544)")]
+# THE ULTRA MOMENT and THE LIVING ULTRA: once per arrival, the ignition (the knob's click into a star (6b549), the
+# spark, the rim's 600 ms reveal from 160 ms, the aurora's breath, the lit label); at Ultra (6b549, the friend page's)
+# the knob is a living star, seven stars drift through the fill, the fill flows and the label's highlight glides
+# (2.5 s), the rim still; leaving drains in 300 ms; Calm and reduced motion plain
+def _ultra_css544(css): return css[css.index("/* ---- ULTRA (6b544"):css.index("/* ---- the focus ring on the slider (6b544")]
 def _ultra544(css, js):
     u = _ultra_css544(css)
     return (".hz.hz-ultra #composer::after,.hz.hz-ultra-out #composer::after{display:block}" in u
@@ -42679,35 +42674,41 @@ def _ultra544(css, js):
             and ".hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}" in u
             and "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);" in u and "padding:1.5px" in u and "opacity:.9;" in u
             and ".hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}" in u
-            and "18%{box-shadow:0 0 6px 2px #fff,0 0 9px 2px rgba(185,168,255,.7)}" in u
-            and ".hz .hz-elevel.spectral{background:linear-gradient(90deg,#cfe0ff,#b9a8ff,#f2a6b4,#e8415a,#f1dcb2,#cfe0ff);background-size:300% 100%;" in u
-            and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}" in u
-            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}" in u
+            and ".hz.hz-ignite:not(.hz-calm) .hz-sl-star{animation:hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both}" in u
+            and "linear-gradient(90deg,#9cc0ff,#c4b0ff 55%,#f7a3c3);\n  -webkit-background-clip:text;background-clip:text;color:transparent;" in u   # the clip after the shorthand, or the label is a box
+            and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) infinite}" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;transform:none}" in u and ".hz.hz-ultra:not(.hz-calm) .hz-sl-core{opacity:0;transform:scale(.55) rotate(45deg)}" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-tst{animation:hzTDrift var(--du) linear var(--dl) infinite}" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 4s linear infinite}" in u
             and "@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}" in u
+            and "hzDiamondFlow" not in css and ".hz-elevel.spectral" not in css
             # no big circles or ovals (per Patrick): no glow in the moment reaches past 12 px (blur + spread)
             and max([int(b) + int(sp) for b, sp in re.findall(r"0 0 (\d+)px (\d+)px", u)] + [0]) <= 12
             and max([int(b) for b in re.findall(r"text-shadow:[^;}]*?0 0 (\d+)px rgba", u)] + [0]) <= 12
             and ".hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}" in u
-            and u.count("infinite") == 4                      # the flow on the label and the diamond (plain and igniting): nothing else loops, the rim never
+            and u.count("infinite") == 4                      # the label's glide (plain and igniting), the track's stars, the fill's flow: nothing else loops, the rim never
             and ".hz.hz-calm.hz-ultra #composer::after{animation:hzRimIn .3s cubic-bezier(.16,1,.3,1) both}" in u
-            and ".hz #composer::after,.hz .hz-sl-thumb,.hz .hz-elevel.spectral,.hz.hz-ignite #hz-aurw{animation:none!important}" in u
+            and ".hz #composer::after,.hz .hz-sl-tst,.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after,.hz .hz-elevel.lum,.hz.hz-ignite #hz-aurw{animation:none!important}" in u
+            and "  .hz .hz-sl-spark,.hz .hz-sl-star{display:none!important}\n  .hz.hz-ultra .hz-sl-core{opacity:1;transform:none}" in u   # reduced motion: the plain knob
             and ".hz-elevel.shim" not in css
-            and 'en.classList.toggle("spectral",i===4);' in js
+            and 'en.classList.toggle("lum",i===4);' in js
             and "if(i===4&&was!=null&&was!==4)hzIgnite();else if(was===4&&i!==4)hzUltraOut();" in js
             and 'function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}' in js
             and 'hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);' in js
             and 'hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ultra-out"),300);' in js
             and 'cb.style.setProperty("--hz-a0",((Math.atan2(dx,-dy)*180/Math.PI+360)%360).toFixed(1)+"deg");' in js
-            # the focus hairline: keyboard only (:focus-visible on the range), a pill that hugs the beam; never from a click
-            and '.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:3px;right:3px;top:13px;height:15px;border-radius:999px;pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}' in css
+            # the focus ring: keyboard only (:focus-visible on the range), 2 px round the pill (6b549); never from a click
+            and '.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:-2px;right:-2px;top:calc(50% - var(--hz-ph) / 2 - 2px);height:calc(var(--hz-ph) + 4px);border-radius:calc(var(--hz-sr) + 2px);pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}' in css
             and ".hz-sl:focus-within" not in css)
-check("6b544 the Ultra moment: the ignition once per arrival (the diamond's bloom, the 160 ms spark, the rim's 600 ms reveal from 160 ms, the aurora's breath, the lit label), the still 1.5 px spectral rim, the living ULTRA (a 3.5 s flow on the label and the diamond, the one loop on text, off in Calm and reduced motion), the 300 ms drain, the keyboard-only ember pill on the beam; the mutants are caught",
+check("6b544 the Ultra moment: the ignition once per arrival (the knob's click into a star, the 160 ms spark, the rim's 600 ms reveal from 160 ms, the aurora's breath, the lit label), the still 1.5 px spectral rim, the living Ultra (6b549: the star knob, the track's drifting stars, the flowing fill, the label's 2.5 s glide, the one loop on text; all off in Calm and reduced motion), the 300 ms drain, the keyboard-only ember ring round the pill; the mutants are caught",
       _ultra544(_hz_css, _hz_js)
       and not _ultra544(_hz_css.replace("hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both", "hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s infinite"), _hz_js)      # a looping rim
-      and not _ultra544(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow", ".hz.hz-ultra .hz-elevel.spectral{animation:hzFlow"), _hz_js)       # Calm flowing
+      and not _ultra544(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep", ".hz.hz-ultra .hz-elevel.lum{animation:hzLumSweep"), _hz_js)      # Calm gliding
+      and not _ultra544(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;", ".hz.hz-ultra .hz-sl-star{opacity:1;"), _hz_js)                          # Calm's knob a star
+      and not _ultra544(_hz_css.replace("hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both", "hzKnobClick .32s cubic-bezier(.2,.8,.2,1) infinite"), _hz_js)           # a pulsing star
       and not _ultra544(_hz_css + ".hz .hz-sl:focus-within{box-shadow:0 0 0 1px var(--hz-ember)}", _hz_js)                                                              # the ring from a click
       and not _ultra544(_hz_css, _hz_js.replace("if(i===4&&was!=null&&was!==4)hzIgnite();", "if(i===4)hzIgnite();"))                                                 # igniting on every paint
-      and not _ultra544(_hz_css.replace("0 0 9px 2px rgba(185,168,255,.7)}", "0 0 9px 2px rgba(185,168,255,.7),0 0 44px 16px rgba(242,166,180,.45)}"), _hz_js), "")   # the wide halo back
+      and not _ultra544(_hz_css.replace("100%{opacity:1;transform:none}}", "100%{opacity:1;transform:none;box-shadow:0 0 44px 16px rgba(242,166,180,.45)}}"), _hz_js), "")   # a wide halo
 # THE WRITING STAR: one idea for the answer's delivery; the aim reads layout once per paint and the frame
 # loop never; the landing retires the star; the comets, the glow and the composer's landing light are gone
 def _star544(pg):
@@ -42742,6 +42743,89 @@ check("6b544 the writing star: one star at the end of the newest text (aimed onc
       and not _star544(page.replace("s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}", "s.on=false;"))                                                            # the star never retiring
       and not _star544(page.replace("const dt=s.at?Math.min(64,t-s.at):16;s.at=t;", "const dt=s.at?Math.min(64,t-s.at):16;s.at=t;s.ty=s.el.getBoundingClientRect().top;")), "")    # a layout read per frame
 # ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): end ====
+
+# ==== the effort slider, slim and fluid (6b549): begin ====
+# Patrick (2026-11-09 evening): "Remember how we had it? It looked beautiful when it was very slim and very fluid, not
+# just a bunch of dots." The friend page's slider (beta/DESIGN.md, The effort slider) replaces 6b542's balance beam: a
+# slim luminous pill (220 x 16 on the home, 200 x 12 in a conversation, radius 4.5 / 4), blue > violet > rose with a
+# bloom growing with the effort, a near-white rounded-square knob with a halo; NO DOTS AT REST (faint notches only on
+# hover, drag or keyboard focus); held, the knob and fill follow the pointer with no transition, the level changing at
+# each stop; released or stepped by a key, a 140 ms snap with no bounce; a 36 px hit area; the level in normal case.
+# The wire is unchanged: five levels, low/medium/high/max/ultra in the question's "effort".
+print("== the effort slider, slim and fluid (6b549) ==")
+def _sl549_rules(css, part):
+    """(selectors, declarations) of every rule whose selector names `part`"""
+    out = []
+    for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", re.sub(r"/\*.*?\*/", "", css, flags=re.S)):
+        sel, body = m.group(1).strip(), m.group(2)
+        if part in sel and not sel.startswith("@"):
+            out.append(([x.strip() for x in sel.split(",")], body))
+    return out
+def _sl549_dots_rest(css):
+    """the notches are invisible at rest: the base rule says opacity:0, and any rule that could show them (an opacity
+    above 0, a display, a visibility) applies only while hovered, dragged or keyboard-focused"""
+    base = [b for sels, b in _sl549_rules(css, "hz-sl-dot") if sels == [".hz .hz-sl-dot"]]
+    if len(base) != 1 or not re.search(r"(^|;)\s*opacity:0(;|$)", base[0].strip()):
+        return False
+    for sels, body in _sl549_rules(css, "hz-sl-dot"):
+        shows = re.search(r"opacity:(?!0[;}]|0$)[.\d]", body) or "display:" in body or "visibility:" in body
+        if shows and not all((":hover" in x or ".dragging" in x or "focus-visible" in x) for x in sels if "hz-sl-dot" in x):
+            return False
+    return True
+def _sl549(css, js, pg):
+    paint, wire = _jsfn(js, "function hzEffortPaint(){"), _jsfn(js, "function hzControlsWire(host){")
+    return (_sl549_dots_rest(css)
+            and ".hz .hz-sl:hover .hz-sl-dot,.hz .hz-sl.dragging .hz-sl-dot,.hz .hz-sl:has(input:focus-visible) .hz-sl-dot{opacity:1}" in css
+            and "background:rgba(255,255,255,.18);opacity:0;transition:opacity .2s var(--hz-ease-out)}" in css and ".hz .hz-sl-dot.passed{background:rgba(255,255,255,.5)}" in css
+            # the pill: slim, rounded, luminous, a bloom growing with the effort; slimmer in a conversation
+            and ".hz .hz-sl{position:relative;width:var(--hz-sw);height:36px;flex:none;--hz-sw:220px;--hz-ph:16px;--hz-ob:14px;--hz-sr:4.5px;--hz-kr:4px;" in css
+            and ".hz #hz-effort.compact .hz-sl{--hz-sw:200px;--hz-ph:12px;--hz-ob:11px;--hz-sr:4px;--hz-kr:3.5px}" in css
+            and "background:linear-gradient(90deg,#4f8cff,#9b72ff 55%,#f07aa6) 0 0/var(--hz-sw) 100% no-repeat}" in css
+            and ".hz .hz-sl-bloom{filter:blur(8px);opacity:var(--hz-bloom);" in css
+            and [re.search(r'\.hz \.hz-sl\[data-lv="%d"\]\{--hz-halo:#[0-9a-f]{6};--hz-bloom:([.\d]+)\}' % k, css).group(1) for k in (1, 2, 3, 4)] == [".4", ".5", ".62", ".78"]
+            and "background:radial-gradient(110% 90% at 50% 25%,#fff 0%,#f4f7ff 45%,#dde5fa 100%);box-shadow:var(--hz-ks);" in css
+            # fluid: the snap is 140 ms on the friend page's curve, no bounce; held, no transition at all
+            and "--hz-snap:140ms cubic-bezier(.22,1,.36,1);" in css and "transition:left var(--hz-snap)}" in css and "transition:width var(--hz-snap);" in css
+            and ".hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-bloom{transition:none}" in css
+            and "hz-ease-spring" not in "".join(b for _, b in _sl549_rules(css, "hz-sl"))
+            and "const inp=sl.querySelector(\"input\"),i=hzEffort(),u=hzS.effDrag!=null?hzS.effDrag:i/HZ_EMAX;" in paint
+            and "getBoundingClientRect" not in paint                                    # the paint reads no layout
+            and "return Math.max(0,Math.min(1,(x-r.left-ph/2)/Math.max(1,r.width-ph)));};" in wire
+            and 'addEventListener("pointermove",e=>{if(hzS.effDrag==null)return;hzS.effDrag=at(e.clientX);hzEffortPaint();});' in wire
+            and "hzS.effDrag=null;hzEffortPaint();};" in wire and 'addEventListener("pointerup",up);addEventListener("pointercancel",up);' in wire
+            and 'inp.addEventListener("input",()=>hzEffortSet(inp.value));' in wire
+            # the native thumb as wide as the pill is tall: its steps fall under the drawn ones
+            and ".hz .hz-sl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:var(--hz-ph);height:36px;" in css
+            # the level: normal case, the UI face, no spaced caps
+            and ".hz .hz-elevel{position:relative;font:500 13px var(--hz-font-ui);color:var(--hz-ink-2);min-width:56px;letter-spacing:.005em;white-space:nowrap}" in css
+            and not any("text-transform" in b or "hz-font-mono" in b for _, b in _sl549_rules(css, "hz-elevel"))
+            # Calm and reduced motion: the same look, still
+            and ".hz.hz-calm .hz-sl *,.hz.hz-calm .hz-sl *::before,.hz.hz-calm .hz-sl *::after{transition:none}" in css
+            and "@media (prefers-reduced-motion:reduce){.hz .hz-sl *,.hz .hz-sl *::before,.hz .hz-sl *::after{transition:none!important}}" in css
+            # the living star: four, six, eight, six points, one form every 140 ms, made on first use (no load-time const)
+            and "function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,9.5)));}" in js
+            and "if(on&&hzS.kT)return;" in js and "if(!hzUltraFx())return;" in _jsfn(js, "function hzKnobStar(on){") and "},140);" in _jsfn(js, "function hzKnobStar(on){")
+            and "hzKnobStar(i===4);" in paint
+            and js.count('class="hz-sl-tst"') == 1 and "[[32,0,3.6],[66,-.7,4.4],[48,-1.5,3.2],[24,-2.2,4.8],[72,-2.9,3.9],[40,-3.4,4.2],[58,-1.1,5]]" in js
+            # the beam is gone
+            and "hz-sl-thumbw" not in pg and "hz-sl-glow" not in pg and "rotate(45deg);transition:transform 120ms ease}" not in pg and "letter-spacing:.14em;text-transform:uppercase" not in css
+            # the wire unchanged
+            and 'const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in js
+            and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in js
+            and 'annExtra.effort=hzEffortWire();' in pg)
+check("6b549 the effort slider, slim and fluid: the friend page's luminous pill (220 x 16, 200 x 12 in a conversation), no dots at rest (faint notches only on hover, drag or keyboard focus), the knob and fill following the pointer while held and snapping in 140 ms, the level in normal case, the living star at Ultra, the wire unchanged; the mutants are caught",
+      _sl549(_hz_css, _hz_js, page)
+      and not _sl549(_hz_css.replace("background:rgba(255,255,255,.18);opacity:0;", "background:rgba(255,255,255,.18);opacity:.35;"), _hz_js, page)            # dots at rest
+      and not _sl549(_hz_css + ".hz .hz-sl-dot.passed{opacity:1}", _hz_js, page)                                                                          # passed dots lit at rest
+      and not _sl549(_hz_css.replace(".hz .hz-sl.dragging .hz-sl-dot,", ".hz .hz-sl-dot,"), _hz_js, page)                                               # shown always, by the back door
+      and not _sl549(_hz_css.replace(".hz .hz-sl.dragging .hz-sl-thumb,.hz .hz-sl.dragging .hz-sl-fill,.hz .hz-sl.dragging .hz-sl-bloom{transition:none}", ""), _hz_js, page)   # a lagging drag
+      and not _sl549(_hz_css.replace("--hz-snap:140ms cubic-bezier(.22,1,.36,1);", "--hz-snap:260ms var(--hz-ease-spring);"), _hz_js, page)            # a slow, bouncing snap
+      and not _sl549(_hz_css + ".hz .hz-elevel{text-transform:uppercase;letter-spacing:.14em}", _hz_js, page)                                          # spaced caps back
+      and not _sl549(_hz_css, _hz_js.replace("u=hzS.effDrag!=null?hzS.effDrag:i/HZ_EMAX;", "u=i/HZ_EMAX;"), page)                                      # stepping, not following
+      and not _sl549(_hz_css, _hz_js.replace("if(on&&hzS.kT)return;", ""), page), "")                                                                  # the star's clock restarted on every paint
+check("6b549 the slider's rules stay scoped under .hz and name no outside URL",
+      _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
+# ==== the effort slider, slim and fluid (6b549): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
