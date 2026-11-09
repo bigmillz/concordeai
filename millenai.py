@@ -10396,9 +10396,9 @@ class NoProfile(RuntimeError):
 
 # what the page shows for each (0b 5.12, Q11). profile.json and the
 # legacy files are read for the chat store, so they say "chats"
-_RF_CHATS = "Couldn’t read your chats. Nothing was changed."
-_RF_MEMORY = "Couldn’t read your memory. Nothing was changed."
-_RF_PREFS = "Couldn’t read your settings. Nothing was changed."
+_RF_CHATS = "Couldn’t read your chats. Nothing changed."
+_RF_MEMORY = "Couldn’t read your memories. Nothing changed."
+_RF_PREFS = "Couldn’t read your settings. Nothing changed."
 READ_FAIL = {CHATS_FILE: _RF_CHATS, LEGACY_CHATS: _RF_CHATS,
              PROFILE_FILE: _RF_CHATS, STATE_FILE: _RF_CHATS,
              MEMORY_FILE: _RF_MEMORY, LEGACY_MEMORY: _RF_MEMORY,
@@ -40446,7 +40446,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         except StoreReadError as exc:
             if not self._head_sent:
                 self._send_json({"err": READ_FAIL.get(str(exc),
-                                 "Couldn\u2019t read that. Nothing was changed."),
+                                 "Couldn’t read that. Nothing changed."),
                                  "unreadable": str(exc)}, code=503)
         except StaleProfile:
             if not self._head_sent:
@@ -42689,7 +42689,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/api/chats":
             # GONE (0b 5.3, 6b322): the whole-list save let an outdated
             # page replace everything; a page this old must reload
-            self._send_json({"err": "this page is out of date; reload it"},
+            self._send_json({"err": "This page is out of date. Reload."},
                             code=410)
             return
         if self.path == "/api/chats/ops":
@@ -42995,7 +42995,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # then shown in Finder; a browser downloads it by id instead
             n = int(self.headers.get("Content-Length", 0) or 0)
             if n <= 0 or n > ANNOTATE_SAVE_MAX * 4 // 3 + 4096:
-                self._send_json({"ok": False, "err": "too big"}, code=413)
+                self._send_json({"ok": False, "err": "Too big"}, code=413)
                 return
             try:
                 d = json.loads(self.rfile.read(n)) or {}
@@ -46945,7 +46945,7 @@ ACCOUNT_HTML = """<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="cai-profile" content="__TAG__">
-<title>__APP__ account</title>
+<title>Account</title>
 <link rel="stylesheet" href="/account.css">
 <script src="/account.js" defer></script>
 </head><body>
@@ -47023,7 +47023,7 @@ ACCOUNT_JS = r"""'use strict';
     if(!s)return;
     document.getElementById('a-title').textContent=TITLE[s.task]||'Account';
     document.getElementById('a-line').textContent=
-      'The account screens are not in this build. This window is where they will open.';
+      'Accounts are coming in a later version.';
     const act=document.getElementById('a-actions');
     const b=el('button','Close');b.type='button';b.addEventListener('click',close);
     act.appendChild(b);b.focus();
@@ -47079,7 +47079,7 @@ def _hand_off() -> bool:
 
 
 def _already_open_notice():
-    msg = "%s is already open. Use its window." % APP_NAME
+    msg = "%s is already open." % APP_NAME
     print("\n  " + msg + "\n")
     try:
         if IS_MAC:
@@ -47159,13 +47159,9 @@ def _window_blocker() -> str:
     launch that can't open the app's own window says what it needs and
     stops."""
     if not HAS_WEBVIEW:
-        return ("%s needs its app window. Install pywebview (the installer "
-                "does this) and start it again." % APP_NAME)
+        return ("%s can’t open its window. Reinstall it and start again." % APP_NAME)
     if _webview2_missing():
-        return ("%s needs Microsoft's WebView2 Runtime to draw its window, "
-                "and this PC doesn't have it. It's free: search for "
-                "\"WebView2 Runtime\" at microsoft.com, install it, and "
-                "start %s again." % (APP_NAME, APP_NAME))
+        return ("%s needs Microsoft’s WebView2 Runtime. Install it from microsoft.com, then start %s again." % (APP_NAME, APP_NAME))
     return ""
 
 
@@ -47645,7 +47641,7 @@ body.resizing{cursor:col-resize;user-select:none}
 
 #chat-list{margin-bottom:2px;overflow-y:auto}
 #chat-list:empty::after{
-  content:"no chats yet";display:block;color:var(--faint);
+  content:"No chats";display:block;color:var(--faint);
   font-size:11px;padding:2px 10px 6px;
 }
 .chat-item{
@@ -51736,7 +51732,7 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
 <div id="mburger" title="Menu">☰</div>
 
 <aside id="sidebar">
-  <div id="sb-resize" title="Drag to resize"></div>
+  <div id="sb-resize"></div>
   <div id="brand-wrap">
     <div id="brand-row">
     <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
@@ -51748,19 +51744,19 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
       </svg>
     </button>
 
-    <div id="update-flag" hidden title="Install the update"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
+    <div id="update-flag" hidden title="Update ready"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg></div>
     </div>
     <!-- 6b308, per Patrick: the chips sit on their OWN line under the
          header. Inside the one-row header their full-width rule ran them
          past the sidebar and squeezed the wordmark to nothing. -->
     <div id="models-flag" hidden
-         title="More models fit this machine">MODELS AVAILABLE</div>
+         title="More models fit this Mac">More models</div>
   </div>
 
 
-  <div id="dlstrip" hidden title="Models downloading — click for details">
+  <div id="dlstrip" hidden title="Downloading models">
     <div class="dltrack"><div class="dlfill"></div></div>
-    <span class="dllbl"><span>models &middot; 0%</span><span></span></span>
+    <span class="dllbl"><span>Models 0%</span><span></span></span>
   </div>
   <div id="mode-tabs">
     <i id="tab-glide"></i>
@@ -51856,7 +51852,7 @@ __CODE_ROWS__
   </div>
   <div id="model-list">
   <div id="chat-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg><input id="chat-q" type="search"
-    placeholder="Search chats" autocomplete="off"
+    placeholder="Search" autocomplete="off"
     spellcheck="false" aria-label="Search chats"></div>
   <div class="group-label chats">Chats</div>
   <div id="chat-list"></div>
@@ -51879,7 +51875,7 @@ __CODE_ROWS__
   <div id="sb-foot">
     <div id="sb-today"></div>
     <div id="sb-where"></div>
-    <button id="settings-btn" title="Settings — preferences &amp; about"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg><span>Settings</span></button>
+    <button id="settings-btn" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg><span>Settings</span></button>
     <!-- hides the sidebar, the same state as the header's button (6b526; Horizon only) -->
     <button id="rail-btn" type="button" title="Hide chats" aria-label="Hide chats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
   </div>
@@ -51938,14 +51934,14 @@ __CODE_ROWS__
   </div>
   <div id="skyload" hidden>
     <div class="track"><div class="fill"></div></div>
-    <div class="lbl">loading the backdrop</div>
+    <div class="lbl">Loading</div>
   </div>
 <div id="palette" hidden>
   <div class="pbox">
-    <input id="pq" placeholder="Search chats, or type a command\u2026"
+    <input id="pq" placeholder="Search or type a command"
            autocomplete="off" spellcheck="false">
     <div id="presults"></div>
-    <div class="pfoot"><span>\u2191\u2193 navigate</span>
+    <div class="pfoot"><span>&uarr;&darr; move</span>
       <span>\u21a9 open</span><span>esc close</span></div>
   </div>
 </div>
@@ -51979,7 +51975,7 @@ __CODE_ROWS__
     <div id="hero">
 <!-- 6.0b2, per Patrick: no in-app hero branding — the greeting IS the
      hero, Claude-style; the only wordmark lives in the sidebar header -->
-      <p class="greet">What's going on today?</p>
+      <p class="greet">What's on your mind?</p>
     </div>
   </div></div>
   <div id="findbar" role="search" hidden>
@@ -51998,7 +51994,7 @@ __CODE_ROWS__
   <div id="composer-wrap">
     <!-- back to the newest line: shown only while an answer streams and the
          reader has scrolled up out of it (6b425) -->
-    <button id="jumpdown" type="button" title="Jump to the newest" aria-label="Jump to the newest" hidden>&#8595;</button>
+    <button id="jumpdown" type="button" title="Jump to the end" aria-label="Jump to the end" hidden>&#8595;</button>
     <!-- starter prompts: inside composer-wrap so the row is EXACTLY the
          composer's width without having to restate it -->
     <div id="suggest" hidden></div>
@@ -52013,28 +52009,28 @@ __CODE_ROWS__
 
       <input type="file" id="fpick" multiple hidden
         accept="image/*,.txt,.md,.markdown,.csv,.json,.js,.ts,.py,.html,.css,.log,.sh,.yaml,.yml,.xml,.toml,.rtf">
-      <textarea id="input" rows="1" placeholder="How can I help you today?"></textarea>
+      <textarea id="input" rows="1" placeholder="Ask anything"></textarea>
       <div id="crow">
       <!-- Horizon's mode picker and effort slider (6b526, 6b534): the mode's
            name opens a glass menu (#hz-menu); Effort is a real range input;
            the engine menu beside them keeps Max, Cloud only, the servers and
            Advanced -->
       <div id="hz-effort" hidden></div>
-      <div id="model-chip" title="More modes">engine <b id="chip-model">Gemma 4 E2B</b></div>
+      <div id="model-chip" title="More modes">model <b id="chip-model">Gemma 4 E2B</b></div>
       <div id="accel-chip" hidden><i></i><b></b></div>
       <!-- your servers' cards (6b334): one chip per paired server whose
            card the server names, in the MLX chip's style -->
       <div id="srv-chips"></div>
       <!-- cloud models are on (6b354): a light blue dot and "cloud", hidden otherwise -->
-      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden><i></i><b>cloud</b></div>
+      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models on" hidden><i></i><b>cloud</b></div>
       <div id="cbtns">
-      <button class="cbtn" id="attach" title="Attach a file">
+      <button class="cbtn" id="attach" title="Attach">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21.4 11.05 12.2 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.2a1.83 1.83 0 0 1-2.6-2.6l8.5-8.48"/>
         </svg>
       </button>
-      <button class="cbtn" id="mic" title="Dictate — speak your message">
+      <button class="cbtn" id="mic" title="Dictate">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="2.5" width="6" height="11.5" rx="3"/>
@@ -52042,7 +52038,7 @@ __CODE_ROWS__
           <path d="M12 18v3.2"/><path d="M8.6 21.4h6.8"/>
         </svg>
       </button>
-      <button class="cbtn" id="voicebtn" title="Voice chat — replies are read aloud">
+      <button class="cbtn" id="voicebtn" title="Read replies aloud">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
              stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 10v4"/><path d="M7 6v12"/><path d="M11 3v18"/>
@@ -52732,7 +52728,7 @@ function profileChanged(){
   if(Date.now()-last<10000){
     if(!$("#profstuck")){const n=document.createElement("div");
       n.id="profstuck";
-      n.textContent="The profile changed. Reload this window to continue.";
+      n.textContent="The profile changed. Reload to continue.";
       document.body.appendChild(n);}
     return;
   }
@@ -52744,7 +52740,7 @@ function profileChanged(){
 function apiStuck(){
   if($("#apistuck"))return;
   const n=document.createElement("div");n.id="apistuck";
-  n.textContent="MillenAI’s window didn’t finish starting. Quit the app and open it again.";
+  n.textContent="The window didn’t finish starting. Quit and reopen.";
   document.body.appendChild(n);
 }
 // X-Models comes percent-encoded outside printable ASCII (6b334)
@@ -53109,8 +53105,7 @@ function setVoice(on){
 if(VOICE_PARKED){
   const vb=$("#voicebtn");
   vb.classList.add("parked");
-  vb.title="Voice chat is off for now — spoken replies waited on the whole "
-          +"council to finish, which is far too long to talk to";
+  vb.title="Voice chat is off in this version.";
   // a machine that had it ON keeps a stale "1" in localStorage, and would
   // otherwise start talking after the next answer
   localStorage.setItem("millen.voice","0");
@@ -56212,9 +56207,9 @@ function sendSafe(){
   try{
     const r=send();
     if(r&&r.catch)r.catch(e=>{
-      input.placeholder="send failed — "+(e&&e.message||e);});
+      input.placeholder="Couldn’t send. "+(e&&e.message||e);});
   }catch(e){
-    input.placeholder="send failed — "+(e&&e.message||e);
+    input.placeholder="Couldn’t send. "+(e&&e.message||e);
   }
 }
 input.addEventListener("keydown",e=>{
@@ -57096,42 +57091,26 @@ const GREETINGS=[
   // ---- any time
   {t:"What's up, {name}?"},
   {t:"Good to see you, {name}. What are we solving?"},
-  {t:"{name}. Talk to me."},
-  {t:"Pull up a chair. What's on your mind?"},
-  {t:"Ask me anything. The weirder the better."},
   {t:"Big question or small one — both welcome."},
   {t:"What's the word in {city}?"},
-  {t:"Reporting for duty, {name}. What's first?"},
-  {t:"I've got all day. Well, all the compute. What's up?"},
   {t:"Where do we start?"},
-  {t:"Fresh page. Fill it."},
-  {t:"Plotting something? I'm in."},
   {t:"Let's make something today, {name}."},
   {t:"What are we figuring out?"},
-  {t:"Hit me."},
-  {t:"Something's on your mind. Out with it."},
-  {t:"Quick one or a deep dive? I'm good either way."},
   {t:"Say the word, {name}."},
   {t:"Right. What's the plan?"},
-  {t:"You bring the question, I'll bring the receipts."},
-  {t:"What's cooking in {city}, {name}?"},
   {t:"Same team, {name}. What do you need?"},
   {t:"Ideas welcome. Half-formed ones especially."},
   {t:"What's the mission?"},
   // ---- morning
-  {t:"Morning, {name}. Coffee first, questions second.",h:[5,9]},
-  {t:"Good morning. What are we making of today?",h:[5,10]},
-  {t:"Early bird. What's up, {name}?",h:[5,7]},
+  {t:"Good morning, {name}.",h:[5,9]},
+  {t:"Good morning.",h:[5,10]},
   {t:"Morning in {city}. What's first on the list?",h:[6,10]},
-  {t:"Good morning, {name}. Let's get ahead of the day.",h:[6,10]},
+  {t:"Good morning, {name}.",h:[6,10]},
   {t:"Up and at it. What do you need?",h:[6,9]},
   {t:"The day's wide open. Where to?",h:[7,11]},
-  {t:"Morning brain, meet a fresh page.",h:[6,10]},
   // ---- midday / afternoon
   {t:"Afternoon, {name}. How's it going?",h:[12,17]},
-  {t:"Midday check-in. What can I take off your plate?",h:[11,14]},
   {t:"How's {city} treating you this afternoon?",h:[13,17]},
-  {t:"Post-lunch brain? I've got you.",h:[13,15]},
   {t:"Afternoon push. What's the next thing?",h:[14,17]},
   {t:"Halfway through the day. What's still open?",h:[12,15]},
   {t:"Good afternoon, {name}. Ask away.",h:[12,17]},
@@ -57139,30 +57118,18 @@ const GREETINGS=[
   {t:"Good evening, {name}.",h:[17,21]},
   {t:"How's {city} tonight, {name}?",h:[18,23]},
   {t:"Evening. What's on your mind?",h:[17,21]},
-  {t:"Winding down or winding up? Either way, I'm here.",h:[18,22]},
-  {t:"Good evening. What are we settling tonight?",h:[18,22]},
-  {t:"Dinner's done, thoughts are loose. What's up?",h:[19,22]},
+  {t:"Good evening.",h:[18,22]},
   {t:"Evening in {city}. What did the day leave you with?",h:[18,22]},
-  {t:"The night's young, {name}. What are we into?",h:[19,22]},
   // ---- late night
-  {t:"Late one, {name}. Big idea or can't sleep?",h:[23,2]},
   {t:"It's late in {city}. What's keeping you up?",h:[23,3]},
-  {t:"Night owl hours. I'm awake too.",h:[0,4]},
   {t:"Midnight. The good ideas come out now.",h:[0,0]},
-  {t:"Still up? Let's make it worth it.",h:[0,3]},
   {t:"The house is quiet. Good time to think.",h:[23,3]},
-  {t:"3 a.m. thoughts are welcome here.",h:[2,4]},
   // ---- days of the week
   {t:"Monday, {name}. Let's set the tone.",d:[1],h:[6,12]},
   {t:"New week. What's the one thing that matters?",d:[1],h:[6,11]},
-  {t:"Midweek. Still standing? Good.",d:[3]},
-  {t:"Wednesday's the hump. Let's get you over it.",d:[3],h:[9,17]},
   {t:"Almost Friday. What's left to knock out?",d:[4],h:[9,18]},
   {t:"Friday, {name}. Let's make it count.",d:[5],h:[8,14]},
-  {t:"Friday afternoon. Finish strong or coast — I'll help either way.",d:[5],h:[15,18]},
-  {t:"Friday night. Plans, or plotting?",d:[5],h:[19,23]},
   {t:"Saturday. No agenda required.",d:[6]},
-  {t:"Weekend brain engaged. What's up, {name}?",d:[0,6]},
   {t:"Sunday. Slow questions welcome.",d:[0]},
   {t:"Sunday evening. Getting ahead of the week?",d:[0],h:[17,22]},
   // ---- seasons (vibes, never forecasts)
@@ -57175,20 +57142,9 @@ const GREETINGS=[
   {t:"Summer, {name}. What's the move?",m:[6,7]},
   {t:"August. Everyone's away; let's get things done.",m:[7]},
   {t:"September energy. Back at it.",m:[8]},
-  {t:"October. Cozy questions season.",m:[9]},
   {t:"November. Time to close out the year strong.",m:[10]},
-  {t:"Holiday season, {name}. What can I help with?",m:[11]},
   {t:"Last days of the year. Wrapping up or planning?",m:[11],dom:[26,31]},
   // ---- a little personality
-  {t:"I read the manual so you don't have to. What's up?"},
-  {t:"No question too dumb. Several too smart, but bring them."},
-  {t:"I run on your Mac and good intentions. What do you need?"},
-  {t:"Local, private, awake. Go."},
-  {t:"Your brain, my patience. Great combo."},
-  {t:"I don't sleep, {name}. Might as well use that."},
-  {t:"Two heads. One of them is me. Let's go."},
-  {t:"Tell me the thing you'd rather not Google."},
-  {t:"Consider me caffeinated."},
   {t:"Okay {name}, what's the situation?"},
 ];
 // CONDITION-GATED (6b255, per Patrick: gate the weather and time lines on
@@ -57279,7 +57235,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
   const prev=__JUST_UPDATED__;
   if(!prev||!$("#updated-veil"))return;
   $("#updated-ver").textContent="__APP_VER__";
-  $("#updated-sub").textContent="You were on "+prev+". Here\u2019s what changed.";
+  $("#updated-sub").textContent="What changed since "+prev;
   let notes="",mu=null;
   // THIS build's notes (6b288): a nightly lists its own commits, a
   // numbered release its own body — never the channel's newest, which
@@ -57291,7 +57247,7 @@ api("/api/prefs").then(r=>r.json()).then(p=>{
       if(r&&r.notes)notes=r.notes;}catch(e){}})(),
     (async()=>{try{mu=await muFetch(true);}catch(e){}})()]);
   $("#updated-notes").innerHTML=notes?notesHTML(notes)
-    :"<p>The full notes are in Settings \u2192 About.</p>";
+    :"<p>Full notes: Settings > About.</p>";
   if(mu&&(mu.state==="running"||muRows(muPlan,muSrv).length||(muPlan&&muPlan.gb))){
     // the section brings its own buttons: Update models / Later
     $("#updated-card .sh-foot").hidden=true;
@@ -57439,7 +57395,7 @@ async function loadChatsFromDisk(){
     const d=await r.json().catch(()=>({}));
     if(!r.ok){
       // unreadable is never empty (0b L1): say so, change nothing, ask again
-      chatsErr=d.err||"Couldn\u2019t read your chats. Nothing was changed.";
+      chatsErr=d.err||"Couldn\u2019t read your chats. Nothing changed.";
       renderChats();setTimeout(loadChatsFromDisk,3000);return;
     }
     chats=d.chats||[];chatsErr="";chatsLoaded=true;
@@ -58182,23 +58138,22 @@ function renderChats(flip){
     +(tk.n?'<span class="ctok"'+(tk.est?' title="estimated from length"':'')+'>'+(tk.est?"~":"")+fmtTok(tk.n)+'</span>':'')
     +'<span class="cpin" title="'+(c.pin?"Unpin":"Pin")+'">'
     +PIN_SVG+'</span>'
-    +'<span class="cx" title="Delete chat">×</span>'
+    +'<span class="cx" title="Delete">×</span>'
     +(sn?'<span class="csnip"></span>':'')+'</div>';};
   let html="";
   if(sp.pins.length)
     html+='<div class="cgroup">'+head("pinned","Pinned",pv)+'</div>'+pins.map(row).join("");
   if(sp.shown.length||sp.hidden){
     html+='<div class="cgroup recents">'+head("recents","Recents",rv)
-      +'<span class="rbtn" title="Recents options">'+OPTS_SVG+'</span></div>';
+      +'<span class="rbtn" title="Options">'+OPTS_SVG+'</span></div>';
     html+=dayRows(rest,row,Date.now());
-    if(sp.hidden&&rv.open)html+='<div class="chidden">'+sp.hidden+' older chat'
-      +(sp.hidden===1?"":"s")+' hidden <span class="rall">Show all</span></div>';
+    if(sp.hidden&&rv.open)html+='<div class="chidden">'+sp.hidden+' more <span class="rall">Show all</span></div>';
   }
   if(chatsErr)html='<div class="cempty">'+esc(chatsErr)+'</div>';
   else if(!html)html='<div class="cempty">'
     +(q?"Nothing matches “"+esc(window.chatQ)+"”"
-      :uiMode==="code"?"No code chats yet"
-      :uiMode==="funnel"?"No funnels yet":"No chats yet")+'</div>';
+      :uiMode==="code"?"No Code chats"
+      :uiMode==="funnel"?"No Funnels":"No chats")+'</div>';
   else if(anyEst)html+='<div class="cfoot">~ estimated from length</div>';
   el.innerHTML=html;
   if(flip&&!hzStill()){
@@ -58298,8 +58253,7 @@ function deleteChat(id){
     renderChats();
     chatOps([{op:"delete",id}]).catch(()=>loadChatsFromDisk());
     const t=$("#undobar");
-    t.querySelector(".ut").textContent='Deleted "'
-      +(undoStash.chat.title||"chat").slice(0,40)+'"';
+    t.querySelector(".ut").textContent="Deleted";
     t.hidden=false;
     clearTimeout(undoTimer);
     undoTimer=setTimeout(()=>{t.hidden=true;undoStash=null;},6000);
@@ -58651,7 +58605,7 @@ function palActions(){
     {k:"go",t:"Settings",run:()=>openAbout()},
     {k:"go",t:"Add models\u2026",run:()=>openModelSets()},
     {k:"go",t:"Update models\u2026",run:()=>openModelUpdates()},
-    {k:"set",t:"Toggle visual effects",
+    {k:"set",t:"Visual effects",
      run:()=>$("#fx-toggle").click()},
   ];
   // tier names come from TIER_META — the same object the composer's
@@ -58692,7 +58646,7 @@ function palSearch(q){
 }
 function palPaint(){
   if(!palItems.length){
-    presults.innerHTML='<div class="pempty">No matches</div>';return;
+    presults.innerHTML='<div class="pempty">Nothing found</div>';return;
   }
   presults.innerHTML=palItems.map((it,i)=>
     '<div class="pitem'+(i===palSel?" sel":"")+'" data-i="'+i+'">'
@@ -59773,7 +59727,7 @@ async function stopRec(){
     // a 503 is the engine gone from under a cached "ready": ask again next time
     if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("transcribe failed");}
     const text=(await r.json()).text;
-    input.placeholder="Message MillenAI\u2026";
+    input.placeholder="Ask anything";
     if(text){
       input.value=text;input.dispatchEvent(new Event("input"));
       if(voiceChat)send();          // voice chat: straight to the model
@@ -59848,8 +59802,8 @@ function micGone(){micClose();}        // a new chat, a profile change
 
 // the hotkey's glue (6b338): the DOM onto dictKey, and dictKey onto the
 // mic button's own path
-micBtn.title="Dictate \u2014 speak your message. Hold "+DICT_KEY
-  +" to talk and let go to finish, or tap it to keep listening";
+micBtn.title="Dictate. Hold "+DICT_KEY
+  +" to talk, or tap to keep listening";
 micBtn.addEventListener("click",()=>{
   if(recording){stopRec();return;}
   dictStart();
@@ -65195,7 +65149,7 @@ function setLook(v,quiet){
     const sk=$("#skyline");if(sk){sk.hidden=true;const vid=$("#sky-color");if(vid&&!vid.paused)vid.pause();}
     const i=$("#input");if(i)i.placeholder="Ask anything";}
   if(v==="classic"&&was){hzStop();root.classList.remove("hz","hz-ready","hz-home","hz-pause","sbhide","hz-sbopen","hz-busy");
-    const i=$("#input");if(i)i.placeholder="How can I help you today?";
+    const i=$("#input");if(i)i.placeholder="Ask anything";
     const g=$("#hero .greet");if(g&&typeof greeting==="function"){g.innerHTML="";g.textContent=greeting();delete g.dataset.hzText;}
     if(!quiet&&typeof bootSkyline==="function"){skyBooted=false;bootSkyline();}}
 }
@@ -66098,7 +66052,7 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden}
   100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.3)}}
 </style></head><body>
 <div id="aura"></div>
-<div id="w"><div id="hello">Welcome to</div><div id="v">__V__</div>
+<div id="w"><div id="hello"></div><div id="v">__V__</div>
 </div>
 <div id="flash"></div>
 <script>
