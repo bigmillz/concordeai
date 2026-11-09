@@ -2785,7 +2785,7 @@ _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
 # (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
 # window in WKWebView, WebView2 and Qt)
 _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
-_PAGE_HOST |= {"Int16Array"}         # 6b541: the page turns captured audio into 16 kHz PCM
+_PAGE_HOST |= {"Int16Array"}         # 6b542: the page turns captured audio into 16 kHz PCM
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -27507,7 +27507,7 @@ const reset=()=>{
   for(const k of Object.keys(dictT))delete dictT[k];
 };
 const delayedGum=()=>{let rel;gumImpl=()=>new Promise(r=>{rel=()=>r(mkStream());});return ()=>rel();};
-// the session's answer held back (6b541: the start call is the voice check now)
+// the session's answer held back (6b542: the start call is the voice check now)
 const delayedVoice=()=>{let rel;apiImpl=(u)=>u.includes("dictate/start")
   ?new Promise(r=>{rel=()=>r(okJ({ok:true,sid:"s1",engine:"system",partials:true}));}):undefined;return ()=>rel();};
 const ended=()=>calls.some(u=>u.includes("dictate/end"));
@@ -27528,7 +27528,7 @@ await sec("order",async()=>{
   relV();await p;ord.push(recording===true);
   o.order=ord.every(Boolean);
 });
-// 2. a start that answers with a session never asks /api/voice/status (6b541: one round trip)
+// 2. a start that answers with a session never asks /api/voice/status (6b542: one round trip)
 await sec("statusskip",async()=>{
   reset();voiceReady=false;await dictStart();
   const first=!calls.some(u=>u.includes("voice/status"))&&recording===true;
@@ -27693,7 +27693,7 @@ await sec("shorthold",async()=>{
   feed(1);dictAct(dictKey({type:"down"},3000));await tick();
   o.shorthold=sh&&!recording&&ended();
 });
-// 6b541: every call the capture path made went to this app's own /api/
+// 6b542: every call the capture path made went to this app's own /api/
 o.local=allCalls.length>0&&allCalls.every(u=>typeof u==="string"&&u.startsWith("/api/"));
 process.stdout.write(JSON.stringify(o));
 })();'''
@@ -28034,8 +28034,8 @@ check("mic warm pref: applyPrefs paints the switch from the saved value; no writ
       _mw_src_ok and "prefSet({mic_warm:on});" in page)
 # ==== 6b345 dictation fast: end ====
 
-# ==== 6b541 dictation instant: begin ====
-# 6b541, per Patrick: "I want the dictation part to work with very low latency, like really
+# ==== 6b542 dictation instant: begin ====
+# 6b542, per Patrick: "I want the dictation part to work with very low latency, like really
 # fast, not like you have to wait a second for it to start and then like then it pauses."
 # The page's streaming path runs in node on the 6b345 glue (the indicator in the keydown, the
 # pre-roll, partials in place, the end after the last chunk, the slip's cancel, the warm-up),
@@ -28287,7 +28287,7 @@ check("dictation instant: the helper is found beside millenai.py or in shell/dic
       and "atexit.register(_dict_helper.stop)" in _MILLENAI_SRC
       and "./shell/dictate/build.sh" in open("build_shell_dmg.sh").read()
       and 'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())
-# ==== 6b541 dictation instant: end ====
+# ==== 6b542 dictation instant: end ====
 
 
 # ==== 6b340 funnel pictures: begin ====

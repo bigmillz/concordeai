@@ -106,7 +106,7 @@ MACHINE_STATE = frozenset((
     "_mlx_engine",
     "_dl_hist", "_job_watch", "_managed_procs", "_mlx_procs", "_modup",
     "_modup_hist", "_setup_jobs", "_studio_bytes_cache", "_fw_cuda",
-    # (6b541) live dictation: the sessions (one microphone, one at a time,
+    # (6b542) live dictation: the sessions (one microphone, one at a time,
     # dropped at the end) and whether whisper's weights were warmed; the
     # helper process is machine state too, held by _dict_helper
     "_dict_sessions", "_whisper_warmed",
@@ -18201,7 +18201,7 @@ def _whisper_weights() -> bool:
 
 
 def _voice_supported() -> bool:
-    """Speech-to-text: the system recognizer (6b541, macOS 26 and later)
+    """Speech-to-text: the system recognizer (6b542, macOS 26 and later)
     needs nothing installed; otherwise whisper's library."""
     return "dict-fake" in TEST_HOOKS or _dict_helper_path() is not None or _whisper_libs()
 
@@ -18295,9 +18295,9 @@ def _fw_transcribe(audio, gpu: bool) -> str:
     return " ".join(sg.text for sg in segments).strip()
 
 
-# ------------------------------------------------ dictation, live (6b541)
+# ------------------------------------------------ dictation, live (6b542)
 # @dictate-begin
-# 6b541, per Patrick: "I want the dictation part to work with very low
+# 6b542, per Patrick: "I want the dictation part to work with very low
 # latency, like really fast, not like you have to wait a second for it to
 # start and then like then it pauses." Measured on his M4 Pro before this:
 # whisper-large-v3-turbo on MLX costs ~760 ms a call whatever the clip's
@@ -41610,7 +41610,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _dir_bytes_real(_hf_model_dir(repo)) / est * 100))
             self._send_json({"supported": _voice_supported(),
                              "ready": _voice_supported() and _voice_ready(),
-                             "engine": _dict_engine_name(),      # 6b541
+                             "engine": _dict_engine_name(),      # 6b542
                              "downloading": job.get("status") == "downloading",
                              "pct": pct,
                              "note": job.get("note", "")})
@@ -43280,7 +43280,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"ok": True})
             return
         if self.path.startswith("/api/dictate/"):
-            # LIVE DICTATION (6b541): start, audio (as it is captured, raw
+            # LIVE DICTATION (6b542): start, audio (as it is captured, raw
             # PCM int16 16 kHz mono; the reply carries the partial so far),
             # end (the tail, the reply is the final text), cancel, warm.
             _route, _, _q = self.path.partition("?")
@@ -49466,7 +49466,7 @@ body.gen #chip-model{color:var(--accent)}
   padding:6px 4px;
 }
 #input::placeholder{color:var(--faint)}
-#input.dictating{opacity:.62}         /* a partial, while it may still change (6b541) */
+#input.dictating{opacity:.62}         /* a partial, while it may still change (6b542) */
 #cbtns{display:flex;align-items:center;gap:2px;flex-shrink:0;
   margin-left:auto;padding-left:4px}
 .cbtn:active{transform:scale(.94)}
@@ -59861,7 +59861,7 @@ const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,
   autoGainControl:false}};
 let micCtx=null,micProc=null,micSrc=null,micStream=null,micGum=null,
     micTimer=null,micCap=false,recHeard=false,dictVoiceP=null;
-/* LIVE DICTATION (6b541, per Patrick: "I want the dictation part to work
+/* LIVE DICTATION (6b542, per Patrick: "I want the dictation part to work
    with very low latency, like really fast, not like you have to wait a
    second for it to start and then like then it pauses."). Before: the
    indicator came on with the first audio chunk (200-800 ms after the
@@ -60212,7 +60212,7 @@ function micWarmPaint(){
   t.addEventListener("click",()=>setMicWarm(!micWarmOn()));
   if(IS_PC)$("#micwarm-note").textContent="On for 15 seconds after you dictate.";
 })();
-// the recognizer is readied when the composer takes focus (6b541), so a
+// the recognizer is readied when the composer takes focus (6b542), so a
 // press finds it listening; once a minute at most
 input.addEventListener("focus",dictWarm);
 

@@ -19131,7 +19131,7 @@ that cuts). Video and stills in `scratchpad/modefx/` (`mode-switch.mp4`, `.gif` 
   this Mac. Never sent anywhere.", untrue since paired servers may read records, and Mac-only while the app
   goes cross-platform; the owner wants it short).
 
-## 6b541 — dictation-instant: it listens at the press, writes as you speak, and is done at the release (per Patrick)
+## 6b542 — dictation-instant: it listens at the press, writes as you speak, and is done at the release (per Patrick)
 
 Patrick: "I want the dictation part to work with very low latency, like really fast, not like you
 have to wait a second for it to start and then like then it pauses." Branch `dictation-instant` from
@@ -19233,7 +19233,7 @@ microphone…", "didn’t catch anything", "(or tap the mic)") and were **red on
 (copy-2, a8f6348, changed the page and not them); they now run the streaming path on the copy
 pass's words, their mutants moved to the new lines (the `order` mutant delays the capture by 20 ms
 instead of awaiting a second start, which hung the file; `statusskip` now watches both presses).
-New block "6b541 dictation instant": `instant`, `preroll`, `partials`, `nopause`, `cancelslip`,
+New block "6b542 dictation instant": `instant`, `preroll`, `partials`, `nopause`, `cancelslip`,
 `warm`, `local` in node with eleven mutants; the session live on the fake engine (`dict-fake` hook,
 on the gauntlet's main copy: a partial per chunk, the whole at the end, 404 after, a cancel drops,
 a new start drops the old, the status names the engine); the "nothing leaves" lint and its mutants;
