@@ -52443,8 +52443,11 @@ html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
 html.tl.hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-left:96px}
 html.tl.hz #main:not(:has(#hero)) #hz-top{height:72px}
 html.tl.hz #hz-top{pointer-events:auto}
-html.tl #brand-row .vghost{display:none}
+html.tl.hz #brand-row .vghost{display:none}
 html.tl #brand-row #newchat{margin-left:auto}
+/* Classic in the shell: its sidebar is the only place the lockup shows, so the lockup stays and
+   starts 20 px right of the green button, the row's centre on the lights' line (16 + 7 + 26 / 2) */
+html.tl:not(.hz) #brand-row{padding-left:78px;margin-top:7px}
 html.tl.hz.hz-sbopen #main:has(#hero) #hz-mark,html.tl.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:inline-block}
 /* the lanes stay centred on the header whatever the corner takes: on the home the two side groups
    share the room equally (the spacers step out), and where the header reserves the lights' 72 px

@@ -40839,7 +40839,8 @@ check("the Mac shell's corner: the lights sit centred on the 72 px header row, t
       and _cn["rpad"] == _cn["pad"] - 24          # the right group carries what the left reserves
       and "html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top," in _cn_css
       and "html.tl.hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}" in _cn_css
-      and "html.tl #brand-row .vghost{display:none}" in _cn_css
+      and "html.tl.hz #brand-row .vghost{display:none}" in _cn_css
+      and "html.tl:not(.hz) #brand-row{padding-left:78px;margin-top:7px}" in _cn_css
       and 'if("0"==="1")document.documentElement.classList.add("tl");' in page
       and '"1" if (SHELL and IS_MAC) else "0")' in _MILLENAI_SRC
       and '<header id="hz-top" aria-label="Window" data-tauri-drag-region>' in page
