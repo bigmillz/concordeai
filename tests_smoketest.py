@@ -41682,7 +41682,7 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
 # ==== the mode switch (6b540): end ====
 
 # ==== CALM BY DEFAULT, BALANCED, BALANCE AND STING (6b542, per Patrick): begin ====
-# Effects has three levels: Calm (the quiet page), Balanced (Calm's chrome and a
+# Effects has three levels: Calm (the quiet page), Balanced (the default: Calm's chrome and a
 # few soft living touches) and Full (today's whole show, by choice). Full's show is PRESENT and GATED behind Effects Full (never
 # deleted): the trace, the streak and sweep, the comets, the ripple, the rings, the arc and
 # glide, the greeting's bloom and sheen, the composer's ring and glow, the Max/Ultra shimmer,
@@ -41694,22 +41694,20 @@ check("6b540 the switch logic in node: the latest wins, a repaint never cuts, th
 # one box, and a trace is killed at once when the text or the box moves.
 print("== calm by default, balance and sting (6b542) ==")
 def _c542_levels(js, css, pg, head):
-    # Full is the default (per Patrick, on the beta-1 merge): unset and "full" are Full; a saved
-    # "balanced" or "calm" keeps its choice
-    return ('function hzFxLevel(){\n  try{return localStorage.getItem("millen.fxlevel")==="calm"?"calm":localStorage.getItem("millen.fxlevel")==="balanced"?"balanced":"full";}catch(e){return "full";}' in js
+    return ('function hzFxLevel(){\n  try{return localStorage.getItem("millen.fxlevel")==="full"?"full":localStorage.getItem("millen.fxlevel")==="calm"?"calm":"balanced";}catch(e){return "balanced";}' in js
             and 'function hzCalm(){return hzFxLevel()!=="full";}' in js and 'function hzFxBal(){return hzFxLevel()==="balanced";}' in js
-            and 'function setFxLevel(v){\n  v=v==="calm"?"calm":v==="balanced"?"balanced":"full";' in js
+            and 'function setFxLevel(v){\n  v=v==="full"?"full":v==="calm"?"calm":"balanced";' in js
             and 'root.classList.toggle("hz-full",lv==="full");root.classList.toggle("hz-bal",lv==="balanced");' in js
-            and 'document.documentElement.classList.add(hzFxl==="calm"?"hz-calm":hzFxl==="balanced"?"hz-bal":"hz-full");' in head   # before the first paint; unset is Full
+            and 'document.documentElement.classList.add(hzFxl==="full"?"hz-full":hzFxl==="calm"?"hz-calm":"hz-bal");' in head   # before the first paint; unset is Balanced
             and '<select id="fx-level"><option value="calm">Calm</option>' in pg and '<option value="balanced">Balanced</option>' in pg and '<option value="full">Full</option></select>' in pg
-            and '<div id="fx-level-note">Full is the default. Balanced and Calm are lighter.</div>' in pg
+            and '<div id="fx-level-note">Balanced is the default. Full is the whole show.</div>' in pg
             and "html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}" in css
             and "hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)" in _MILLENAI_SRC
             and 'value="off"' not in pg and "millen.fxlevel\",\"calm\")" not in js)        # no Off level, no migration away from Balanced
-check("6b542 Effects: Full (the default, and what an unset or saved Full is), Balanced and Calm (what a saved one stays); hz-full / hz-bal set before the first paint; Classic sees no levels; the mutants are caught",
+check("6b542 Effects: Calm, Balanced (the default, and what a saved Balanced stays) and Full; hz-full / hz-bal set before the first paint; Classic sees no levels; the mutants are caught",
       _c542_levels(_hz_js, _hz_css, page, _hz_head)
-      and not _c542_levels(_hz_js.replace('?"balanced":"full";}catch(e){return "full";}', '?"balanced":"balanced";}catch(e){return "balanced";}'), _hz_css, page, _hz_head)
-      and not _c542_levels(_hz_js, _hz_css, page, _hz_head.replace('hzFxl==="balanced"?"hz-bal":"hz-full"', 'hzFxl==="balanced"?"hz-bal":"hz-bal"')), "")
+      and not _c542_levels(_hz_js.replace('?"calm":"balanced";}catch(e){return "balanced";}', '?"calm":"calm";}catch(e){return "calm";}'), _hz_css, page, _hz_head)
+      and not _c542_levels(_hz_js, _hz_css, page, _hz_head.replace('hzFxl==="calm"?"hz-calm":"hz-bal"', 'hzFxl==="calm"?"hz-calm":"hz-full"')), "")
 def _c542_sky(js, css):
     return ('if(hzFxLevel()==="calm")return;      // Calm plays no footage' in js                       # no decode, no texImage2D a frame
             and 'const full=hzFxLevel()==="full",gap=hzS.gen&&hzS.genLocal?1000/15:0;\n    const lv=hzFxLevel(),calm=lv==="calm",bal=lv==="balanced",g2=gap;' in js   # Balanced and Full at the display's rate (per Patrick: smooth); 15 fps only while a local engine writes
@@ -41895,7 +41893,7 @@ check("6b542 one greeting: Calm writes ONE text node (shown at once); Full's thr
       and 'if(!fill){g.classList.add("shown");delete g.dataset.hzBusy;return;}' in _hz_js
       and 'if(hzReady){hzMachinesPaint();const g=$("#hero .greet");if(g&&root.classList.contains("hz")){hzHeadline(g,hzGreeting());hzHeadlineShow(g);}}' in _hz_js
       and "Update?" not in page, "%r %r %r" % (_c542_g1, _c542_g2, _c542_gm.get("same")))
-# BALANCED: the living touches, each soft, from a real input or the hour, settling;
+# BALANCED (the default): the living touches, each soft, from a real input or the hour, settling;
 # nothing loops but the slow sky (the status dot breathes only while an answer works)
 def _c542_bal(js, css):
     bal = css[css.index("/* ---- BALANCED (6b542"):]
@@ -41921,7 +41919,7 @@ def _c542_bal(js, css):
             and ".hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}" in css
             and "@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}" in css
             and bal.count("infinite") == 1 and ".live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite" in bal)   # the one loop: the dot, while working
-check("6b542 Balanced: the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the landing's one pass, the breathing dot only while working, the lifting hover; nothing else loops; the mutants are caught",
+check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the landing's one pass, the breathing dot only while working, the lifting hover; nothing else loops; the mutants are caught",
       _c542_bal(_hz_js, _hz_css)
       and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .hz-sl-halo{display:block;animation:none;", ".hz.hz-bal .hz-sl-halo{display:block;animation:hzBreathe 8s ease-in-out infinite;"))
       and not _c542_bal(_hz_js.replace("if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}", "if(!full)return;"), _hz_css)
