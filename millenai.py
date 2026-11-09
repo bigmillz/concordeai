@@ -4453,7 +4453,7 @@ AGENTS = {
         # itself — direct, opinionated, zero corporate varnish. The
         # system prompt sets TONE, not permissions: it still refuses
         # what must be refused, it just skips the sermon.
-        "icon": "\U0001fabd", "desc": "the infamous one — direct, no varnish",
+        "icon": "\U0001fabd", "desc": "Direct. No varnish.",
         "picks": ["Hermes 4 14B", "Hermes 3 8B", "Ministral 3 14B",
                   "Gemma 4 E2B"],
         "system": (
@@ -4467,7 +4467,7 @@ AGENTS = {
             "lecture."),
     },
     "Resumes": {
-        "icon": "📄", "desc": "bullets that get interviews",
+        "icon": "📄", "desc": "Bullets that get interviews",
         "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE",
           "Gemma 4 12B", "Ministral 3 14B"],
         "system": (
@@ -4480,7 +4480,7 @@ AGENTS = {
             "sharper alternative whenever a bullet is weak."),
     },
     "Writing": {
-        "icon": "✍️", "desc": "emails, essays, anything with a reader",
+        "icon": "✍️", "desc": "Emails, essays, anything with a reader",
         "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B",
           "Gemma 4 12B", "Ministral 3 14B", "Hermes 3 8B"],
         "system": (
@@ -4493,7 +4493,7 @@ AGENTS = {
             "yes."),
     },
     "Mnemosyne": {
-        "icon": "\U0001f9e0", "desc": "total recall — and how to remember",
+        "icon": "\U0001f9e0", "desc": "Total recall, and how to remember",
         "picks": ["Qwen 3.6 35B MoE", "Gemma 4 26B",
           "Hermes 3 8B", "Ministral 3 14B"],
         "system": (
@@ -4514,7 +4514,7 @@ AGENTS = {
             "to prove it stuck."),
     },
     "Math & Logic": {
-        "icon": "🧮", "desc": "careful step-by-step reasoning",
+        "icon": "🧮", "desc": "Careful step-by-step reasoning",
         "picks": ["Qwen 3.5 9B", "DeepSeek R1 8B", "Gemma 4 26B",
           "Qwen 3.6 35B MoE", "Gemma 4 12B"],
         "system": (
@@ -4526,7 +4526,7 @@ AGENTS = {
             "answer on its own line."),
     },
     "Research": {
-        "icon": "🔎", "desc": "searches the web, writes a cited brief",
+        "icon": "🔎", "desc": "Searches the web, writes a cited brief",
         "picks": ["Hermes 3 8B", "Qwen 3.6 35B MoE",
           "Gemma 4 12B", "Ministral 3 14B"],
         "research": True,
@@ -51829,9 +51829,9 @@ __CODE_ROWS__
            spellcheck="false">
     <span class="fcount" id="find-count" aria-live="polite"></span>
     <button id="find-prev" type="button" aria-label="Previous match"
-            title="Previous match (Shift+Enter)">&#8593;</button>
+            title="Previous (Shift+Enter)">&#8593;</button>
     <button id="find-next" type="button" aria-label="Next match"
-            title="Next match (Enter)">&#8595;</button>
+            title="Next (Enter)">&#8595;</button>
     <button id="find-close" type="button" aria-label="Close find"
             title="Close (Esc)">&#10005;</button>
   </div>
@@ -59566,7 +59566,7 @@ function findStep(cur,n,dir){
 }
 function findCountText(cur,n,q,more){
   if(!q)return "";
-  if(!(n>0))return "No matches";
+  if(!(n>0))return "Nothing found";
   return (cur+1)+" of "+n+(more?"+":"");
 }
 // at most `cap` hits are marked (review of 6b352: one letter in a long chat
@@ -59807,14 +59807,14 @@ function dlLeft(key,have,want,now,hold){
   }
   if(have>=want)return "";
   const still=now-c.moved;
-  if(still>15000)return "waiting for the download to resume";
+  if(still>15000)return "Waiting to resume";
   if(still>5000)return "";
   if(now-c.t0<3000&&have-c.b0<want*0.01)return "";
   const rate=c.w>0?c.r/c.w:0;           // the average, not biased to 0
   return rate>0?dlLeftIn((want-have)/rate):"";
 }
 function dlLeftIn(s){
-  if(s<60)return "under a minute left";
+  if(s<60)return "Under a minute left";
   const m=Math.min(72*60,Math.round(s/60));   // ETA_CAP_MIN's 72 hours
   if(m<60)return "about "+m+" min left";
   const h=Math.floor(m/60),r=m%60;
