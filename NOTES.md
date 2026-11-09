@@ -17124,3 +17124,164 @@ declared in MACHINE_STATE.
 The gauntlet on `quality-2`: run 1 (fd0039a, partly edited mid-run) stopped on a stale 6b516 pin (the verify
 call's text) after failing the new state's MACHINE_STATE lint, two server and two craft mutant anchors and
 three 6b515 pins, all named above and fixed; run 2 (2a97eba): **1199/1199**, exit 0.
+
+## 6b522 — A .md or .txt file is read whole, on this Mac and nowhere else (per Patrick)
+
+Patrick wanted a long markdown or text file (notes, a plan, a long log) attached with the paperclip to be read whole,
+with its size and tokens on the chip, wrapped in `<document>` before his words, and answered by one model on this
+Mac, never the cloud or the server. Before: `addDocFile` sliced every text file to 50,000 characters, the chip showed
+only the name, and the server folded files in as `--- FILE: name ---` into whatever the tier did next (the cloud,
+the paired server, a council, a web search, the memory pass).
+
+**What changes, for .md and .txt only** (other text files keep the old path: 50,000 characters, the old chip; one
+that rides with a .md or .txt goes into the same local turn, capped as before).
+
+- **Reading.** The page reads the bytes with `TextDecoder("utf-8", {fatal: true})`; a file that isn't valid UTF-8
+  is decoded again without `fatal` (what can't be read becomes U+FFFD) and still attached, and the chip says
+  "Not UTF-8" (chosen over refusing it: a Latin-1 note is mostly readable). No slice; the 2 MB file cap stands
+  (the server caps .md/.txt at 2,000,000 characters to match).
+- **The chip.** Name, size (B/KB/MB) and tokens: `≈chars/4` at once, then `POST /api/doc/measure` gives the model's
+  own count (no "≈" when it is exact). Its tooltip adds what the chip can't show: the whole name, who counted
+  ("61,050 tokens, counted by Gemma 4 26B") and the context ("Free memory limits it to 61,440 of 262,144
+  tokens."). After a choice in the bar the chip says "Truncated" or "Summarized"; clicking that undoes it. Clicks on the chips and the bar are taken
+  by one listener on each container (`#imgchips`, `#docwarn`): the old per-chip listeners went with every repaint.
+- **The wrapper** (`doc_message`): the old frame line ("Their contents are real data provided by the user — read
+  them and answer from them directly and factually", the ZEBRA-42 fix of 1.20.0), a line for each partial or
+  summarised document, then each file as `<document name="NAME">\nCONTENTS\n</document>`, then the person's words
+  last, verbatim (the default ask when there are none). The name is HTML-escaped (`"` → `&quot;`, and & < > ')
+  and put on one line. A literal `</document>` inside a file is written `<\/document>` (the slash escaped, as JSON
+  does; any case, spaces anywhere): the model reads the same words and the file can't close its own wrapper. The
+  `QUESTION:` label went: the wrapper marks the boundary now.
+
+**Tokens and context** (`# ==== doc attach (6b522)` in millenai.py).
+
+- Tokens: the model's own tokenizer when its MLX build is in the Hugging Face cache (`tokenizer.json` read with the
+  `tokenizers` package mlx_lm brings; read from disk, nothing fetched, loaded once per file and kept in
+  `_doc_toks`); otherwise chars/4 and `exact: false`. 955,864 characters count in 0.2-0.4 s.
+- `ctx_max`: an Ollama route asks `/api/show` for `<arch>.context_length`; an MLX build's cached `config.json`
+  gives `max_position_embeddings` (or its `text_config`'s); neither: 8,192, said as "Context unknown. Using 8,192 tokens." (and asked
+  again next time).
+- `ctx_use` = `ctx_max` capped by free memory: (free − the model's weights − 2 GB) ÷ KV bytes a token, in steps of
+  1,024, never under 4,096. Free is read as `model_fits_memory` reads it (max of available and total − used); the
+  weights are CATALOG's `mem_gb`, nothing when the model is already loaded. KV bytes a token are an ESTIMATE:
+  layers × KV heads × head_dim × 2 (K and V) × 2 bytes (fp16), from the config or the GGUF's own figures. It counts
+  every layer as full attention, so it overstates Gemma 4 (sliding windows) and Qwen 3.5/3.6 (linear attention):
+  the cap errs on the safe side. Gemma 4 26B: 30 × 8 × 256 × 4 = 245,760 bytes a token, 64 GB at 262,144 tokens;
+  on this 48 GB Mac the cap came out at 61,440 to 134,144 tokens in one evening (it moves with what else is running; the line 43,008 to 93,900) (it moves with what else is running).
+- The 70% line: `limit70 = int(0.70 × ctx_use)`. A turn **needs** its documents' tokens + the system prompt + the
+  last 6 messages of the chat + the frame, notes and wrappers + the question + 2,048 tokens kept for the answer.
+  Over the line when need > limit70. The page does the same sum with the server's `fixed` part and the words in the
+  composer at 4 characters a token.
+- "The selected model" is the one the turn will run on (`doc_local_pick`, step 5), the same function for the
+  measure and the turn.
+
+**The turn: one model of this Mac.** The chat handler saves the question, aliases the tier, and when a .md or .txt
+rides the request leaves at once for `_chat_doc`, before the tier, the server, the cloud or the search are looked at.
+
+- Which model: a picture with the file → the picture model here (Qwen 3.5 Vision 9B, Ollama) reads both, in the one
+  turn; with none installed the pictures are left out and the status says so. A prompt agent (not Research or
+  Remote) → its best local pick and its system prompt. A mode (Fast, Thinking, Pro, Max) → its best local pick in
+  `_tier_ready`'s order (local models only, never `resolve_tier_seats`). A model picked by hand or the Advanced list
+  → the first that is this Mac's. Anything else (Cloud Only and its picks, "<server> Only", a server's model) → this
+  Mac's best fit (Fast's pick here). None installed that fits → "No model on this Mac can read this file, so nothing
+  was sent. Install one in Settings › Models." The status says which: "Read on this Mac: Gemma 4 26B" ("this PC"
+  off a Mac).
+- `num_ctx`: on an Ollama route every call of the turn (each summary and the answer) sends `options.num_ctx =
+  ctx_use` (`run_model(..., num_ctx=)` → `stream_ollama(..., num_ctx=)`, through `_stream_guarded(run_kw=)`); it wins
+  over GIANT_CTX, which caps a context for the same reason. `mlx_lm server` has no such option, so on MLX the
+  server's own count against the line is the limit.
+- The budget, on the server, never the page's word alone: a turn that fits is sent whole whatever its mode. Over
+  the line, a file marked "split" is summarised; whatever is still over keeps its start, the room shared between
+  the files by size: "truncate" as chosen, and a "full" the page let through is cut too, with a status line saying
+  so ("long.md was cut to its first 39,410 of 61,050 tokens.").
+- **Truncate** keeps the start within the budget, cut at the end of a paragraph when one lies in the last fifth of
+  what fits (else a line's, else a word's), then `[truncated: kept the first N of M tokens]` inside the document,
+  and a frame line tells the model the document is partial and to say so when the answer may be in the rest.
+- **Split & summarize** splits at markdown headings, a section still too long at its paragraphs, a paragraph still
+  too long at token boundaries, then packs neighbours while they fit: each part at most min(32,768, the line − the
+  summary prompt − 1,024 kept for the summary). Each part is summarised in turn by the SAME model ("Summarise this
+  part in at most 250 words, focused on the question below"), with STEP and STATUS frames "Summarizing part 3 of
+  7"; the answer then reads `<document name="NAME (summaries of 7 parts)">[Part 1 of 7]…</document>`, told they are
+  summaries written for this question. Stop is honoured between parts and inside a part (the reader's socket is
+  checked); the answer then never starts.
+
+**The words** follow design/COPY.md (approved 2026-11-08): labels of one to three words, an error says what
+happened and what to do in two short sentences, a hint only where it adds what the label can't, no middle dots,
+no "please", "just", "simply" or "we". The chip: name, size, tokens, "Not UTF-8", "Truncated"/"Summarized". The bar:
+"long.md is too long for Gemma 4 26B." / "Needs 65K tokens. 44K fit in free memory." / Truncate (hint "Sends the
+first 41K tokens"), Split & summarize ("Summarizes each part, then answers"), Remove. A gauntlet check draws the
+chip, its tooltip and the bar in node and lints them with the server's lines.
+
+**Every path a document turn could touch, and why it's safe.**
+
+- Before the exit, in the handler: the benchmark hold (`server_only_request` is False for a document turn, so it
+  takes this computer's hold, as a local answer does, and a benchmark refuses it before anything is saved), the
+  question saved on arrival and a rewind (the local chat store, holding what the page shows: the words and the
+  file's NAME, never its contents), the pictures and the annotate grid (parsed, nothing sent), the per-chat title
+  tickets popped. No network.
+- Never reached: Cloud Only's bench and Max's `cloud_bench()`, `server_refresh_modes`/`server_sleepers` (no server
+  is checked or woken), `resolve_tier_seats` and agent seats (the server first), the picture/video/export intents,
+  pasted links (`read_links`), every web search branch and the grounded planner (cloud or server), the pre-warm,
+  `eta_plan`, `run_council` (drafts, critic, compositor, fact-check), the exception path's server retry
+  (`server_side_pick`) and smallest-model rescue, the places pass (cloud or server), the export, and the memory
+  pass (`_extract_memory`, which asks the server or the cloud).
+- In `_chat_doc`: the pick (the catalog, the HF cache, the local Ollama's tags), the person's name and standing
+  instructions from Settings (remembered facts are not added), the headers (`X-Web-Search: 0`, `X-Models` the local
+  model; no `X-Hurry` or `X-Eta`, so no Answer now and the time-left uses the tier's remembered total), the heartbeat
+  (re-sends the last STATUS to the page only), `doc_answer` (the tokenizer and config from disk; Ollama's
+  `/api/show` and `/api/ps` on 127.0.0.1; `run_model` on a label that is never a server's, so only this computer's
+  engines; `_stream_guarded`'s retry is on the same model), and on an error `offline_hint`'s line and nothing else
+  (no other model is tried).
+- After: the quality line and the usage count (local, numbers only); no memory pass, no places, no export.
+- The title: `_doc_chats` marks the chat for 5 minutes and `/api/title` then calls `make_title(txt,
+  ask_server=False)` with no provider ticket, so a model of this Mac names it (from the words the page shows, not
+  the file).
+- The measure route: the same pick, the tokenizer and config from disk, Ollama's metadata on 127.0.0.1; no engine is
+  loaded, nothing leaves, and its reply carries numbers and the file's name only.
+- Not the document's: an MLX engine started for the turn may ask the Hugging Face Hub whether its model has a newer
+  revision, as every engine start does (only the benchmark starts engines offline); no part of the request goes
+  with it. Chats are not synced anywhere (`_sync_url` has no caller yet).
+- A static check holds it: no cloud, server, search, council, memory or title function is named anywhere in
+  `_chat_doc` or the doc section (the gauntlet walks both ASTs).
+
+**Measured, the dev copy on 9894 (no servers.json, no cloud keys), this 48 GB M4 Pro.**
+
+- The fixture (200,289 characters): 61,050 tokens by Gemma's tokenizer (≈50,073 at chars/4, the chip's first figure;
+  62,725 by Qwen 3.8 27B's). Gemma 4 E2B picked by hand: ctx_max 131,072 (config), ctx_use 131,072 (not capped),
+  line 91,750, need 64,784: sent whole, 35.4 s with the engine's load, and it answered both markers (the first and
+  the last page). Fast picked Gemma 4 26B: ctx_max 262,144, ctx_use 61,440-134,144 as free memory moved, so the
+  same file was over the line on one measure and under it on the next. Split on it (ctx_use 76,800, line 53,760):
+  2 parts summarised in 150 s, 153.0 s in all, right answer. With "truncate" chosen while it fit (ctx_use 134,144)
+  it was sent whole, as designed: 161.9 s with a cold 17 GB load.
+- Ollama: the fixture on Qwen 3.5 Vision 9B (qwen3.5:9b, no MLX build here, so ≈50,073): ctx_max 262,144
+  (`/api/show`), ctx_use 74,752, line 52,326; truncated. `/api/ps` showed the model loaded with context_length
+  74,752: num_ctx reached Ollama. 412.2 s (the model thinks by default); it gave the start's marker and said the
+  end's was in the part left out.
+- A long private test file of Patrick's (not in the repo; numbers only): 955,864 characters, 247,939
+  tokens by Gemma's tokenizer (229,237 by Llama 3.2 1B's), 0.4 s to measure. Over the line on every model here:
+  Gemma 4 E2B line 91,750 (need 251,664), Llama 3.2 1B 91,750 (need 232,925), Gemma 4 26B 40,857 at the
+  moment measured. Split & summarize on Gemma 4 E2B: 8 parts, 120 s of summaries, 125.0 s to the end of the answer
+  (1,344 characters). Truncate on Gemma 4 E2B: 47.0 s (1,239 characters).
+- The page in the Browser pane (Blink, hidden): the chip's tokens went from "≈50K" to "61K" when the measure came
+  back; the bar showed over the line; Truncate, the chip's "Truncated" (undo), Remove and the ×
+  each worked by a real click (and `elementFromPoint` hits each button and the ×); send() with the bar up sent
+  nothing and nudged the bar; a Latin-1 .txt attached with "Not UTF-8"; a .csv kept the old chip; changing the mode
+  measured again. The ×, clipped by `.docchip`'s `overflow:hidden` before, shows whole on these chips.
+
+**Risks left.** mlx_lm's server keeps up to 10 prompt caches with no byte cap (the app starts it without
+`--prompt-cache-bytes`), so the parts of a split on a dense model can hold more KV memory than one prompt's, which is
+all `ctx_use` counts. A model with no MLX build here is counted at chars/4; a text that tokenises denser (CJK, code)
+could pass the line and be cut by Ollama from its start, within the 30% margin above the line. Ollama models that
+think by default (qwen3.5:9b) think through every summary (stream_ollama turns thinking off only for the giants). Not
+checked in WKWebView: the chip, the bar and the clicks were checked in the Browser pane (Blink).
+
+Gauntlet: `# ==== 6b522 doc attach` (30 checks, one of them 16 mutants, each caught by the check it targets),
+plus one live check beside 6b339's paired server, and the old ZEBRA-42 check now runs through the document path.
+`SMOKE_LONG_DOC=/path/file.md` swaps in another long file (details print numbers only). The fixture is
+`tests/fixtures/long_sample.md` (200,289 characters, 61,050 Gemma tokens: a fictional relocation plan with headings,
+lists, tables, YAML and shell blocks, a literal `</document>` and two markers), written byte for byte by
+`tests/fixtures/make_long_sample.py` (seed 522). Full run on this branch: 1230/1230, exit 0, 89 min (the first
+run, 1221/1230, found eight older checks that pinned what this change touched: `> BIG_MODEL_BYTES)` in
+`run_model`, one `send_header("X-Models"`, `paintModels`' last lines, `server_only_request` in the servers
+namespace, and the profile lint's `except StaleProfile` before a broad handler; each kept, the code or the pin
+adjusted). The doc block alone also ran 30/30 with `SMOKE_LONG_DOC` on the private file.

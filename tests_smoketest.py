@@ -20381,6 +20381,8 @@ def _sv_ns(src, hooks=("server-http-loopback",)):
         else ns["_RAN"].append(label))
     ns["_stream_guarded"] = lambda label, msgs, emit, status, fb, note: ns["run_model"](
         label, msgs, emit)
+    # (6b522) server_only_request asks whether a .md or .txt rides the request: none does in these checks
+    ns["doc_request_docs"] = lambda req: None
     exec(_sv_sect(src, "servers"), ns)
     ns.update(ctx_executor=_ctx_exec34, _srv_send_real=ns["_srv_send"])
     return ns, ctx, d
@@ -21148,7 +21150,9 @@ def _svc_review(src):
     out["header"] = (urllib.parse.unquote(h) == nm and "Llama 3.2 3B" in h
                      and ns["header_text"]("Gemma 4 26B, Qwen 3.5 9B") == "Gemma 4 26B, Qwen 3.5 9B"
                      and 'self.send_header("X-Models", header_text(xm))' in src
-                     and src.count('send_header("X-Models"') == 1
+                     # (6b522) a document turn names its one local model through the same encoding
+                     and src.count('send_header("X-Models"') == 2
+                     and 'self.send_header("X-Models", header_text(label))' in src
                      and 'lastModels=hdrText(resp.headers.get("X-Models"));' in src
                      and 'const line=hdrText(resp.headers.get("X-Models"));' in src
                      and "function hdrText(v){try{return decodeURIComponent(v||\"\");}" in src
@@ -25932,6 +25936,23 @@ check("modes (live, the page's own request): Fast, Thinking and Pro run on the s
       "and Pro merge on the server too (on a model it already holds), a refused merge falls back and says so; Pro seats "
       "four and says so; the switch off runs it here; a funnel stage asks the server first",
       bool(_mg39) and all(_mg39.values()), "%r %r" % (_mg39, _md39))
+# (6b522) a .md file in the page's real request with a mode, beside a paired and preferred server whose models
+# that mode would seat: ONE model of this computer reads it, the server is never asked, nothing is searched
+_n522l, _n522s = len(_loc39(_SV)), len(_chats39())
+_b522 = _page_body39("Fast", "what is the codename in this file? 522d")
+_b522["docs"] = [{"name": "notes.md", "text": "quarterly notes\nthe codename is OTTER-9\n", "mode": "full"}]
+_s522, _h522, _t522, _f522 = _mchat39(_SV, _b522)
+time.sleep(1.5)
+_l522 = _loc39(_SV)[_n522l:]
+_x522 = urllib.parse.unquote(_h522.get("X-Models", ""))
+_here522 = "this Mac" if sys.platform == "darwin" else "this PC"
+check("6b522 a .md file beside a paired, preferred server (live, the page's request): one model of this computer "
+      "reads it, the server is never asked, nothing is searched, the status says where",
+      _s522 == 200 and _h522.get("X-Web-Search") == "0" and bool(_x522) and " \u00b7 " not in _x522
+      and [c_[1] for c_ in _l522 if c_[0] == "run"] == [_x522] and all(c_[1] == _x522 for c_ in _l522)
+      and len(_chats39()) == _n522s and "LOCAL-ANSWER-" + _x522 in _t522
+      and any(f_[0] == "STATUS" and f_[1].startswith("Read on %s: %s" % (_here522, _x522)) for f_ in _f522),
+      "%r" % [_s522, _x522, _l522, len(_chats39()) - _n522s])
 # a plain server pick keeps this Mac quiet in the same terms: no engine warmed or started for it either
 _nl39 = len(_loc39(_SV))
 _scQ = _svchat(text="say hello in one word 339q", models=[_SVL], tier="")
@@ -37413,6 +37434,564 @@ check("the final writer's reasoning level goes only to gpt-oss, and a server tha
       and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
       and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
+# ==== 6b522 doc attach: begin ====
+# A .md OR .txt FILE IS READ ON THIS MAC (6b522, per Patrick): read whole as UTF-8, its size and tokens and the
+# model's context on the chip, wrapped as <document name="...">...</document> before the person's words, and the
+# turn runs on ONE local model and nothing else (no cloud call, no server, no web search, no memory pass, no
+# council); Ollama gets options.num_ctx; over 70% of ctx_use the page asks first (Truncate, Split & summarize,
+# Remove) and the server applies the same budget itself. SMOKE_LONG_DOC=/path/file.md swaps in another long file
+# for these checks; a check's detail carries numbers only, never the file's words. The block reads only check,
+# req, page and _MILLENAI_SRC, so it can also be run on its own. NOTES 6b522.
+print("== a .md or .txt file is read on this Mac (6b522) ==")
+import glob as _glob522, html as _html522, threading as _th522, unicodedata as _ud522, types as _ty522
+import tempfile as _tf522, subprocess as _sp522, textwrap as _tw522, ast as _ast522
+_LONG522 = os.environ.get("SMOKE_LONG_DOC") or os.path.join("tests", "fixtures", "long_sample.md")
+_FIX522 = not os.environ.get("SMOKE_LONG_DOC")       # the fixture's own markers are checked only on the fixture
+with open(_LONG522, encoding="utf-8") as _fh522:
+    _long522 = _fh522.read()
+_HUB522 = os.path.join(os.environ.get("HF_HOME") or os.path.expanduser("~/.cache/huggingface"), "hub")
+_E2B522 = "mlx-community/gemma-4-e2b-it-4bit"     # its tokenizer counts for "Local A" when it is cached here
+
+
+def _def522(src, name):
+    """One top-level def, class or assignment of src, by name (its text up to the next column-0 line)."""
+    m = re.search(r"^(?:(?:def|class) %s\b|%s = ).*?(?=^\S)" % (re.escape(name), re.escape(name)), src, re.M | re.S)
+    if not m:
+        raise KeyError(name)
+    return m.group(0)
+
+
+def _ns522(src):
+    """The doc section of src, exec'd beside stand-ins: "Local A" (MLX, the real Gemma 4 E2B tokenizer when it is
+    cached), "Local O" (Ollama, no MLX build: the estimate), "Local B" (doesn't fit); every cloud, server,
+    search, council, memory and title call a recorder that fails the turn."""
+    rec = []
+
+    def _rec(name):
+        def f(*a, **k):
+            rec.append(name)
+            raise AssertionError(name + " was called on a document turn")
+        return f
+    ns = {"re": re, "os": os, "json": json, "glob": _glob522, "html": _html522, "threading": _th522, "time": time,
+          "urllib": urllib, "unicodedata": _ud522, "profile_cache": lambda n, o, reset=None: o,
+          "pc_words": lambda t: t, "_rec522": rec,
+          "_hf_model_dir": lambda repo: os.path.join(_HUB522, "models--" + repo.replace("/", "--")),
+          "MLX_REPOS": {"Local A": _E2B522},
+          "MODEL_ROUTES": {"Local A": ("mlx", 8946), "Local O": ("ollama", "local-o:9b"), "Local B": ("mlx", 8910)},
+          "MODEL_MEM_BYTES": {"Local A": 3_200_000_000, "Local O": 7_400_000_000, "Local B": 17_000_000_000},
+          "HAS_PSUTIL": False, "_engine_up": lambda p: False, "_ollama_loaded": lambda: [],
+          "_hook_arg": lambda n: "", "SYSTEM_PROMPT": {"role": "system", "content": "You are the app."},
+          "_venue_stamp": lambda f: "Monday", "ollama_pulled_tags": lambda: {"local-o:9b"},
+          "slow_giant": lambda l: False, "model_fits_memory": lambda l: l != "Local B",
+          "TIERS": {"Fast": {"count": 1}, "Thinking": {"count": 3}, "Pro": {"count": 99, "all": True},
+                    "Max": {"count": 99, "all": True, "max": True},
+                    "Cloud Only": {"count": 0, "cloud_only": True}},
+          "_tier_ready": lambda t: {"Fast": ["Local B", "Local A"], "Thinking": ["Local O", "Local A"],
+                                    "Pro": ["Local A", "Local O"], "Max": ["Local A"]}.get(t, []),
+          "MERGE_RANK": ["Local B", "Local O", "Local A"], "BLEND_EXCLUDE": {"Local O"},
+          "AGENTS": {"Coding": {"system": "CODER"}, "Research": {"research": True}},
+          "resolve_agent": lambda n: ("Local O", {}) if n == "Coding" else (None, None)}
+    ns["server_label"] = lambda l: isinstance(l, str) and " · " in l and l not in ns["MODEL_ROUTES"]
+    ns["model_cached"] = lambda l, p=None: l in ns["MODEL_ROUTES"]
+    for nm in ("cloud_text", "cloud_bench", "run_cloud_only", "server_stream", "server_side_text",
+               "server_side_pick", "server_pick", "run_council", "run_search", "run_search_deep", "ground_start",
+               "_extract_memory", "make_title", "resolve_tier_seats", "max_tier_seats"):
+        ns[nm] = _rec(nm)
+    for nm in ("NUL", "Ctl", "_THINK_RE", "strip_think", "_looks_degenerate", "_Degenerate", "rate_frame",
+               "_detruncate", "_stream_guarded"):
+        exec(_def522(src, nm), ns)
+    exec(src[src.index("# ==== doc attach (6b522): begin ===="):src.index("# ==== doc attach (6b522): end ====")], ns)
+    return ns
+
+
+def _run522(ns, label, docs, calls, q="When is the walkthrough?", ctx=(16384, "config", 4096), use=(16384, False),
+            gone=lambda: False, images=None):
+    """doc_answer on ns with a stand-in run_model (a summary per part, then the answer) and a fixed context."""
+    out, steps, stats = [], [], []
+
+    def rm(lbl, msgs, emit, thinking=False, **kw):
+        calls.append((lbl, msgs, kw))
+        mm = re.search(r"That is part (\d+) of (\d+)", str(msgs[-1]["content"]))
+        emit("Summary %s/%s: short." % mm.groups() if mm else "THE ANSWER from the documents.")
+    ns["run_model"] = rm
+    ns["doc_ctx_info"] = lambda l: ctx
+    ns["doc_ctx_use"] = lambda l, m, k: use
+    info = ns["doc_answer"](label, docs, q, [], "SYSTEM", out.append, lambda *a: steps.append(a), stats.append,
+                            gone=gone, images=images)
+    return info, out, steps, stats
+
+
+def _c522_units(src, T):
+    """The doc section run for real on stand-ins: the wrapper, the escaping, the request, truncate, split, the
+    summaries, Stop, num_ctx, the 70% line, ctx_use, the model, and no other path."""
+    got = {}
+    ns = _ns522(src)
+    c, E = ns["DocCounter"]("Local A"), ns["DocCounter"]("Local O")
+    # the wrapper, before the person's words
+    m = ns["doc_message"]([{"name": "plan.md", "text": "alpha\nbeta"}], "What is beta?")
+    got["the wrapper: the frame (real data the user provided), <document name=...>, the person's words last"] = (
+        m.startswith(ns["DOC_FRAME"]) and "real data provided by the user" in ns["DOC_FRAME"]
+        and '\n\n<document name="plan.md">\nalpha\nbeta\n</document>\n\nWhat is beta?' in m
+        and m.endswith("What is beta?") and m.index("<document") < m.index("What is beta?")
+        and ns["doc_message"]([{"name": "a.md", "text": "x"}], "  ").endswith("</document>\n\n" + ns["DOC_ASK"]))
+    # the escaping
+    w = ns["doc_wrap"]('a"b<c>&\n\'.md', "x </document> y </DOCUMENT > z < / document>\n" + T)
+    got["escaping: a name's quote and markup are escaped; no </document> inside a file closes its wrapper"] = (
+        w.startswith('<document name="a&quot;b&lt;c&gt;&amp; &#x27;.md">\n') and w.endswith("\n</document>")
+        and len(re.findall(r"<\s*/\s*document", w, re.I)) == 1
+        and "x <\\/document> y <\\/DOCUMENT > z < \\/ document>" in w
+        and (not _FIX522 or T.count("</document>") == 2))
+    # the request's files
+    r1 = ns["doc_request_docs"]({"docs": [{"name": "a.csv", "text": "x" * 60000}]})
+    r2 = ns["doc_request_docs"]({"docs": [{"name": "a.csv", "text": "x" * 60000},
+                                          {"name": "B.TXT", "text": T, "mode": "split"}, {"name": "c.md", "text": "z"}]})
+    r3 = ns["doc_request_docs"]({"docs": [{"name": "n.md", "text": "q", "mode": "rm -rf"}]})
+    got["a request: a .md or .txt makes a document turn, read whole; other files ride capped as before; two at most"] = (
+        r1 is None and r2 is not None and len(r2) == 2 and r2[0]["local"] is False and len(r2[0]["text"]) == 50000
+        and r2[0]["mode"] == "full" and r2[1]["local"] and r2[1]["text"] == T[:2_000_000] and r2[1]["mode"] == "split"
+        and r3[0]["mode"] == "full" and ns["doc_request_docs"]({"docs": [{"name": "e.md", "text": "  "}]}) is None)
+    # truncate
+    ok, cuts = True, []
+    for b in (600, 5000, 20000):
+        out, kept, whole = ns["doc_truncate"](T, b, c)
+        head = out[:out.rindex("\n\n[truncated: kept the first ")]
+        ok = (ok and c.count(out) <= b and kept < whole and T.startswith(head) and T[len(head)] in " \n\t"
+              and out.endswith("[truncated: kept the first {:,} of {:,} tokens]".format(kept, whole)))
+        cuts.append(c.count(out) <= b)
+    oe = ns["doc_truncate"](T, 5000, E)[0]
+    got["truncate: within budget with its marker (kept N of M), the start kept, cut at a boundary; a fit unchanged"] = (
+        ok and E.count(oe) <= 5000 and ns["doc_truncate"]("short", 600, c)[0] == "short"
+        and (not _FIX522 or ("GRANITE-7" in ns["doc_truncate"](T, 5000, c)[0]
+                             and "final walkthrough" not in ns["doc_truncate"](T, 5000, c)[0])))
+    # split
+    ok = True
+    for lim in (1000, 8000, 32768):
+        parts = ns["doc_split"](T, lim, c)
+        ok = (ok and max(c.count(p) for p in parts) <= lim
+              and re.sub(r"\s+", "", "".join(parts)) == re.sub(r"\s+", "", T))
+    flat = "word " * 40000
+    pf, pe = ns["doc_split"](flat, 3000, c), ns["doc_split"](T, 5000, E)
+    got["split: each part within the limit, in order, together the whole text; headings, paragraphs, then a hard cut"] = (
+        ok and len(pf) >= 4 and max(c.count(p) for p in pf) <= 3000 and "".join(pf) == flat
+        and max(E.count(p) for p in pe) <= 5000
+        and (not _FIX522 or all(p.startswith("#") for p in ns["doc_split"](T, 8000, c))))
+    # split & summarize: N + 1 calls on the one local model
+    lim = int(16384 * 0.7)
+    calls = []
+    info, out, steps, stats = _run522(ns, "Local A", [{"name": "long.md", "text": T, "mode": "split"}], calls)
+    n = info["parts"]
+    fin = str(calls[-1][1][-1]["content"]) if calls else ""
+    got["split & summarize: N parts summarised in turn on the same local model, then one answer: N+1 calls"] = (
+        n >= 2 and len(calls) == n + 1 and {x[0] for x in calls} == {"Local A"}
+        and all("That is part %d of %d" % (i, n) in str(calls[i - 1][1][-1]["content"]) for i in range(1, n + 1))
+        and all(c.count(x[1][0]["content"]) + c.count(x[1][1]["content"]) <= lim for x in calls[:-1])
+        and '<document name="long.md (summaries of %d parts)">' % n in fin and "Summary %d/%d: short." % (n, n) in fin
+        and "holds summaries of the file" in fin and fin.endswith("When is the walkthrough?")
+        and out == ["THE ANSWER from the documents."] and info["prompt"] <= lim
+        and any(s[0] == "council" and s[1] == "Summarizing part %d of %d" % (n, n) for s in steps)
+        and "Summarizing part 1 of %d" % n in stats and not ns["_rec522"])
+    # Stop during the summaries
+    calls2, k = [], [0]
+
+    def gone():
+        k[0] += 1
+        return k[0] > 2
+    try:
+        _run522(ns, "Local A", [{"name": "long.md", "text": T, "mode": "split"}], calls2, gone=gone)
+        stopped = False
+    except ns["DocStopped"]:
+        stopped = True
+    got["Stop during the summaries: no further part is asked, and no answer"] = stopped and len(calls2) == 2
+    # truncate in a turn; a "full" over the line cut by the server, said; a fit sent whole whatever its mode
+    calls3, calls4, calls5 = [], [], []
+    it, _o, _s, _st = _run522(ns, "Local A", [{"name": "long.md", "text": T, "mode": "truncate"}], calls3)
+    ft = str(calls3[-1][1][-1]["content"]) if calls3 else ""
+    iff, _o, _s, stf = _run522(ns, "Local A", [{"name": "long.md", "text": T, "mode": "full"}], calls4)
+    ifit, _o, _s, _st = _run522(ns, "Local A", [{"name": "s.md", "text": "tiny note", "mode": "split"}], calls5)
+    got["truncate in a turn: one call, the marker and a note that it is partial, within the line; a full over it is cut and said"] = (
+        len(calls3) == 1 and "\n\n[truncated: kept the first " in ft and "is partial: only its first" in ft
+        and it["prompt"] <= lim and it["truncated"] and not it["forced"]
+        and len(calls4) == 1 and iff["forced"] == ["long.md"] and iff["prompt"] <= lim
+        and "long.md was cut to its first %s of 61,050 tokens." % "{:,}".format(iff["truncated"][0][1]) in stf
+        if _FIX522 else any(x.startswith("long.md was cut to its first ") for x in stf)
+        and len(calls5) == 1 and ifit["parts"] == 0 and "\ntiny note\n</document>" in str(calls5[0][1][-1]["content"])
+        and "partial" not in str(calls5[0][1][-1]["content"]))
+    # num_ctx: every call on an Ollama model carries ctx_use; none on MLX
+    calls6 = []
+    _run522(ns, "Local O", [{"name": "long.md", "text": T, "mode": "split"}], calls6)
+    got["num_ctx: every call of an Ollama turn (summaries and answer) carries ctx_use; an MLX turn's carry none"] = (
+        len(calls6) >= 3 and all(x[2] == {"num_ctx": 16384} for x in calls6) and all(x[2] == {} for x in calls))
+    # the 70% line
+    ns["doc_ctx_info"] = lambda l: (131072, "config", 35840)
+    ns["doc_ctx_use"] = lambda l, mx, kv: (131072, False)
+    me = ns["doc_measure"]("Local A", [{"name": "long.md", "text": T}], "When?", "SYSTEM")
+    need = me["need"]
+    lo = next(x for x in range(int(need / 0.7) - 3, int(need / 0.7) + 5) if int(x * 0.7) >= need)
+    ns["doc_ctx_use"] = lambda l, mx, kv: (lo, False)
+    at = ns["doc_measure"]("Local A", [{"name": "long.md", "text": T}], "When?", "SYSTEM")
+    ns["doc_ctx_use"] = lambda l, mx, kv: (lo - 1, False)
+    over = ns["doc_measure"]("Local A", [{"name": "long.md", "text": T}], "When?", "SYSTEM")
+    got["the 70% line: 70% of ctx_use; need = the documents + system, frame, question and 2,048 for the answer"] = (
+        ns["doc_limit"](131072) == 91750 and ns["doc_limit"](63488) == 44441 and ns["DOC_ANSWER_ROOM"] == 2048
+        and me["limit70"] == 91750 and me["need"] == me["tokens"] + me["fixed"] + me["q_tokens"]
+        and me["fixed"] == (c.count("SYSTEM") + c.count(ns["doc_message"]([{"name": "long.md", "text": ""}], ""))
+                            + 2048)
+        and me["over"] == (need > 91750) and at["over"] is False and over["over"] is True
+        and me["tokens"] == c.count(T) and me["exact"] == c.exact)
+    # ctx_use: the model's maximum, capped by free memory after its weights
+    ns2 = _ns522(src)
+    vm = _ty522.SimpleNamespace(total=48_000_000_000, available=30_000_000_000, used=20_000_000_000)
+    ns2.update(HAS_PSUTIL=True, psutil=_ty522.SimpleNamespace(virtual_memory=lambda: vm))
+    a1 = ns2["doc_ctx_use"]("Local B", 262144, 245760)
+    a2 = ns2["doc_ctx_use"]("Local A", 131072, 35840)
+    a3 = ns2["doc_ctx_use"]("Local A", 131072, 0)
+    ns2["_engine_up"] = lambda p: True
+    a4 = ns2["doc_ctx_use"]("Local B", 262144, 245760)
+    ns2["_hook_arg"] = lambda n: "8192" if n == "doc-ctx" else ""
+    a5 = ns2["doc_ctx_use"]("Local A", 131072, 35840)
+    ns2["_hook_arg"] = lambda n: ""
+    vm.available, vm.used = 1_000_000_000, 47_000_000_000
+    a6 = ns2["doc_ctx_use"]("Local B", 262144, 245760)
+    got["ctx_use: capped by free memory after the weights (none when loaded), in steps of 1,024, never under 4,096"] = (
+        a1 == (44032, True) and a2 == (131072, False) and a3 == (131072, False) and a4 == (113664, True)
+        and a5 == (8192, True) and a6 == (4096, True))
+    # ctx_max: an MLX build's cached config, Ollama's /api/show, else a labelled fallback
+    td = _tf522.mkdtemp()
+    snap = os.path.join(td, "models--x--y", "snapshots", "abc")
+    os.makedirs(snap)
+    with open(os.path.join(snap, "config.json"), "w") as fh:
+        json.dump({"model_type": "gemma4", "text_config": {
+            "max_position_embeddings": 131072, "num_hidden_layers": 35, "num_key_value_heads": 1,
+            "num_attention_heads": 8, "head_dim": 256}}, fh)
+    ns3 = _ns522(src)
+    ns3["_hf_model_dir"] = lambda repo: os.path.join(td, "models--" + repo.replace("/", "--"))
+    ns3["MLX_REPOS"] = {"Local A": "x/y"}
+    ns3["_doc_ollama_info"] = lambda tag: ({
+        "general.architecture": "qwen35", "qwen35.context_length": 262144, "qwen35.block_count": 32,
+        "qwen35.attention.head_count_kv": 4, "qwen35.attention.head_count": 16,
+        "qwen35.attention.key_length": 256, "qwen35.attention.value_length": 256} if tag == "local-o:9b" else {})
+    got["ctx_max: the cached config (text_config), Ollama's context_length, else a safe fallback said as one"] = (
+        ns3["doc_ctx_info"]("Local A") == (131072, "config", 35 * 1 * 256 * 2 * 2)
+        and ns3["doc_ctx_info"]("Local O") == (262144, "ollama", 32 * 4 * 512 * 2)
+        and ns3["doc_ctx_info"]("Local B") == (8192, "fallback", 0) and "Local B" not in ns3["_doc_ctx_seen"]
+        and ns3["doc_ctx_note"]("Local B", 8192, "fallback", 8192, False) == "Context unknown. Using 8,192 tokens."
+        and ns3["doc_ctx_note"]("Local B", 262144, "config", 44032, True)
+        == "Free memory limits it to 44,032 of 262,144 tokens.")
+    # the model: always this Mac's
+    P = ns["doc_local_pick"]
+    picks = [P("Fast"), P("Thinking"), P("Smart"), P("Max"), P("Cloud Only"), P("cloud:fast"), P("srv:abc"),
+             P("", "Desk · qwen3:32b", ["Desk · qwen3:32b"]),
+             P("", "Local O", ["Desk · qwen3:32b", "Local O"]), P("", "", None, "Coding"),
+             P("Fast", "", None, "Research")]
+    ns["DOC_VISION"] = "Local O"
+    pic = P("Fast", images=True)
+    ns["model_cached"] = lambda l, p=None: False
+    none = P("Fast")
+    got["the model: a mode's local pick, a hand pick of this Mac, else this Mac's best; never a server's or the cloud's"] = (
+        picks == [("Local A", "mode"), ("Local O", "mode"), ("Local A", "mode"), ("Local A", "mode"),
+                  ("Local A", "best"), ("Local A", "best"), ("Local A", "best"), ("Local A", "best"),
+                  ("Local O", "picked"), ("Local O", "agent"), ("Local A", "mode")]
+        and pic == ("Local O", "picture") and none == ("", "none") and not ns["_rec522"])
+    # a picture with a document rides the same turn to the picture model
+    ns["model_cached"] = lambda l, p=None: l in ns["MODEL_ROUTES"]
+    calls7 = []
+    _run522(ns, "Local O", [{"name": "s.md", "text": "tiny"}], calls7, images=["AAAA"])
+    got["a picture with a document: the picture model here reads both, in the one turn"] = (
+        len(calls7) == 1 and calls7[0][1][-1].get("images") == ["AAAA"] and calls7[0][0] == "Local O")
+    # _stream_guarded hands run_kw to run_model
+    seen = []
+    ns["run_model"] = lambda l, ms, emit, thinking=False, **kw: (seen.append(kw), emit("ok"))
+    ns["_stream_guarded"]("Local O", [{"role": "user", "content": "q"}], [].append, [].append, None, "n",
+                          run_kw={"num_ctx": 7})
+    ns["_stream_guarded"]("Local O", [{"role": "user", "content": "q"}], [].append, [].append, None, "n")
+    got["the guarded stream hands a document turn's num_ctx to run_model, and nothing otherwise"] = seen == [{"num_ctx": 7}, {}]
+    return got
+
+
+def _c522_paths(src):
+    """Where a document turn meets the app: the Ollama payload, run_model, the handler's exit, the hold, the
+    title, and no other path named anywhere in its code."""
+    got = {}
+    # num_ctx in the Ollama payload
+    seen = []
+
+    class _FS:
+        def __init__(self, ln): self._l = ln
+        def __iter__(self): return iter(self._l)
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def _uo(rq, timeout=None):
+        seen.append(json.loads(rq.data))
+        return _FS([b'{"message":{"content":"hi"},"done":true}\n'])
+    so = {"json": json, "time": time, "urllib": _ty522.SimpleNamespace(request=_ty522.SimpleNamespace(
+        Request=urllib.request.Request, urlopen=_uo)), "ollama_url": lambda p: "http://127.0.0.1:1" + p,
+        "usage_note": lambda *a, **k: None, "GIANT_CTX": 32768, "GIANT_KEEP_ALIVE": "30m", "GIANT_LOAD_TIMEOUT": 3600,
+        "OLLAMA_THINK_OFF": set()}
+    exec(_def522(src, "stream_ollama"), so)
+    so["stream_ollama"]("local-o:9b", [{"role": "user", "content": "x"}], [].append, num_ctx=74752)
+    so["stream_ollama"]("big:70b", [{"role": "user", "content": "x"}], [].append, big=True, num_ctx=59392)
+    so["stream_ollama"]("local-o:9b", [{"role": "user", "content": "x"}], [].append)
+    got["num_ctx in the Ollama payload: a document turn's ctx_use, over GIANT_CTX too; nothing without one"] = (
+        len(seen) == 3 and seen[0]["options"].get("num_ctx") == 74752 and seen[1]["options"].get("num_ctx") == 59392
+        and "num_ctx" not in seen[2]["options"])
+    rm = _def522(src, "run_model")
+    got["run_model takes num_ctx and passes it to Ollama"] = (
+        "num_ctx: int = 0) -> None:" in rm and "                              num_ctx=num_ctx,\n" in rm
+        and "run_model(label, msgs, guarded, **(run_kw or {}))" in _def522(src, "_stream_guarded"))
+    # the handler: saved, then out before the tier, the server, the cloud or the search
+    ch = src[src.index('        if self.path != "/api/chat":'):]
+    i0 = ch.index("self._chat_doc(req_json, messages, tier, model_name, images, _ldocs)")
+    got["the chat handler: the question saved, then a document turn leaves before the tier, server, cloud or search"] = (
+        "        _ldocs = doc_request_docs(req_json)\n        if _ldocs is not None:\n"
+        "            self._chat_doc(req_json, messages, tier, model_name, images, _ldocs)\n            return\n" in ch
+        and ch.index("chat_append_turn(") < i0 < ch.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")
+        < ch.index("server_refresh_modes(") and i0 < ch.index("needs_search(prompt)") and i0 < ch.index("run_council(")
+        and "        _doc_chats.pop((self.ctx.name, _title_cid), None)" in ch[:i0])
+    # the hold: a document turn takes this computer's, whatever the pick
+    sr = {"srv_only_tier": lambda t: str(t or "").startswith("srv:"), "server_pick": lambda m, ctx: (None, ""),
+          "StoreReadError": OSError, "NoProfile": RuntimeError, "re": re, "html": _html522, "threading": _th522,
+          "profile_cache": lambda n, o, reset=None: o, "pc_words": lambda t: t}
+    exec(src[src.index("# ==== doc attach (6b522): begin ===="):src.index("# ==== doc attach (6b522): end ====")]
+         .split("def doc_name_attr")[0], sr)
+    exec(_def522(src, "server_only_request"), sr)
+    got["a document turn is never \"server only\": it takes this computer's hold, as a local answer does"] = (
+        sr["server_only_request"]({"tier": "srv:x", "docs": [{"name": "a.md", "text": "x"}]}, None) is False
+        and sr["server_only_request"]({"tier": "srv:x", "docs": [{"name": "a.csv", "text": "x"}]}, None) is True
+        and sr["server_only_request"]({"tier": "srv:x"}, None) is True)
+    # no other path named anywhere in a document turn's code
+    meth = src[src.index("    def _chat_doc(self"):src.index("    def _do_POST(self):")]
+    sec = src[src.index("# ==== doc attach (6b522): begin ===="):src.index("# ==== doc attach (6b522): end ====")]
+    names = set()
+    for t in (_ast522.parse(_tw522.dedent(meth)), _ast522.parse(sec)):
+        for nd in _ast522.walk(t):
+            if isinstance(nd, _ast522.Name):
+                names.add(nd.id)
+            elif isinstance(nd, _ast522.Attribute):
+                names.add(nd.attr)
+    bad = names & {"cloud_text", "cloud_bench", "cloud_allowed", "run_cloud_only", "cloud_role_model", "server_stream",
+                   "server_side_text", "server_side_pick", "server_pick", "server_refresh_modes", "server_wake_ask",
+                   "resolve_tier_seats", "max_tier_seats", "run_council", "run_search", "run_search_deep",
+                   "ground_start", "place_search", "weather_snippets", "read_links", "_extract_memory", "make_title"}
+    got["no cloud, server, search, council, memory or title call is named anywhere in a document turn's code"] = (
+        not bad and "run_model" in names and "_stream_guarded" in names and "doc_answer" in names)
+    # the title: on this Mac
+    tt = src[src.index('        if self.path == "/api/title":'):src.index('        if self.path == "/api/open-logs":')]
+    mt = {"re": re, "TITLE_PROMPT": "T: ", "_clean_title": lambda t: t.strip(), "strip_special": lambda t: t,
+          "ollama_pulled_tags": lambda: set(), "MODEL_ROUTES": {"Local A": ("mlx", 1)}, "model_cached": lambda l, p=None: True,
+          "model_fits_memory": lambda l: True, "slow_giant": lambda l: False, "MODEL_MEM_BYTES": {"Local A": 3e9},
+          "_engine_up": lambda p: False, "_looks_degenerate": lambda t: False}
+    rec = []
+    for nm in ("cloud_text", "server_side_text", "server_stream", "_ticket_conf", "cloud_role_model", "_provider_of"):
+        mt[nm] = (lambda nm_: lambda *a, **k: rec.append(nm_))(nm)
+    mt["run_model"] = lambda l, ms, emit, thinking=False, **kw: emit("Moving Plan")
+    exec(_def522(src, "_THINK_RE") + _def522(src, "strip_think") + _def522(src, "make_title"), mt)
+    got["a chat a document was read in is titled on this Mac: no server, no provider"] = (
+        "_dc = _doc_chats.get((self.ctx.name, _tcid)) if _tcid else None" in tt
+        and 'self._send_json({"title": make_title(txt, ask_server=False)' in tt
+        and tt.index("_dc = _doc_chats") < tt.index("_so = (_srv_only_chats")
+        and mt["make_title"]("q", ask_server=False) == "Moving Plan" and rec == [])
+    # the measure route: the page's own api(), the gate, the same pick as the turn
+    ms = src[src.index('        if self.path == "/api/doc/measure":'):src.index('        if self.path != "/api/chat":')]
+    got["the measure route: the turn's own pick and measure, nothing loaded"] = (
+        "label, why = doc_local_pick(" in ms and "m = doc_measure(label, mdocs," in ms and "run_model" not in ms
+        and "_need_engine" not in ms and "ensure_mlx_engine" not in ms)
+    return got
+
+
+def _js522(src, name):
+    """A page function's text, by its braces."""
+    i = src.index("function %s(" % name)
+    j = src.index("{", i)
+    d = 0
+    for k in range(j, len(src)):
+        d += {"{": 1, "}": -1}.get(src[k], 0)
+        if d == 0:
+            return src[i:k + 1]
+    raise KeyError(name)
+
+
+def _c522_page(src):
+    """The page: UTF-8 whole, the chip, the bar, the delegated clicks, send asking first, measured through api()."""
+    got = {}
+    h0 = src.index('HTML_CONTENT = r"""')
+    pg = src[h0:src.index('\n"""\n', h0)]
+    ad = _js522(pg, "addDocFile")
+    got["a .md or .txt is read whole as UTF-8 (strict, else U+FFFD and said), an estimate at once, then measured"] = (
+        "const DOC_LOCAL=/\\.(md|txt)$/i;" in pg and "if(DOC_LOCAL.test(f.name)){" in ad
+        and 'try{text=new TextDecoder("utf-8",{fatal:true}).decode(buf);}' in ad
+        and 'catch(e){text=new TextDecoder("utf-8").decode(buf);bad=true;}' in ad
+        and 'tok:Math.ceil(text.length/4),exact:false,mode:"full"});\n      paintChips();docMeasure();\n      return;' in ad
+        and ad.index("return;") < ad.index(".slice(0,50000)")
+        and "else if(f.size<2_000_000)addDocFile(f);" in pg)
+    pc = _js522(pg, "paintChips")
+    got["the chip: name, size, tokens (≈ while estimated), not-UTF-8, the choice; clicks delegated from the container"] = (
+        "docSize(d.bytes||0)+'</i>'" in pc and "(d.exact?'':'\\u2248')+docK(d.tok)+' tokens</i>'" in pc
+        and "(d.bad?'<i class=\"dcm dcbad\">Not UTF-8</i>':'')" in pc and "data-k=\"m\"" in pc and "addEventListener" not in pc
+        and '$("#imgchips").addEventListener("click",e=>{' in pg and 'e.target.closest("[data-k]")' in pg
+        and "w.querySelectorAll(\"b\").forEach(b=>b.addEventListener" not in pg)
+    pw = _js522(pg, "paintDocWarn")
+    got["the bar: above the composer, the numbers and Truncate, Split & summarize, Remove; its clicks delegated"] = (
+        '<div id="imgchips" hidden></div>\n    <!-- a .md or .txt file too long for the model here asks first (6b522) -->\n'
+        '    <div id="docwarn" hidden role="alert"></div>' in pg and "#docwarn[hidden]{display:none}" in pg
+        and 'data-dw="truncate"' in pw and 'data-dw="split"' in pw and 'data-dw="remove"' in pw
+        and "too long for <b>" in pw and "Needs '+docK(need)+' tokens. '" in pw
+        and "docK(b.limit70)+' fit'" in pw
+        and '$("#docwarn").addEventListener("click",e=>{' in pg and 'e.target.closest("button[data-dw]")' in pg
+        and "addEventListener" not in pw)
+    sd = _js522(pg, "send")
+    got["send asks first: measured again when the pick changed, nothing sent while the bar waits"] = (
+        "if(docAsks()){paintDocWarn(true);return;}" in sd
+        and sd.index("if(docAsks()){paintDocWarn(true);return;}") < sd.index("const sentDocs=pendingDocs.slice();")
+        and "if(!docBudget||docBudget.key!==docSelKey()){" in sd
+        and 'api("/api/doc/measure",{method:"POST"' in _js522(pg, "docMeasure")
+        and 'new MutationObserver(docSelChanged).observe($("#chip-model"),' in pg
+        and "docSel" not in _js522(pg, "paintModels"))
+    # the page's 70% rule and its numbers, run in node
+    js = ("let docBudget={limit70:1000,fixed:300},pendingDocs=[{local:true,tok:600,mode:'full'}],input={value:'x'.repeat(400)};\n"
+          + "\n".join(_js522(pg, n) for n in ("docSize", "docK", "docNeed", "docAsks")) + "\n"
+          "const o=[docNeed(),docAsks()];input.value+='y';o.push(docNeed(),docAsks());pendingDocs[0].mode='split';"
+          "o.push(docAsks());pendingDocs[0].mode='full';docBudget=null;o.push(docAsks());"
+          "o.push(docSize(0),docSize(1536),docSize(200289),docSize(3e6),docK(950),docK(1500),docK(61050),docK(1.2e6));"
+          "process.stdout.write(JSON.stringify(o));")
+    fj = os.path.join(_tf522.mkdtemp(), "d522.js")
+    with open(fj, "w") as fh:
+        fh.write(js)
+    try:
+        o = json.loads(_sp522.run(["node", fj], capture_output=True, text=True, timeout=30).stdout)
+    except Exception:
+        o = None
+    got["the page's 70% rule (node): need = files + the server's fixed part + the words at 4 a token; over when > the line"] = (
+        o == [1000, False, 1001, True, False, False, "0 B", "1.5 KB", "196 KB", "2.9 MB", "950", "1.5K", "61K", "1.20M"])
+    # the words (design/COPY.md, approved 2026-11-08): the chip, its tooltip and the bar as the page draws them
+    # (node), and the server's lines: no middle dots, no "please", "just", "simply" or "we", no exclamation
+    # marks; the error says what happened, then what to do, in two sentences
+    js2 = ("const els={};const $=q=>els[q]||(els[q]={hidden:true,innerHTML:'',classList:{add(){},remove(){}},"
+           "offsetWidth:0});\nlet pendingImages=[],docErr='',input={value:'When?'};\n"
+           + pg[pg.index("const DOC_MODE_TXT="):pg.index(";", pg.index("const DOC_MODE_TXT=")) + 1] + "\n"
+           + "\n".join(_js522(pg, n) for n in ("esc", "docSize", "docK", "docTip", "paintChips", "docNeed",
+                                                 "docAsks", "paintDocWarn")) + "\n"
+           "let docBudget={label:'Gemma 4 26B',ctx_note:'Free memory limits it to 63,488 of 262,144 tokens.',"
+           "limit70:44441,fixed:3719,ctx_use:63488,capped:true};\n"
+           "let pendingDocs=[{name:'plan.md',local:true,tok:61050,exact:true,bytes:200289,bad:true,mode:'truncate'}];"
+           "paintChips();const a=$('#imgchips').innerHTML;pendingDocs[0].mode='full';paintChips();"
+           "process.stdout.write(JSON.stringify([a,$('#imgchips').innerHTML,$('#docwarn').innerHTML]));")
+    fj2 = os.path.join(_tf522.mkdtemp(), "w522.js")
+    with open(fj2, "w") as fh:
+        fh.write(js2)
+    try:
+        drawn = json.loads(_sp522.run(["node", fj2], capture_output=True, text=True, timeout=30).stdout)
+    except Exception:
+        drawn = ["", "", ""]
+    shown = " ".join(_html522.unescape(re.sub(r"<[^>]+>", " ", h)) + " " + " ".join(
+        _html522.unescape(t) for t in re.findall(r'title="([^"]*)"', h)) for h in drawn)
+    sec = src[src.index("# ==== doc attach (6b522): begin ===="):src.index("# ==== doc attach (6b522): end ====")]
+    told = []
+    nsw = _ns522(src)
+    told += [nsw["DOC_NO_MODEL"], nsw["doc_ctx_note"]("M", 8192, "fallback", 8192, False),
+             nsw["doc_ctx_note"]("M", 262144, "config", 44032, True), nsw["doc_ctx_note"]("M", 131072, "config", 131072, False)]
+    meth = src[src.index("    def _chat_doc(self"):src.index("    def _do_POST(self):")]
+    told += re.findall(r'(?:status|step)\(([^\n]*)', meth + _def522(src, "doc_answer"))
+    lint = shown + " " + " ".join(told)
+    got["the words: no middle dots, no please, just, simply or we, no exclamation marks; the error in two sentences"] = (
+        "plan.md" in shown and "Truncated" in drawn[0] and "61K tokens" in drawn[1] and "Not UTF-8" in drawn[1]
+        and "too long for" in drawn[2] and "Needs 65K tokens. 44K fit in free memory." in shown
+        and "Sends the first 41K tokens" in shown and "Some characters couldn\u2019t be read." in shown
+        and "\u00b7" not in lint and not re.search(r"\b(?:please|just|simply|easily|we)\b", lint, re.I)
+        and "!" not in lint.replace("!=", "")
+        and nsw["DOC_NO_MODEL"] == ("\u26a0\ufe0f No model on this Mac can read this file, so nothing was sent. "
+                                    "Install one in Settings \u203a Models."))
+    return got
+
+
+def _c522_all(src, T):
+    out = {}
+    for fn, args in ((_c522_units, (src, T)), (_c522_paths, (src,)), (_c522_page, (src,))):
+        try:
+            for k, v in fn(*args).items():
+                out[k] = bool(v)
+        except Exception as e_:
+            out[fn.__name__ + ": raised " + type(e_).__name__] = False
+    return out
+
+
+_r522 = _c522_all(_MILLENAI_SRC, _long522)
+for _n522, _o522 in _r522.items():
+    check("6b522 " + _n522, _o522, "")
+_C522_MUT = [
+    ("a file closes its own wrapper", '    return _DOC_CLOSE_RX.sub(\n        lambda m: "<" + m.group(1) + "\\\\/" + m.group(2) + m.group(3), str(text or ""))',
+     '    return str(text or "")'),
+    ("the name not escaped", '    return html.escape(n or "file", quote=True)', '    return n or "file"'),
+    ("the question before the documents", '    return (head + "\\n\\n"\n            + "\\n\\n".join(doc_wrap(d["name"], d["text"]) for d in docs)\n'
+     '            + "\\n\\n" + (str(question or "").strip() or DOC_ASK))',
+     '    return ((str(question or "").strip() or DOC_ASK) + "\\n\\n" + head + "\\n\\n"\n'
+     '            + "\\n\\n".join(doc_wrap(d["name"], d["text"]) for d in docs))'),
+    ("no num_ctx in the Ollama payload", '        options["num_ctx"] = int(num_ctx)', "        pass"),
+    ("a turn drops num_ctx", '    run_kw = ({"num_ctx": ctx_use}', "    run_kw = ({}"),
+    ("truncate leaves no room for its marker",
+     "    keep = max(0, int(budget) - counter.count(mark % (_doc_fmt(total), _doc_fmt(total))) - 8)",
+     "    keep = max(0, int(budget))"),
+    ("split packs past the limit", "        if cur and ntok(cur[0], b) <= cap:", "        if cur:"),
+    ("the line at 100%", "DOC_LIMIT = 0.70 ", "DOC_LIMIT = 1.00 "),
+    ("Stop ignored during the summaries", "                if gone():\n                    raise DocStopped()",
+     "                if False:\n                    raise DocStopped()"),
+    ("the handler doesn't leave", "            self._chat_doc(req_json, messages, tier, model_name, images, _ldocs)\n            return\n",
+     "            self._chat_doc(req_json, messages, tier, model_name, images, _ldocs)\n"),
+    ("a memory pass on a document turn", "                if said[0]:\n                    try:\n                        usage_put(",
+     "                if said[0]:\n                    _extract_memory(label, question, user_base)\n                    try:\n                        usage_put("),
+    ("a server-only pick keeps its server hold", "    if doc_request_docs(req) is not None:\n        # a .md or .txt file is read on this Mac",
+     "    if False:\n        # a .md or .txt file is read on this Mac"),
+    ("the mode's pick from a server seat", '        pick = next((l for l in _tier_ready(tier) if ok(l)), "")',
+     '        pick = next((l for l in resolve_tier_seats(tier) if ok(l)), "")'),
+    ("a .md sliced to 50,000 again", "    if(DOC_LOCAL.test(f.name)){", "    if(false){"),
+    ("sent while the bar waits", "    if(docAsks()){paintDocWarn(true);return;}\n", ""),
+    ("chip clicks bound per element", 'e.target.closest("[data-k]")', 'e.target.querySelector("[data-k]")'),
+]
+_c522_caught = []
+_T522m = _long522[:120000]
+for _mn, _ma, _mb in _C522_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c522_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c522_all(_ms, _T522m).values()):
+        _c522_caught.append((_mn, "not caught"))
+check("6b522's rules each break a check when broken (%d mutants)" % len(_C522_MUT), not _c522_caught,
+      "%r" % _c522_caught)
+# the measure route, live, over the copy's own gate
+_a522 = req("/api/doc/measure", "POST", {"docs": [{"name": "long.md", "text": _long522}], "tier": "Fast",
+                                         "model": "Llama 3.2 3B", "models": ["Llama 3.2 3B"], "question": "When?"},
+            timeout=180)
+_m522 = json.loads(_a522[2] or b"{}") if _a522[0] == 200 else {}
+_tok522 = None
+try:
+    from tokenizers import Tokenizer as _Tk522
+    _snp522 = sorted(_glob522.glob(os.path.join(_HUB522, "models--" + _E2B522.replace("/", "--"), "snapshots", "*",
+                                                "tokenizer.json")))
+    _tok522 = _Tk522.from_file(_snp522[0]) if _snp522 else None
+except Exception:
+    _tok522 = None
+_e522 = (json.loads(req("/api/doc/measure", "POST", {"docs": [{"name": "long.md", "text": _long522}], "tier": "",
+                                                     "model": "Gemma 4 E2B", "models": ["Gemma 4 E2B"]},
+                         timeout=180)[2] or b"{}") if _tok522 else {})
+check("6b522 the measure route (live): behind the cookie and the token; the turn's own local model, its tokens, "
+      "ctx_max and ctx_use, the 70% line; no word of the file comes back",
+      _a522[0] == 200 and req("/api/doc/measure", "POST", {"name": "a.md", "text": "x"}, token=False)[0] == 403
+      and req("/api/doc/measure", "POST", {"name": "a.md", "text": "x"}, cookie=False)[0] == 403
+      and req("/api/doc/measure", "POST", {"docs": []})[0] == 400
+      and _m522.get("label") and " · " not in _m522["label"] and _m522.get("why") == "mode"
+      and _m522.get("tokens", 0) > 1000 and _m522["ctx_max"] >= _m522["ctx_use"] >= 4096
+      and _m522["limit70"] == int(_m522["ctx_use"] * 0.7)
+      and _m522["need"] == _m522["tokens"] + _m522["fixed"] + _m522["q_tokens"]
+      and _m522["over"] == (_m522["need"] > _m522["limit70"]) and _m522["ctx_src"] in ("config", "ollama", "fallback")
+      and not any(_long522[i:i + 48].encode() in _a522[2] for i in (0, len(_long522) // 2, len(_long522) - 48))
+      and (not _tok522 or (_e522.get("label") == "Gemma 4 E2B" and _e522.get("exact") is True
+                           and _e522.get("tokens") == len(_tok522.encode(_long522, add_special_tokens=False).ids)
+                           and _e522.get("ctx_max") == 131072 and _e522.get("ctx_src") == "config")),
+      "%r" % [_a522[0], {k: _m522.get(k) for k in ("label", "why", "tokens", "exact", "ctx_max", "ctx_use", "limit70",
+                                                    "need", "over")}, {k: _e522.get(k) for k in ("label", "tokens",
+                                                                                                 "ctx_max")}])
+# ==== 6b522 doc attach: end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
