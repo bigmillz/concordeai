@@ -18027,6 +18027,30 @@ sets' and server sets' mutant anchors (`l not in TRIAL_ROWS`). Run 1 (e902cfc, b
 reasoning too; it costs time, about 2x a whole answer at low and 3.5x at high, and 3-7x on a long prompt.
 It stays on trial until Patrick decides; what promoting it would take is in the report.
 
+**Promoted (integ-1, per Patrick: "promote Muse to Gamma's writer, with its reasoning strength following
+the Effort slider").** Off trial (`TRIAL_ROWS` is empty; the rule and its checks stay, run with a row put on
+it) and first in the Thinking picks after GPT-OSS 120B, so the craft's one writer is Muse on a Mac that
+holds it: on 32 and 48 GB Gamma seats Muse, Gemma 4 26B, Qwen 3.8 27B (Gemma still merges, Qwen 3.8 is the
+critic), on 128 GB GPT-OSS 120B, Muse, Gemma 4 26B; 16 GB is unchanged. Not in Fast (Alpha). A paired server
+with suitable models still seats first (6b339): there Muse drafts only in the seats the server leaves. **The
+strength follows effort** for a Muse row's council draft (`MUSE_EFFORT`, `muse_draft_level`, from
+`run_council`'s own effort): Low, Medium and High at "low", Max and Ultra at "high"; no effort (an old page,
+a node run) at "high" as before; the level rides `thinking` to both routes (MLX `reasoning_strength`, Ollama
+`think`; `enable_thinking` stays a bool); the critic, peer and merge passes stay at "low", and so does a
+Muse picked alone. **Cards**: a server set holds it only on a card it fills whole (18.2 GB × 1.05 + 1.25 GiB,
+`_srv_fits`): a 24 GB card yes, a 16 GB card (the owner's) or a 5070 Ti never, and it is not a
+`SRV_RAM_ROWS` spill row, so it never goes into a server's memory. **What updates offer**: the update
+card brings Muse (19.4 GB) to a Mac whose set was Recommended or Everything and that holds it (24 GB and
+up), and to a server with a 24 GB card or larger on those sets; never on Light, a 16 GB Mac or a 16 GB card.
+On Recommended it takes Qwen 3.6 35B MoE's seat (24-64 GB) or Qwen 3.8 27B's (96 GB and up); nothing is
+deleted (only retired rows are cleared), but a server's Recommended sheet now lists Qwen 3.6 35B under
+Remove if the person applies it. Pins that follow: Recommended on 48 GB, Everything 16 on 48 GB and 17 on
+128 GB (Qwen 3.6 35B stays in it), the Light-here download (19.4 + 16.1 + 15.1 + 6.6 GB), a 24 GB server's
+Recommended, a 16 GB server holding no Muse, the 5070 Ti's "no other model spills" (Muse added). Checks: the
+6b533 block is 15 (the promoted seats, the trial rule with a row put on it, the effort map at every step and
+none, both routes with a level, the one draft call that asks, the card guard), 28 mutants, each caught on
+stand-in engines; the full gauntlet waits for the combined branch's run.
+
 ## 6b534 — Horizon, the owner's final round: the Greek modes and five efforts apart, every Apple aerial by the hour, the wordmark's slower reveal, asking from the home (per Patrick)
 
 Builds on the handoff commit (the WIP of 6b526's OVERRIDE 2: the GPU night, the tracer, the machine dies, the
