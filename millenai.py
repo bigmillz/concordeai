@@ -517,9 +517,12 @@ def _real_app_dir() -> str:
 _KNOWN_ENV = frozenset((
     "MILLENAI_DEV", "MILLENAI_HOME", "MILLENAI_NOWINDOW", "MILLENAI_TEST_HOOKS",
     "MILLENAI_SYNC_URL", "MILLENAI_PORT", "MILLENAI_TESTBUILD",
-    "MILLENAI_NO_PACKAGE",
+    "MILLENAI_NO_PACKAGE", "MILLENAI_SHELL",
     # a dev copy's measuring knobs (6b518, 6b520): honoured only when DEV_HOME is set
-    "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"))
+    "MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF",
+    # a dev copy's release feed (6b537): the updater proven against a local
+    # stand-in for api.github.com; honoured only when DEV_HOME is set
+    "MILLENAI_UPDATE_API"))
 
 
 def _dev_home(env, real):
@@ -530,6 +533,10 @@ def _dev_home(env, real):
     if odd:
         return None, ("Unknown setting %s. A dev copy is MILLENAI_DEV=1 plus "
                       "MILLENAI_HOME (see CLAUDE.md)." % ", ".join(odd))
+    # the native shell names itself (6b532); any other name is a leftover
+    if env.get("MILLENAI_SHELL", "") not in ("", "tauri"):
+        return None, ("MILLENAI_SHELL can only be 'tauri' (the native window, "
+                      "shell/); got %r." % env.get("MILLENAI_SHELL"))
     dev = env.get("MILLENAI_DEV", "") == "1"
     home = env.get("MILLENAI_HOME", "").strip()
     if not dev:
@@ -563,6 +570,20 @@ if DEV_HOME:
     os.makedirs(DEV_HOME, mode=0o700, exist_ok=True)
 # no window and no browser: the gauntlet's instances (0a 5.2)
 NOWINDOW = bool(DEV_HOME) and os.environ.get("MILLENAI_NOWINDOW") == "1"
+# THE NATIVE SHELL (6b532, per Patrick: the move to Rust, step 1). With
+# MILLENAI_SHELL=tauri the window is the Tauri app's (shell/), and this
+# process is its sidecar: it serves, writes run/instance.json as every
+# copy does and run/boot.json beside it (the one-time code the shell
+# trades for the cookie, 6b321; 0600, in this user's own folder, where the
+# key and the token already are), and draws no window of its own. The
+# shell hands the page its token through one IPC command that answers
+# only this app's origin, as _WindowBridge did. Allowed for the real app,
+# not only dev copies: it weakens nothing (_gate is unchanged; the token
+# is still never in the HTML, a cookie or a URL), and it must run the
+# real folder to be the app. The sidecar also watches its parent: when
+# the shell is gone, so is this process (no orphans, see __main__).
+SHELL = os.environ.get("MILLENAI_SHELL") == "tauri"
+SHELL_PARENT = os.getppid() if SHELL else 0
 # test hooks, named in a comma list; none outside a dev copy (0a 5.14)
 TEST_HOOKS = frozenset(
     x.strip() for x in os.environ.get("MILLENAI_TEST_HOOKS", "").split(",")
@@ -863,6 +884,13 @@ except Exception:
 # Release whose tag ends in the build number (e.g. "v5") with the .dmg
 # attached; the app then offers a one-click in-place update.
 UPDATE_REPO = "bigmillz/concordeai"
+# THE FEED IS A DEV COPY'S TO POINT (6b537): a dev copy (DEV_HOME set) may
+# name a local stand-in for GitHub's API with MILLENAI_UPDATE_API, so the
+# whole update — the check, the download, the swap and the relaunch — is
+# proven against a fake release before a real one is cut. The app a person
+# opened reads GitHub and nothing else, whatever its environment says.
+UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")
+               if DEV_HOME else "") or "https://api.github.com")
 
 # MILLENAI_PORT names the port to try first; a dev copy uses it to pick
 # its own. It changes nothing else (6b319).
@@ -9931,10 +9959,21 @@ def studio_needs(kind: str) -> str:
 _update = {"state": "idle", "pct": 0, "note": "", "latest": "", "url": "",
            "size": 0}
 
+# THE SWAP KNOWS BOTH BUNDLES (6b537): the Python app's main executable is
+# Contents/MacOS/MillenAI (6b443); the native shell's is
+# Contents/MacOS/ConcordeAI (shell/, 6b532), and from 7.0 the .dmg a
+# release carries is the shell's. The helper waits for whichever of the
+# two owns the bundle to be gone (the shell quits when its sidecar exits
+# with 0, which _do_update's os._exit is), swaps the bundle whole, and
+# `open -n` relaunches whatever the new bundle's executable is — so a
+# Python install updates into the shell and a shell install into the
+# next shell by the one path. Resources/millenai.py sits at the same
+# place in both layouts, so _app_bundle_path needs no second rule.
 _SWAP_SCRIPT = """#!/bin/zsh
-# Wait for MillenAI to quit so its bundle can be replaced safely.
+# Wait for the app (its launcher or its shell) to quit so its bundle can
+# be replaced safely.
 for i in $(seq 1 60); do
-  pgrep -f "%(app)s/Contents/MacOS/MillenAI" >/dev/null || break
+  pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break
   sleep 0.5
 done
 MP=$(mktemp -d)
@@ -10012,7 +10051,7 @@ def _channel_release():
     ch = update_channel()
     if ch in ("beta", "nightly"):
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/releases?per_page=20"
+            UPDATE_API + "/repos/%s/releases?per_page=20"
             % UPDATE_REPO, headers=hdrs)
         with urllib.request.urlopen(req, timeout=8) as r:
             rels = json.loads(r.read().decode("utf-8"))
@@ -10030,7 +10069,7 @@ def _channel_release():
                 UPDATE_REPO, 404, "no releases", None, None)
         return rels[0]                    # GitHub lists newest first
     req = urllib.request.Request(
-        "https://api.github.com/repos/%s/releases/latest" % UPDATE_REPO,
+        UPDATE_API + "/repos/%s/releases/latest" % UPDATE_REPO,
         headers=hdrs)
     with urllib.request.urlopen(req, timeout=8) as r:
         return json.loads(r.read().decode("utf-8"))
@@ -10089,11 +10128,14 @@ def _check_update_live():
     # is the name, and appending a build would put the number back.
     if re.search(r"beta$", shown):
         shown = "%s %d" % (shown, _build_from_tag(tag))
-    # and the numeric part obeys the same trailing-.0 truncation
+    # and the numeric part obeys the same trailing-.0 truncation: ONE .0,
+    # as short_version does (6b242). The loop here kept going (6b537,
+    # seen against a fake feed): the release named "7.0 beta 2" was
+    # offered as "7 beta 2", a major line rather than a version
     mnum = re.match(r"^([\d.]+)(.*)$", shown)
     if mnum:
         num = mnum.group(1)
-        while num.count(".") >= 1 and num.endswith(".0"):
+        if num.count(".") >= 2 and num.endswith(".0"):
             num = num[:-2]
         shown = num + mnum.group(2)
     dmg = next((a for a in rel.get("assets", [])
@@ -10181,7 +10223,7 @@ def whats_new(prev: str) -> dict:
 
     def _get(path):
         req = urllib.request.Request(
-            "https://api.github.com/repos/%s/%s" % (UPDATE_REPO, path),
+            UPDATE_API + "/repos/%s/%s" % (UPDATE_REPO, path),
             headers=hdrs)
         with urllib.request.urlopen(req, timeout=8) as r:
             return json.loads(r.read().decode("utf-8"))
@@ -40649,7 +40691,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__GIANT_TIP__", _html_escape(giant_blurb()[1]))
                     .replace("__MEM_LABEL__", mem_label())
                     .replace("__WIN_WIPE__",
-                             "1" if (HAS_WEBVIEW and IS_MAC) else "0")
+                             # the wipe needs pywebview's transparent
+                             # NSWindow; the shell paints its own night
+                             # (6b532)
+                             "1" if (HAS_WEBVIEW and IS_MAC and not SHELL)
+                             else "0")
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
@@ -42770,7 +42816,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not ACCOUNTS or self.ctx.root:
                 self._send_json({"ok": True})
                 return
-            _r = account_open("signout", headless=NOWINDOW)
+            _r = account_open("signout", headless=NOWINDOW or SHELL)
             self._send_json({"ok": "err" not in _r, "account_window": "signout",
                              **({"err": _r["err"]} if "err" in _r else {})})
             return
@@ -45986,7 +46032,9 @@ def _write_boot_note():
     """The 'boot-code' test hook (6b321, dev copies only): a windowless
     copy has no window to spend a boot code, so the gauntlet gets one
     here, 0600 beside the instance note. 'boot-short' makes it live 2 s,
-    so expiry is tested without a 60 s wait."""
+    so expiry is tested without a 60 s wait. The native shell's sidecar
+    (MILLENAI_SHELL=tauri, 6b532) writes the same note: the shell reads
+    it, loads /?boot=<code> once, and deletes the file."""
     code = _mint_boot_code(2.0 if "boot-short" in TEST_HOOKS else BOOT_TTL)
     try:
         fd = os.open(os.path.join(os.path.dirname(INSTANCE_NOTE),
@@ -65861,8 +65909,9 @@ if __name__ == "__main__":
     # NO PAGE OUTSIDE THE APP WINDOW (6b320): a launch that can't draw
     # its window stops here, before the lock, the scrub or any port. Only
     # a windowless test copy runs without one. Exit 4: 1 is no port, 2 a
-    # refused setting, 3 a folder in use.
-    if not NOWINDOW:
+    # refused setting, 3 a folder in use. The native shell's sidecar
+    # (MILLENAI_SHELL=tauri, 6b532) has the shell's window.
+    if not (NOWINDOW or SHELL):
         _why = _window_blocker()
         if _why:
             print("\n  %s\n" % _why, file=sys.stderr)
@@ -65917,7 +65966,7 @@ if __name__ == "__main__":
     else:
         print("  no instance lock: the chats aren't migrated this run")
     profile_resume()
-    if not NOWINDOW and _web_engine() == "qt" and _INSTANCE_LOCK:
+    if not (NOWINDOW or SHELL) and _web_engine() == "qt" and _INSTANCE_LOCK:
         _webstore_qt_boot()      # files, while no page holds them (Q16)
     if DEFAULT_APP:
         # dev and test instances share this data folder: only the app a
@@ -65940,6 +65989,9 @@ if __name__ == "__main__":
         sys.exit(1)
     _write_instance_note()      # every copy, in its own folder (6b319)
     if NOWINDOW and "boot-code" in TEST_HOOKS:
+        _write_boot_note()
+    if SHELL:
+        # the shell's window spends this code on its first load (6b532)
         _write_boot_note()
     ctx_thread(target=start_backend, args=(_server,),
                      daemon=True).start()
@@ -65968,7 +66020,7 @@ if __name__ == "__main__":
         print("  (telemetry simulated — pip install psutil for real numbers)")
     print()
 
-    if HAS_WEBVIEW and IS_MAC:
+    if HAS_WEBVIEW and IS_MAC and not SHELL:
         # WKWebView ships with getUserMedia dead in two separate ways, and
         # both fail as a silent hang, not an error (measured: the promise
         # neither resolves nor rejects). 1) media devices are OFF at the
@@ -66286,7 +66338,22 @@ if __name__ == "__main__":
         except Exception:
             pass
 
-    if NOWINDOW:
+    if SHELL:
+        # THE NATIVE SHELL'S SIDECAR (6b532): the Tauri app (shell/) is the
+        # window and this process just serves. It leaves with its parent:
+        # a shell that crashed or was force-quit can't ask it to stop, so
+        # when the parent pid changes (an orphan is re-parented to pid 1 on
+        # macOS and Linux) the SIGTERM path runs — the turn in flight is
+        # kept, the engines stop, the note goes — and there is no orphan.
+        print("  native shell (tauri) — serving; the window is the shell's.\n")
+        try:
+            while os.getppid() == SHELL_PARENT:
+                time.sleep(1.0)
+            print("\n  the shell is gone — shutting down. o7\n")
+            _signal_exit(0, None)
+        except KeyboardInterrupt:
+            print("\n  shutting down. o7\n")
+    elif NOWINDOW:
         # a test copy (0a 5.2): no window, just the server; the harness
         # reads its port and key from run/instance.json
         print("  no window — serving. ctrl-c to stop.\n")

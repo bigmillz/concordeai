@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "main",
+  "description": "The app's own page may call exactly one command, api_token; the command itself checks the page's origin against the sidecar's port before answering (6b532).",
+  "local": true,
+  "remote": {
+    "urls": ["http://127.0.0.1:*"]
+  },
+  "windows": ["main"],
+  "permissions": ["allow-api-token"]
+}

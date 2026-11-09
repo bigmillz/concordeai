@@ -42,3 +42,9 @@ crypto-selftest.json
 # server passwords and belong to the private VPN repo, never this public one
 v23-*
 *.shadowrocket.conf
+
+# the native shell (6b532): Rust build output and Tauri's generated schemas
+shell/src-tauri/target/
+shell/src-tauri/gen/
+# the shell build's extracted first-run script and pins (build_shell_dmg.sh, 6b537)
+shell/src-tauri/sidecar/

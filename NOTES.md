@@ -18356,6 +18356,95 @@ alone and is untouched; a README json block had to be labelled jsonc because tes
 every ```json block as a tariff). Not covered on purpose: 8470 (llama-server's loopback port) is not
 in the nft guard; that firewall line waits for a visit.
 
+## 6b532 — the move to Rust begins: a Tauri shell replaces pywebview as the window (per Patrick)
+
+Patrick: "I want to do the fastest language we can run that will be cross-platform." He
+chose Rust and approved the toolchain (rustup's rustc/cargo 1.99.1 under
+`/opt/homebrew/opt/rustup/bin`, not on PATH; tauri-cli 2.12.4 under `~/.cargo`). The
+strategy is a strangler, not a rewrite: `RUST_PLAN.md` at the repo root is the plan
+(contract, inventory, porting order, crates, engines, packaging, updater, tests, timeline,
+risks), grounded in measurements taken first.
+
+**The baseline, Python today** (windowless dev copy on 9884, no servers, no keys): launch
+to `run/instance.json` 0.35 s, to `/` answering 0.38–0.40 s; idle RSS 208 MB (server
+only); the page 742,353 bytes in one response (523 KB inline JS, 173 KB CSS), rendered
+server-side in 17–35 ms, parsed by Blink in 19 ms (responseEnd → domInteractive);
+`/api/chat` received → first model call **2.3–3.1 ms** warm (9.1 ms the first time, it
+probes `/models`), against a recording provider stub, Cloud Only, search off. So the
+server's own overhead is not the problem; the move buys launch, memory, a real binary, the
+end of the pywebview crash classes (6b508) and, in step 3, in-process engines.
+
+**Step 1, done on macOS: `shell/`**, a Tauri 2 app (Rust, tauri 2.12.5, plugins
+single-instance and opener; one bin, `ConcordeAI`). It starts `millenai.py` as a sidecar
+with `MILLENAI_SHELL=tauri`, waits for `run/instance.json` and `run/boot.json` (both with
+the child's pid), loads `/?boot=<code>` once and deletes the boot note. The page gets its
+token the way it always has, through `window.pywebview.api.api_token()`: an
+initialization script (main frame only) defines that one frozen object as a shim over one
+IPC command, `api_token`, which answers only while the webview's URL is
+`http://127.0.0.1:<the sidecar's port>` (the `_WindowBridge` rule), under a capability
+that grants exactly `allow-api-token` to `http://127.0.0.1:*`. Quit (Cmd+Q, close, a
+second launch) SIGTERMs the sidecar and waits 8 s before SIGKILL; the sidecar also watches
+its parent pid and runs `_signal_exit` when the shell is gone, so a crashed shell leaves
+no orphan (proven with SIGKILL: gone in ~1 s, note dropped, port free). Menus: ConcordeAI,
+Edit, View (Reload), Window. Window: 1320×860, min 940×620, transparent title bar with the
+title hidden, dark appearance, window and webview background `#03040a` before any paint
+(first frame captured: pure night). Downloads land in `~/Downloads`; other origins open in
+the browser; the main frame shows only the app's origin, `about:blank`, or the shell's own
+error page (a `data:` document: the server's exit code meaning and the log's tail).
+
+**The lesson that cost an hour**: the webview must start on `about:blank`. Starting on
+Tauri's own `tauri://localhost` page and navigating to `/?boot=` made WebKit treat the
+navigation as cross-site, the 302's `SameSite=Strict` cookie was withheld on `/`, and the
+window sat on the 403 ("open the app from its own window"). pywebview never saw this
+because its first load has no initiator document.
+
+**The Python side, `MILLENAI_SHELL=tauri`** (small and marked): the setting is known and
+takes only `tauri` (anything else exits 2; `_dev_home`); `SHELL`/`SHELL_PARENT` beside
+`NOWINDOW`; the window blocker and the Cocoa patches are skipped; `_write_boot_note()`
+runs after the instance note; `__WIN_WIPE__` is `0` (the wipe needs pywebview's transparent
+NSWindow); the serve loop polls `os.getppid()` once a second. `_gate` is untouched; the
+token is still never in the HTML, a URL or a cookie. Allowed for the real app, not only
+dev copies: it must run the real folder to be the app, and it weakens nothing (the boot
+note is 0600 beside the note that already holds the key and token).
+
+**Measured, pywebview vs the release shell** (dev copies, fresh folders, memory 20 s after
+launch, three rounds; `scratchpad/rs_ab*.out`): window on screen pywebview 0.94–1.12 s;
+shell **0.22–0.23 s** warm (3.0 s the first launch after copying a new ad-hoc-signed
+binary, macOS's one-time assessment). Memory, everything: pywebview 1.16–1.30 GB (Python
+576–580 MB, WebKit GPU 78–104, WebContent 85–92, Networking 417–533 MB); shell 0.70–1.24
+GB (ConcordeAI 102–115 MB, Python sidecar 482–486 MB, GPU 32–78, WebContent 67–90,
+Networking 20–476 MB). The Networking process is the backdrop clips being fetched and
+swings in both; without it pywebview is 767–790 MB and the shell 684–763 MB. The sidecar's
+~485 MB is the Python server with the page using it (208 MB bare); step 1 is a window win,
+the memory win is step 2's. Bundle: 6.7 MB `.app` (the Python one is 3.0 MB;
+both lean on the venv). Cross-platform: `cargo check --target x86_64-pc-windows-msvc`
+needs Homebrew LLVM's `llvm-rc` on PATH (tauri-winres compiles the icon resource); Linux
+needs the gtk/webkit dev packages, so `.github/workflows/shell-build.yml` (not pushed)
+builds macOS arm64/x64, Windows x64 and Linux x64 as artifacts.
+
+**Not yet**: microphone permission in the shell's WKWebView (pywebview needed a delegate
+and a private preference; wry grants the delegate call, the preference is unverified),
+`target=_blank` windowed check, the updater's swap for the new bundle layout
+(`Contents/MacOS/ConcordeAI`, `Resources/millenai.py`), `release.sh` building the shell,
+signing/notarisation, Windows and Linux runs. `RUST_PLAN.md` §12 lists the decisions.
+
+**Gauntlet**: six new checks under `== the native shell's sidecar mode ==`: the setting and
+its mutants through `_dev_home`; the source rules (blocker skipped, boot note, no wipe,
+parent watch); a live shell-mode copy on 9903 (boot note 0600 with its pid, page without
+token/key/code, one trade → HttpOnly Strict cookie, replay 403, cookie alone on /api 403,
+token alone 403, other Host 403, proxy header 403, wrong token 403); the orphan rule (a
+stand-in `sh` parent SIGKILLed → the sidecar stops within seconds and drops its note); no
+boot note outside shell mode; and the Rust source's own rules (one command, the
+scheme/host/port check, `about:blank`, the night colour, one permission, no secret in the
+shim, SIGTERM on exit). Full run: see the scorecard line below.
+
+Run: `cd shell/src-tauri && MILLENAI_DEV=1 MILLENAI_HOME=… MILLENAI_PORT=9895 cargo tauri dev`
+(or `cargo run`); the release bundle `cargo tauri build --bundles app`. Overrides
+`CONCORDE_PYTHON`, `CONCORDE_SERVER`; debug builds honour `CONCORDE_SHELL_QUIT_AFTER`.
+
+Full gauntlet: queued behind other sessions' locks at the time of this commit; the
+scorecard follows in the next commit's line here.
+
 ## 6b533 — Muse Glimmer 30B on trial: its channels split, its strength sent, and a fair retest (per Patrick)
 
 On `muse` from `main`. A first look (report only) found Meta's Muse Glimmer 30B (dense, 27.9B text + 1.9B
@@ -18739,6 +18828,97 @@ Playwright at 390 and 1440: no page errors, no API response over 400.
   Classic keeps 6b522's own styles. 6b522's user-facing words name no mode; its NOTES entry got a line that the
   names a person sees are the Greek ones since 6b534. Pins: the bar's line (`too long for the model on ` and its
   title) re-pinned; 6b522's node-drawn chip and bar check and its copy lint hold on the merged source.
+
+## 6b537 — the shell is the app: release.sh ships the Tauri bundle, the updater carries Python installs into it, CI builds the rest (7.0 beta prep, per Patrick)
+
+On `shell-beta`, from `integ-1` with `rust-shell` (61219c2, 6b532) merged in: one conflict, the
+`_KNOWN_ENV` tuple (both sides had added names; union), and 6b532's NOTES entry moved from the top
+of the file into id order. Nothing was cut or pushed: this branch builds and proves; the owner cuts.
+
+**What ships from here.** `release.sh` builds the macOS asset with `build_shell_dmg.sh`: the Tauri
+shell's `ConcordeAI.app` (universal, `--target universal-apple-darwin`; both Apple targets are
+installed in this Mac's rustup now), into the same styled `ConcordeAI-<version>.dmg` through
+`build_dmg.sh` (which takes the bundle as given when `DMG_APP_READY=1`, and builds the Python app
+as before without it). `packaging/shell_stamp.py` stamps the shell's `version` from `APP_VERSION`
+and writes the sidecar's first-run files into `shell/src-tauri/sidecar/` (git-ignored): `launch.sh`
+extracted from `build_macos_app.sh`'s LAUNCH heredoc, so the venv bootstrap stays one script, and
+the hash-pinned `crypto-requirements.txt`. After the bundle is built, `CFBundleVersion` is set to
+`APP_BUILD` (Tauri writes the version there; the tag the updater compares is `v<APP_BUILD>`),
+`CFBundleShortVersionString` re-asserted, the bundle signed again (`CONCORDE_SIGN_IDENTITY`, ad hoc
+without it) and verified, and both keys, the bundle id, the executable name, the five resources and
+`Resources/millenai.py == millenai.py` are read back; `release.sh` reads the two keys off the bundle
+once more before it publishes. `./release.sh --dry-run [ARG]` needs no `gh`, stamps nothing, builds
+the DMG and the Windows zip, verifies, prints what a real cut would publish and exits before the
+commit. Run here: `--dry-run beta 7.0.0` → "7.0 beta 1 (build 278) as tag v278 (prerelease)";
+universal build 1:47 wall (arm64 alone 1:09); `ConcordeAI-7.0.0.dmg` 5.6 MB (3.5 MB arm64-only),
+`ConcordeAI.app` 12 MB, `ConcordeAI-7.0.0-Windows.zip` 1.0 MB.
+
+**The Windows asset stays the Python app's** (the zip from `build_windows.sh`, the MSI from
+`windows-installer.yml`), recommended for 7.0: the shell runs the server from the venv at
+`%LOCALAPPDATA%\MillenAI\venv`, which the frozen Windows app never makes, so a shell MSI would open
+on the "can't find its Python engine" page; the Windows updater is a browser download of the MSI,
+so switching later changes no contract; and no Windows run of the shell has happened. The shell's
+Windows MSI/NSIS and Linux .deb/AppImage come from Actions as artifacts for testing.
+
+**The updater, proven before it was pinned.** `_SWAP_SCRIPT` waits for `<app>/Contents/MacOS/`
+(the Python launcher `MillenAI` or the shell `ConcordeAI`) instead of `MillenAI` alone, swaps the
+bundle whole and `open -n`s whatever the new bundle is; `Resources/millenai.py` sits at the same
+place in both layouts, so `_app_bundle_path` needed nothing. The shell got `watch_sidecar`: a clean
+exit of the server (the updater's `os._exit(0)`) quits the shell, so the helper's wait ends and the
+relaunch is the new bundle; any other end shows the log's tail. `bootstrap_venv`: a fresh Mac with
+no venv runs the bundled `launch.sh --bootstrap` behind a "Setting up" page, then starts the server
+(macOS only; `CONCORDE_PYTHON` skips it). A dev copy may point the feed at a stand-in with
+`MILLENAI_UPDATE_API` (`UPDATE_API`, honoured only under `DEV_HOME`; the real app reads GitHub
+whatever its environment says), and the three GitHub calls go through the constant. The offer's
+display strips ONE trailing .0 like `short_version` (6b242): the loop here turned "7.0 beta 2" into
+"7 beta 2". Proof, against a fake `api.github.com` + asset server on 9878 and a fake `open` on PATH
+that records the relaunch instead of launching (scratchpad `shellbeta/updproof/proof.py`, 19/19):
+an old Python install (main's millenai.py, 6.1.0/276, in a temp `.app`) on the stable channel is
+not offered the beta; on the beta channel it is offered v277, downloads, hands off, exits 0, the
+helper swaps it into the shell bundle (CFBundleVersion 277, executable ConcordeAI, MillenAI gone,
+`launch.sh` and the pins present, no quarantine, no mount, no `.new`) and asks for `open -n <app>`;
+then that shell install updates to a build-278 DMG the same way. Windowed, with the built bundle
+as a dev copy on 9895: window on screen with the Horizon home, boot cookie and token working (`/`
+200 with the cookie, 403 without; `/api/stats` 200 with the token, 403 without), ready 0.9 s after
+exec; the Quit Apple event sent to the shell's pid stopped shell and server in 0.81 s (port closed,
+note dropped); an `/api/update/install` over the API had the shell gone on its own 1.67 s later,
+the bundle swapped to 278 and the relaunch requested. Screenshot by `screencapture -l` in the
+scratchpad (`shellbeta/smoke/shell-window.png`).
+
+**CI (edited, not pushed).** `shell-build.yml` runs on `release: published` (and dispatch, and
+pushes of `shell/**` to `rust-shell`/`shell-beta`), checks out the release's tag, stamps with
+`shell_stamp.py`, builds Windows (msi,nsis) and Linux (deb,appimage) and uploads them as run
+artifacts; it attaches nothing, because the Windows updater offers the first `.msi` without
+"arm64" in its name and would hand the shell MSI to every Python install. The macOS rows are gone
+from it: the Mac asset is `release.sh`'s. `nightly.yml` builds the shell DMG (`build_shell_dmg.sh`,
+with rustup's two Apple targets, tauri-cli and the cargo cache), so a nightly-channel install on the
+shell is never offered the Python app back; the zip is unchanged. Pushing it means: the next push to
+main that touches the listed paths builds the nightly with the shell (first run cold: ~15 min*
+for the Rust toolchain and tauri-cli; ~5 min* warm), and every published release adds two shell
+jobs (~10 min* each cold).
+
+**Signing.** `security find-identity -v -p codesigning`: 0 valid identities. The beta is ad-hoc
+signed like every build so far: a download is blocked by Gatekeeper until Privacy & Security ▸ Open
+Anyway (the DMG's window says so); the in-app update strips quarantine, so updates never prompt.
+A Developer ID Application certificate in the login keychain (`CONCORDE_SIGN_IDENTITY="Developer
+ID Application: …"`) plus notarisation credentials (`APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or an
+API key, read by `cargo tauri build`) would make it open clean; hardened runtime then needs the
+microphone entitlement and, while the venv's dylibs run in-process, nothing more (the venv lives
+outside the bundle).
+
+**Checks.** Four 6b537 checks over `release.sh`, `build_shell_dmg.sh`, `build_dmg.sh`,
+`shell_stamp.py`, `tauri.conf.json`, `main.rs`, the three workflows and the source (the swap
+pattern is rendered and run as a regex against both executables' command lines and the server's),
+and 16 mutants each of which must break one; the 6b443 pin on the swap's pgrep line moved to the
+new pattern. Run standalone (the gauntlet's lock folders were other sessions'): 10/10 with every
+existing check that reads the build scripts or workflows; `ast.parse` clean; pincheck 2164 literal
+pins, 0 real failures (its one line is the absent half of an `or`). Full gauntlet: owed to the
+integration run before the cut.
+
+**Not done, for the cut.** The full gauntlet on this branch; a run of the shell on Intel (the
+universal binary is built, not run there); the Windows shell at all; Linux has no venv path yet; a
+beta from a fresh Mac exercises `bootstrap_venv` for the first time (it needs the Apple CLT's
+python3 and the internet, as the Python app's first run did).
 
 ## 6b538 — copy-2: the approved copy rewrite laid onto integ-1 by a re-runnable applier (per Patrick: "Apply all, I'll judge in the app")
 

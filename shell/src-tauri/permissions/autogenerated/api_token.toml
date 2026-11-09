@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-api-token"
+description = "Enables the api_token command without any pre-configured scope."
+commands.allow = ["api_token"]
+
+[[permission]]
+identifier = "deny-api-token"
+description = "Denies the api_token command without any pre-configured scope."
+commands.deny = ["api_token"]

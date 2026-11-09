@@ -17610,7 +17610,9 @@ check("6b443: the .app's main executable is a native launcher that keeps the bun
       and 'codesign --verify --strict "$APP"' in _bm443
       and '@"launch.sh"' in _lm443 and "execv" not in _lm443
       and "packaging/macos_launcher.m" in open(".github/workflows/nightly.yml").read()
-      and '/Contents/MacOS/MillenAI" >/dev/null || break' in _MILLENAI_SRC)
+      # 6b537: the helper waits for the bundle's executable, whichever it
+      # is: MillenAI (this launcher) or ConcordeAI (the native shell)
+      and '/Contents/MacOS/" >/dev/null || break' in _MILLENAI_SRC)
 # THE WINDOW'S PROCESS IS THE APP (6b455, per Patrick: the Dock showed a
 # Python rocket, no dot under the app's icon, and a click started a second
 # copy): the launcher loads the venv's Python framework and runs the
@@ -40238,6 +40240,190 @@ check("6b522 the measure route (live): behind the cookie and the token; the turn
                                                                                                  "ctx_max")}])
 # ==== 6b522 doc attach: end ====
 
+# ==== native shell (6b532): begin ====
+print("== the native shell's sidecar mode, MILLENAI_SHELL=tauri (6b532) ==")
+# THE TAURI SHELL (6b532, per Patrick: the move to Rust, step 1). With
+# MILLENAI_SHELL=tauri the window is the Rust app's (shell/) and the
+# Python process is its sidecar. The auth rules (6b310, 6b321) must hold
+# exactly as they did for pywebview's window: the token is never in the
+# page, the cookie comes only from a one-time boot code, other origins and
+# other hosts are refused, and the sidecar can't outlive its shell.
+import types as _t32
+
+# the setting itself: only the one name is a shell; a dev copy or the real
+# app may carry it (the shell is how the real app runs); half-set dev
+# settings are still refused with it
+_sh32 = {"os": os, "sys": sys, "_KNOWN_ENV": None}
+_exec_names(_sh32, {"_KNOWN_ENV", "_dev_home"})
+_dh32 = _sh32["_dev_home"]
+_r32 = {
+    "qt": _dh32({"MILLENAI_SHELL": "qt"}, "/real")[1],
+    "real+tauri": _dh32({"MILLENAI_SHELL": "tauri"}, "/real"),
+    "dev+tauri": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_DEV": "1",
+                        "MILLENAI_HOME": "/tmp/cai-dev32"}, "/real"),
+    "halfset+tauri": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_HOME": "/tmp/x"}, "/real")[1],
+    "unknown": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_SHELLX": "1"}, "/real")[1],
+}
+check("MILLENAI_SHELL is a known setting that takes only 'tauri'; it changes none of the dev-copy rules",
+      "MILLENAI_SHELL" in _sh32["_KNOWN_ENV"]
+      and "can only be 'tauri'" in (_r32["qt"] or "")
+      and _r32["real+tauri"] == (None, None)
+      and _r32["dev+tauri"] == (os.path.realpath("/tmp/cai-dev32"), None)
+      and "only for dev copies" in (_r32["halfset+tauri"] or "")
+      and "Unknown setting MILLENAI_SHELLX" in (_r32["unknown"] or ""), "%r" % _r32)
+
+# the source: the sidecar skips the window blocker and the pywebview
+# patches, writes the boot note, paints no wipe, and leaves with its parent
+_src32 = _MILLENAI_SRC
+check("in shell mode the server draws no window, writes run/boot.json, skips the wipe and follows its parent",
+      'SHELL = os.environ.get("MILLENAI_SHELL") == "tauri"' in _src32
+      and "SHELL_PARENT = os.getppid() if SHELL else 0" in _src32
+      and "    if not (NOWINDOW or SHELL):\n        _why = _window_blocker()" in _src32
+      and "    if SHELL:\n        # the shell's window spends this code on its first load (6b532)\n"
+          "        _write_boot_note()" in _src32
+      and '"1" if (HAS_WEBVIEW and IS_MAC and not SHELL)' in _src32
+      and "            while os.getppid() == SHELL_PARENT:\n                time.sleep(1.0)" in _src32
+      and "_signal_exit(0, None)" in _src32
+      and "    if HAS_WEBVIEW and IS_MAC and not SHELL:" in _src32
+      and 'account_open("signout", headless=NOWINDOW or SHELL)' in _src32
+      # the test-hook line the 6b321 check names is still there, untouched
+      and 'if NOWINDOW and "boot-code" in TEST_HOOKS:\n        _write_boot_note()' in _src32, "")
+
+# live: a shell-mode copy (no MILLENAI_NOWINDOW; the shell's env) on 9903
+_SH = Instance(9903, "SH", env={"MILLENAI_SHELL": "tauri", "MILLENAI_NOWINDOW": ""}).start()
+_shb = os.path.join(_SH.home, "run", "boot.json")
+try:
+    with open(_shb) as _fh:
+        _shbd = json.load(_fh)
+    _shb_mode = os.stat(_shb).st_mode & 0o777
+except (OSError, ValueError):
+    _shbd, _shb_mode = {}, None
+_shpage = _ireq(_SH, "/", token=False)
+_shbody = _shpage[1].decode("utf-8", "replace")
+check("a shell-mode copy writes its one-time boot code to run/boot.json (0600, its own pid) and the page carries neither token nor key",
+      _shbd.get("pid") == _SH.proc.pid and len(_shbd.get("code", "")) >= 40 and _shb_mode == 0o600
+      and _shpage[0] == 200 and _SH.token not in _shbody and _SH.key not in _shbody
+      and _shbd.get("code", "x") not in _shbody and 'if("0"==="1")' in _shbody,
+      "%r" % [_shbd.get("pid"), _SH.proc.pid, _shb_mode, _shpage[0]])
+
+
+def _sh_raw(path, headers):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(_SH.base + path, headers=headers), timeout=10) as r_:
+            return r_.status, dict(r_.headers), r_.read()
+    except urllib.error.HTTPError as e_:
+        return e_.code, dict(e_.headers), e_.read()
+
+
+# the trade: once, for a cookie that is HttpOnly and Strict; a replay is
+# refused; the cookie alone opens the page and nothing under /api; the
+# token alone (no cookie), another Host and a proxied request are refused
+class _NoRedir32(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+_op32 = urllib.request.build_opener(_NoRedir32)
+try:
+    with _op32.open(urllib.request.Request(_SH.base + "/?boot=" + _shbd.get("code", "")), timeout=10) as r_:
+        _tr = (r_.status, r_.headers.get("Set-Cookie", ""), r_.headers.get("Location"))
+except urllib.error.HTTPError as e_:
+    _tr = (e_.code, e_.headers.get("Set-Cookie", ""), e_.headers.get("Location"))
+try:
+    with _op32.open(urllib.request.Request(_SH.base + "/?boot=" + _shbd.get("code", "")), timeout=10) as r_:
+        _tr2 = r_.status
+except urllib.error.HTTPError as e_:
+    _tr2 = e_.code
+_sh_ck = "millen_key_9903=" + _SH.key
+_sh_rules = {
+    "cookie alone, page": _sh_raw("/", {"Cookie": _sh_ck})[0],
+    "cookie alone, api": _sh_raw("/api/prefs", {"Cookie": _sh_ck})[0],
+    "token alone, api": _sh_raw("/api/prefs", {"X-Api-Token": _SH.token})[0],
+    "both, api": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token})[0],
+    "other host": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token,
+                                         "Host": "evil.test:9903"})[0],
+    "proxied": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token,
+                                      "X-Forwarded-For": "10.0.0.9"})[0],
+    "wrong token": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": "x" * 43})[0],
+}
+check("in shell mode the boot code trades once for an HttpOnly Strict cookie; a replay, the cookie alone on /api, the token alone, another Host, a proxy header and a wrong token are all refused",
+      _tr[0] == 302 and _tr[2] == "/" and "millen_key_9903=" + _SH.key in _tr[1]
+      and "HttpOnly" in _tr[1] and "SameSite=Strict" in _tr[1] and _tr2 == 403
+      and _sh_rules == {"cookie alone, page": 200, "cookie alone, api": 403, "token alone, api": 403,
+                        "both, api": 200, "other host": 403, "proxied": 403, "wrong token": 403},
+      "%r" % [_tr, _tr2, _sh_rules])
+_SH.stop()
+
+# the sidecar follows its parent: started under a throwaway sh, with the
+# sh killed outright (as a crashed shell would be), the server stops on
+# its own and the port closes. A plain windowless copy (no MILLENAI_SHELL)
+# writes no boot note.
+_sh_home2 = os.path.join(_SMOKE_TMP, "SH2")
+os.makedirs(_sh_home2, mode=0o700, exist_ok=True)
+_sh_env2 = {k: v for k, v in os.environ.items() if not k.startswith("MILLENAI_")}
+_sh_env2.update(MILLENAI_DEV="1", MILLENAI_HOME=_sh_home2, MILLENAI_PORT="9903", MILLENAI_SHELL="tauri")
+_sh_log2 = open(os.path.join(_SMOKE_TMP, "SH2.log"), "w")
+_sh_wrap = subprocess.Popen(
+    ["/bin/sh", "-c", '"$0" "$1"; exit 0', os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+    env=_sh_env2, stdout=_sh_log2, stderr=subprocess.STDOUT, start_new_session=True)
+_sh_pid2 = None
+for _ in range(600):
+    try:
+        with open(os.path.join(_sh_home2, "run", "instance.json")) as _fh:
+            _d2 = json.load(_fh)
+        if _port_open(9903):
+            _sh_pid2 = _d2["pid"]
+            break
+    except (OSError, ValueError, KeyError):
+        pass
+    time.sleep(0.1)
+_sh_parent_ok = False
+if _sh_pid2:
+    _pp = subprocess.run(["ps", "-o", "ppid=", "-p", str(_sh_pid2)], capture_output=True, text=True).stdout.strip()
+    _sh_parent_ok = _pp == str(_sh_wrap.pid)
+    os.kill(_sh_wrap.pid, 9)      # the stand-in shell dies without a word
+    _sh_wrap.wait(10)
+_sh_t0 = time.time()
+_sh_gone = None
+while time.time() - _sh_t0 < 15:
+    if not _port_open(9903) and (not _sh_pid2 or subprocess.run(
+            ["ps", "-p", str(_sh_pid2)], capture_output=True).returncode != 0):
+        _sh_gone = round(time.time() - _sh_t0, 1)
+        break
+    time.sleep(0.2)
+if _sh_gone is None and _sh_pid2:
+    try:
+        os.kill(_sh_pid2, 9)
+    except OSError:
+        pass
+_sh_note2 = os.path.exists(os.path.join(_sh_home2, "run", "instance.json"))
+check("a shell-mode sidecar whose shell is killed outright stops itself within seconds and drops its note; no orphan",
+      _sh_parent_ok and _sh_gone is not None and _sh_gone <= 6 and not _sh_note2,
+      "%r" % [_sh_pid2, _sh_parent_ok, _sh_gone, _sh_note2])
+_nb = Instance(9903, "NB").start()
+_nb_boot = os.path.exists(os.path.join(_nb.home, "run", "boot.json"))
+_nb.stop()
+check("a copy outside shell mode and without the boot-code hook writes no run/boot.json", not _nb_boot)
+
+# the Rust side, by its source: the one command, its origin check against
+# the sidecar's port, the blank first page (a tauri:// page as the
+# navigation's initiator made WebKit withhold the Strict cookie), the
+# night before the paint, the one permission, and a shim with no secret
+_rs_main = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+_rs_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
+_rs_shim = _rs_main[_rs_main.index("const BRIDGE_SHIM"):_rs_main.index('})();"#;')]
+check("the Tauri shell hands the token over through one command that checks scheme, host and the sidecar's port; starts on about:blank in the night colour; grants one permission; the shim holds no secret",
+      _rs_main.count("#[tauri::command]") == 1
+      and 'url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == Some(*port)' in _rs_main
+      and 'WebviewUrl::External("about:blank"' in _rs_main
+      and ".background_color(NIGHT)" in _rs_main and "Color(0x03, 0x04, 0x0a, 0xff)" in _rs_main
+      and ".initialization_script(BRIDGE_SHIM)" in _rs_main
+      and "initialization_script_for_all_frames" not in _rs_main
+      and _rs_cap.get("permissions") == ["allow-api-token"] and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
+      and "token" not in _rs_shim.replace("api_token", "")
+      and '.env("MILLENAI_SHELL", "tauri")' in _rs_main
+      and "libc::SIGTERM" in _rs_main and "RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app)" in _rs_main,
+      "")
+# ==== native shell (6b532): end ====
+
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
 # ZITO REMOVED (6b525, per Patrick): holding Z+I+T+O opened a hidden board
@@ -40761,6 +40947,206 @@ check("6b529 an imported chat continued here: the messages brought in keep the o
       _byimp(page) and not _byimp(page.replace(',m.loc,m,m.imp?by:"",m.model));', ',m.loc,m,by,m.model));'))
       and '_m["imp"] = 1' in _IMP_SEG and 'for _m in chat.get("messages") or []:' in _IMP_SEG, "")
 # ==== bring your chats (6b529): end ====
+
+# ==== the shell is the app, 7.0 beta (6b537): begin ====
+print("== the shell is the app: release, updater, CI (6b537) ==")
+# THE 7.0 BETA SHIPS THE NATIVE SHELL (6b537, per Patrick: the move to Rust,
+# step 1 → the app). release.sh builds the shell's bundle into the same
+# ConcordeAI-<version>.dmg, CFBundleVersion = APP_BUILD (the tag's number),
+# the version from APP_VERSION, both read back from the built bundle; a
+# --dry-run builds everything and publishes nothing. The updater's helper
+# waits for either executable and relaunches whatever the new bundle is,
+# so a Python install updates into the shell and the shell into the next
+# shell; the shell quits when its sidecar exits cleanly (the updater's
+# path), and bootstraps the venv on a fresh Mac. CI builds the Windows and
+# Linux shells from a release's tag and attaches nothing (the Windows
+# updater would offer any .msi). Proven live against a fake feed before
+# this was written (Python 6.1/276 → shell 7.0/277 → shell 278).
+_F36 = {k: open(v, encoding="utf-8").read() for k, v in {
+    "rel": "release.sh", "bsd": "build_shell_dmg.sh", "bdm": "build_dmg.sh",
+    "stamp": os.path.join("packaging", "shell_stamp.py"),
+    "rs": os.path.join("shell", "src-tauri", "src", "main.rs"),
+    "conf": os.path.join("shell", "src-tauri", "tauri.conf.json"),
+    "sb": os.path.join(".github", "workflows", "shell-build.yml"),
+    "nw": os.path.join(".github", "workflows", "nightly.yml"),
+    "wi": os.path.join(".github", "workflows", "windows-installer.yml")}.items()}
+_F36["src"] = _MILLENAI_SRC
+
+
+def _c36_release(f):
+    """release.sh: the macOS asset is the shell's DMG under the one name; the
+    bundle's CFBundleVersion and short version are checked against the cut;
+    --dry-run needs no gh, stamps nothing, and leaves before the commit."""
+    r = f["rel"]
+    out = {
+        "shell dmg, same name": "./build_shell_dmg.sh >/dev/null" in r and "./build_dmg.sh >/dev/null" not in r
+                                and 'DMG="ConcordeAI-${VERSION}.dmg"' in r,
+        "bundle read back": '[[ "$GOT_BUILD" == "$BUILD" ]] || {' in r and '[[ "$GOT_VER" == "$VERSION" ]] || {' in r
+                            and 'PlistBuddy -c "Print :CFBundleVersion" "$PL"' in r,
+        "dry run flag": 'if [[ "$1" == "--dry-run" ]]; then DRY_RUN=1; shift; fi' in r
+                        and 'if [[ "$DRY_RUN" == 0 ]] && ! command -v gh' in r,
+        "dry run stamps nothing": 'if [[ "$DRY_RUN" == 1 ]]; then' in r
+                                  and r.index('if [[ "$DRY_RUN" == 1 ]]; then') < r.index("p.write_text(s)"),
+    }
+    i_dry = r.find("dry run: built, verified, published nothing")
+    i_pub = r.find('gh release create "v$BUILD"')
+    i_push = r.find("git push origin HEAD")
+    out["dry run leaves before commit, push, release"] = (
+        0 < i_dry < i_push < i_pub and "  exit 0\nfi" in r[i_dry:i_push])
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_bundle(f):
+    """build_shell_dmg.sh: stamped from millenai.py; CFBundleVersion set to
+    APP_BUILD after the build and signed after that; both keys, the id, the
+    executable and the resources read back; universal; the image is
+    build_dmg.sh's, which keeps the Python path when not told otherwise."""
+    b, d, st = f["bsd"], f["bdm"], f["stamp"]
+    conf = json.loads(f["conf"])
+    res = conf.get("bundle", {}).get("resources", {})
+    out = {
+        "stamped from millenai.py": 'read -r VER BUILD <<<"$(python3 packaging/shell_stamp.py)"' in b
+                                    and 'conf["version"] = version' in st
+                                    and "re.search(r\"<<'LAUNCH'\\n(.*?)\\nLAUNCH\\n\", bm, re.S)" in st
+                                    and "crypto_reqs.py" in st,
+        "CFBundleVersion = APP_BUILD, then signed": '/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"' in b
+                                                   and 'codesign --force --sign "$IDENTITY" "$BUNDLE"' in b
+                                                   and 'codesign --verify --strict "$BUNDLE"' in b
+                                                   and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign --force --sign'),
+        "read back": '[[ "$GOT_BUILD" == "$BUILD" ]] ||' in b and '[[ "$GOT_VER" == "$VER" ]] ||' in b
+                     and '[[ "$GOT_ID" == "com.millen.millenai" ]]' in b and '[[ "$GOT_EXE" == "ConcordeAI" ]]' in b
+                     and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx; do" in b
+                     and 'cmp -s millenai.py "$BUNDLE/Contents/Resources/millenai.py"' in b,
+        "universal": 'TARGET="universal-apple-darwin"' in b and "expected a universal binary" in b,
+        "the image is build_dmg.sh's": "DMG_APP_READY=1 ./build_dmg.sh" in b
+                                      and 'if [[ -n "$DMG_APP_READY" ]]; then' in d and "  ./build_macos_app.sh\n" in d,
+        "the bundle's identity and resources": conf.get("identifier") == "com.millen.millenai"
+                                              and {"millenai.py", "launch.sh", "crypto-requirements.txt", "fonts", "vfx"} <= set(res.values())
+                                              and conf["bundle"]["macOS"].get("minimumSystemVersion") == "11.0",
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_updater(f):
+    """The swap helper waits for the bundle's executable whichever it is and
+    relaunches whatever the new bundle is; the feed is GitHub unless a dev
+    copy points it elsewhere; the display strips one .0; the shell quits
+    on its sidecar's clean exit and bootstraps the venv on a fresh Mac."""
+    s, rs = f["src"], f["rs"]
+    out = {}
+    m = re.search(r'_SWAP_SCRIPT = """(.*?)"""', s, re.S)
+    swap = (m.group(1) if m else "") % {"app": "/Applications/ConcordeAI.app", "dmg": "/t/update.dmg", "tmp": "/t"}
+    pm = re.search(r'pgrep -f "(.*?)"', swap)
+    pat = pm.group(1) if pm else "(?!)"
+    out["helper waits for either executable, not the server"] = (
+        bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/ConcordeAI"))
+        and bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/MillenAI"))
+        and not re.search(pat, "/x/venv/bin/python3 /Applications/ConcordeAI.app/Contents/Resources/millenai.py")
+        and 'open -n "/Applications/ConcordeAI.app"' in swap
+        and 'ditto "$NEW" "/Applications/ConcordeAI.app.new" && rm -rf "/Applications/ConcordeAI.app"' in swap)
+    out["feed: GitHub, or a dev copy's stand-in"] = (
+        'UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")\n'
+        '               if DEV_HOME else "") or "https://api.github.com")' in s
+        and '"MILLENAI_UPDATE_API"))' in s and "https://api.github.com/repos" not in s
+        and s.count('UPDATE_API + "/repos/%s/') == 3)
+    out["one .0 falls away in the offer"] = (
+        '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]\n        shown = num + mnum.group(2)' in s
+        and 'while num.count(".") >= 1' not in s)
+    out["shell: sidecar's clean exit quits the shell"] = (
+        "fn watch_sidecar(app: AppHandle, log_path: PathBuf)" in rs
+        and "if status.code() == Some(0) {\n            app.exit(0);" in rs
+        and "watch_sidecar(app.clone(), log_path.clone());" in rs
+        and rs.index("*sc.child.lock().unwrap() = Some(child);") < rs.index("watch_sidecar(app.clone(), log_path.clone());")
+        and rs.count("#[tauri::command]") == 1)
+    out["shell: venv bootstrap on a fresh Mac"] = (
+        "fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool" in rs
+        and 'if !cfg!(target_os = "macos") || std::env::var_os("CONCORDE_PYTHON").is_some()' in rs
+        and '.arg("--bootstrap")' in rs and "if !py.exists() && !bootstrap_venv(&app, &py) {" in rs)
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c36_ci(f):
+    """shell-build.yml runs on a published release from its tag, stamps the
+    shell the same way, uploads artifacts and attaches nothing; nightly.yml
+    builds the shell DMG; the Windows MSI stays the Python app's."""
+    sb, nw, wi = f["sb"], f["nw"], f["wi"]
+    out = {
+        "on release, from the tag": "release:\n    types: [published]" in sb
+                                    and "ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}" in sb
+                                    and "!= 'nightly'" in sb,
+        "attaches nothing": "gh release upload" not in sb and "actions/upload-artifact@v4" in sb
+                            and "run: python packaging/shell_stamp.py" in sb,
+        "no mac rows (release.sh's job)": "macos-" not in sb,
+        "nightly builds the shell dmg": "./build_shell_dmg.sh" in nw and "./build_dmg.sh\n" not in nw
+                                        and 'cargo install tauri-cli --version "^2" --locked' in nw
+                                        and "aarch64-apple-darwin,x86_64-apple-darwin" in nw
+                                        and "shell/**" in nw and "build_shell_dmg.sh," in nw,
+        "windows msi stays python": "ConcordeAI-$ver-x64.msi" in wi and "build_windows_exe.ps1" in wi,
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_C36_CHECKS = [("6b537 release.sh: the shell's DMG under the one asset name, the bundle's build and version read back, "
+                "--dry-run publishes nothing", _c36_release),
+               ("6b537 build_shell_dmg.sh: stamped from millenai.py, CFBundleVersion = APP_BUILD then signed, "
+                "read back, universal, the resources, build_dmg.sh's image", _c36_bundle),
+               ("6b537 updater: the helper waits for either executable and relaunches the new bundle, the feed knob is "
+                "a dev copy's, one .0 in the offer, the shell quits on its sidecar's exit and bootstraps the venv", _c36_updater),
+               ("6b537 CI: the shell's Windows and Linux builds from a release's tag as artifacts only, nightly's DMG "
+                "is the shell's, the Windows MSI stays the Python app's", _c36_ci)]
+
+
+def _c36_run(f, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C36_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(f)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i36, _n36, _o36, _d36 in _c36_run(_F36):
+    check(_n36, _o36, "%r" % (_d36,))
+_C36_MUT = [
+    ("rel", "the Python DMG again", "./build_shell_dmg.sh >/dev/null", "./build_dmg.sh >/dev/null", [0]),
+    ("rel", "the bundle's build not checked", '[[ "$GOT_BUILD" == "$BUILD" ]] || {', '[[ -n "$GOT_BUILD" ]] || {', [0]),
+    ("rel", "a dry run that goes on to publish", '  exit 0\nfi\n\necho "→ publishing v$BUILD"', 'fi\n\necho "→ publishing v$BUILD"', [0]),
+    ("rel", "a dry run that stamps millenai.py", 'if [[ "$DRY_RUN" == 1 ]]; then\n  if [[ -n "$ARG" ]]; then', 'if false; then\n  if [[ -n "$ARG" ]]; then', [0]),
+    ("bsd", "CFBundleVersion from the version", 'Set :CFBundleVersion $BUILD', 'Set :CFBundleVersion $VER', [1]),
+    ("bsd", "one arch only", 'TARGET="universal-apple-darwin"', 'TARGET=""', [1]),
+    ("bsd", "signed before the plist is patched", 'codesign --force --sign "$IDENTITY" "$BUNDLE"\ncodesign --verify --strict "$BUNDLE"\n',
+     "", [1]),
+    ("bdm", "build_dmg.sh never builds the Python app", 'if [[ -n "$DMG_APP_READY" ]]; then', "if true; then", [1]),
+    ("conf", "the first-run script left out of the bundle", '      "sidecar/launch.sh": "launch.sh",\n', "", [1]),
+    ("src", "the helper waits for the Python launcher only", 'pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break',
+     'pgrep -f "%(app)s/Contents/MacOS/MillenAI" >/dev/null || break', [2]),
+    ("src", "the feed knob honoured by the real app", '\n               if DEV_HOME else "") or "https://api.github.com")',
+     ') or "https://api.github.com")', [2]),
+    ("src", "every .0 stripped from the offer", '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]',
+     '        while num.count(".") >= 1 and num.endswith(".0"):\n            num = num[:-2]', [2]),
+    ("rs", "the shell stays open on the sidecar's clean exit", "if status.code() == Some(0) {\n            app.exit(0);",
+     "if status.code() == Some(0) {\n            return;", [2]),
+    ("rs", "no venv bootstrap", "if !py.exists() && !bootstrap_venv(&app, &py) {", "if !py.exists() {", [2]),
+    ("sb", "the shell MSI attached to the release", "      - uses: actions/upload-artifact@v4",
+     "      - run: gh release upload v1 x.msi\n      - uses: actions/upload-artifact@v4", [3]),
+    ("nw", "the nightly DMG is the Python app's", "./build_shell_dmg.sh", "./build_dmg.sh", [3]),
+]
+_c36_caught = []
+for _mf, _mn, _ma, _mb, _mw in _C36_MUT:
+    _mut = dict(_F36)
+    _mut[_mf] = _F36[_mf].replace(_ma, _mb, 1)
+    if _mut[_mf] == _F36[_mf]:
+        _c36_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c36_run(_mut, _mw)):
+        _c36_caught.append((_mn, "not caught"))
+check("6b537's rules each break a check when broken (%d mutants)" % len(_C36_MUT), not _c36_caught,
+      "%r" % _c36_caught)
+# ==== the shell is the app, 7.0 beta (6b537): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

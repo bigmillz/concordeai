@@ -6,6 +6,19 @@
 #   ./release.sh rc           the next release candidate ("6.1 RC1", "6.1 RC2")
 #   ./release.sh 6.1.0        STABLE: clears the beta/RC hold, lands on /releases/latest
 #   ./release.sh patch|minor|major   stable, computed from the current version
+#   ./release.sh --dry-run [ARG]  build every asset locally from the constants
+#                             as they are; commit, tag, push and publish
+#                             nothing. With ARG, also print the cut it would make.
+#
+# THE APP IS THE NATIVE SHELL FROM 7.0 (6b537, per Patrick: the move to
+# Rust, step 1). The macOS asset is the Tauri shell's bundle in the same
+# ConcordeAI-<version>.dmg (build_shell_dmg.sh), so a Python-app install
+# updates into the shell and a shell install into the next shell through
+# the one tag rule. CFBundleVersion is APP_BUILD (the tag's number) and
+# the shell's version is APP_VERSION; both are verified in the built
+# bundle before anything is published. The Windows assets stay the
+# Python app's (the zip here, the MSI from CI) until the shell carries a
+# Python of its own on Windows.
 #
 # THE LINE (6b286, per Patrick, the macOS way): nightlies roll on every
 # push; when one looks clean he says "commit this to beta N"; betas are
@@ -33,20 +46,24 @@ if [[ -z "$SITE" ]]; then
   done
 fi
 
+DRY_RUN=0
+if [[ "$1" == "--dry-run" ]]; then DRY_RUN=1; shift; fi
 ARG="$1"; ARG2="${2:-}"
-if [[ -z "$ARG" ]]; then
+if [[ -z "$ARG" && "$DRY_RUN" == 0 ]]; then
   echo "usage: ./release.sh beta [X.Y.Z]   next numbered beta (or beta 1 of a new line)"
   echo "       ./release.sh rc             next release candidate of the current line"
   echo "       ./release.sh X.Y.Z          stable — clears the beta/RC hold"
   echo "       ./release.sh patch|minor|major   stable, computed from the current version"
   exit 1
 fi
-if ! command -v gh >/dev/null; then
+if [[ "$DRY_RUN" == 0 ]] && ! command -v gh >/dev/null; then
   echo "gh not found — install with: brew install gh && gh auth login"; exit 1
 fi
 
 # --- work out the next version + build from millenai.py
-read -r VERSION BUILD BETA RC <<<"$(python3 - "$ARG" "$ARG2" <<'PY'
+# (a dry run without ARG builds the constants as they are: "--dry-run"
+# alone passes "current" through, which is not a cut)
+read -r VERSION BUILD BETA RC <<<"$(python3 - "${ARG:-current}" "$ARG2" <<'PY'
 import re, sys, pathlib
 arg, arg2 = sys.argv[1], sys.argv[2]
 src = pathlib.Path("millenai.py").read_text()
@@ -55,7 +72,9 @@ build = int(re.search(r"APP_BUILD = (\d+)", src).group(1)) + 1
 beta = int(re.search(r"^APP_BETA = (\d+)", src, re.M).group(1))
 rc = int(re.search(r"^APP_RC = (\d+)", src, re.M).group(1))
 
-if arg == "beta":
+if arg == "current":
+    version, build = cur, build - 1          # a dry run of what is there
+elif arg == "beta":
     # numbered per line: a new version starts at beta 1, the same
     # version counts up; a line that already reached RC does not go back
     new_line = False
@@ -113,8 +132,26 @@ elif (( BETA > 0 )); then
   PRE=(--prerelease); SHOW="$SHOW beta $BETA"
 fi
 
-echo "→ $SHOW (build $BUILD)"
-python3 - "$VERSION" "$BUILD" "$BETA" "$RC" <<'PY'
+if [[ "$DRY_RUN" == 1 ]]; then
+  if [[ -n "$ARG" ]]; then
+    echo "→ DRY RUN: a real '$ARG' cut would publish $SHOW (build $BUILD) as tag v$BUILD${PRE:+ (prerelease)}"
+    echo "  building the constants as they ARE instead; millenai.py is not stamped"
+    read -r VERSION BUILD BETA RC <<<"$(python3 - <<'PY'
+import re, pathlib
+s = pathlib.Path("millenai.py").read_text()
+print(re.search(r'APP_VERSION = "([^"]+)"', s).group(1),
+      re.search(r"^APP_BUILD = (\d+)", s, re.M).group(1),
+      re.search(r"^APP_BETA = (\d+)", s, re.M).group(1),
+      re.search(r"^APP_RC = (\d+)", s, re.M).group(1))
+PY
+)"
+    PRE=(); (( RC > 0 || BETA > 0 )) && PRE=(--prerelease)
+  else
+    echo "→ DRY RUN: $SHOW (build $BUILD), the constants as they are"
+  fi
+else
+  echo "→ $SHOW (build $BUILD)"
+  python3 - "$VERSION" "$BUILD" "$BETA" "$RC" <<'PY'
 import pathlib, re, sys
 version, build, beta, rc = sys.argv[1:5]
 p = pathlib.Path("millenai.py"); s = p.read_text()
@@ -124,16 +161,34 @@ s = re.sub(r"^APP_BETA = \d+", "APP_BETA = %s" % beta, s, count=1, flags=re.M)
 s = re.sub(r"^APP_RC = \d+", "APP_RC = %s" % rc, s, count=1, flags=re.M)
 p.write_text(s)
 PY
+fi
 
-echo "→ building macOS"
-./build_dmg.sh >/dev/null
+echo "→ building macOS (the native shell)"
+./build_shell_dmg.sh >/dev/null
 DMG="ConcordeAI-${VERSION}.dmg"   # build_dmg.sh derives this from millenai.py
 [[ -f "$DMG" ]] || { echo "expected $DMG but it wasn't built"; exit 1; }
+# THE BUNDLE SAYS WHAT THE TAG SAYS (6b537): CFBundleVersion is the build
+# the updater compares (v$BUILD), the short version is the version. Read
+# off the bundle that went into the image, not off the config that fed it.
+PL="ConcordeAI.app/Contents/Info.plist"
+GOT_BUILD="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PL")"
+GOT_VER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PL")"
+[[ "$GOT_BUILD" == "$BUILD" ]] || { echo "the bundle's CFBundleVersion is $GOT_BUILD, not $BUILD"; exit 1; }
+[[ "$GOT_VER" == "$VERSION" ]] || { echo "the bundle's CFBundleShortVersionString is $GOT_VER, not $VERSION"; exit 1; }
+echo "  $DMG — CFBundleVersion $GOT_BUILD, CFBundleShortVersionString $GOT_VER"
 
 echo "→ building Windows"
 ./build_windows.sh >/dev/null
 ZIP="ConcordeAI-${VERSION}-Windows.zip"
 [[ -f "$ZIP" ]] || { echo "expected $ZIP but it wasn't built"; exit 1; }
+
+if [[ "$DRY_RUN" == 1 ]]; then
+  echo ""
+  echo "✓ dry run: built, verified, published nothing"
+  ls -la "$DMG" "$ZIP" | awk '{printf "  %s  %.1f MB\n", $NF, $5/1e6}'
+  echo "  a real run would: commit, push, gh release create v$BUILD $DMG $ZIP${PRE:+ --prerelease}"
+  exit 0
+fi
 
 echo "→ publishing v$BUILD"
 git add -A && git commit -m "Release $SHOW (build $BUILD)" || true
