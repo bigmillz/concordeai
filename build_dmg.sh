@@ -50,8 +50,14 @@ mkdir -p "$STAGE/.background"
 cp -R ConcordeAI.app "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
 
+# THE FIRST-OPEN HELP FOLLOWS THE SIGNATURE (6b548): an app with Apple's
+# notarization ticket stapled to it opens with no warning, so its window
+# says only how to install; any other keeps the Open Anyway steps
+NOTARIZED=0
+xcrun stapler validate -q ConcordeAI.app >/dev/null 2>&1 && NOTARIZED=1
+
 # --- background art (1320x800 @144dpi -> 660x400 pts, retina-sharp)
-"$VENV/bin/python3" - "$STAGE/.background/bg.png" "$SHOW_VER" <<'PYEOF'
+"$VENV/bin/python3" - "$STAGE/.background/bg.png" "$SHOW_VER" "$NOTARIZED" <<'PYEOF'
 import random
 import sys
 
@@ -199,13 +205,18 @@ centered(base + CAP + 30, sys.argv[2], sub, (150, 156, 168, 235))
 
 # install help. macOS 15+ removed the right-click→Open bypass, so an
 # unnotarized app MUST be allowed from System Settings the first time.
+# A notarized one (6b548) just opens: one line, and no Open Anyway.
 small = font("/System/Library/Fonts/Menlo.ttc", 21)
-centered(668, "1. drag ConcordeAI into Applications, then open it once",
-         small, (124, 130, 142, 235))
-centered(704, "2. macOS will block it — that is expected for a free app",
-         small, (124, 130, 142, 235))
-centered(740, "3. System Settings ▸ Privacy & Security ▸ Open Anyway",
-         small, (226, 230, 238, 245))
+if sys.argv[3] == "1":
+    centered(704, "drag ConcordeAI into Applications, then open it",
+             small, (226, 230, 238, 245))
+else:
+    centered(668, "1. drag ConcordeAI into Applications, then open it once",
+             small, (124, 130, 142, 235))
+    centered(704, "2. macOS will block it — that is expected for a free app",
+             small, (124, 130, 142, 235))
+    centered(740, "3. System Settings ▸ Privacy & Security ▸ Open Anyway",
+             small, (226, 230, 238, 245))
 
 # drag arrow between the two icon slots (icons at 165pt / 495pt), carrying
 # the wing's own steel -> silver ramp so the window stays monochrome

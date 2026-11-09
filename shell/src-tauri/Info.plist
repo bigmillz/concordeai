@@ -5,7 +5,9 @@
   <key>NSLocalNetworkUsageDescription</key>
   <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
   <key>NSMicrophoneUsageDescription</key>
-  <string>ConcordeAI uses the microphone for voice input — audio never leaves this Mac.</string>
+  <string>ConcordeAI listens only while you dictate. Your voice stays on your computer.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>ConcordeAI turns what you say into text on your computer. Nothing is sent anywhere.</string>
   <key>NSHighResolutionCapable</key>
   <true/>
 </dict>

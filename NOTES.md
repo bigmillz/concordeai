@@ -19672,3 +19672,98 @@ re-pinned at the same strength; the KEEP_LS pin reads the list. New checks: the 
 mutant), the corner's full-screen rule, the home pill's absence, the menu's Import Chats, the drop's
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
+
+## 6b548: Developer ID signing and notarization, ready for the certificate (per Patrick; the number may be renumbered at merge)
+
+**Why.** Patrick's mom was stopped by macOS's "can't check this app" on the ad-hoc 7.0 beta 1. Patrick is
+enrolling in the Apple Developer Program as an individual. The build now signs, notarizes and staples on its
+own once his certificate and notary profile are in the keychain. His side of it is `docs/SIGNING.md`.
+
+**Modes** (`build_shell_dmg.sh`, decided before anything is built):
+- *developer-id*: `CONCORDE_SIGN_ID` names an identity (`CONCORDE_SIGN_IDENTITY`, the old name, still works),
+  or the keychain's first valid "Developer ID Application" is taken by its hash. Signing goes inside out: both
+  helpers, then the bundle (its main binary with it), all with `--options runtime --timestamp`, and the bundle
+  with `shell/src-tauri/entitlements.plist`. Then every Mach-O in the bundle is read back (runtime flag, the
+  Developer ID authority, a timestamp), along with audio-input on the bundle, no entitlements on the helpers,
+  and both usage strings in the built Info.plist.
+- With a notary profile (`concorde-notary`, or `CONCORDE_NOTARY_PROFILE`), checked up front with `notarytool
+  history`: the app is zipped, notarized and **stapled before the image is made**, so it opens offline once
+  dragged out. Then the DMG is signed (timestamped), notarized and stapled. Gatekeeper is asked about the image
+  (`spctl -a -t open --context context:primary-signature`) and about the app inside the mounted image
+  (`spctl -a -vv`, plus `stapler validate`), and both must say "Notarized Developer ID". A submission that
+  isn't Accepted prints Apple's `notarytool log` and stops. A stored profile that doesn't work, or a named one
+  that isn't there, also stops; only a never-stored default profile is skipped quietly (signed, not notarized).
+  `packaging/notary_verdict.py` reads the id and status from notarytool's JSON in any shape.
+- *rehearsal* (`CONCORDE_SIGN_HARDENED=1`, no identity): ad hoc, but with the hardened runtime and the
+  entitlements, and the DMG ad hoc signed. Never for a release.
+- *adhoc*: exactly as before (`codesign --force --sign -`), and one line says so. `CONCORDE_SIGN_ID=-` forces it.
+
+`release.sh` reads the result off the build (the bundle's Authority, the app's and the image's tickets) and
+prints `macOS signing: …` after the Mac build, in a dry run, and again under the final ✓. The DMG's
+first-open help (`build_dmg.sh`) follows the app's stapled ticket: a notarized app gets one line ("drag
+ConcordeAI into Applications, then open it") instead of the Open Anyway steps. Nightlies are built on
+GitHub's Macs with no certificate, so they stay ad hoc.
+
+**Entitlements: only `com.apple.security.device.audio-input`.**
+- JIT: not needed. WebKit's JIT runs in Apple's WebContent process. The hardened build ran a 3×10⁷-step JS
+  loop in ~120 ms, which is JIT speed, not the interpreter's.
+- Python from outside the bundle: needs nothing. It is a separate process with its own signature, and library
+  validation only governs what loads into the shell itself.
+- `disable-library-validation`: not needed. Nothing foreign loads into the shell.
+- Speech recognition: there is no hardened-runtime key for it. TCC asks for the usage string.
+
+`shell/src-tauri/Info.plist` gains NSSpeechRecognitionUsageDescription. The responsible process for the
+helper (shell → Python → helper) is the app, as tccd's own attribution lines showed. The microphone line is
+reworded. Copy for Patrick's approval:
+- Microphone, old: "ConcordeAI uses the microphone for voice input — audio never leaves this Mac." New:
+  "ConcordeAI listens only while you dictate. Your voice stays on your computer."
+- Speech recognition, new: "ConcordeAI turns what you say into text on your computer. Nothing is sent anywhere."
+- DMG window when notarized, new: "drag ConcordeAI into Applications, then open it".
+
+**Proven on the rehearsal build** (universal, `CONCORDE_SIGN_HARDENED=1 ./build_shell_dmg.sh`, all three
+Mach-Os `flags=0x10002(adhoc,runtime)`). It was launched through LaunchServices as a dev copy (9893, its own
+`MILLENAI_HOME`) under a test bundle id, `com.millen.millenai.signtest`, so the real app's TCC entries and
+WebKit store were never touched.
+- The window opens and the page renders: greeting, composer, sky.
+- The sidecar starts from the venv.
+- `/api/doc/pdf` reads `text.pdf` and `unicode.pdf` through the bundle's hardened `concorde-pdftext` (reader
+  pdfkit, Hebrew, Arabic, Greek and Japanese intact).
+- `/api/dictate` runs the bundle's hardened `concorde-dictate` on a `say` recording and returns "The quick
+  brown fox jumps over the lazy dog." No crash and no prompt (the system recognizer asks for none).
+- Microphone: a hardened test app without audio-input is refused at once, with no prompt (status 0 → 2).
+  With the shell's entitlements file it is authorized (0 → 3). No prompt appeared, so this Mac may allow it by
+  policy.
+- **Not proven:** getUserMedia in the shell's own WKWebView. The window was on another Space while Patrick
+  was in a full-screen Space, so the page was hidden (`visibilityState` "hidden"), and WebKit holds a hidden
+  page's request with or without the key. Check once by holding ⌘D in the first signed build.
+
+**Updater, hardened** (`scratchpad/updproof3/proof.py`, from 6b537's stand-in feed proof, 13/13). An installed
+hardened 278 is offered 279 by the stand-in feed, downloads it, the server exits 0, the shell quits, the helper
+swaps the bundle and `open -n` relaunches it. Results:
+- The downloaded image and the new bundle carry no quarantine, so this path never meets Gatekeeper's
+  first-launch check, and a stapled ticket (a file in Contents/) rides `ditto` unchanged.
+- The swapped bundle verifies `--strict --deep` and keeps the runtime and the entitlement.
+- The relaunched process runs hardened.
+
+Two notes for the first signed releases:
+- Under a Developer ID, TCC permissions follow the team, not the cdhash, so the microphone grant survives
+  updates (ad hoc builds can lose it on every update). The first signed build asks once more.
+- macOS's App Management protection: updating a notarized app in /Applications needs the same team ID as the
+  updater (ours: the app itself, so it should pass). The first signed-to-signed update is unproven until two
+  signed builds exist; watch it on beta 2 → beta 3.
+
+**Gauntlet.** 6b548's block: the mode block of `build_shell_dmg.sh` is *run* in zsh against stub `security`
+and `xcrun` (no identity; an Apple Development identity alone; a keychain Developer ID with and without the
+profile; a broken profile; a named missing one; the `-` override; named and legacy-named identities; an
+unknown one; the rehearsal). There are also source checks for signing order and read-back, notarization and
+stapling order, Gatekeeper on both, the verdict reader on four shapes of output, the plists, release.sh's
+report, the DMG help and the owner's steps, plus 17 mutants. The 6b537, 6b543 and 6b546 pins on
+`build_shell_dmg.sh` were re-pinned to `codesign "${SIGN[@]}"` at the same strength (6b537's "signed before
+the plist is patched" mutant now removes the whole bundle-signing block).
+
+**Checked:** these blocks only, not the full gauntlet, per the brief: 6b286's release.sh, 6b287's DMG window,
+6b543's and 6b546's shell-build pins, all of 6b537 and all of 6b548 (15/15, 16 + 17 mutants caught). Also
+`ast.parse` and `zsh -n` on the scripts.
+
+**Also.** The first test launch's server reaped an orphan mlx_lm engine (pid 69166, ppid 1) on 8884. That is
+the server's boot reaper doing its job on a corpse, but it is shared machine state.
