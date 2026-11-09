@@ -11,6 +11,16 @@ import signal
 import socket
 import subprocess
 import sys
+import builtins as _builtins
+# 6b528's usage tap: the council and the answer paths now name each stage
+# (usage_role) and may install a tap (usage_tap). The many checks that exec
+# run_council or its helpers into a namespace of their own predate it; a
+# missing name there killed the draft threads (NameError) and left those
+# checks waiting out their timeouts. A namespace that brings the real
+# functions still uses them (a module global shadows a builtin); every
+# other one gets these no-ops.
+_builtins.usage_role = lambda role="": ""
+_builtins.usage_tap = lambda fn=None: None
 import tempfile
 import time
 import urllib.request
