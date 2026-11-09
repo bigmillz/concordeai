@@ -552,10 +552,10 @@ def _bal_page_checks(rows):
             "Balance ≈ $12.34*" in ok and "set $20.00 on" in ok and "Update balance" in ok and star_note(ok),
             "low row: amber, Low balance with *, footnote":
             "Low balance ≈ $1.50*" in low and 'class="ckbal low"' in low and star_note(low),
-            "used row: Balance used up*, unpriced line with *, footnote":
-            "Balance used up*" in used and "highest price*" in used and star_note(used),
+            "used row: Balance spent*, unpriced line with *, footnote":
+            "Balance spent*" in used and "top rate*" in used and star_note(used),
             "no balance: only the prompt and the field, no figure or footnote":
-            "Add your balance to track it" in none and "ckbal-in" in none and "Estimated from" not in none
+            "Track balance" in none and "ckbal-in" in none and "Estimated from" not in none
             and "≈" not in none,
             "free tiers and Kimi show nothing, even with an estimate": gem == "" and groq == "" and kimi == ""}
 
@@ -571,7 +571,9 @@ check("balance row (node): * and footnote on every figure, amber when low, promp
 _us441 = _MILLENAI_SRC[_MILLENAI_SRC.index("def _usage_num(v):"):_MILLENAI_SRC.index("def usage_put(rec: dict):")]
 _us441 = _us441[:_us441.index("# ==== balance: begin ====")]
 _got441 = []
-_ns441 = {"time": time, "usage_put": _got441.append}
+# the page's usage tap (6b528) reads _tl_usage inside usage_note; without it the
+# NameError is swallowed and nothing is recorded
+_ns441 = {"time": time, "usage_put": _got441.append, "_tl_usage": _th329.local()}
 exec(_us441, _ns441)
 _ns441["usage_note"]("claude-opus-5-5", "claude", [{"role": "user", "content": "SECRET PROMPT"}], 40,
                      {"input_tokens": 10, "cache_read_input_tokens": 100, "cache_creation_input_tokens": 50,
@@ -1887,7 +1889,8 @@ for _lbl, _a, _b in _ann_pm:
 check("draw on a picture: the served page wires the grid, the card, Save and Copy; no HTML from the model",
       _ann_page_ok(page) and all(c is True for _l, c in _ann_pc), str([x for x in _ann_pc if x[1] is not True]))
 # 6b292, per Patrick: performance mode is now "Enable visual effects" in
-# About and touches ONLY the backdrop; the cog sits left of the pen;
+# About and touches ONLY the backdrop; the cog sat left of the pen until
+# 6b528 moved it into the sidebar's foot (#sb-foot, after the brand row);
 # automatic update checks are a switch (launch + daily) with the button
 # as the manual path
 def _nv_ok(pg):
@@ -1919,13 +1922,15 @@ def _nv_ok(pg):
     return classic, bad
 _nv_mut = page.replace(".hz body.novideo #sidebar{transition:none}", ".hz body.novideo #sidebar{transition:none;margin:0}", 1)
 assert _nv_mut != page
-check("visual effects switch: backdrop only, in About; cog left of pen",
+check("visual effects switch: backdrop only, in About; cog in the sidebar's foot (6b528)",
       'id="fx-toggle"' in page and 'id="perf-toggle"' not in page
       and "body.perf" not in page and "body:not(.perf)" not in page
       and "body.novideo #skyline{display:none}" in page
       and _nv_ok(page) == (3, [])          # Classic's three; every Horizon-era rule decorative only (integration)
       and _nv_ok(_nv_mut)[1] != []            # the mutant: a margin slipped into a still rule is caught
-      and 0 < page.index('id="settings-btn"') < page.index('id="newchat"')
+      # the pen stays in the brand row; the cog is the foot's last control (6b528)
+      and 0 < page.index('id="newchat"') < page.index('id="sb-foot"') < page.index('id="settings-btn"')
+      and page.count('id="settings-btn"') == 1 and page.count('id="sb-foot"') == 1
       and 'id="settings">' not in page
       and '{k:"set",t:"Visual effects",' in page)
 _auto = json.loads(req("/api/update/check", cookie=K)[2])
@@ -2119,8 +2124,10 @@ check("risky tasks gated by a warning card",
       and "This could be hard to undo." in page
       and '<span>Go ahead</span></button>' in page and '<span>Skip</span></button></div>' in page
       and 'class="twarn"' in page)
+# counted inside the TASKS literal: hz-chat's phrase tables (6b528) carry `review:"…"` keys that end in w:"
+_tasks_js = page[page.index("const TASKS=["):page.index("];", page.index("const TASKS=["))]
 check("full 53-task library with the flagged set",
-      page.count("{n:\"") == 53 and page.count("w:\"") == 22)
+      _tasks_js.count("{n:\"") == 53 and _tasks_js.count("w:\"") == 22)
 # 6b251: the prereq card is GONE on purpose — the execution engine needs
 # nothing installed on the server (systemd-run is already there, reboot
 # survival is Concorde-side polling), so asking the user to install
@@ -2785,6 +2792,7 @@ _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
 # (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
 # window in WKWebView, WebView2 and Qt)
 _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
+_PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" otherwise; filled before the page is sent
 _PAGE_HOST |= {"Int16Array"}         # 6b542: the page turns captured audio into 16 kHz PCM
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
@@ -2829,18 +2837,26 @@ check("the served page's scripts parse, alone and together",
 _pjs = _jsscan.page_script(_MILLENAI_SRC)
 _ptk = _jsscan.tokenize(_pjs)
 _fi = [i for i, t in enumerate(_ptk) if t == ("i", "fetch")]
-_nats = [w for w in ("XMLHttpRequest", "EventSource", "sendBeacon", "WebSocket")
-         if ("i", w) in _ptk]
+_nats = [w for w in ("EventSource", "sendBeacon", "WebSocket") if ("i", w) in _ptk]
+# the one XMLHttpRequest (6b529): the import's upload, for its progress bar; it takes the token
+# from apiTok() like api() does and sets both headers before it sends, or it is a bare transport
+_xhr_n = sum(1 for t in _ptk if t == ("i", "XMLHttpRequest"))
+_up = _pjs[_pjs.index("function impUpload(file,run){"):_pjs.index("function impInspected(")]
+_xhr_ok = (_xhr_n == 1 and _up.count("new XMLHttpRequest()") == 1
+           and "apiTok().then(tok=>{" in _up
+           and _up.index("apiTok()") < _up.index("new XMLHttpRequest()")
+           < _up.index('x.setRequestHeader("X-Api-Token",tok);')
+           < _up.index('x.setRequestHeader("X-Profile",PROFILE);') < _up.index("x.send(file);"))
 _napi = sum(1 for i, t in enumerate(_ptk[:-1]) if t == ("i", "api") and _ptk[i + 1] == ("p", "("))
 _direct = re.findall(r'(?<![\w-])(?:src|href)\s*=\s*["\'`]/api/', page)
-check("the page's one fetch is api(): no bare fetch, no element pointing at /api/",
+check("the page's one fetch is api(): no bare fetch, no element pointing at /api/; the import's one XHR carries the token (6b529)",
       len(_fi) == 1
       and _ptk[_fi[0] - 4:_fi[0] + 3] == [("i", "nFetch"), ("p", "="), ("i", "window"),
                                           ("p", "."), ("i", "fetch"), ("p", "."), ("i", "bind")]
-      and not _nats and _napi >= 100
+      and not _nats and _xhr_ok and _napi >= 100
       and not re.search(r'["\'`]fetch["\'`]', _pjs)
       and not re.search(r"(?<![\w.$])fetch\(", page) and not _direct,
-      "%r" % [len(_fi), _nats, _napi, _direct[:3]])
+      "%r" % [len(_fi), _nats, _xhr_n, _xhr_ok, _napi, _direct[:3]])
 # THE WRAPPER ITSELF, in node (6b321): its own source, with a stand-in
 # window and bridge. A call made before pywebviewready waits and is sent
 # once the token arrives, with the token and the caller's method, body
@@ -2957,7 +2973,8 @@ check("Contribute is gone: no worker, no hub, no UI, and its creds scrubbed",
 # ISO-18, app half (accounts step 2, 0a 5.8, 6b320): the web version is
 # deleted for good. The names are word-bounded, so "suggest", the
 # greetings' "welcome" and the Gemini provider's googleapis hosts don't
-# count. The one webbrowser.open left is the update's GitHub page.
+# count. Two webbrowser.open remain, each behind an https allow-list: the
+# update's GitHub page and the import's vendor export page (6b529).
 _WEB_GONE = (r"\bWELCOME_PAGE\b", r"/api/welcome\b", r"/api/guest\b",
              r"(?i:\bguests?\b)", r"\bgoogle_conf\b", r"\bGOOGLE_OAUTH",
              r"/auth/google", r"google_oauth\.json", r"accounts\.google\.com",
@@ -2983,8 +3000,9 @@ _rel = open("release.sh").read()
 check("ISO-18 app half: no web sign-in, guest, owner-PIN or proxy-identity code; its routes 404 and set no cookie",
       not _web_left and not os.path.exists("go-live.sh")
       and "MillenAI-live" not in _rel
-      and _MILLENAI_SRC.count("webbrowser.open(") == 1
+      and _MILLENAI_SRC.count("webbrowser.open(") == 2
       and 'ok = url.startswith("https://github.com/")' in _MILLENAI_SRC
+      and 'if not url.startswith("https://"):\n        return {"ok": False, "url": ""}\n    try:\n        webbrowser.open(url)' in _MILLENAI_SRC
       and all(s_ == 404 and not h_.get("Set-Cookie") for s_, h_, _b in _web_routes)
       and not os.path.exists(os.path.join(INST.home, "users")),
       "%r" % [_web_left, [r[0] for r in _web_routes]])
@@ -3142,14 +3160,16 @@ check("Everything's triangle: yellow over memory, red once a giant is in, none w
       and ".plan-card.danger .warn{color:#e5534b}" in _MILLENAI_SRC
       and '"danger": bool(sets.get("giants"))' in _MILLENAI_SRC)
 check("the three sets' cards: yours, installed, to download, the same-as line, the risky one warned (node)",
-      "✓ yours" in _mcard(_ma, "recommended") and "3 models · installed" in _mcard(_ma, "light")
-      and "14 models · 61 GB to download" in _mcard(_ma, "everything")
+      # (6b538) the count line lost its middle dot and "to download": "3 models
+      # installed" / "14 models, 61 GB"; the whole <span class="gb"> is pinned
+      "✓ yours" in _mcard(_ma, "recommended") and ">3 models installed<" in _mcard(_ma, "light")
+      and ">14 models, 61 GB<" in _mcard(_ma, "everything")
       and '<div class="plan-card set-card on"' in _ma
       and _ma.count("set-card risky") == 1 and "⚠" in _mcard(_ma, "everything")
       and "even ones too big for this Mac" in _mcard(_ma, "everything")
-      and "The same as Recommended on Desk." in _mcard(_mb, "everything") and "risky" not in _mb
-      and "9.4 GB to download" in _mcard(_mb, "light")
-      and "Click again to go ahead." in _mcard(_mc, "everything")
+      and "Same as Recommended on Desk." in _mcard(_mb, "everything") and "risky" not in _mb
+      and ">3 models, 9.4 GB<" in _mcard(_mb, "light")
+      and "Bigger than this Mac’s memory. They can crash it. Click again to continue." in _mcard(_mc, "everything")
       and [x in _ma + _mb for x in (">Light<", ">Recommended<", ">Everything<")] == [True] * 3
       and not re.search(r">(Basic|Minimum|Full|Max|Pro|Fast)<", _ma + _mb),
       "%r" % _mo)
@@ -3169,24 +3189,23 @@ check("the Add models chooser is gone; updates and clean-outs stay in Settings",
       and 'setTitle("Updates available"' not in _MILLENAI_SRC
       and '{k:"go",t:"Add models\\u2026",run:()=>openModelSets()},' in _MILLENAI_SRC)
 check("giants box says what they need, from the catalog, per platform",
-      _gl == _wl == _il == "Include models for 512 GB+ systems"
+      # (6b538) the short voice: "Models for\u2026", one "Needs", no in-use figure
+      _gl == _wl == _il == "Models for 512 GB+ systems"
       # the Mac: exactly today's text, its two MLX giants only
-      and _gt == ("DeepSeek V3.2 671B and GLM 5.3. Each needs 512 GB or "
-                  "more of memory (390\u2013430 GB in use) and a "
-                  "378\u2013418 GB download.")
+      and _gt == ("DeepSeek V3.2 671B and GLM 5.3. Needs 512 GB of memory "
+                  "and a 378\u2013418 GB download.")
       # Windows: its two Ollama giants, 404.5 rounds to 405, and the
       # truth about speed (6b315: workstation-only)
-      and _wt == ("Qwen 3 Coder 480B and DeepSeek V3.1 671B. They need "
-                  "384\u2013512 GB or more of memory (305\u2013417 GB in use) "
-                  "and a 290\u2013405 GB download. For workstations: with one "
-                  "graphics card most of the model runs from system RAM, at "
-                  "roughly 5\u201312 tokens a second; it is fast only when it "
-                  "all fits in graphics memory (three to five 96 GB cards).")
+      and _wt == ("Qwen 3 Coder 480B and DeepSeek V3.1 671B. Needs "
+                  "384\u2013512 GB of memory and a 290\u2013405 GB download. "
+                  "On a workstation with one graphics card: about 5\u201312 "
+                  "tokens a second. Fast only when it all fits in graphics "
+                  "memory.")
       and _wt2 == _wt + " This computer can't hold DeepSeek V3.1 671B."
       and _wt3 == _wt + " This computer can't hold them."
-      # an Intel Mac runs none: all four, and where they do run
+      # an Intel Mac runs none: all four, and that they won't run here
       and all(n in _it for n in _WG + _MG)
-      and _it.endswith("they run on Apple silicon Macs and on Windows.")
+      and _it.endswith("Won't run on this computer.")
       and "Mac" not in _gl
       and "128 GB+" not in _MILLENAI_SRC.split('HTML_CONTENT = r"""')[1]
       and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3,
@@ -3647,8 +3666,8 @@ check("the benchmark's hardware line comes from the GPU inventory",
       _bl["2xpro6000+128"]["line"] == "CPU · 128 GB · 2 × RTX PRO 6000 Blackwell 96 GB"
       and _bl["2xpro6000+128"]["gpus"] == [["NVIDIA RTX PRO 6000 Blackwell", 97887 << 20]] * 2
       and _bl["3090+w7900"]["line"] == "CPU · 64 GB · RTX 3090 24 GB · AMD Radeon PRO W7900 48 GB"
-      and _bl["strix+ours"]["line"].endswith("no graphics card in use")   # shared memory: no card
-      and _bl["cpu+32"]["line"] == "CPU · 32 GB · no graphics card in use",
+      and _bl["strix+ours"]["line"].endswith("No graphics card in use")   # shared memory: no card
+      and _bl["cpu+32"]["line"] == "CPU · 32 GB · No graphics card in use",
       "%r" % {k: v["line"] for k, v in _bl.items()})
 _pcf.update(nl=True, gi=True)
 _gw = {k: tuple(_fm(k, g) for g in ("Qwen 3 Coder 480B", "DeepSeek V3.1 671B"))
@@ -3745,19 +3764,20 @@ _w_say = {st: _worker_run(True, st)["Qwen 3.8 27B"][1]
           for st in ("staged", "sibling", "offline", "arm64", "released", "current", "theirs")}
 check("an old Ollama: the user's gets a note, the app's fetches a newer one",
       _w_theirs["Qwen 3.8 27B"][0] == "error"
-      and "needs Ollama 0.32.12 or newer; this computer has 0.28.1" in _w_theirs["Qwen 3.8 27B"][1]
+      # (6b538) the notes in the short voice: "Needs … ; the app has …"
+      and "Needs Ollama 0.32.12 or newer; this computer has 0.28.1" in _w_theirs["Qwen 3.8 27B"][1]
       and _w_theirs["Llama 3.2 1B"][0] == "done" and _w_theirs_pull == ["llama3.2:1b"]
       and not _w_theirs_staged
-      and "is downloading: in a few minutes quit and reopen" in _w_ours["Qwen 3.8 27B"][1]
+      and "the app has 0.28.1. A newer engine is downloading. In a few minutes, quit, reopen and retry." in _w_ours["Qwen 3.8 27B"][1]
       and _w_ours_staged == [1] and _w_ours_pull == ["llama3.2:1b"]
       # (review of the port) each outcome says what it is
-      and "is ready: quit and reopen" in _w_say["staged"]
-      and "close every ConcordeAI window" in _w_say["sibling"]
+      and "A newer engine is ready. Quit, reopen and retry." in _w_say["staged"]
+      and "Another ConcordeAI window is open. Close them all, reopen" in _w_say["sibling"]
       and "check the internet connection" in _w_say["offline"]
-      and "native ARM64 engine is downloading" in _w_say["arm64"]
+      and "The ARM64 engine is downloading" in _w_say["arm64"]
       and "try again tomorrow" in _w_say["released"]
-      and "on this computer: quit and reopen" in _w_say["current"]
-      and "Update Ollama (ollama.com/download)" in _w_say["theirs"]
+      and "A newer engine is installed. Quit, reopen and retry." in _w_say["current"]
+      and "Update at ollama.com, then retry." in _w_say["theirs"]
       and not any("is downloading" in _w_say[k] for k in ("staged", "sibling", "offline",
                                                         "released", "current", "theirs")),
       "%r" % [_w_theirs, _w_ours, _w_say])
@@ -4146,7 +4166,8 @@ _need["intel, no 3.8"] = _nz["_ollama_needed"]()
 _nz["SUPPORTED"] = dict(_plat["intel"]["SUPPORTED"], **{"Qwen 3.8 27B": False, "Muse Glimmer 30B": False})
 _need["intel, no 3.8 or Muse"] = _nz["_ollama_needed"]()
 check("the engine download is checked against the release, and sized to this computer",
-      _dl_ok and _dl_bad == ("the engine download doesn't match the release's checksum", [])
+      # (6b538) the message in the short voice; the archive is still removed
+      _dl_ok and _dl_bad == ("The engine download failed its checksum.", [])
       and _need["apple"] == (0, 17, 1)          # only its MLX-less Vision row
       and _need["windows"] == (0, 32, 12) and _need["intel"] == (0, 32, 12)
       and _need["intel, no 3.8"] == (0, 32, 8)
@@ -4985,7 +5006,7 @@ check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render tr
       and "AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE" in _MILLENAI_SRC)
 check("giants boxes: greyed until no-limits, with the 512 GB tooltip",
       'id="giants" disabled' in page and 'id="wiz-gi" disabled' in page
-      and page.count("512 GB or more of memory") >= 2
+      and page.count("Needs 512 GB of memory") >= 2      # (6b538) both tooltips
       and "function paintGiants" in page and "include_giants:false" in page
       and "Titan · 512 GB" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
@@ -5296,13 +5317,14 @@ check("seamless dark title bar",
 # and Forget Me is scoped + triple-locked. 6b259: About is the
 # exception — the version right under the title says it better than a
 # sentence would. 6b310 retired the Community pane: four descriptions
-# across five panes. (6b530) Your stuff opens with its own: six.
+# across five panes. (6b530) Your stuff opens with its own: six. They are
+# <p>s; the import's Settings note (6b529) borrows the class on a <div>.
 check("settings: descriptions + Account pane + scoped forget",
       # scoped to the settings panel: counting the whole page broke the
       # moment another dialog grew a description (6b303)
       (page.split('id="about-veil"')[1].split('id="gear-veil"')[0]
        if 'id="gear-veil"' in page
-       else page.split('id="about-veil"')[1]).count('class="tdesc"') == 6
+       else page.split('id="about-veil"')[1]).count('<p class="tdesc">') == 6
       and 'data-pane="p-account"' in page
       and '"/api/me"' in _MILLENAI_SRC
       and '"/api/logout"' in _MILLENAI_SRC
@@ -5370,9 +5392,9 @@ check("roster rows: a failed giant says why and offers retry",
       and '">install</span>' in _ro[2] and "data-giant" not in _ro[2]
       and ">quick<" in _ro[2]
       and '">remove</span>' in _ro[3]
-      # an armed prompt survives a repaint of the list
-      and '">download 290.1 GB? click again</span>' in _ro[4]
-      and '">really remove? frees 1.8 GB</span>' in _ro[5]
+      # an armed prompt survives a repaint of the list (copy-2 words, 6b538)
+      and '">download 290.1 GB. Click again.</span>' in _ro[4]
+      and '">Remove? Frees 1.8 GB. Click again.</span>' in _ro[5]
       # Ollama checking a finished file reads "checking", not a stuck 99%
       # (6b317), in the row and in the line of models moving
       and '<span class="rgo">checking</span>' in _ro[6]
@@ -5479,7 +5501,7 @@ check("time left: a 10 s moving average, not the last poll's burst (node)",
       and 4 <= int(_bm_min.group(1)) < 16, "%r" % _eta)
 check("time left: quiet during a stall, waiting after 15 s, a fresh estimate once it moves (node)",
       _eta.get("stall", [""])[0].startswith("about")
-      and _eta["stall"][1:4] == ["", "", "waiting for the download to resume"]
+      and _eta["stall"][1:4] == ["", "", "Waiting to resume"]
       and _eta["stall"][4] == "" and _eta["stall"][5].startswith("about")
       and _eta["stall"][6].startswith("about"),
       "%r" % _eta)
@@ -5490,7 +5512,7 @@ check("time left: a late poll's older bytes are ignored; Ollama's check is never
       and "def _only_checking(jobs: dict) -> bool:" in _MILLENAI_SRC, "%r" % _eta)
 check("time left: hours and minutes, an hour, under a minute, 72 h at most (node)",
       _eta.get("hm") == "about 1 h 23 min left" and _eta.get("h") == "about 1 h left"
-      and _eta.get("under") == "under a minute left" and _eta.get("cap") == "about 72 h left"
+      and _eta.get("under") == "Under a minute left" and _eta.get("cap") == "about 72 h left"
       and _eta.get("gap") == ""
       and _eta.get("tail") == [" · about 6 min left", ""], "%r" % _eta)
 # every bar asks the one helper, and nothing reads the server's old
@@ -5599,10 +5621,10 @@ def _of_plan_checks(src):
     # the same state, swept: auto-clean takes exactly the plan's list
     _of_scene(ns)
     swept = ns["_auto_cleanup_pass"]()
-    ok = (why == {"Gemma 4 12B": "new",
-                  "Qwen 3.5 Vision 9B": "replaces LLaVA Vision 7B",
-                  "Ministral 3 14B": "replaces Mistral Nemo 12B",
-                  "Qwen 3.8 27B": "newer version of Qwen 3.6 27B"}
+    ok = (why == {"Gemma 4 12B": "New",
+                  "Qwen 3.5 Vision 9B": "Replaces LLaVA Vision 7B",
+                  "Ministral 3 14B": "Replaces Mistral Nemo 12B",
+                  "Qwen 3.8 27B": "Newer version of Qwen 3.6 27B"}
           and [d["label"] for d in plan["download"]][:2] == ["Gemma 4 12B", "Qwen 3.5 Vision 9B"]
           and rm == ["Mistral Nemo 12B"] and swept == rm
           and plan["keep_n"] == 4
@@ -5644,7 +5666,7 @@ def _of_page(src):
           and r["rm"] == [x["label"] for x in plan["remove"]]
           and r["groups"] == ["Download", "Remove"]
           and all(d["why"] in r["h"] for d in plan["download"])
-          and "<i>replaces Mistral Nemo 12B</i>" in r["h"]
+          and "<i>Replaces Mistral Nemo 12B</i>" in r["h"]
           and r["keep"] == ["4 other models unchanged"]
           and r["sum"].startswith("%s GB to download · %s GB freed · "
                                   % (round(plan["dl_gb"]), plan["free_gb"]))
@@ -5654,7 +5676,7 @@ def _of_page(src):
                           "remove": [], "keep_n": 0, "dl_gb": 6.8, "free_gb": 0,
                           "after_gb": -2.5})
     ok = ok and r2["groups"] == ["Download"] and r2["rm"] == [] and r2["keep"] == [] \
-        and r2["sum"] == "6.8 GB to download · 2.5 GB short of free space"
+        and r2["sum"] == "6.8 GB to download · 2.5 GB short on disk"
     return ok, {"page": r, "short": r2}
 
 
@@ -5973,7 +5995,7 @@ check("the card's lifecycle: queued, downloading with the time left for all, fin
       _lcl[0] == "0 / 9.8 GB · 0% · 20 MB/s"
       and _lcl[1].startswith("0.2 / 9.8 GB · 2% · 20 MB/s")
       and re.search(r"· about \d+ min left$", _lcl[2])
-      and _lcl[3] == "Finishing: checking the files…"
+      and _lcl[3] == "Checking the files…"
       and _lcl[4] == "Loading Ministral 3 14B…"
       and _lcl[5] == "Done ✓ · added 2 models"
       and _lce[:6] == ["", "", "", "", "", "done"], "%r" % _lc)
@@ -5986,7 +6008,7 @@ check("the card's lifecycle: a failure says which and why, with a retry, once th
       and '$("#new-bg").textContent="Continue in background";$("#new-retry").hidden=true;' in page,
       "%r" % _lc)
 check("the card's lifecycle: Ollama's check reads as finishing, with the rest waiting (node)",
-      _lcl[10] == "Finishing: checking the files\u2026 \u00b7 1 waiting" and _lce[10] == "",
+      _lcl[10] == "Checking the files\u2026 \u00b7 1 waiting" and _lce[10] == "",
       "%r" % _lc[10:])
 # only the bytes line is held together; a failure's reason wraps like a
 # sentence, and a word longer than the card breaks rather than clips
@@ -6038,13 +6060,13 @@ def _ros_run(src):
     return subprocess.run(["node", _f], capture_output=True, text=True, timeout=30).stdout
 _ros_ok = _ros_run(_MILLENAI_SRC)
 check("manage roster: this-mac models only, no cloud group or rows",
-      "ready · this mac" in _ros_ok and "<ROW Qwen>" in _ros_ok
-      and "not downloaded" in _ros_ok and "<ROW Gemma>" in _ros_ok
+      "On this Mac" in _ros_ok and "<ROW Qwen>" in _ros_ok
+      and "Not downloaded" in _ros_ok and "<ROW Gemma>" in _ros_ok
       and "cloud" not in _ros_ok.lower() and "Gemini" not in _ros_ok
       and "Groq" not in _ros_ok, _ros_ok[:200])
 _ros_mut = _MILLENAI_SRC.replace(
-    """  if(miss.length)h+='<div class="ros-gh">not downloaded</div>'""",
-    """  h+='<div class="ros-gh">ready · cloud ☁</div>';\n  if(miss.length)h+='<div class="ros-gh">not downloaded</div>'""", 1)
+    """  if(miss.length)h+='<div class="ros-gh">Not downloaded</div>'""",
+    """  h+='<div class="ros-gh">ready · cloud ☁</div>';\n  if(miss.length)h+='<div class="ros-gh">Not downloaded</div>'""", 1)
 check("manage roster: re-adding a cloud group is caught (mutant)",
       _ros_mut != _MILLENAI_SRC
       and "cloud" in _ros_run(_ros_mut).lower())
@@ -6613,7 +6635,7 @@ check("photo edit path: an attached photo plus an edit request returns a saved p
 _pe_body["images"] = [_b64m.b64encode(b"FAIL-STUB" + b"x" * 20).decode()]
 _pe_t2 = req("/api/chat", "POST", _pe_body, cookie=K, timeout=120)[2].decode("utf-8", "replace")
 check("photo edit failure: the reply says why in a sentence, no picture, never 'I cannot generate images of you'",
-      "hit a snag" in _pe_t2 and "![" not in _pe_t2 and "cannot generate" not in _pe_t2
+      "The edit failed on this computer." in _pe_t2 and "![" not in _pe_t2 and "cannot generate" not in _pe_t2
       and "wasn\u2019t sent anywhere" in _pe_t2, _pe_t2[-200:])
 check("photo edit is local only: no cloud painter, no server, no fallback in its code",
       not any(w in _pseg for w in ("generate_image(", "GEMINI_API", "urlopen",
@@ -7493,7 +7515,7 @@ finally:
 _uback = req("/api/usage?range=all")[0]
 _ucheck("usage: an unreadable ledger answers 503 and is left alone",
       lambda: (_u503 and _u503[0] == 503
-      and json.loads(_u503[2]).get("err") == "Couldn’t read your usage. Nothing was changed."
+      and json.loads(_u503[2]).get("err") == "Couldn’t read your usage. Nothing changed."
       and _ukept and _uback == 200 and not _uerr),
       lambda: "%r" % [_u503 and _u503[:1], _u503 and _u503[2][:120], _uback, _uerr])
 
@@ -7512,8 +7534,8 @@ _ucheck("usage: the Settings rail has a Usage pane with the six periods",
       and '<option value="all" selected>' in _upane
       and '<select id="us-model" aria-label="Model"><option value="">All models</option>' in _upane
       and [re.sub(r"\s+", " ", x) for x in re.findall(r'<div class="us-k">([^<]+)</div>', _upane)]
-      == ["Requests", "Input toks", "Output toks", "Cache hit"]
-      and "Usage &amp; Stats" in _upane and 'id="us-plot"' in _upane
+      == ["Requests", "Tokens in", "Tokens out", "Cache hit"]
+      and '<span class="us-title">Usage</span>' in _upane and 'id="us-plot"' in _upane
       and all(x in _upane for x in (">Input</span>", ">Cached</span>", ">Output</span>"))
       and 'if(id==="p-usage")loadUsage();' in page
       and 'await api("/api/usage?range="' in page
@@ -7629,7 +7651,7 @@ const opts=()=>el("us-model").kids.map(o=>o.value+"|"+o.textContent);
  p=loadUsage();reply(4,true,Object.assign({},base,{totals:{requests:0,answers:0,input:0,cached:0,
   output:0,cache_hit:null},series:[]}));await p;
  out.empty=[$("#us-plot").innerHTML,$("#us-hit").textContent,$("#us-cached").textContent,$("#us-ans").textContent];
- p=loadUsage();reply(5,false,{err:"Couldn’t read your usage. Nothing was changed.",unreadable:"usage.jsonl"});await p;
+ p=loadUsage();reply(5,false,{err:"Couldn’t read your usage. Nothing changed.",unreadable:"usage.jsonl"});await p;
  out.err=[$("#us-plot").innerHTML,$("#us-req").textContent,$("#us-span").textContent,
   $("#p-usage").classList.contains("busy")];
  process.stdout.write(JSON.stringify(out));
@@ -7650,10 +7672,10 @@ _ucheck("usage: the pane paints replies in order, keeps the model, hides an empt
                           "Estimated from text length: 1 of 12 requests.", False,
                           "/api/usage?range=all&model=B"]
       and _pu["seq"] == ["99", True]
-      and _pu["empty"] == ['<div class="us-empty">Nothing recorded in this period.</div>',
+      and _pu["empty"] == ['<div class="us-empty">Nothing in this period</div>',
                            "—", "", "0 answers"]
-      and _pu["err"] == ['<div class="us-empty">Couldn’t read your usage. Nothing was changed.</div>',
-                         "—", "Token Usage", False]),
+      and _pu["err"] == ['<div class="us-empty">Couldn’t read your usage. Nothing changed.</div>',
+                         "—", "Tokens", False]),
       lambda: "%r" % _pu)
 
 
@@ -7772,8 +7794,8 @@ _mac_page = _pw["pc_words"](_page_src)
 _mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
 check("off a Mac the app says PC; on a Mac nothing changes",
       not _mac_left and _mac_page == _page_src
-      and '+"this PC. Start chatting the moment the first piece lands."' in _pc_page
-      and "ready \u00b7 this pc" in _pc_page
+      and '"Setting up on this PC. Chat opens when the first model is ready.");' in _pc_page
+      and '<div class="ros-gh">On this PC</div>' in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
       and "Pictures on this computer need Apple" in _MILLENAI_SRC
       and "Video on this computer needs Apple" in _MILLENAI_SRC
@@ -8689,8 +8711,7 @@ _mn = _M.split('if __name__ == "__main__":')[-1]
 check("Windows: the window fits the screen; no WebView2 means a message and an exit, never the browser",
       _fw96 == (1320, 776, 940, 620) and _wv_have is False and _wv_none is True
       and _wv_x64emu is True and _wv_arm is False and not _wv_reg and not _boxes
-      and _wb_nopy == ("ConcordeAI needs its app window. Install pywebview "
-                       "(the installer does this) and start it again.")
+      and _wb_nopy == "ConcordeAI can’t open its window. Reinstall it and start again."
       and "WebView2 Runtime" in _wb_nowv2 and "microsoft.com" in _wb_nowv2
       and "browser" not in _wb_nowv2 and _wb_fine == ""
       and -1 < _mn.find("_window_blocker()") < _mn.find("single_instance(")
@@ -9435,17 +9456,17 @@ for _fn, _paths in (("chats.v2.json", [("GET", "/api/chats", None), ("GET", "/ap
                                           "auto_web": False, "messages": [{"role": "user",
                                           "content": "My name is Zorblatt and I keep bees."}]},
                    timeout=300)[0]
-        _got.append((_mst, "Nothing was changed." if _mst == 200 else ""))
+        _got.append((_mst, "Nothing changed." if _mst == 200 else ""))
         time.sleep(8)
     _same = open(_fp, "rb").read() == _bad
     with open(_fp, "wb") as fh:
         fh.write(_orig)
     _lines[_fn] = (_got, _same)
 check("LOC-5: an unreadable chats, memory or settings file answers 503, and nothing is written over it",
-      all(_same and all(g[0] in (503, 200) and "Nothing was changed." in g[1] for g in _got)
+      all(_same and all(g[0] in (503, 200) and "Nothing changed." in g[1] for g in _got)
           for _got, _same in _lines.values())
       and _lines["memory.v2.json"][0][-1][0] == 200 and _lines["memory.v2.json"][0][0][0] == 503
-      and "chats" in _lines["chats.v2.json"][0][0][1] and "memory" in _lines["memory.v2.json"][0][0][1]
+      and "chats" in _lines["chats.v2.json"][0][0][1] and "memories" in _lines["memory.v2.json"][0][0][1]
       and "settings" in _lines["prefs.json"][0][0][1],
       "%r" % _lines)
 
@@ -9598,10 +9619,10 @@ check("review: Edit & resend while an answer is being written stops it, waits fo
 def _chips_ok(p):
     acts = p[p.index("+'<div class=\"srv-acts\">"):][:900]
     return ('data-a="test">Test</button>' in acts and 'data-a="repair">Pair again</button>' in acts
-            and 'data-a="tok">Change Access token</button>' in acts
+            and 'data-a="tok">Change token</button>' in acts
             and acts.index('data-a="tok"') < acts.index('data-a="rm"')
             and 'aria-label="Remove this server" title="Remove this server">' in acts
-            and '"\\u2715"' in acts and 'Remove it and its key? Click again' in acts
+            and '"\\u2715"' in acts and 'Remove this server and its key? Click again.' in acts
             and ".srv-acts .about-btn.slim{white-space:nowrap}" in p
             and ".srv-acts .srv-rm{margin-left:auto;color:#e8907e;" in p
             and ".srv-acts .srv-rm.armed{white-space:normal;" in p)
@@ -9609,7 +9630,7 @@ _chips_mut = [page.replace('"\\u2715"', '"Remove"', 1),
               page.replace(".srv-acts .about-btn.slim{white-space:nowrap}", "", 1),
               page.replace("margin-left:auto;color:#e8907e;", "color:#e8907e;", 1),
               page.replace('aria-label="Remove this server" ', "", 1)]
-check("server action chips: Test, Pair again, Change Access token and a red cross Remove on one line",
+check("server action chips: Test, Pair again, Change token and a red cross Remove on one line",
       _chips_ok(page) and not any(_chips_ok(m_) for m_ in _chips_mut),
       "%r" % [_chips_ok(page)] + "%r" % [_chips_ok(m_) for m_ in _chips_mut])
 
@@ -9769,7 +9790,7 @@ def _fp_ok(p):
             and 'if(!box.classList.contains("warm"))follow();\n}' in p
             and '<span class="statusline"><i class="cspin"></i></span>\';\n  autoScroll(true);' in p
             and "#chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 24px))}" in p
-            and '<button id="jumpdown" type="button" title="Jump to the newest" aria-label="Jump to the newest" hidden>' in p
+            and '<button id="jumpdown" type="button" title="Jump to the end" aria-label="Jump to the end" hidden>' in p
             and "#jumpdown[hidden]{display:none}" in p and "chatJumpPaint();                 // the ↓" in p)
 _fp_mut = [page.replace('box.classList.remove("warm");follow();}', 'box.classList.remove("warm");}', 1),
            page.replace("#chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 24px))}",
@@ -11176,8 +11197,7 @@ finally:
     _hold.close()
 check("browser mode is gone: without pywebview the app says so and exits before it binds",
       _nw_rc == 4
-      and ("ConcordeAI needs its app window. Install pywebview (the installer "
-           "does this) and start it again.") in _nw_out
+      and "ConcordeAI can’t open its window. Reinstall it and start again." in _nw_out
       and "no free port" not in _nw_out and "running on http" not in _nw_out
       and not os.path.exists(os.path.join(_nw_home, "run"))
       and _nw_shim_ok and not os.path.exists(_nw_log),
@@ -11596,10 +11616,8 @@ check("KEY-8: with no key saved, start, Settings and a restart reach no provider
       _k8 == [200] * 4 and not _k8_hits, "%r" % [_k8, _k8_hits[:3]])
 check("KEY-5: with no Gemini key a picture and a video send nothing and say how to add one",
       _img_nokey[0] == 200 and _vid_nokey[0] == 200
-      and ("Add a Gemini key in **Settings › Cloud power**, or add image generation "
-           "under **Settings › Models › Manage models**.") in _img_nokey[1]
-      and ("Add a Gemini key in **Settings › Cloud power**, or add video generation "
-           "under **Settings › Models › Manage models**.") in _vid_nokey[1]
+      and "Add a Gemini key in Settings > Cloud, or add image generation in Settings > Models." in _img_nokey[1]
+      and "Add a Gemini key in Settings > Cloud, or add video generation in Settings > Models." in _vid_nokey[1]
       and "Turn on Use cloud power" not in _img_nokey[1] + _vid_nokey[1],
       "%r" % [_img_nokey[1][-220:], _vid_nokey[1][-220:]])
 
@@ -11757,11 +11775,11 @@ _S26["probe403"].discard(_K2_26)
 _gq_e = _groq26()
 check("a rejected paste, an unreachable one, the same key offline and an unchecked busy one "
       "all leave the working key saved and in use",
-      not _bad_paste.get("ok") and "unchanged" in str(_bad_paste.get("err"))
-      and not _off_paste.get("ok") and "unchanged" in str(_off_paste.get("err"))
-      and not _same_paste.get("ok") and "unchanged" in str(_same_paste.get("err"))
+      not _bad_paste.get("ok") and "still works" in str(_bad_paste.get("err"))
+      and not _off_paste.get("ok") and "still works" in str(_off_paste.get("err"))
+      and not _same_paste.get("ok") and "still works" in str(_same_paste.get("err"))
       and not _busy_paste.get("ok") and "busy" in str(_busy_paste.get("err"))
-      and not _p403_paste.get("ok") and "unchanged" in str(_p403_paste.get("err"))
+      and not _p403_paste.get("ok") and "still works" in str(_p403_paste.get("err"))
       and all(g.get("key") == _K2_26 and g.get("status") == "ok"
               for g in (_gq_a, _gq_b, _gq_c, _gq_d, _gq_e)),
       "%r" % [_bad_paste, _off_paste, _same_paste, _busy_paste, _p403_paste,
@@ -12546,7 +12564,7 @@ check("ssh output: CRs become lines; 'not found' only without ssh; a name failur
       "and retries once; a changed server says so",
       _so_ok == (0, "10%\n20%\n30%\ndone\n")
       and _so_missing_found[1].startswith("ssh failed:")
-      and _so_missing == (-1, "ssh client not found on this machine")
+      and _so_missing == (-1, "No ssh client on this computer.")
       and _so_res == (0, "10%\n20%\n30%\ndone\n") and _so_res_calls == 2
       and _so_calls[0][1] == "/r/run" and _so_calls[0][0][2] == "ssh-q.conf"
       and _so_hk[0] == 255 and _so_hk[1].endswith(
@@ -12757,7 +12775,7 @@ for _cur, _ent, _auth in ((_new26, _FE, False), (_new26, _FE, True),
 check("a failed paste: the same key offline stands, the same key rejected is marked, "
       "another working key stands, a failed or missing one is replaced",
       _sfr == [("ok", "ok"), (None, "fail"), ("ok", "ok"), (None, "fail"), (None, "fail")]
-      and _sf["_kept_note"]("Groq", "ok").endswith("unchanged and still in use")
+      and _sf["_kept_note"]("Groq", "ok").endswith("Groq key still works")
       and "if _busy and not found:" in _MILLENAI_SRC,
       "%r" % _sfr)
 
@@ -15468,7 +15486,7 @@ check("X-Profile: api() sends the page's tag, a 409 profile-changed reloads once
       _o8.get("r1") == 1 and _o8.get("r2") == 1 and _o8.get("n2") == 1
       and _o8.get("r3") == 1 and _o8.get("r4") == 1
       and _o8.get("sent") == [_tag8] * 4
-      and _o8.get("notice") == ["The profile changed. Reload this window to continue."],
+      and _o8.get("notice") == ["The profile changed. Reload to continue."],
       "%r" % _o8)
 _etag8 = _q8("/", raw=True, headers={"If-None-Match": _pg8[1].get("ETag", "")})[0]
 _B8b = _hook8(op="create")["name"]
