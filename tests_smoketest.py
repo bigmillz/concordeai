@@ -3411,9 +3411,9 @@ _smd = _MILLENAI_SRC[_MILLENAI_SRC.index("def start_model_downloads("):
 check("a 400 GB pull: bytes across layers; a giant stops before the drive fills",
       _p_ok == "ok" and _pj.get("done_b") == 3_000_011_000 and _pj.get("pct") == 1
       and _pj.get("phase") == "verifying"
-      and _p_short.startswith("needs 309 GB free on ") and "100 GB free" in _p_short
+      and _p_short.startswith("Needs 309 GB free on ") and "100 GB free" in _p_short
       and "picks up where it stopped" not in _MILLENAI_SRC
-      and _p_full.startswith("stopped: ") and "almost full (5 GB free)" in _p_full
+      and _p_full.startswith("Stopped. ") and "almost full (5 GB free)" in _p_full
       and _p_small == "ok" and _p_done == "ok" and _p_prealloc == "ok"
       and "resumes unless Ollama restarts first" in _p_short
       and _moved in _dirs
@@ -3506,6 +3506,7 @@ def _pc(ram_gib, smi="", adapters=(), ours=False, used_gb=6, cm=True):
              WINDOWS_ONLY=_pn["WINDOWS_ONLY"], MOE_ROWS=_pn["MOE_ROWS"],
              no_limits=lambda: _pcf["nl"], giants_on=lambda: _pcf["gi"],
              _mem_available=lambda: None, _engine_up=lambda p: False,
+             _mlx_last_use=0.0, _mlx_procs={}, _ENGINE_IDLE_FLOOR_S=20,   # 6b539's idle-engine credit
              _managed_serve=lambda: object() if ours else None)
     _exec_names(z, {"_DISPLAY_CLASS", "_DISPLAY_GUID", "_AMD_IGPU", "_BIG_IGPU",
                     "_INTEL_DGPU", "_nvidia_cards", "_present_display_keys",
