@@ -2164,7 +2164,7 @@ CLOUD_STRENGTH = ("claude", "kimi", "gemini", "groq")
 CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}
 CLOUD_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}
 CLOUD_PROMISE = "Only cloud models answer. Nothing runs on this computer."
-CLOUD_ADD_KEY = "Add a key under Settings › Cloud power"
+CLOUD_ADD_KEY = "Add a key in Settings > Cloud"
 # "cloud:fast", ":think", ":pro" and "cloud:m:<provider>" are Cloud Only's
 # modes and picks; plain "Cloud Only" keeps its old meaning. Read in one
 # place: cloud_tier_parse
@@ -3652,13 +3652,12 @@ def cloud_plan_why(mode: str, pid: str = "") -> str:
     if mode == "Model":
         s = next((x for x in sts if x["id"] == pid), None)
         n = s["name"] if s else "That model"
-        return ("%s has no key yet. %s." % (n, CLOUD_ADD_KEY) if s and s["why"] == "no key yet"
+        return ("%s has no key. %s." % (n, CLOUD_ADD_KEY) if s and s["why"] == "no key yet"
                 else "%s is unavailable: %s." % (n, s["why"] if s else "unknown"))
     if not keyed:
-        return "%s: Gemini and Groq both have free tiers." % CLOUD_ADD_KEY
+        return "%s. Gemini and Groq are free." % CLOUD_ADD_KEY
     if mode in ("Fast", "Thinking") and any(s["ok"] for s in sts):
-        return ("%s uses only free or low-cost models, and none is available. "
-                "%s: Gemini and Groq both have free tiers." % (mode, CLOUD_ADD_KEY))
+        return ("%s uses free or low-cost models, and none is available. %s." % (mode, CLOUD_ADD_KEY))
     bits = ["%s (%s)" % (s["name"], s["why"]) for s in keyed]
     return "Every cloud model is unavailable: %s." % ", ".join(bits)
 
@@ -6121,8 +6120,7 @@ def _own_engine_port(label: str) -> int:
     if _port_in_use(port):
         mine = _listener_is_mine(port)
         if mine is None:
-            raise RuntimeError("couldn't check who runs this model's "
-                               "engine; try again in a moment")
+            raise RuntimeError("Couldn’t check who runs this engine. Try again in a moment.")
         if mine is False:
             port = _free_port()
             MODEL_ROUTES[label] = (kind, port)
@@ -6152,9 +6150,7 @@ def ollama_url(path: str) -> str:
                     else True)                # ours, still starting
         if mine is not True:
             raise RuntimeError(
-                "Ollama on this computer is running for another account "
-                "(or its owner couldn't be checked), so this app won't "
-                "send it anything")
+                "Ollama is running under another account, so nothing was sent to it.")
     return "http://127.0.0.1:%d%s" % (port, path)
 
 
@@ -7270,7 +7266,7 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
                 out["frames"] = _snap_frames(base.get("frames", 33) * 0.85)
                 out["w"] = int(base["w"] * 0.8)
                 out["h"] = int(base["h"] * 0.8)
-                notes.append("smaller and shorter, to be quicker")
+                notes.append("smaller and shorter for speed")
             else:
                 out["steps"] = min(40, base["steps"] + (8 * eff))
         elif _img_distilled(studio_tier("image").get("base")) and eff > 0:
@@ -7278,7 +7274,7 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
             # nothing, so quality comes from pixels
             out["w"] = int(base["w"] * (1.4 if eff == 1 else 1.75))
             out["h"] = int(base["h"] * (1.4 if eff == 1 else 1.75))
-            notes.append("larger, which is where detail comes from here")
+            notes.append("larger for detail")
         else:
             out["steps"] = max(1, min(50, base["steps"]
                                       + (6 * eff if eff > 0 else -6)))
@@ -7286,7 +7282,7 @@ def resolve_overrides(key: str, ov: dict, prev: dict = None) -> tuple:
     final = studio_opts(key, out)
     for f in ("w", "h", "frames"):
         if f in want and int(_num(want[f], 0)) != final.get(f):
-            notes.append("%s came out at %s, the most this engine takes"
+            notes.append("%s capped at %s, the engine\u2019s most"
                          % ({"w": "width", "h": "height",
                              "frames": "length"}[f], final.get(f)))
     return out, notes
@@ -8075,7 +8071,7 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
                 "--width", str(o["w"]), "--height", str(o["h"]),
                 "--output", out]
         if not _render_lock.acquire(timeout=5):
-            raise RenderBusy("already making one \u2014 ask again when it lands")
+            raise RenderBusy("already making one; ask again when it lands")
         pf = None
         try:
             _vb = os.path.join(STUDIOS["image"]["venv"], "bin")
@@ -8133,7 +8129,7 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
                 errs.append("gemini: %s" % str(exc)[:120])
     # no keyless fallback (6b310): Pollinations got the description with
     # no opt-in, in a URL, onto a public feed
-    raise RuntimeError("; ".join(errs) or "no image engine")
+    raise RuntimeError("; ".join(errs) or "No image engine")
 
 
 # ==== photoedit: begin ====
@@ -8144,7 +8140,7 @@ def generate_image(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
 # as the reference. LOCAL ONLY: the photo never goes to a cloud painter or a
 # server, and a failed edit is never retried anywhere else. The segment holds
 # no cloud or server call on purpose; the gauntlet checks that.
-PE_NOTE = "Edited on this computer; your photo wasn’t sent anywhere"
+PE_NOTE = "Edited on this computer. Your photo wasn’t sent anywhere."
 PE_TIER = "quick"                     # the klein rung: the only edit weights
 PE_BASE = "flux2-klein-4b"
 PE_TOOL = "mflux-generate-flux2-edit"
@@ -8283,19 +8279,13 @@ def photo_edit_unavailable():
     """'' when this Mac can edit a photo now, else the sentence that says
     why not (nothing was sent anywhere)."""
     if not studio_supported():
-        return ("Editing a photo only works on an Apple silicon Mac for now, "
-                "so it wasn’t edited, and your photo wasn’t sent "
-                "anywhere.")
+        return ("Photo editing needs an Apple silicon Mac. Nothing was edited or sent.")
     t = studio_tier("image", PE_TIER)
     tool = os.path.join(STUDIOS["image"]["venv"], "bin", PE_TOOL)
     if not _studio_engine_ok("image") or not os.path.exists(tool):
-        return ("Editing a photo needs image generation on this Mac: add or "
-                "update it under **Settings › Models › Manage "
-                "models**. Your photo wasn’t sent anywhere.")
+        return ("Photo editing needs image generation. Add it in Settings > Models. Your photo wasn’t sent anywhere.")
     if not _studio_model_ok("image", PE_TIER) or not _snap_dir(t["repo"]):
-        return ("Editing a photo needs the Quick picture model (%s GB): add "
-                "it under **Settings › Models › Manage models**. "
-                "Your photo wasn’t sent anywhere." % t.get("gb", 4.6))
+        return ("Photo editing needs the Quick picture model (%s GB). Add it in Settings > Models. Your photo wasn’t sent anywhere." % t.get("gb", 4.6))
     return ""
 
 
@@ -8337,12 +8327,11 @@ def edit_photo(ctx, b64: str, request: str, sock=None, step=None) -> str:
         if len(raw) < 16:
             raise ValueError("empty")
     except Exception:
-        raise PhotoEditUnavailable("I couldn’t read that photo, so nothing "
-                                   "was edited.")
+        raise PhotoEditUnavailable("Couldn’t read that photo. Nothing was edited.")
     if stub and raw.startswith(b"FAIL-STUB"):
         stub = "fail"                  # the gauntlet's failing engine
     if not _render_lock.acquire(timeout=5):
-        raise RenderBusy("already making one — ask again when it lands")
+        raise RenderBusy("already making one; ask again when it lands")
     src = prepped = pf = None
     out = stage_path(".png")
     landed = False
@@ -8383,7 +8372,7 @@ def edit_photo(ctx, b64: str, request: str, sock=None, step=None) -> str:
         if cut:
             raise RenderBusy("stopped")
         if rc != 0 or not os.path.exists(out):
-            raise RuntimeError(tail[-200:].strip() or "the engine stopped")
+            raise RuntimeError(tail[-200:].strip() or "The engine stopped.")
         _render_note(out, {"w": w, "h": h, "steps": 4, "guidance": 1.0,
                            "fmt": "png", "seed": 0, "neg": "", "edit": True},
                      time.time() - t0)
@@ -9329,19 +9318,17 @@ def run_export(text: str, ext: str, title: str, base,
     text = x_clean(text)
     ext = (ext or "").lower().lstrip(".")
     if ext not in EXPORT_KIND:
-        raise RuntimeError("I don't know how to write a .%s file" % ext)
+        raise RuntimeError("Can’t write .%s files" % ext)
     kind = EXPORT_KIND[ext][0]
     if ext in EXPORT_NEEDS_DEPS and not ensure_export_deps(block_s=90):
         # a failed install says why, not "still installing" forever
         # (6b317, from the Windows sweep)
         if _export_install.get("state") == "error":
             raise RuntimeError(
-                "this computer couldn't install the document engines for "
-                ".%s files (%s) — Markdown, CSV or HTML still work"
+                "the document engines for .%s didn’t install (%s); Markdown, CSV or HTML still work"
                 % (ext, (_export_install.get("note") or "no details")[:120]))
         raise RuntimeError(
-            "the document engines are still installing (about 70 MB, once) "
-            "— ask again in a minute")
+            "the document engines are still installing; ask again in a minute")
     token = secrets.token_urlsafe(16)
     suffix = "csv" if ext == "anki" else ext
     # written in run/, then moved into the profile whole (1a 5.3): an
@@ -9365,7 +9352,7 @@ def run_export(text: str, ext: str, title: str, base,
             ex_text(text, ext, path)
         size = os.path.getsize(path)
         if size > EXPORT_MAX_BYTES:
-            raise RuntimeError("that came out larger than the %d MB limit"
+            raise RuntimeError("the file is over the %d MB limit"
                                % (EXPORT_MAX_BYTES // 1_000_000))
         _hook_delay("export")
         try:
@@ -9756,7 +9743,7 @@ def _veo_video(ctx, prompt: str) -> str:
     # request with no key spent a clip of the day (6b326)
     gem = (_cloud_all().get("providers") or {}).get("gemini") or {}
     if not (gem.get("key") and gem.get("status", "ok") == "ok"):
-        raise RuntimeError("no cloud key that can make video")
+        raise RuntimeError("No cloud key can make video.")
     today = time.strftime("%Y-%m-%d")
     # RESERVE THE SLOT FIRST (6b309, review): checking, then counting
     # after the submit let two requests at once both slip under the cap
@@ -9857,7 +9844,7 @@ def _veo_video(ctx, prompt: str) -> str:
             last = str(exc)[:160]
         break
     _give_back()
-    raise RuntimeError(last or "the cloud could not make that video")
+    raise RuntimeError(last or "The cloud couldn’t make that video.")
 
 
 def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
@@ -9889,7 +9876,7 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         if o.get("neg"):
             args += ["--negative-prompt", "@prompt:neg"]
         if not _render_lock.acquire(timeout=5):
-            raise RenderBusy("already making one \u2014 ask again when it lands")
+            raise RenderBusy("already making one; ask again when it lands")
         pf = None
         try:
             cmd, pf = prompt_cmd(
@@ -9924,7 +9911,7 @@ def generate_video(ctx, prompt: str, over: dict = None, sock=None) -> tuple:
         raise
     except Exception as exc:
         errs.append("cloud: %s" % str(exc)[:160])
-    raise RuntimeError("; ".join(errs) or "no video engine")
+    raise RuntimeError("; ".join(errs) or "No video engine")
 
 
 def studio_needs(kind: str) -> str:
@@ -9932,14 +9919,12 @@ def studio_needs(kind: str) -> str:
     this computer and no working Gemini key is saved (6b326). Nothing has
     been sent anywhere."""
     if studio_supported():
-        return ("Add a Gemini key in **Settings \u203a Cloud power**, or add "
-                "%s generation under **Settings \u203a Models \u203a Manage "
-                "models**." % ("image" if kind == "image" else "video"))
-    how = ("Add a Gemini key in **Settings \u203a Cloud power** to make this "
+        return ("Add a Gemini key in Settings > Cloud, or add %s generation in Settings > Models." % ("image" if kind == "image" else "video"))
+    how = ("Add a Gemini key in Settings > Cloud to make this "
            "with Gemini.")
     if kind == "image":
-        return "Making pictures on this computer needs an Apple silicon Mac. " + how
-    return "Making video on this computer needs an Apple silicon Mac. " + how
+        return "Pictures on this computer need Apple silicon. " + how
+    return "Video on this computer needs Apple silicon. " + how
 
 
 # ------------------------------------------------------------- updates
@@ -21228,8 +21213,7 @@ def _link_fetch(url: str):
     """((text, content type, final url), "") for a pasted link, or
     (None, why) in a few plain words."""
     if not _link_public(url):
-        return None, ("it points at this computer or a private network, "
-                      "which I don’t open")
+        return None, ("it points at a private address, which isn’t opened")
     try:
         op = urllib.request.build_opener(_LinkRedirects)
         rq = urllib.request.Request(url, headers={
@@ -21561,8 +21545,7 @@ def _link_usable(page: dict):
     if not rich and _LINK_WALL_RX.search(page["title"] + " " + page["text"][:600]):
         return False, "the site showed a robot check instead of the page"
     if not rich and not (page["title"] or page["og_title"]):
-        return False, ("the page shows nothing without JavaScript, "
-                       "which I can’t run")
+        return False, ("the page needs JavaScript, which isn’t run here")
     return True, ""
 
 
@@ -21708,10 +21691,8 @@ def links_none_line(reads: list) -> str:
     whys = list(dict.fromkeys(r.get("why") or "the page couldn’t be read"
                               for r in reads))
     n = len(reads)
-    return ("%s — %s. So I haven’t described %s: anything I said "
-            "would be made up. Paste the page text here (the title, the "
-            "description and the price for your dates) and I’ll work "
-            "from that." % (
+    return ("%s: %s. Nothing about %s is described here. Paste the page text "
+            "and ask again." % (
                 "I couldn’t read the link you pasted" if n == 1 else
                 "I couldn’t read any of the %d links you pasted" % n,
                 "; ".join(whys[:3]), "it" if n == 1 else "them"))
@@ -22885,8 +22866,7 @@ def closure_notices(query: str) -> str:
 def run_search(query: str) -> str:
     """DuckDuckGo snippets with a 60s cache. Never raises."""
     if not HAS_SEARCH:
-        return ("Search is unavailable — install it with: "
-                "pip install ddgs")
+        return ("Web search isn’t installed. Reinstall to fix.")
     with _search_lock:
         fresh = (time.time() - _search_cache["timestamp"]) < 60
         if _search_cache["query"] == query and fresh:
@@ -25911,8 +25891,7 @@ _srv_wake_tl = threading.local()
 _srv_wake_blocked = profile_cache("_srv_wake_blocked", {})   # server id -> every wake packet was refused by this computer
 _srv_relay_state = profile_cache("_srv_relay_state", {})     # server id -> {ok, err}: the wake relay's last answer (6b431)
 SRV_RELAY_S = 4                 # connect and read, each, of a wake sent through the relay
-SRV_WAKE_BLOCKED = (" This computer wouldn\u2019t let the app send the wake-up call. "
-                    "Allow ConcordeAI in System Settings \u203a Privacy & Security \u203a Local Network.")
+SRV_WAKE_BLOCKED = (" Local network access is off. Allow ConcordeAI in System Settings > Privacy & Security > Local Network.")
 SRV_USAGE_S = 3                 # one read of a server's card usage: short, the meter polls
 SRV_MAX_CHARS = 2_000_000       # an answer longer than this is cut there
 # Ollama's own converted copies (6b448, per Patrick): Ollama 0.40 converts a
@@ -26446,12 +26425,10 @@ def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
     name = e["name"]
 
     def tls_text():
-        return ("%s\u2019s certificate didn\u2019t check out, so nothing more "
-                "was sent." % name)
+        return ("%s’s certificate didn’t check out. Nothing was sent." % name)
 
     def off_text():
-        return ("%s didn\u2019t answer. It may be off, asleep or offline. "
-                "Nothing was sent anywhere else." % name)
+        return ("%s didn’t answer. It may be off or asleep. Nothing was sent anywhere else." % name)
 
     def dropped_text():
         return "%s\u2019s connection dropped before it answered." % name
@@ -26479,8 +26456,7 @@ def _srv_send(e, method: str, path: str, body: bytes = b"", signed=True,
         return conn, conn.getresponse()
     except (TimeoutError, _socket.timeout):
         conn.close()
-        raise ServerSlow("offline", "%s took longer than %s to start "
-                         "answering." % (name, _srv_span(wait))) from None
+        raise ServerSlow("offline", "%s didn’t start answering within %s." % (name, _srv_span(wait))) from None
     except _ssl.SSLError as exc:
         conn.close()
         if _srv_cert_failed(exc):
@@ -26551,46 +26527,36 @@ def _srv_fail_why(e, status: int, js: dict, model: str = "") -> ServerError:
                               if ch.isprintable()).split())[:160]
     if status in (301, 302, 303, 307, 308) or code == "access" \
             or (status == 403 and not code):
-        return ServerError("access", "Cloudflare Access turned the request "
-                           "away before it reached %s. Use Change Access token "
-                           "on its card in Settings \u203a Your servers." % name,
+        return ServerError("access", "Cloudflare Access refused the request. Change the token on %s’s card in Settings > Servers." % name,
                            code)
     if code in ("unpaired", "bad_signature", "unsigned") or (
             status == 401 and code not in ("clock_skew", "replay")):
         return ServerError("auth", SRV_PAIR_LOST % name, code)
     if code == "clock_skew":
-        return ServerError("clock", "%s\u2019s clock and this computer\u2019s "
-                           "are more than a minute apart, so it refused the "
-                           "request. Check the time on both." % name, code)
+        return ServerError("clock", "%s’s clock is more than a minute off this computer’s, so it refused. Check the time on both." % name, code)
     if code == "replay":
         return ServerError("replay", "%s refused a repeated request. Ask "
                            "again." % name, code)
     if code == "unavailable":
         return ServerError("server", "%s isn\u2019t set up to make that." % name, code)
     if code == "busy" or status in (409, 429) or (status == 503 and code):
-        return ServerError("busy", "%s is busy with other requests. Try "
-                           "again in a moment." % name, code or "busy")
+        return ServerError("busy", "%s is busy. Try again in a moment." % name, code or "busy")
     if code == "gpu_fit":
         srv_note_nofit(e, model)
-        return ServerError("fit", "%s doesn\u2019t fit in %s\u2019s graphics "
-                           "memory." % (model or "That model", name), code)
+        return ServerError("fit", "%s doesn’t fit on %s’s card." % (model or "That model", name), code)
     if code == "gpu_spill" and re.search(r"\(0% on GPU\)", detail):
         # 0% is not a spill: the card wasn't in use at all (a server that
         # started before its graphics driver was ready ran the model on
         # its CPU, 6b339). Partial spills keep the old words below.
-        return ServerError("fit", "%s\u2019s graphics card isn\u2019t in use "
-                           "right now, so the model would have run on its "
-                           "CPU. It stopped." % name, code)
+        return ServerError("fit", "%s’s card isn’t in use, so the model would have run on CPU. It stopped." % name, code)
     if code in ("gpu_spill", "ram_pressure"):
-        return ServerError("fit", "%s couldn\u2019t keep %s in its memory, "
-                           "so it stopped." % (name, model or "the model"), code)
+        return ServerError("fit", "%s couldn’t keep %s in memory. It stopped." % (name, model or "the model"), code)
     if status == 404 and model:
         return ServerError("missing", "%s isn\u2019t installed on %s."
                            % (model, name), code)
     if not code and (status == 502 or status == 503 or 520 <= status <= 530):
-        return ServerError("offline", "%s didn\u2019t answer. It may be off, "
-                           "asleep or offline. Nothing was sent anywhere "
-                           "else." % name, code)
+        return ServerError("offline", "%s didn\u2019t answer. It may be off or asleep. "
+                           "Nothing was sent anywhere else." % name, code)
     return ServerError("server", "%s answered with an error%s." % (
         name, (": " + detail) if detail else " (HTTP %d)" % status), code)
 
@@ -26668,7 +26634,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         raise ServerError("gone", SRV_GONE)
     if not _srv_paired(e):
         raise ServerError("unpaired", "%s isn\u2019t paired with this "
-                          "computer. Pair it in Settings \u203a Your servers."
+                          "computer. Pair it in Settings > Servers."
                           % e["name"])
     if not cai_crypto.available():
         raise ServerError("crypto", SRV_NO_CRYPTO)
@@ -26752,8 +26718,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                     line = resp.readline(1 << 22)
                 except (TimeoutError, _socket.timeout):
                     _w = SRV_IDLE_S if got_any[0] else _first
-                    raise ServerSlow("offline", "%s sent nothing for %s, so "
-                                      "the answer stopped there." % (
+                    raise ServerSlow("offline", "%s went quiet for %s. The answer stopped there." % (
                                           e["name"], "%d minutes" % (_w // 60)
                                           if _w >= 120 else "%d seconds" % _w))
                 except (OSError, _hc.HTTPException):
@@ -26773,8 +26738,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                     raise _srv_fail(e, 0, obj, model)
                 chunk = str((obj.get("message") or {}).get("content") or "")
                 if chunk and sent[0] + len(chunk) > SRV_MAX_CHARS:
-                    raise ServerError("server", "%s\u2019s answer passed %s "
-                                      "characters, so it was cut there." % (
+                    raise ServerError("server", "%s’s answer was cut at %s characters." % (
                                           e["name"], format(SRV_MAX_CHARS, ",")))
                 if chunk:
                     sent[0] += len(chunk)
@@ -26815,7 +26779,7 @@ def server_vision(label: str) -> str:
         raise ServerError("gone", SRV_GONE)
     if not _srv_paired(e):
         raise ServerError("unpaired", "%s isn\u2019t paired with this "
-                          "computer. Pair it in Settings \u203a Your servers."
+                          "computer. Pair it in Settings > Servers."
                           % e["name"])
     if not cai_crypto.available():
         raise ServerError("crypto", SRV_NO_CRYPTO)
@@ -26844,7 +26808,7 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
     name = label.split(SERVER_SEP, 1)[0]
     said = [False]
     if refuse:
-        emit(AppText("\u26a0\ufe0f " + refuse + ("" if "Nothing was sent" in refuse
+        emit(AppText(refuse + ("" if "Nothing was sent" in refuse
                                                  else " Nothing was sent anywhere else.")))
         return
 
@@ -26855,11 +26819,10 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
     try:
         who = name
         if any(isinstance(m, dict) and m.get("images") for m in messages):
-            status("asking %s which model reads pictures" % name)
+            status("Asking %s for a vision model" % name)
             use = server_vision(label)
             if not use:
-                emit(AppText("\u26a0\ufe0f %s has no model that reads "
-                             "pictures. Nothing was sent anywhere else." % name))
+                emit(AppText("%s has no vision model. Nothing was sent anywhere else." % name))
                 return
             if use != label:
                 who, label = use, use     # the badge says which one read it
@@ -26872,16 +26835,14 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
     except ServerError as se:
         emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f " + str(se)))
     except StoreReadError:
-        emit(AppText("\u26a0\ufe0f Couldn\u2019t read your servers. Nothing "
-                     "was sent."))
+        emit(AppText("Couldn’t read your servers. Nothing was sent."))
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
         raise
     except Exception as exc:
         # anything else is said too: the handler's catch-all would try
         # another model, and a pick of your own server never falls back
-        emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f %s couldn\u2019t "
-                     "answer (%s). Nothing was sent anywhere else."
-                     % (name, type(exc).__name__)))
+        emit(AppText(("\n\n" if said[0] else "") + "%s couldn\u2019t answer. "
+                     "Nothing was sent anywhere else." % name))
 
 
 # ---- "<server> Only" (6b337)
@@ -27674,15 +27635,15 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
         if polish is not None:
             # TWO PASS, like Fast on this Mac: a silent draft, then the
             # rewrite streamed; both on the server
-            status("%s is thinking it through" % label)
+            status("%s is thinking" % label)
             parts = []
             with server_first_deadline(first_s):
                 run_model(label, messages, parts.append)
             draft = strip_think("".join(parts))
         if draft and not _looks_degenerate(draft):
             step("draft", "Drafted the answer", "done", "%d chars" % len(draft))
-            step("polish", "Sharpening it", "run", "")
-            status("%s is sharpening the answer" % label)
+            step("polish", "Polishing", "run", "")
+            status("%s is polishing the answer" % label)
             try:
                 with server_first_deadline(first_s):
                     _stream_guarded(label, polish(draft), _m, status, draft,
@@ -27713,12 +27674,12 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
         emit(AppText("\n\n\u26a0\ufe0f " + why))
         return "failed"
     if defer_fail:
-        status("%s didn\u2019t answer, going on without it" % name)
+        status("%s didn’t answer. Going on without it." % name)
         return "down"
     if not fallback:
         emit(AppText("\u26a0\ufe0f " + why))
         return "failed"
-    status("%s didn\u2019t answer, so %s answers here" % (name, fallback))
+    status("%s didn’t answer. %s answers here." % (name, fallback))
     emit(Ctl(NUL + "RESET" + NUL))
     emit(Ctl(NUL + "RUN:" + json.dumps({"r": [fallback], "w": "local",
                                         "m": fallback}) + NUL))
@@ -28113,7 +28074,7 @@ def _srv_bytes(e, path: str, cap: int, timeout: float = 60.0) -> bytes:
                 raise ServerError("offline", "%s stopped answering partway through."
                                   % e["name"]) from None
             if len(data) > cap:
-                raise ServerError("server", "%s sent something larger than %d MB, so it was refused."
+                raise ServerError("server", "%s sent more than %d MB. It was refused."
                                   % (e["name"], cap >> 20))
             return data
         finally:
@@ -28123,7 +28084,7 @@ def _srv_bytes(e, path: str, cap: int, timeout: float = 60.0) -> bytes:
 
 def server_generate(e, kind: str, prompt: str, opts: dict, status, gone=None) -> tuple:
     """Make one picture or video on server e: start a job, ask about it every
-    SRV_GEN_POLL_S seconds (status() gets "Making the picture on <name>... 40%"
+    SRV_GEN_POLL_S seconds (status() gets "Making the picture on <name>… 40%"
     whenever the words change), fetch the bytes, tell the server to forget them.
     (bytes, content type, seconds). gone() true (the reader left) cancels the
     job and raises ServerGenStopped. A job that runs past SRV_GEN_CAP_S[kind] is
@@ -28144,8 +28105,7 @@ def server_generate(e, kind: str, prompt: str, opts: dict, status, gone=None) ->
                 _srv_gen_forget(e, jid)
                 raise ServerGenStopped("stopped")
             if time.monotonic() - t0 > SRV_GEN_CAP_S[kind]:
-                raise ServerSlow("offline", "%s took more than %d minutes to make the %s, so it was "
-                                  "stopped." % (e["name"], SRV_GEN_CAP_S[kind] // 60, what))
+                raise ServerSlow("offline", "%s took over %d minutes on the %s. It was stopped." % (e["name"], SRV_GEN_CAP_S[kind] // 60, what))
             _srv_gen_wait(SRV_GEN_POLL_S)
             try:
                 st, js = _srv_json(e, "GET", base, timeout=SRV_CONNECT_S)
@@ -29003,12 +28963,10 @@ def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
     if r == "stopped":
         return "", ""
     if r == "skipped":
-        return "", ("%s is asleep, and you chose not to wait for it. Nothing was sent anywhere "
-                    "else." % name)
+        return "", ("%s is asleep and you skipped the wait. Nothing was sent anywhere else." % name)
     if r == "tried":
         server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
-        return "", ("%s didn\u2019t wake up in %d seconds. It may be off or offline. "
-                    "Nothing was sent anywhere else.%s" % (
+        return "", ("%s didn’t wake in %d seconds. Nothing was sent anywhere else.%s" % (
                         name, SRV_WAKE_WAIT_S,
                         SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e["id"]) else ""))
     st = server_only_state(e)
@@ -29076,7 +29034,7 @@ def server_wake_ask(sids, ctx, status, step, skip, alive=None):
             status("%s is awake." % name)
             woke.append(name)
         elif r == "skipped":
-            status("Skipped waking %s, going on without it" % name)
+            status("Skipped waking %s. Going on without it." % name)
         elif r == "tried":
             status("%s didn\u2019t wake in %d s, going on without it" % (name, SRV_WAKE_ASK_S))
             try:
@@ -29153,7 +29111,7 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
         if k in ("offline", "tls", "crypto") and not getattr(exc, "slow", False):
             server_mark_down(ctx, e["name"], "%s %s." % (name, why))
         step("srvgen", "%s couldn’t make the %s" % (name, what), "done", why)
-        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))
+        status("%s couldn’t make the %s (%s). Trying here." % (name, what, why))
         return False
     ext = {"image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp",
            "video/mp4": ".mp4"}[ctype]
@@ -29176,8 +29134,7 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
     except StaleProfile:
         raise
     except OSError:
-        emit(AppText("⚠️ %s made the %s, but this computer couldn’t save it. Ask "
-                     "again." % (name, what)))
+        emit(AppText("%s made the %s, but it couldn’t be saved here. Ask again." % (name, what)))
         return True
     step("srvgen", "Made the %s on %s" % (what, name), "done", "%d s" % round(secs))
     extra = list(notes or [])
@@ -29191,10 +29148,10 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
     note = "" if not extra else " · " + "; ".join(extra)
     cap = subject[:1].upper() + subject[1:]
     if sub == IMAGE_SUB:
-        emit("![%s](/api/image/%s)\n\n*%s — made on %s%s*"
+        emit("![%s](/api/image/%s)\n\n*%s. Made on %s.%s*"
              % (subject.replace("]", ""), os.path.basename(path), cap, name, note))
     else:
-        emit("[[vid:%s]]\n\n*%s — made on %s%s*"
+        emit("[[vid:%s]]\n\n*%s. Made on %s.%s*"
              % (json.dumps({"id": os.path.basename(path), "t": subject[:80]},
                            separators=(",", ":")), cap, name, note))
     return True
@@ -30116,8 +30073,7 @@ def _need_engine(label: str, timeout: float = 180.0):
     """ensure_mlx_engine, or stop (6b310): its False used to be ignored,
     and the prompt went to whatever held the port."""
     if not ensure_mlx_engine(label, timeout=timeout):
-        raise RuntimeError("%s's engine didn't start for this account; "
-                           "nothing was sent" % label)
+        raise RuntimeError("%s’s engine didn’t start. Nothing was sent." % label)
 
 
 def _retire_engine(label: str):
@@ -30242,8 +30198,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
                       if model_cached(l, pulled)), label)
     kind, target = MODEL_ROUTES.get(label, (None, None))
     if kind is None:
-        raise RuntimeError("no downloaded model can take this request — "
-                           "grab one in Settings › Download models…")
+        raise RuntimeError("No downloaded model can take this. Add one in Settings > Models.")
     if kind == "mlx":
         global _mlx_last_use
         _mlx_last_use = time.time()
@@ -30303,11 +30258,9 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
             # Retrying would only repeat the wait: say what happened.
             if kind == "ollama" and model_is_giant(label):
                 raise RuntimeError(
-                    "%s didn't finish loading within an hour. It reads "
-                    "%d GB from disk on every load; a faster drive or "
-                    "more memory helps" % (label, round(
+                    "%s didn’t load within an hour. It reads %d GB from disk each time." % (label, round(
                         MODEL_INFO[label]["gb"])))
-            raise RuntimeError("%s stopped answering (timed out)" % label)
+            raise RuntimeError("%s stopped answering." % label)
         except urllib.error.URLError:
             # engine may be mid-startup, or another MillenAI instance on
             # this machine terminated it on ITS exit (shared 88xx ports —
@@ -33066,7 +33019,7 @@ class _BenchCloud:
                     raw["chunks"] += 1
                     on_tok(raw["chunks"])
         except (TimeoutError, socket.timeout):
-            raise RuntimeError("the provider stopped answering (timed out)") from None
+            raise RuntimeError("The provider stopped answering.") from None
         except (OSError, http.client.HTTPException):
             raise RuntimeError("the provider stopped answering partway through") from None
         self.total = round(time.monotonic() - raw["t_send"], 3)
@@ -33699,12 +33652,10 @@ def run_cloud_only(messages: list, emit, status, step, plan=None, pen: str = "")
             step("draft", "Drafted the answer", "done", lbl)
             return
         if c.get("_stop") == "refusal":
-            step("draft", "That provider declined", "done", lbl)
-            emit(AppText("☁️ **%s** declined to answer that one. Switch to "
-                         "**Fast**, **Thinking** or **Pro** and this machine "
-                         "will answer it." % lbl))
+            step("draft", "%s declined" % lbl, "done", "")
+            emit(AppText("**%s** declined. Switch to Alpha, Gamma or Sigma to answer here." % lbl))
             return
-        step("draft", "That provider dropped out", "done", lbl)
+        step("draft", "%s dropped out" % lbl, "done", "")
         emit(_cloud_all_down())
         return
     try:
@@ -33727,10 +33678,9 @@ def _cloud_plan_down(plan: dict, tried: bool = False) -> str:
     model, and nothing about this computer answering for it."""
     why = (cloud_plan_why(plan.get("mode"), plan.get("pid") or "")
            if not tried or not plan.get("seats") else
-           "That model didn’t answer this one. Try again in a moment.")
-    return AppText("☁️ **%s** has no working model right now.\n\n%s\n\n"
-                   "Pick another cloud model, or switch to **Cloud Only** to try "
-                   "every key. %s" % (cloud_plan_title(plan), why, CLOUD_PROMISE))
+           "No answer. Try again in a moment.")
+    return AppText("**%s** has no working model. %s Pick another cloud model, or Cloud Only. %s"
+                   % (cloud_plan_title(plan), why, CLOUD_PROMISE))
 
 
 def run_cloud_plan(messages: list, emit, status, step, plan: dict, pen: str = "") -> None:
@@ -33757,13 +33707,12 @@ def run_cloud_plan(messages: list, emit, status, step, plan: dict, pen: str = ""
                 step("draft", "Drafted the answer", "done", lbl)
                 return
             if c.get("_stop") == "refusal":
-                step("draft", "That provider declined", "done", lbl)
-                emit(AppText("☁️ **%s** declined to answer that one. Pick "
-                             "another cloud model, or switch to **Cloud Only**." % lbl))
+                step("draft", "%s declined" % lbl, "done", "")
+                emit(AppText("**%s** declined. Pick another cloud model, or Cloud Only." % lbl))
                 return
             if i + 1 < len(tries):
-                status("%s didn’t answer, so %s is asked" % (lbl, tries[i + 1][0]))
-        step("draft", "That provider dropped out", "done", seats[0][0])
+                status("%s didn’t answer. Asking %s." % (lbl, tries[i + 1][0]))
+        step("draft", "%s dropped out" % seats[0][0], "done", "")
         emit(_cloud_plan_down(plan, tried=True))
         return
     try:
@@ -33788,26 +33737,23 @@ def _cloud_all_down() -> str:
         # a provider rest OR every model it fields resting (6b307)
         left = cloud_rest_left(pid, v)
         if left > 0 and _NO_CREDIT_RX.search(v.get("note") or ""):
-            broken.append("**%s** — out of credit, top up the account"
+            broken.append("**%s**: out of credit"
                           % pid.title())
         elif left > 0:
             resting.append("**%s** — back in about %d minute%s"
                            % (pid.title(), max(1, left // 60),
                               "" if 60 <= left < 120 else "s"))
-    out = ["☁️ **Cloud Only** has no working model right now."]
+    out = ["**Cloud Only** has no working model."]
     if resting:
         out.append("Resting:\n\n" + "\n".join("- " + r for r in resting))
     if broken:
         out.append("Needs a new key:\n\n"
                    + "\n".join("- " + b for b in broken))
     if not resting and not broken and keyed:
-        out.append("Your cloud providers didn't answer this one — try "
-                   "again in a moment.")
+        out.append("No cloud provider answered. Try again in a moment.")
     elif not resting and not broken:
-        out.append("Add a key under **Settings › Cloud power** — Gemini "
-                   "and Groq both have free tiers.")
-    out.append("Switch to **Fast**, **Thinking** or **Pro** and this "
-               "machine will answer it now.")
+        out.append("Add a key in Settings > Cloud. Gemini and Groq are free.")
+    out.append("Or switch to Alpha, Gamma or Sigma to answer here.")
     return AppText("\n\n".join(out))
 
 
@@ -33943,7 +33889,7 @@ def run_council(labels: list, messages: list, emit, status,
     # same model would make the contributor ledger lie.
     if usable:
         for _lbl, _why in skipped:
-            took_part(_lbl, "(no answer — %s)" % _why)
+            took_part(_lbl, "(no answer: %s)" % _why)
 
     # THE CLOUD BENCH (6b219, per Patrick: "offload as much as
     # possible"): every working key drafts IN PARALLEL with the local
@@ -34159,7 +34105,7 @@ def run_council(labels: list, messages: list, emit, status,
                 # answered"): the critic's seat writes, once, as for a hiccup
                 _craft_retry.append(label)
                 _model_fail.add(label)
-            took_part(label, "(no answer — degenerate output)")
+            took_part(label, "(no answer: repeating)")
             return
         if text:
             took_part(label, text)
@@ -34225,7 +34171,7 @@ def run_council(labels: list, messages: list, emit, status,
         # ledger reads "2 of 3" with the reason instead of a model gone
         # missing (after the drafts, so the page's time-left milestones
         # count only real drafts)
-        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")
+        took_part(_lbl, "(no answer: not asked. Gamma seats one writer and one critic)")
 
     good = [d for d in drafts if not d[1].startswith("(no answer")]
     if not good and srv_only:
@@ -34239,7 +34185,7 @@ def run_council(labels: list, messages: list, emit, status,
         raise ServerError("council", "None of the picked models answered. "
                           + _srv_errs[0])
     if not good:
-        raise RuntimeError("none of the selected models answered")
+        raise RuntimeError("None of the selected models answered.")
 
     # THE FACT-CHECK READS WHAT WAS SHOWN (6b515): from here on, every
     # emit is tapped, so the final text (what follows the last RESET) is
@@ -34292,7 +34238,7 @@ def run_council(labels: list, messages: list, emit, status,
                 _by_check = report["stuck_after_writer"] - left
                 _step_frame("fix", "Applied the review\u2019s corrections", "done",
                             "%d of %d%s" % (len(_corr) - left, len(_corr),
-                                            " \u00b7 %d by the check" % _by_check
+                                            ", %d by the check" % _by_check
                                             if _by_check else ""))
         except (StaleProfile, BrokenPipeError, ConnectionResetError):
             raise
@@ -34432,8 +34378,8 @@ def run_council(labels: list, messages: list, emit, status,
     good = good[:5]
 
     usage_role("final")                   # the page's ledger row (6b528)
-    status("compositing\u2026" if _pen_kind or not pen else
-           "%s can\u2019t write the answer right now, so the usual compositor does" % pen_name(pen))
+    status("Writing the final answer\u2026" if _pen_kind or not pen else
+           "%s is unavailable. The default compositor writes it." % pen_name(pen))
     question = messages[-1]["content"] if messages else ""
     # TWO CUTS OF THE SAME DRAFTS (6b245, per Patrick: "will Gemma
     # distilling ruin it?"). The 1500-char cap exists for SMALL LOCAL
@@ -34513,8 +34459,8 @@ def run_council(labels: list, messages: list, emit, status,
         _step_frame("review", "Reviewed the draft", "done",
                     (("%d note%s" % (notes.count("\n") + 1,
                                      "" if notes.count("\n") == 0 else "s"))
-                     if notes else "no problems found")
-                    + (" \u00b7 %d correction%s" % (_nc, "" if _nc == 1 else "s") if _nc else "")
+                     if notes else "no problems")
+                    + (", %d correction%s" % (_nc, "" if _nc == 1 else "s") if _nc else "")
                     + (" \u00b7 %d dropped" % _nd if _nd else ""))
         report["notes"] = notes
     elif reflect and len(good) > 1 and not _hurried():
@@ -34672,7 +34618,7 @@ def run_council(labels: list, messages: list, emit, status,
                 emit(Ctl(NUL + "STEP:" + json.dumps(
                     {"id": "draft", "s": "run" if state == "run" else "done",
                      "l": {"run": "Writing the answer", "done": "Answer written",
-                           "fail": "The merge fell back"}[state],
+                           "fail": "Used the best draft"}[state],
                      "d": str(lbl)[:70]}) + NUL))
             except Exception:
                 pass
@@ -34710,9 +34656,9 @@ def run_council(labels: list, messages: list, emit, status,
                 except Exception:
                     pass
                 return None          # cut short: nothing to check
-            status("%s didn\u2019t write the merge, so %s" % (
-                _name, "%s writes it here" % _merge_fb if _merge_fb
-                else "the best single answer is shown"))
+            status("%s didn\u2019t write the final. %s" % (
+                _name, "%s writes it here." % _merge_fb if _merge_fb
+                else "The best single draft is shown."))
             try:
                 if _merge_fb:
                     emit(Ctl(NUL + "RUN:" + json.dumps(
@@ -35530,7 +35476,7 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
     step("verify", "Checking the facts", "run",
          "%d claim%s · %s" % (n_cl, "" if n_cl == 1 else "s", name))
     try:
-        status("checking the facts with %s" % name)
+        status("Checking facts with %s" % name)
     except Exception:
         pass
     usage_role("verify")                  # the page's ledger row (6b528)
@@ -35551,7 +35497,7 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
     res = verify_answer(run, who if kind != "cloud" else "", question,
                         material, text, budget_s=budget, known=stuck)
     if res is None:
-        step("verify", "Couldn\u2019t check the facts in time \u2014 answer kept",
+        step("verify", "Fact check ran out of time. Answer kept.",
              "done", name)
         out["timeout"] = True
         _resend_if_changed()
@@ -35571,9 +35517,9 @@ def verify_pass(text: str, report: dict, messages: list, emit, status,
             res["checked"], plural, res["fixed"]), "done", name)
     else:
         _resend_if_changed()
-        step("verify", "Checked %d claim%s, all held" % (res["checked"], plural)
+        step("verify", "Checked %d claim%s. All held." % (res["checked"], plural)
              if not res["fixed"] else
-             "Checked %d claim%s \u2014 kept as written" % (res["checked"], plural),
+             "Checked %d claim%s. Kept as written." % (res["checked"], plural),
              "done", name)
     return out
 
@@ -35629,7 +35575,7 @@ RESEARCH_WRITE = (
 
 def _plan_queries(label: str, question: str, status) -> list:
     """Ask the model what to search for. Falls back to the raw question."""
-    status("planning the research")
+    status("Planning the research")
     parts = []
     _was = usage_role("search")           # the page's ledger row (6b528)
     try:
@@ -35665,7 +35611,7 @@ def run_research(labels: list, messages: list, emit, status) -> None:
     except NoProfile:
         _rs = None
     if not usable and _rs is None:
-        raise RuntimeError("no model is available to research with")
+        raise RuntimeError("No model is available for research.")
     rank = {l: i for i, l in enumerate(MERGE_RANK)}
     local_writer = min(usable, key=lambda l: rank.get(l, 99)) if usable else ""
     writer = _rs["label"] if _rs is not None else local_writer
@@ -35692,12 +35638,12 @@ def run_research(labels: list, messages: list, emit, status) -> None:
                 sources.append(r)
     if not sources:
         raise RuntimeError(
-            "the searches came back empty — check the network connection")
+            "The searches came back empty. Check the connection.")
     sources = sources[:12]
 
     # READ the top pages, don't just skim their snippets — fetched in
     # parallel, snippet kept whenever a page won't give up its text
-    status("reading the top sources")
+    status("Reading the top sources")
     def _enrich(s):
         text = _page_text(s["url"])
         if len(text) > 300:
@@ -35741,11 +35687,11 @@ def run_research(labels: list, messages: list, emit, status) -> None:
                 emit("\n\n\u26a0\ufe0f " + (str(_wx) if type(_wx).__name__ == "ServerError"
                                              else "%s stopped answering." % _name))
             elif local_writer:
-                status("%s didn\u2019t answer, so %s writes it here" % (_name, local_writer))
+                status("%s didn’t answer. %s writes it here." % (_name, local_writer))
                 _stream_guarded(local_writer, brief, emit, status, plain,
                                 "showing the raw findings instead")
             else:
-                status("%s didn\u2019t answer, so here is what was found" % _name)
+                status("%s didn’t answer. Here is what was found." % _name)
                 emit(plain)
     else:
         _stream_guarded(writer, brief, emit, status, plain,
@@ -37104,38 +37050,26 @@ def offline_hint(kind: str, err: Exception) -> str:
         if kind == "ollama" and err.code == 404:
             # a PC has no `ollama` command; the app's own copy is private
             # (6b317, from the Windows sweep): point at the app instead
-            return ("⚠️ Ollama is running but that model isn't pulled.\n\n"
-                    f"`{detail or 'model not found'}`\n\n"
-                    + ("Install it in Settings \u203a Models, then try again."
+            return ("Ollama doesn\u2019t have that model (%s). " % (detail or "model not found")
+                    + ("Install it in Settings > Models."
                        if IS_WIN else
-                       "Run `ollama pull <model>` and try again."))
-        return (f"⚠️ The engine rejected the request (HTTP {err.code}).\n\n"
-                + (f"It says: **{detail}**" if detail
-                   else "No details were provided."))
+                       "Run `ollama pull <model>`."))
+        return ("The engine refused the request (HTTP %s). %s"
+                % (err.code, detail or "No details."))
     if isinstance(err, urllib.error.URLError):
         if kind == "ollama":
             if IS_WIN:
-                return ("⚠️ The model engine isn't answering yet. It can "
-                        "take a minute to start after launch; try again "
-                        "shortly. If it keeps happening, quit and reopen "
-                        "ConcordeAI.")
-            return ("⚠️ Ollama isn't reachable on port %d.\n\n"
-                    % OLLAMA_PORT[0] +
-                    "Start it with `ollama serve`, and make sure the model is "
-                    "pulled (`ollama pull <model>`).")
-        return ("⚠️ No MLX server answering on that port.\n\n"
-                "Launch it first, e.g. `mlx_lm.server --model <model> "
-                "--port <port>`.")
+                return ("The engine isn’t answering yet. Try again in a minute, or quit and reopen.")
+            return ("Ollama isn\u2019t reachable on port %d. Start it with `ollama serve`."
+                    % OLLAMA_PORT[0])
+        return ("No MLX server on that port. Start it first.")
     # a model too big for RAM gets SIGKILLed mid-load; the engine reports
     # this as a terminated helper or a truncated stream
     text = str(err).lower()
     if any(s in text for s in ("signal: killed", "unexpected eof",
                                "process has terminated")):
         return pc_words(
-                "⚠️ This model ran out of memory and the engine stopped it.\n\n"
-                "It needs more free RAM than this Mac has right now. Close "
-                "some apps and retry, or pick a smaller model — the ones at "
-                "the top of the sidebar are much lighter.")
+                "The model ran out of memory. Close some apps and retry, or pick a smaller one.")
     return f"⚠️ Backend error — {type(err).__name__}: {err}"
 
 
@@ -43539,8 +43473,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # per the rules review): an agent is refused, never run here or
             # in the cloud. The page turns the pick off when an agent is
             # chosen, so this is the door for a stale or hand-made request
-            _so_fail = ("%s Only can\u2019t run the %s agent, and nothing "
-                        "was run." % (_so_c0.split(SERVER_SEP, 1)[0]
+            _so_fail = ("%s Only can’t run the %s agent. Nothing ran." % (_so_c0.split(SERVER_SEP, 1)[0]
                                       or "Your server", agent_name[:40]))
             agent_name = ""
         ag_system, ag_research, ag_remote = "", False, False
@@ -44743,7 +44676,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
         # a server that was asleep was woken before this answer (6b346)
         for _wn, _wok in server_take_wake_notes():
-            status(("Woke %s." if _wok else "%s didn\u2019t wake.") % _wn)
+            status(("%s is awake." if _wok else "%s didn\u2019t wake.") % _wn)
 
         # "<name> Only" on a server that sleeps (6b369): the wake goes out now
         # that the page has its headers, says "Waking <name>... 12 s" while it
@@ -44842,8 +44775,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # "<name> Only" makes no picture or video (6b339): not on this
             # computer, not with a cloud key, and no model is asked to word
             # one. A plain server pick keeps 6b334's behaviour, on purpose.
-            emit(AppText("\u26a0\ufe0f %s Only can\u2019t make pictures or "
-                         "videos, and nothing was made."
+            emit(AppText("%s Only can’t make pictures or video. Nothing was made."
                          % (_so_c0.split(SERVER_SEP, 1)[0] or "Your server")))
             hb_stop.set()
             return
@@ -44871,12 +44803,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if len(src) > 200 else "")
             step("export", "Writing the file", "run",
                  EXPORT_KIND.get(ext, ("", ext))[1])
-            status("writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
+            status("Writing the %s" % EXPORT_KIND.get(ext, ("", ext))[1])
             try:
                 info = run_export(src, ext, ttl, self.ctx,
                                   export_req.get("filename", ""))
                 step("export", "Wrote the file", "done", info["name"])
-                emit("Here it is \u2014 **%s**, %s.\n\n[[dl:%s]]"
+                emit("**%s**, %s.\n\n[[dl:%s]]"
                      % (info["name"], _x_size(info["size"]),
                         json.dumps(info, separators=(",", ":"))))
             except StaleProfile:
@@ -44884,7 +44816,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 step("export", "Couldn\u2019t write the file", "done",
                      str(exc)[:70])
-                emit("I couldn\u2019t make that file: %s." % str(exc)[:200])
+                emit("Couldn’t make that file: %s." % str(exc)[:200])
             hb_stop.set()
             return
 
@@ -44941,8 +44873,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # busy: say so, and do NOT spend cloud quota on a fallback
                 if str(rb) != "stopped":
                     step("video", "Another render is running", "done", "")
-                    emit("I\u2019m already making one \u2014 ask again when it "
-                         "lands, and I\u2019ll start this straight after.")
+                    emit("Already making one. Ask again when it lands.")
             except StaleProfile:
                 raise
             except Exception as exc:
@@ -44950,22 +44881,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      str(exc)[:70])
                 if "VEO_CAP:" in str(exc):
                     # local video exists only on Apple silicon (6b317)
-                    emit("That\u2019s today\u2019s cloud-video limit (%d "
+                    emit("Today\u2019s cloud video limit is reached (%d "
                          "clips, about $0.80 each). It resets tomorrow%s."
                          % (int(profile_local(user_base).get(
                              "veo_daily_cap", VEO_DAILY_CAP) or 0),
                             "; video made on this Mac isn\u2019t limited"
                             if studio_supported() else ""))
                 elif video_ready():
-                    emit("The video engine on this Mac hit a snag%s \u2014 "
-                         "try once more in a moment. (%s)"
-                         % (" and the cloud couldn\u2019t step in"
+                    emit("Video failed on this Mac%s. "
+                         "Try again in a moment. (%s)"
+                         % (" and in the cloud"
                             if _cloud_vid else "", str(exc)[:160]))
                 else:
-                    emit("Gemini couldn\u2019t make that video just now "
-                         "\u2014 try once more in a moment%s. (%s)"
-                         % (", or add video generation under **Settings "
-                            "\u203a Models \u203a Manage models**"
+                    emit("Gemini couldn\u2019t make that video. "
+                         "Try again in a moment%s. (%s)"
+                         % (", or add video generation in Settings > Models"
+                            ""
                             if studio_supported() else "", str(exc)[:160]))
             hb_stop.set()
             return
@@ -44982,7 +44913,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             "Mac" % ("Cloud Only" if cloud_only else
                                      (_so_c0.split(SERVER_SEP, 1)[0]
                                       or "Your server") + " Only"))
-                status("editing on this Mac \u2014 your photo stays here")
+                status("Editing on this computer")
             _pe_why = ("" if "photoedit-stub" in "".join(TEST_HOOKS)
                        else photo_edit_unavailable())
             if _pe_why:
@@ -44992,7 +44923,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 hb_stop.set()
                 return
             step("image", "Editing your photo", "run", "on this Mac")
-            status("editing your photo \u00b7 on this Mac")
+            status("Editing your photo on this computer")
             try:
                 _b64 = images[0].split(",", 1)[1] \
                     if images[0].startswith("data:") else images[0]
@@ -45005,9 +44936,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except RenderBusy as rb:
                 if str(rb) != "stopped":
                     step("image", "Another render is running", "done", "")
-                    emit("I\u2019m already making a picture \u2014 ask again "
-                         "when it lands, and I\u2019ll edit this one straight "
-                         "after.")
+                    emit("Already making a picture. Ask again when it lands.")
             except PhotoEditUnavailable as pu:
                 step("image", "Couldn\u2019t edit the photo", "done",
                      "nothing was sent")
@@ -45017,9 +44946,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except Exception as exc:
                 step("image", "Couldn\u2019t edit the photo", "done",
                      str(exc)[:70])
-                emit("The picture editor on this Mac hit a snag \u2014 try once "
-                     "more in a moment, and your photo wasn\u2019t sent "
-                     "anywhere. (%s)" % str(exc)[:160])
+                emit("The edit failed on this computer. Your photo wasn’t sent anywhere. Try again in a moment. (%s)" % str(exc)[:160])
             hb_stop.set()
             return
 
@@ -45070,23 +44997,22 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except RenderBusy as rb:
                 if str(rb) != "stopped":
                     step("image", "Another render is running", "done", "")
-                    emit("I\u2019m already making one \u2014 ask again when it "
-                         "lands, and I\u2019ll start this straight after.")
+                    emit("Already making one. Ask again when it lands.")
             except StaleProfile:
                 raise
             except Exception as exc:
                 step("image", "Couldn\u2019t generate the image", "done",
                      str(exc)[:70])
                 if image_ready():
-                    emit("The painter on this Mac hit a snag%s \u2014 try "
-                         "once more in a moment. (%s)"
-                         % (" and the cloud couldn\u2019t step in"
+                    emit("The picture failed on this Mac%s. "
+                         "Try again in a moment. (%s)"
+                         % (" and in the cloud"
                             if _cloud_img else "", str(exc)[:160]))
                 else:
-                    emit("Gemini couldn\u2019t make that picture just now "
-                         "\u2014 try once more in a moment%s. (%s)"
-                         % (", or add image generation under **Settings "
-                            "\u203a Models \u203a Manage models**"
+                    emit("Gemini couldn\u2019t make that picture. "
+                         "Try again in a moment%s. (%s)"
+                         % (", or add image generation in Settings > Models"
+                            ""
                             if image_supported() else "", str(exc)[:160]))
             hb_stop.set()
             return
@@ -45323,7 +45249,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
 
         def _cloud_vision() -> bool:
             for _vc in _vis_cloud:
-                status("cloud power \u2014 " + _vc.get("name", "cloud"))
+                status("Cloud: " + _vc.get("name", "cloud"))
                 if cloud_stream_conf(_vc, full_messages, memit):
                     return True
                 _rc = claude_refusal_conf(_vc)
@@ -45331,10 +45257,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     return True
             # (6b357) the person's server reads it next when it can
             if cloud_only or (not _vis_local and _vis_srv is None):
-                emit("The cloud couldn\u2019t read that image just now"
+                emit("The cloud couldn\u2019t read that image"
                      + ("" if cloud_only else
-                        ", and the local vision engine isn\u2019t installed "
-                        "yet (it downloads from **Settings \u203a Models**)")
+                        ", and no local vision model is installed. Add one in Settings > Models")
                      + ". Try again in a moment.")
             return cloud_only or (not _vis_local and _vis_srv is None)
         # first image before the vision engine exists: kick the download
@@ -45349,12 +45274,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _vkey = any((_pvk.get(p) or {}).get("key")
                             and (_pvk.get(p) or {}).get("status", "ok") == "ok"
                             for p in ("claude", "gemini"))
-                emit("Getting the vision engine ready (about 6.6 GB) — "
-                     "the download just started. Progress is under "
-                     "**Settings › Download models…**; paste the image again once it "
-                     "shows the check mark."
-                     + (" Or turn on **Use cloud power** under **Settings "
-                        "\u203a Cloud power** and your saved key reads "
+                emit("Downloading the vision model (6.6 GB). Paste the image again when "
+                     "Settings > Models shows it done."
+                     + (" Or turn on cloud models in Settings > Cloud and your saved key reads "
                         "pictures now." if _vkey else ""))
             except (BrokenPipeError, ConnectionResetError):
                 pass
@@ -45373,15 +45295,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if _vk:
                     _mins = max(1, min(cloud_rest_left(p, v)
                                        for p, v in _vk) // 60)
-                    emit("☁️ **Cloud Only**: the providers that read "
-                         "images are busy or resting — try again in "
-                         "about %d minute%s." % (_mins,
-                                                 "" if _mins == 1 else "s"))
+                    emit("**Cloud Only**: the vision providers are resting. Try again in "
+                         "%d minute%s." % (_mins, "" if _mins == 1 else "s"))
                 else:
-                    emit("☁️ **Cloud Only** reads images with a Claude or "
-                         "Gemini key. Add one under **Settings › Cloud "
-                         "power**, or switch to Fast, Thinking or Pro and "
-                         "the local vision engine will look at it.")
+                    emit("**Cloud Only** reads images with a Claude or Gemini key. "
+                         "Add one in Settings > Cloud, or switch to Alpha, Gamma or Sigma.")
             elif cloud_only:
                 run_cloud_only(full_messages, memit, status, step, _cplan, mode_pen)
             elif ag_remote:
@@ -45542,7 +45460,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # the UI's name: "turbo" is only the pref key.
                     for _fc in _fl:
                         _nm = _fc.get("name", "cloud")
-                        status("cloud power \u2014 " + _nm)
+                        status("Cloud: " + _nm)
                         _run_lbl([_nm])
                         if cloud_stream_conf(_fc, full_messages, memit):
                             hb_stop.set()
@@ -45553,12 +45471,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                                      memit):
                             hb_stop.set()
                             return
-                    status("cloud power unavailable — running locally")
+                    status("Cloud unavailable. Answering here.")
                 if _cl_fb is not None and not lbl:
                     # the server didn't answer, the cloud had nothing, and this
                     # computer holds no copy of the coder (6b461)
-                    emit(AppText("\u26a0\ufe0f Your server didn\u2019t answer, and no cloud "
-                                 "model or model on this computer could take the question."))
+                    emit(AppText("Your server didn’t answer, and nothing else could take the question."))
                     hb_stop.set()
                     return
                 if lbl in _seat_fb:
@@ -45605,7 +45522,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # TWO PASS: draft in silence, then stream the rewrite.
                     # The reader waits a little longer and gets a visibly
                     # better answer instead of a first-take one.
-                    status(f"{lbl} is thinking it through")
+                    status(f"{lbl} is thinking")
                     parts = []
                     draft = ""
                     try:
@@ -45616,8 +45533,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     if draft and not _looks_degenerate(draft):
                         step("draft", "Drafted the answer", "done",
                              "%d chars" % len(draft))
-                        step("polish", "Sharpening it", "run", "")
-                        status(f"{lbl} is sharpening the answer")
+                        step("polish", "Polishing", "run", "")
+                        status(f"{lbl} is polishing the answer")
                         # for a searched OR doc-carrying answer the
                         # "question" is the full grounded message — a
                         # reviser that can't see the data can't tell a
@@ -45646,9 +45563,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # nothing has streamed: that is where a giant's cold
                     # load of 300-400 GB is explained (6b314)
                     if slow_giant(lbl):
-                        step("draft", "Loading the model, then writing",
-                             "run", "%s · %d GB, can take minutes" % (
-                                 lbl, round(MODEL_INFO[lbl]["gb"])))
+                        step("draft", "Loading %s (%d GB). Can take minutes." % (
+                                 lbl, round(MODEL_INFO[lbl]["gb"])), "run", "")
                     else:
                         step("draft", "Writing the answer", "run", lbl)
                     # guarded like every other path: a lone model that
@@ -45703,9 +45619,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     except Exception:
                         pass
             if not sent[0]:
-                emit("That engine stopped responding and the backup "
-                     "didn't answer either. Ask again — it usually "
-                     "comes straight back.")
+                emit("The engine stopped and the backup didn’t answer. Ask again.")
         finally:
             # the effort ends with the answer (6b534): a title or a memory
             # pass after it on this thread reasons at the model's default
@@ -45880,8 +45794,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 except StaleProfile:
                     pass
                 except Exception as _exc:
-                    emit("\n\nI wrote the answer but couldn\u2019t package "
-                         "it: %s." % str(_exc)[:200])
+                    emit("\n\nThe answer is written but the file failed: %s." % str(_exc)[:200])
             # THE RUN'S CLOCK (6b528): first word and total from the request's
             # arrival, and the mode that answered, so the page's token line and
             # signature say the same on a reopened chat as they did live.
@@ -54144,8 +54057,8 @@ function formCard(spec){
   wrap.className="qform";
   const multi=!!spec.multi;
   wrap.innerHTML='<div class="qtop">'+esc(spec.q||"")+'</div>'
-    +'<div class="qhint">'+(multi?"check all that apply"
-        :"pick one")+'</div>'
+    +'<div class="qhint">'+(multi?"Choose any"
+        :"Choose one")+'</div>'
     +'<div class="qopts">'+(spec.opts||[]).map((o,i)=>
       '<div class="qopt'+(multi?"":" radio")+'" data-i="'+i+'">'
       +'<span class="qbox"></span>'+esc(o)+'</div>').join("")+'</div>'
@@ -54233,7 +54146,7 @@ function dlBox(d){
     // a button, not <a href> (6b321): a plain link can't carry the
     // token, so a middle-click or "Download Linked File" saved a 403
     +'<button type="button" class="dlgo" data-api-href="'+ap+'" data-name="'+nm+'" '
-    +'title="Save this file">'
+    +'title="Save">'
     +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
     +'stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">'
     +'<path d="M12 4v11"/><path d="M6.5 10.5L12 16l5.5-5.5"/>'
@@ -54465,7 +54378,7 @@ function annBlobSave(blob){
 function annCard(e,shapes){
   const card=document.createElement("div");card.className="annot done";
   const stage=document.createElement("div");stage.className="annstage";
-  const im=new Image();im.alt="the picture, marked up";im.src=e.img;
+  const im=new Image();im.alt="Marked-up picture";im.src=e.img;
   const cv=document.createElement("canvas");cv.className="anncv";
   stage.append(im,cv);card.appendChild(stage);
   const redraw=()=>{
@@ -54508,7 +54421,7 @@ function annCard(e,shapes){
           headers:{"Content-Type":"application/json"},
           body:JSON.stringify({png:url,reveal:true})})).json();
       }catch(e2){r=null;}
-      if(r&&r.ok&&r.shown){say(save,"Saved · shown in Finder",2600);return;}
+      if(r&&r.ok&&r.shown){say(save,"Saved. Shown in Finder.",2600);return;}
       if(r&&r.ok){await apiDownload("/api/export/"+encodeURIComponent(r.id),r.name);say(save,"Saved");return;}
       annBlobSave(blob);say(save,"Saved");
     }catch(err){say(save,"Couldn’t save");}});
@@ -54516,7 +54429,7 @@ function annCard(e,shapes){
     try{
       await navigator.clipboard.write([new ClipboardItem({"image/png":annFlat(e,shapes)})]);
       say(copy,"Copied");
-    }catch(err){say(copy,"Couldn’t copy — use Save");}});
+    }catch(err){say(copy,"Couldn’t copy. Use Save.");}});
   bar.append(save,copy);card.appendChild(bar);
   return card;}
 function annHydrate(ph){
@@ -54628,8 +54541,8 @@ function renderMD(raw){
       +'<div class="codebar"><span>'+esc(lang||"code")+'</span>'
       +'<button class="cbtn lines" type="button" title="Line numbers">lines</button>'
       +(close
-        ?'<button class="ccopy" title="Copy this block">copy</button>'
-        :'<button class="ccopy wait" disabled title="Still generating…">copy</button>')
+        ?'<button class="ccopy" title="Copy">copy</button>'
+        :'<button class="ccopy wait" disabled title="Still writing…">copy</button>')
       +'</div>'
       +'<pre><span class="gut" aria-hidden="true">'+Array.from({length:nl},(_,i)=>i+1).join("\n")+'</span>'
       +"<code>"+hilite(code,lang)+"</code></pre></div>");
@@ -54720,7 +54633,7 @@ function renderMD(raw){
   s=s.replace(/\u0000THINKOPEN(\d+)\u0000/g,(_,i)=>
     '<details open><summary>◈ reasoning…</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
   s=s.replace(/\u0000THINK(\d+)\u0000/g,(_,i)=>
-    '<details><summary>◈ reasoning (click to expand)</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
+    '<details><summary>Reasoning</summary><div class="think-body">'+esc(thinks[+i]).replace(/\n/g,"<br>")+"</div></details>");
   return s;
 }
 
@@ -54972,7 +54885,7 @@ function mapCard(m){
   return '<div class="mapcard"><div class="lmap" id="'+id+'"></div>'
     +'<a href="https://maps.apple.com/?ll='+la+','+lo
     +'&q='+encodeURIComponent(nm||"pin")
-    +'" target="_blank" rel="noopener">Open in Maps \u2197</a></div>';
+    +'" target="_blank" rel="noopener">Open in Maps</a></div>';
 }
 async function mountPin(id,la,lo,nm){
   const el=document.getElementById(id);
@@ -55168,7 +55081,7 @@ function paintSteps(){
              :"~"+Math.round(eta)+"s left"):"";
   const nowBtn=(runTier!=="Vera Rubin"&&curHid&&liveDrafts>0&&!streamDone)
     ?(hurriedNow
-      ?'<button class="wtnow" disabled>Hurrying it along…</button>'
+      ?'<button class="wtnow" disabled>Finishing early…</button>'
       :'<button class="wtnow">Answer now</button>'):"";
   // THE SPINE (6b528): rebuilt when a step, a call, a draft or the running list
   // changed; between changes only the clock and the live step's hairline move,
@@ -55523,7 +55436,7 @@ function thinkPhrase(steps,status,nDrafts){
   if(/reviewing the draft/i.test(t))return "reviewing the draft";
   if(/double-checking/i.test(t))return "reviewing the drafts";
   if(/checking the facts/i.test(t))return "checking the facts";
-  if(/planning the research/i.test(t))return "planning the search";
+  if(/planning the research/i.test(t))return "Planning the search";
   if(/^(woke|waking) /i.test(t))return t.charAt(0).toLowerCase()+t.slice(1).replace(/\.$/,"");
   return "thinking";
 }
@@ -56575,8 +56488,8 @@ async function send(){
   if(advGhostOnly){
     const g=adv.local[0],gs=srvList.find(x=>g.indexOf(x.name+SRV_SEP)===0);
     body.insertAdjacentHTML("beforebegin",'<div class="ghostnote" style="font-size:11px;'
-      +'color:var(--faint);margin-bottom:6px">Your hand-picked models are no longer on '
-      +esc(gs?gs.name:"your server")+", so Fast answered.</div>");
+      +'color:var(--faint);margin-bottom:6px">Your picked models are gone from '
+      +esc(gs?gs.name:"your server")+". Alpha answered.</div>");
   }
   try{
     // a Try again or Edit & resend rewinds the saved chat: the server
@@ -56615,7 +56528,7 @@ async function send(){
           pendingImages=sentImages;pendingDocs=sentDocs;paintChips();}
         if(madeChat){chats=chats.filter(x=>x.id!==myChat);renderChats();}
       }
-      throw new Error(e.err||("the app answered "+resp.status));
+      throw new Error(e.err||("The app answered "+resp.status+". Try again."));
     }
     // the server may land the turns in a copy, or a fresh chat for one
     // deleted meanwhile: the answer follows it
@@ -56758,7 +56671,7 @@ async function send(){
         paintDrafts(aiDiv,drafts,true,status);
       // the council reports into the SAME tree the searches use
       const mmc=/(\d+)\s*of\s*(\d+)/.exec(status||"");
-      if(mmc)addStep({id:"council",l:"Consulting models",
+      if(mmc)addStep({id:"council",l:"Asking the models",
         s:(+mmc[1]>=+mmc[2]?"done":"run"),d:mmc[1]+" of "+mmc[2]});
       // a merge that collapsed mid-stream sends RESET \u2014 everything
       // streamed before it is gone (streamText), the replacement kept
@@ -56791,7 +56704,7 @@ async function send(){
     aiDiv.querySelectorAll(".apcard:not(.decided)").forEach(c=>{
       c.classList.add("decided","no");
       const v=c.querySelector(".apverdict");
-      if(v){v.hidden=false;v.textContent="no answer \u2014 nothing ran";}
+      if(v){v.hidden=false;v.textContent="No answer. Nothing ran.";}
     });
     if(steps.length)paintSteps();
     // let the reveal catch up (capped — a hidden window throttles rAF)
