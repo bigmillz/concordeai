@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>ConcordeAI uses the microphone for voice input — audio never leaves this Mac.</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+</dict>
+</plist>

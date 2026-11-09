@@ -40243,6 +40243,190 @@ check("6b522 the measure route (live): behind the cookie and the token; the turn
                                                                                                  "ctx_max")}])
 # ==== 6b522 doc attach: end ====
 
+# ==== native shell (6b532): begin ====
+print("== the native shell's sidecar mode, MILLENAI_SHELL=tauri (6b532) ==")
+# THE TAURI SHELL (6b532, per Patrick: the move to Rust, step 1). With
+# MILLENAI_SHELL=tauri the window is the Rust app's (shell/) and the
+# Python process is its sidecar. The auth rules (6b310, 6b321) must hold
+# exactly as they did for pywebview's window: the token is never in the
+# page, the cookie comes only from a one-time boot code, other origins and
+# other hosts are refused, and the sidecar can't outlive its shell.
+import types as _t32
+
+# the setting itself: only the one name is a shell; a dev copy or the real
+# app may carry it (the shell is how the real app runs); half-set dev
+# settings are still refused with it
+_sh32 = {"os": os, "sys": sys, "_KNOWN_ENV": None}
+_exec_names(_sh32, {"_KNOWN_ENV", "_dev_home"})
+_dh32 = _sh32["_dev_home"]
+_r32 = {
+    "qt": _dh32({"MILLENAI_SHELL": "qt"}, "/real")[1],
+    "real+tauri": _dh32({"MILLENAI_SHELL": "tauri"}, "/real"),
+    "dev+tauri": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_DEV": "1",
+                        "MILLENAI_HOME": "/tmp/cai-dev32"}, "/real"),
+    "halfset+tauri": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_HOME": "/tmp/x"}, "/real")[1],
+    "unknown": _dh32({"MILLENAI_SHELL": "tauri", "MILLENAI_SHELLX": "1"}, "/real")[1],
+}
+check("MILLENAI_SHELL is a known setting that takes only 'tauri'; it changes none of the dev-copy rules",
+      "MILLENAI_SHELL" in _sh32["_KNOWN_ENV"]
+      and "can only be 'tauri'" in (_r32["qt"] or "")
+      and _r32["real+tauri"] == (None, None)
+      and _r32["dev+tauri"] == (os.path.realpath("/tmp/cai-dev32"), None)
+      and "only for dev copies" in (_r32["halfset+tauri"] or "")
+      and "Unknown setting MILLENAI_SHELLX" in (_r32["unknown"] or ""), "%r" % _r32)
+
+# the source: the sidecar skips the window blocker and the pywebview
+# patches, writes the boot note, paints no wipe, and leaves with its parent
+_src32 = _MILLENAI_SRC
+check("in shell mode the server draws no window, writes run/boot.json, skips the wipe and follows its parent",
+      'SHELL = os.environ.get("MILLENAI_SHELL") == "tauri"' in _src32
+      and "SHELL_PARENT = os.getppid() if SHELL else 0" in _src32
+      and "    if not (NOWINDOW or SHELL):\n        _why = _window_blocker()" in _src32
+      and "    if SHELL:\n        # the shell's window spends this code on its first load (6b532)\n"
+          "        _write_boot_note()" in _src32
+      and '"1" if (HAS_WEBVIEW and IS_MAC and not SHELL)' in _src32
+      and "            while os.getppid() == SHELL_PARENT:\n                time.sleep(1.0)" in _src32
+      and "_signal_exit(0, None)" in _src32
+      and "    if HAS_WEBVIEW and IS_MAC and not SHELL:" in _src32
+      and 'account_open("signout", headless=NOWINDOW or SHELL)' in _src32
+      # the test-hook line the 6b321 check names is still there, untouched
+      and 'if NOWINDOW and "boot-code" in TEST_HOOKS:\n        _write_boot_note()' in _src32, "")
+
+# live: a shell-mode copy (no MILLENAI_NOWINDOW; the shell's env) on 9903
+_SH = Instance(9903, "SH", env={"MILLENAI_SHELL": "tauri", "MILLENAI_NOWINDOW": ""}).start()
+_shb = os.path.join(_SH.home, "run", "boot.json")
+try:
+    with open(_shb) as _fh:
+        _shbd = json.load(_fh)
+    _shb_mode = os.stat(_shb).st_mode & 0o777
+except (OSError, ValueError):
+    _shbd, _shb_mode = {}, None
+_shpage = _ireq(_SH, "/", token=False)
+_shbody = _shpage[1].decode("utf-8", "replace")
+check("a shell-mode copy writes its one-time boot code to run/boot.json (0600, its own pid) and the page carries neither token nor key",
+      _shbd.get("pid") == _SH.proc.pid and len(_shbd.get("code", "")) >= 40 and _shb_mode == 0o600
+      and _shpage[0] == 200 and _SH.token not in _shbody and _SH.key not in _shbody
+      and _shbd.get("code", "x") not in _shbody and 'if("0"==="1")' in _shbody,
+      "%r" % [_shbd.get("pid"), _SH.proc.pid, _shb_mode, _shpage[0]])
+
+
+def _sh_raw(path, headers):
+    try:
+        with urllib.request.urlopen(urllib.request.Request(_SH.base + path, headers=headers), timeout=10) as r_:
+            return r_.status, dict(r_.headers), r_.read()
+    except urllib.error.HTTPError as e_:
+        return e_.code, dict(e_.headers), e_.read()
+
+
+# the trade: once, for a cookie that is HttpOnly and Strict; a replay is
+# refused; the cookie alone opens the page and nothing under /api; the
+# token alone (no cookie), another Host and a proxied request are refused
+class _NoRedir32(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+_op32 = urllib.request.build_opener(_NoRedir32)
+try:
+    with _op32.open(urllib.request.Request(_SH.base + "/?boot=" + _shbd.get("code", "")), timeout=10) as r_:
+        _tr = (r_.status, r_.headers.get("Set-Cookie", ""), r_.headers.get("Location"))
+except urllib.error.HTTPError as e_:
+    _tr = (e_.code, e_.headers.get("Set-Cookie", ""), e_.headers.get("Location"))
+try:
+    with _op32.open(urllib.request.Request(_SH.base + "/?boot=" + _shbd.get("code", "")), timeout=10) as r_:
+        _tr2 = r_.status
+except urllib.error.HTTPError as e_:
+    _tr2 = e_.code
+_sh_ck = "millen_key_9903=" + _SH.key
+_sh_rules = {
+    "cookie alone, page": _sh_raw("/", {"Cookie": _sh_ck})[0],
+    "cookie alone, api": _sh_raw("/api/prefs", {"Cookie": _sh_ck})[0],
+    "token alone, api": _sh_raw("/api/prefs", {"X-Api-Token": _SH.token})[0],
+    "both, api": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token})[0],
+    "other host": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token,
+                                         "Host": "evil.test:9903"})[0],
+    "proxied": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": _SH.token,
+                                      "X-Forwarded-For": "10.0.0.9"})[0],
+    "wrong token": _sh_raw("/api/prefs", {"Cookie": _sh_ck, "X-Api-Token": "x" * 43})[0],
+}
+check("in shell mode the boot code trades once for an HttpOnly Strict cookie; a replay, the cookie alone on /api, the token alone, another Host, a proxy header and a wrong token are all refused",
+      _tr[0] == 302 and _tr[2] == "/" and "millen_key_9903=" + _SH.key in _tr[1]
+      and "HttpOnly" in _tr[1] and "SameSite=Strict" in _tr[1] and _tr2 == 403
+      and _sh_rules == {"cookie alone, page": 200, "cookie alone, api": 403, "token alone, api": 403,
+                        "both, api": 200, "other host": 403, "proxied": 403, "wrong token": 403},
+      "%r" % [_tr, _tr2, _sh_rules])
+_SH.stop()
+
+# the sidecar follows its parent: started under a throwaway sh, with the
+# sh killed outright (as a crashed shell would be), the server stops on
+# its own and the port closes. A plain windowless copy (no MILLENAI_SHELL)
+# writes no boot note.
+_sh_home2 = os.path.join(_SMOKE_TMP, "SH2")
+os.makedirs(_sh_home2, mode=0o700, exist_ok=True)
+_sh_env2 = {k: v for k, v in os.environ.items() if not k.startswith("MILLENAI_")}
+_sh_env2.update(MILLENAI_DEV="1", MILLENAI_HOME=_sh_home2, MILLENAI_PORT="9903", MILLENAI_SHELL="tauri")
+_sh_log2 = open(os.path.join(_SMOKE_TMP, "SH2.log"), "w")
+_sh_wrap = subprocess.Popen(
+    ["/bin/sh", "-c", '"$0" "$1"; exit 0', os.environ.get("SMOKE_PY") or sys.executable, "millenai.py"],
+    env=_sh_env2, stdout=_sh_log2, stderr=subprocess.STDOUT, start_new_session=True)
+_sh_pid2 = None
+for _ in range(600):
+    try:
+        with open(os.path.join(_sh_home2, "run", "instance.json")) as _fh:
+            _d2 = json.load(_fh)
+        if _port_open(9903):
+            _sh_pid2 = _d2["pid"]
+            break
+    except (OSError, ValueError, KeyError):
+        pass
+    time.sleep(0.1)
+_sh_parent_ok = False
+if _sh_pid2:
+    _pp = subprocess.run(["ps", "-o", "ppid=", "-p", str(_sh_pid2)], capture_output=True, text=True).stdout.strip()
+    _sh_parent_ok = _pp == str(_sh_wrap.pid)
+    os.kill(_sh_wrap.pid, 9)      # the stand-in shell dies without a word
+    _sh_wrap.wait(10)
+_sh_t0 = time.time()
+_sh_gone = None
+while time.time() - _sh_t0 < 15:
+    if not _port_open(9903) and (not _sh_pid2 or subprocess.run(
+            ["ps", "-p", str(_sh_pid2)], capture_output=True).returncode != 0):
+        _sh_gone = round(time.time() - _sh_t0, 1)
+        break
+    time.sleep(0.2)
+if _sh_gone is None and _sh_pid2:
+    try:
+        os.kill(_sh_pid2, 9)
+    except OSError:
+        pass
+_sh_note2 = os.path.exists(os.path.join(_sh_home2, "run", "instance.json"))
+check("a shell-mode sidecar whose shell is killed outright stops itself within seconds and drops its note; no orphan",
+      _sh_parent_ok and _sh_gone is not None and _sh_gone <= 6 and not _sh_note2,
+      "%r" % [_sh_pid2, _sh_parent_ok, _sh_gone, _sh_note2])
+_nb = Instance(9903, "NB").start()
+_nb_boot = os.path.exists(os.path.join(_nb.home, "run", "boot.json"))
+_nb.stop()
+check("a copy outside shell mode and without the boot-code hook writes no run/boot.json", not _nb_boot)
+
+# the Rust side, by its source: the one command, its origin check against
+# the sidecar's port, the blank first page (a tauri:// page as the
+# navigation's initiator made WebKit withhold the Strict cookie), the
+# night before the paint, the one permission, and a shim with no secret
+_rs_main = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+_rs_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
+_rs_shim = _rs_main[_rs_main.index("const BRIDGE_SHIM"):_rs_main.index('})();"#;')]
+check("the Tauri shell hands the token over through one command that checks scheme, host and the sidecar's port; starts on about:blank in the night colour; grants one permission; the shim holds no secret",
+      _rs_main.count("#[tauri::command]") == 1
+      and 'url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == Some(*port)' in _rs_main
+      and 'WebviewUrl::External("about:blank"' in _rs_main
+      and ".background_color(NIGHT)" in _rs_main and "Color(0x03, 0x04, 0x0a, 0xff)" in _rs_main
+      and ".initialization_script(BRIDGE_SHIM)" in _rs_main
+      and "initialization_script_for_all_frames" not in _rs_main
+      and _rs_cap.get("permissions") == ["allow-api-token"] and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
+      and "token" not in _rs_shim.replace("api_token", "")
+      and '.env("MILLENAI_SHELL", "tauri")' in _rs_main
+      and "libc::SIGTERM" in _rs_main and "RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app)" in _rs_main,
+      "")
+# ==== native shell (6b532): end ====
+
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
 # ZITO REMOVED (6b525, per Patrick): holding Z+I+T+O opened a hidden board
