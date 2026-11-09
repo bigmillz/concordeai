@@ -9048,11 +9048,14 @@ check("chats: a 61st chat no longer erases the oldest; 1,000 kept, pins always",
 # (6b322) the early-save machinery of 6b318 is gone with the page's
 # whole-list saves: see "== chat store (0b) ==" at the end.
 
-# 6b318, per Patrick: the Beta channel reads "Prerelease" (it carries the
-# RCs too). The stored value stays "beta", so saved choices still match.
-check("Settings: the channel between Stable and Nightly is called Prerelease",
-      '<option value="beta">Prerelease</option>' in page
-      and ">Beta</option>" not in page,
+# 6b318, per Patrick: the Beta channel read "Prerelease" (it carries the
+# RCs too); 6b550, per Patrick: "Beta" again, as on the website and in the
+# release names ("7.0 beta 1"). The stored value stays "beta", so saved
+# choices still match.
+check("Settings: the channel between Stable and Nightly is called Beta (its value still beta)",
+      '<option value="beta">Beta</option>' in page
+      and ">Prerelease</option>" not in page
+      and '<option value="stable">Stable</option>' in page and '<option value="nightly">Nightly</option>' in page,
       page[page.index('id="upchan"'):page.index('id="upchan"') + 200])
 
 # 6b318, per Patrick: "whenever settings is re-opened, make sure it goes
@@ -42822,7 +42825,8 @@ def _sl_segs(css, js):
             # the front's lanes: a glass box radius 6, a lit box radius 4.5 that slides in 200 ms
             and ".hz .sl-seg{position:relative;display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;height:32px;box-sizing:border-box;border-radius:6px;" in css
             and "transform:translateX(calc(var(--i,0) * 100%));background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));" in css
-            and "box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(150,165,255,.3),0 0 12px -3px rgba(110,130,255,.45);transition:transform .2s var(--sl-out)}" in css
+            and "box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(232,234,242,.28),0 0 12px -3px rgba(232,234,242,.3);transition:transform .2s var(--sl-out)}" in css
+            and not re.search(r"rgba\((?:150,165|110,130|196,140|240,122),|#f07aa6|#f2a6b4|#9b72ff|#ff8b9b|#ffb3be", css)   # silver and one hue: no blue, violet, rose or pink
             and ".hz #about-veil select.sl-native{display:none!important}" in css and "html:not(.hz) .sl-sel{display:none}" in css
             and ".hz #sl-pop{position:fixed;z-index:90;" in css)
 
@@ -42831,7 +42835,7 @@ def _sl_segs(css, js):
 _sl_kind_js = _jsfn(_MILLENAI_SRC, "function slKind(sel){") + r"""
 const mk=a=>({options:a.map(t=>({text:t}))});
 process.stdout.write(JSON.stringify([
-  slKind(mk(["Stable","Prerelease","Nightly"])),slKind(mk(["Horizon","Classic"])),slKind(mk(["Calm","Balanced","Full"])),
+  slKind(mk(["Stable","Beta","Nightly"])),slKind(mk(["Horizon","Classic"])),slKind(mk(["Calm","Balanced","Full"])),
   slKind(mk(["1 hour","1 day","1 week","1 month","1 year","All time"])),
   slKind(mk(["Gemini (free tier)","Groq (free tier)","Claude (paid)","Kimi K3 (paid)"])),slKind(mk(["All models"]))]));"""
 try:

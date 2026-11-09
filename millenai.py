@@ -52829,8 +52829,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #about-veil .about-btn:disabled,.hz #about-veil .bm-btn:disabled{opacity:.45;cursor:default;transform:none}
 .hz #about-veil .about-btn:focus-visible,.hz #about-veil .bm-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--sl-ember)}
 .hz #about-veil .about-btn.primary{margin-left:auto;padding:0 24px;background:rgba(255,255,255,.09);border-color:var(--sl-hair2)}
-.hz #about-veil .about-btn.danger{color:#ff8b9b;border-color:rgba(232,65,90,.4);background:rgba(232,65,90,.06)}
-.hz #about-veil .about-btn.danger:hover{color:#ffb3be;border-color:rgba(232,65,90,.7);background:rgba(232,65,90,.1)}
+.hz #about-veil .about-btn.danger{color:#f0566c;border-color:rgba(232,65,90,.4);background:rgba(232,65,90,.06)}
+.hz #about-veil .about-btn.danger:hover{color:#f4f5fa;border-color:rgba(232,65,90,.7);background:rgba(232,65,90,.1)}
 .hz #about-veil .about-btn.quiet{border:0;background:none;box-shadow:none;color:var(--sl-ink3);height:32px;padding:0 8px}
 .hz #about-veil .about-btn[hidden],.hz #about-veil .bm-btn[hidden]{display:none}
 /* fields */
@@ -52936,7 +52936,7 @@ html:not(.hz) .sl-sel{display:none}
 .hz .sl-seg button:disabled{opacity:.45;cursor:default}
 .hz .sl-hi{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n,3));border-radius:4.5px;pointer-events:none;
   transform:translateX(calc(var(--i,0) * 100%));background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(150,165,255,.3),0 0 12px -3px rgba(110,130,255,.45);transition:transform .2s var(--sl-out)}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(232,234,242,.28),0 0 12px -3px rgba(232,234,242,.3);transition:transform .2s var(--sl-out)}   /* silver: no hue in Settings but the ember */
 .hz .sl-seg.none .sl-hi{opacity:0}
 .hz .sl-menu{display:inline-flex;align-items:center;gap:8px;height:32px;max-width:100%;min-width:0;padding:0 8px 0 12px;box-sizing:border-box;border-radius:8px;
   border:1px solid var(--sl-hair2);background:var(--sl-glass);box-shadow:inset 0 1px 0 rgba(255,250,240,.06);color:var(--sl-ink);font:400 13px/1 var(--sl-ui);cursor:pointer;
@@ -53660,14 +53660,15 @@ __CODE_ROWS__
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check now</button>
-      <!-- 6b285: three channels. Stable is the default; Prerelease
-           (value "beta", kept for saved prefs; renamed 6b318 per
-           Patrick) gets the betas and RCs; Nightly follows the rolling
+      <!-- 6b285: three channels. Stable is the default; Beta
+           (value "beta", kept for saved prefs; "Prerelease" from 6b318,
+           "Beta" again in 6b550 per Patrick, to match the website and the
+           release names) gets the betas and RCs; Nightly follows the rolling
            "nightly" release that GitHub Actions rebuilds on every push
            to main. -->
       <label id="beta-row"><span>Update channel</span>
         <select id="upchan"><option value="stable">Stable</option>
-          <option value="beta">Prerelease</option>
+          <option value="beta">Beta</option>
           <option value="nightly">Nightly</option></select></label>
       <!-- 6b292, per Patrick: automatic checks are a choice — on, the
            app checks at launch and daily; off, the button above is the

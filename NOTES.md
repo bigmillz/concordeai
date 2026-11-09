@@ -19716,7 +19716,7 @@ its own Settings).**
 select in `#about-veil` (Horizon only): up to four short choices (≤ 28 characters together) are the front's
 lanes control — a glass box radius 6, a lit box radius 4.5 that slides between equal segments in 200 ms on
 `--out`, labels `--ink3` → `--ink`, arrow keys, Home, End; anything longer a glass menu (`#sl-pop`, rows of 32,
-the diamond on the chosen, keys and Esc). So Update channel (Stable · Prerelease · Nightly), Look and Effects
+the diamond on the chosen, keys and Esc). So Update channel (Stable · Beta · Nightly; the label "Beta" again, its value still `beta`), Look and Effects
 are segmented; the usage period and model, the cloud provider and the benchmark's runs are menus. The select
 keeps its id, value and handler (hidden, `.sl-native`); a pick sets it and sends input and change; a value the
 page sets in code repaints it (the instance's `value` and `selectedIndex` are watched), as does a new option
