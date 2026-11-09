@@ -45549,7 +45549,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             xm_names += [lbl for lbl, _c in cloud_bench()]
         if _max:                                  # Max names every cloud model it asks (6b440)
             xm_names += [lbl for lbl, _c in _max_bench]
-        xm = ", ".join(xm_names)[:300]
+        # whole names only, up to 2,000 characters: a cut at 300 left a big council's last
+        # name in pieces ("Gemm") once six server seats with long names sat beside it
+        xm_keep, xm_len = [], 0
+        for _xn in xm_names:
+            if xm_len + len(_xn) + (2 if xm_keep else 0) > 2000:
+                break
+            xm_keep.append(_xn)
+            xm_len += len(_xn) + (2 if len(xm_keep) > 1 else 0)
+        xm = ", ".join(xm_keep)
         # a server's name may be anything ("Sam’s server", "サーバー"),
         # and http.server writes headers as latin-1 (review of 6b334):
         # everything outside printable ASCII, and %, is percent-encoded;

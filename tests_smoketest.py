@@ -41302,6 +41302,16 @@ check("every millen.* key the page writes to browser storage is kept by storeBoo
       _lsu == [] and _lsn >= 20 and _lsu_m == ["millen.recentsDays"]
       and "lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF)" in _MILLENAI_SRC,
       "%r" % [_lsu, _lsn, _lsu_m])
+# X-MODELS NAMES WHOLE MODELS (run h): the header was cut at 300 characters, so a Pro council of six
+# server seats with long names and nine of this computer's ended in "Gemm"; now whole names, up to 2,000
+_xm_seg = _MILLENAI_SRC[_MILLENAI_SRC.index("xm_names = list(council)"):_MILLENAI_SRC.index('self.send_header("X-Models", header_text(xm))')]
+_xm_ns = {"council": ["Pat’s Desk – デスク · m%02d:8b" % i for i in range(30)], "cloud_allowed": lambda: False,
+          "_srv_only": False, "cloud_only": False, "_max": False, "cloud_bench": lambda: [], "_max_bench": []}
+exec(__import__("textwrap").dedent("        " + _xm_seg), _xm_ns)
+_xm_parts = _xm_ns["xm"].split(", ")
+check("X-Models names whole models: never a name cut in pieces, up to 2,000 characters",
+      "[:300]" not in _xm_seg and len(_xm_ns["xm"]) <= 2000 and all(x in _xm_ns["council"] for x in _xm_parts)
+      and len(_xm_parts) == 30, "%r" % [len(_xm_ns["xm"]), _xm_parts[-1:]])
 # THE MAC SHELL'S CORNER (per Patrick: the traffic lights crowded the header's sidebar
 # toggle, "too tight"). The shell runs the page under a transparent title bar (Overlay) and
 # seats the lights on the 72 px header row (TL_X, TL_Y); the page, told by __SHELL_TL__,
