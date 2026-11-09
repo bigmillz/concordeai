@@ -19441,7 +19441,9 @@ each paint: the wrap, then `hzStarAim`, which reads ONE Range rect (the last cha
 message's rect (`hzStar.reads` counts it: 416 reads over 416 paints in the headed run); `hzStarFrame` moves
 the star with a transform alone, eased on the clock (`1-exp(-dt/55)`, the same at 60 and 120 Hz), and reads
 nothing. (The first cut aimed from the pre-wrap node list, whose tail node `splitText` had truncated, and the
-star sat a line up: caught by the rect comparison, fixed before commit.) The star is `position:absolute` in
+star sat a line up: caught by the rect comparison, fixed before commit. The last character sits in the newest
+`.hz-new` span 2 px into its rise, so the aim subtracts the rise: measured headed, the star's centre rests
+6 px after the last word's edge and within half a pixel of the line's middle.) The star is `position:absolute` in
 `.msg.ai` (now `position:relative`), so it scrolls with its text. **Draft -> polish (6b539):** at the swap
 `hzStarSweep` makes one pass down the answer's left edge (10 px outside, 350 ms) while the text crossfades
 (6b539's 170 + 280 ms, unchanged). **Landing:** `hzStarLand(aiDiv)` runs on every ending, aborted or not:

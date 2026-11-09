@@ -56636,17 +56636,19 @@ function hzStarPaint(body){
   if(m.length&&m[m.length-1].len>t.len)m.length=0;          // a RESET: the text started over
   m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();
   for(let k=m.length-1;k>0;k--){const a=m[k-1].len,b=m[k].len;if(b>a)hzStarWrap(t.nodes,a,b,now-m[k].t);}
-  hzStarAim(body,t.nodes);
+  hzStarAim(body);          // a fresh walk: the wrap split the tail node, so the list above is stale
 }
-function hzStarAim(body,nodes){
+function hzStarAim(body){
   const s=hzStar;if(!s.on||!s.el||s.div!==body.parentElement)return;
-  const ns=nodes||hzStarNodes(body).nodes;let last=null;
+  const ns=hzStarNodes(body).nodes;let last=null;
   for(let k=ns.length-1;k>=0;k--){if(/\S/.test(ns[k].n.data)){last=ns[k].n;break;}}
   if(!last)return;
   const e=last.data.replace(/\s+$/,"").length,r=document.createRange();r.setStart(last,Math.max(0,e-1));r.setEnd(last,e);
   const rr=r.getBoundingClientRect(),mr=s.div.getBoundingClientRect();s.reads++;
   if(!rr.width&&!rr.height)return;
-  s.tx=rr.right-mr.left+6;s.ty=rr.top-mr.top+rr.height*.52;
+  // the last character sits in the newest .hz-new span, 2 px into its rise: aim at where it will rest
+  const rise=last.parentElement&&last.parentElement.classList.contains("hz-new")?2:0;
+  s.tx=rr.right-mr.left+6;s.ty=rr.top-mr.top+rr.height*.52-rise;
   if(isNaN(s.x)){s.x=s.tx;s.y=s.ty;}
 }
 // the frame: a transform toward the target, eased on the clock (the same at 60 and 120 Hz); no read
