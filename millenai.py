@@ -4412,7 +4412,7 @@ AGENTS = {
     "Workspace": {
         # Claude-Code-shaped, honestly scoped: it READS the folder you
         # point it at and answers about YOUR code. No writes, no shell.
-        "icon": "\U0001f5c2\ufe0f", "desc": "answers about your own code",
+        "icon": "\U0001f5c2\ufe0f", "desc": "Answers about your own code",
         # the coders first (6b494): both read 256K tokens of a workspace
         "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
           "Qwen 3.8 27B", "Gemma 4 26B",
@@ -4437,7 +4437,7 @@ AGENTS = {
         # Claude Code drives a shell. The model here is only the FLOOR —
         # run_remote_agent picks the strongest available driver (cloud
         # when keyed). Lives in the Code tab beside Coding/Workspace.
-        "icon": "🛰️", "desc": "runs commands on your server over SSH",
+        "icon": "🛰️", "desc": "Runs commands on your server over SSH",
         "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
           "Qwen 3.8 27B", "Qwen 3.6 35B MoE",
           "GPT-OSS 20B", "Gemma 4 26B", "Qwen 3.5 9B", "Gemma 4 12B"],
@@ -4445,7 +4445,7 @@ AGENTS = {
         "system": "",       # the loop supplies REMOTE_SYSTEM itself
     },
     "Coding": {
-        "icon": "💻", "desc": "working code, tight explanations",
+        "icon": "💻", "desc": "Working code, short explanations",
         "picks": ["Devstral Small 2 24B", "Qwen 3 Coder 30B MoE",
           "Qwen 3.8 27B", "Qwen 3.5 9B",
           "Qwen 3.6 35B MoE", "GPT-OSS 20B", "Gemma 4 12B"],
@@ -36189,8 +36189,7 @@ def _ssh_once(conf: dict, cmd: str, timeout: int):
         try:
             text = _ssh_config(conf)
         except ValueError as bad:
-            return -1, ("ssh can't use %s in the connection settings: "
-                        "check it for spaces or odd characters" % bad)
+            return -1, ("ssh can’t use %s. Check it for spaces or odd characters." % bad)
         if not os.path.exists(_known_hosts_path()):
             # private from the first byte; ssh appends to it
             bound_ctx().append(KNOWN_HOSTS_NAME, b"", mode=0o600)
@@ -36210,10 +36209,10 @@ def _ssh_once(conf: dict, cmd: str, timeout: int):
     except StaleProfile:
         raise
     except subprocess.TimeoutExpired:
-        return -1, "(command timed out after %ds)" % timeout
+        return -1, "(timed out after %d s)" % timeout
     except FileNotFoundError as exc:
         if shutil.which("ssh") is None:
-            return -1, "ssh client not found on this machine"
+            return -1, "No ssh client on this computer."
         return -1, "ssh failed: %s" % (str(exc)[:200])
     except Exception as exc:
         return -1, "ssh failed: %s" % (str(exc)[:200])
@@ -36332,7 +36331,7 @@ def ssh_wait_back(conf: dict, minutes: float = 8.0, status=None):
             return True, up
         if status:
             try:
-                status("waiting for %s to come back up"
+                status("Waiting for %s to come back"
                        % conf.get("host", "the server"))
             except Exception:
                 pass
@@ -36415,8 +36414,7 @@ def ssh_run_long(conf: dict, cmd: str, emit_status=None,
                 emit_status("still running (" + (first or "starting") + ")")
             except Exception:
                 pass
-    return -1, ("(long job still running after %d min — left it going on "
-                "the box under unit %s)" % (int(minutes), unit))
+    return -1, ("(still running after %d min; left running on the server as %s)" % (int(minutes), unit))
 
 
 def _shq(s: str) -> str:
@@ -36946,16 +36944,13 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
     if not driver:
         if (not cloud_allowed()
                 and work_ladder("work")):
-            emit(AppText("Cloud power is off, so your cloud key can't drive "
-                         "the remote agent. Turn on **Use cloud power** under "
-                         "**Settings › Cloud power**, or install a coding "
-                         "model in Settings."))
+            emit(AppText("Cloud models are off, so your key can\u2019t drive the agent. "
+                         "Turn them on in Settings > Cloud, or install a coding model."))
             return
-        emit(AppText("No model is available to drive the remote agent. "
-                     "Install a coding model in Settings, or add a cloud key."))
+        emit(AppText("No model can drive the agent. Install a coding model or add a cloud key."))
         return
     host = conf.get("host", "the server")
-    status("connecting to %s" % host)
+    status("Connecting to %s" % host)
     rc, out = ssh_run(conf, "echo __ok__ && uname -a", timeout=20)
     if rc != 0 or "__ok__" not in out:
         # ssh_run has already said what to do for a changed server
@@ -36963,8 +36958,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         # is ssh's last, so the tail is kept
         emit(AppText("**Couldn't connect to %s.**\n\n```\n%s\n```\n\n%s"
                      % (host, out.strip()[-600:],
-                        "Forget its old key with the button under the "
-                        "Remote agent's server connection."
+                        "If its key changed, use Forget old key under Server connection."
                         if _SSH_HOSTKEY_RX.search(out) else
                         "This agent uses key-based SSH only, with the "
                         "connection settings under the Remote agent.")))
@@ -36974,7 +36968,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
     driver_name = driver[1].get("name", "cloud") if driver[0] == "cloud" \
         else driver[1]
     for i in range(1, REMOTE_CAP + 1):
-        status("%s is planning step %d" % (driver_name, i))
+        status("Planning step %d" % i)
         # RIDE THROUGH A CLOUD HICCUP (6b250, seen live): cloud_text
         # swallows a transient 429/timeout as "", and an empty turn used
         # to END the whole run — mid-task, on a live box. Retry the turn
@@ -37004,7 +36998,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
             # cleared — a healthy key looked dead mid-task. Back off for
             # real, and RE-RESOLVE the driver so a provider that just
             # got rested hands over to the next one on the bench.
-            status("driver is rate limited or quiet — backing off")
+            status("The model is rate limited. Waiting.")
             time.sleep((4, 12, 25, 40)[_try])
             nd = remote_driver()
             if nd:
@@ -37013,9 +37007,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
                                if nd[0] == "cloud" else nd[1])
         if not act:
             if not text.strip():
-                emit("The driver model went quiet — a cloud hiccup, not a "
-                     "problem with the server. Say “keep going” "
-                     "and I’ll pick up where I left off.")
+                emit("The model went quiet; the server is fine. Say “keep going” to continue.")
             else:
                 emit(text.strip())
             return
@@ -37036,27 +37028,24 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
             # answer at all would reboot the box (6b309)
             if _rok == "expired":
                 step(sid, "Reboot the server", "skip",
-                     "no answer — nothing ran")
-                emit("Paused — I waited 10 minutes for your OK to reboot "
-                     "and nothing ran. Say **keep going** when you're back.")
+                     "No answer. Nothing ran.")
+                emit("Paused after 10 minutes with no answer on the reboot. Nothing ran. Say **keep going** to continue.")
                 return
             if _rok is not True:
-                step(sid, "Reboot the server", "skip", "you skipped it")
+                step(sid, "Reboot the server", "skip", "Skipped")
                 convo.append({"role": "assistant", "content": text})
                 convo.append({"role": "user", "content":
                               "The user DECLINED the reboot. Do not "
                               "reboot; find another way or finish."})
                 continue
-            step(sid, "Rebooting " + host, "run", "session will drop")
+            step(sid, "Rebooting " + host, "run", "")
             status("rebooting %s" % host)
             ssh_run(conf, "( sleep 1; systemctl reboot ) >/dev/null 2>&1 &",
                     timeout=15)
             ok, up = ssh_wait_back(conf, minutes=8.0, status=status)
             if not ok:
-                step(sid, "Reboot", "done", "did not come back in 8 min")
-                emit("The server didn't come back within 8 minutes of the "
-                     "reboot. It may still be booting, or the change kept "
-                     "it from starting — check your provider's console.")
+                step(sid, "Reboot", "done", "Not back after 8 min")
+                emit("The server didn’t come back within 8 minutes. Check your provider’s console.")
                 return
             _r, ident = ssh_run(conf, "uname -r; %s"
                                 % "uptime -p", timeout=15)
@@ -37090,18 +37079,16 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
                    or (autonomy == "auto" and risk != "read")
                    or risk == "danger")
         if need_ok:
-            step(sid, label, "wait", "waiting for you")
+            step(sid, label, "wait", "Waiting for you")
             # the approval card shows every command in the batch, so one
             # tap is never a blind yes
             _ok = await_approval("\n".join(cmds), risk)
             if _ok == "expired":
-                step(sid, label, "skip", "no answer — nothing ran")
-                emit("Paused — I waited 10 minutes for your OK on that "
-                     "step and nothing ran. Say **keep going** when you're "
-                     "back and I'll pick it up.")
+                step(sid, label, "skip", "No answer. Nothing ran.")
+                emit("Paused after 10 minutes with no answer. Nothing ran. Say **keep going** to continue.")
                 return
             if _ok is not True:
-                step(sid, label, "skip", "you skipped it")
+                step(sid, label, "skip", "Skipped")
                 convo.append({"role": "assistant", "content": text})
                 convo.append({"role": "user", "content":
                               "The user DECLINED that. Do not run it. "
@@ -37114,27 +37101,26 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         for n, c in enumerate(cmds, 1):
             status("running: " + c[:60])
             if want_long:
-                status("long job — running detached and watching it")
+                status("Long job. Running detached.")
                 rc, out = ssh_run_long(conf, c, emit_status=status)
             else:
                 rc, out = ssh_run(conf, c)
             ran += 1
             if batch:
                 step("%s_%d" % (sid, n), c, "done",
-                     ("exit %d" % rc) if rc == 0 else "FAILED exit %d" % rc)
+                     ("exit %d" % rc) if rc == 0 else "Failed, exit %d" % rc)
             results.append("Command: %s\nExit code: %d\n%s"
                            % (c, rc, _fence_output(out, 2500)))
             if rc != 0:
                 failed = True
-                results.append("(batch stopped here — this step failed)")
+                results.append("(stopped here: this step failed)")
                 break
         step(sid, label, "done",
              ("%d of %d ran" % (ran, len(cmds)) if batch
               else ("exit 0" if not failed else "failed")))
         convo.append({"role": "assistant", "content": text})
         convo.append({"role": "user", "content": "\n\n".join(results)})
-    emit("Reached the %d-command limit for one run. Tell me to continue "
-         "and I'll pick up where I left off." % REMOTE_CAP)
+    emit("Reached the %d-command limit for one run. Say continue to go on." % REMOTE_CAP)
 
 
 def offline_hint(kind: str, err: Exception) -> str:
@@ -42196,7 +42182,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 str(d.get("root") or "").strip().strip('"'))
             if not root or not os.path.isdir(root):
                 self._send_json({"ok": False,
-                                 "err": "that folder doesn't exist"})
+                                 "err": "That folder doesn’t exist."})
                 return
             root = os.path.realpath(root)
             profile_local_update(self.ctx,
@@ -42242,9 +42228,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           "jump": str(d.get("jump", "")).strip()[:300]}
                 conf = _remote_merge(remote_conf(), posted)
                 if conf is not None and not _remote_save(conf):
-                    self._send_json({"ok": False, "err": "couldn't save the "
-                                     "connection settings: check that the "
-                                     "ConcordeAI folder isn't read-only"})
+                    self._send_json({"ok": False, "err": "Couldn’t save the connection. Check that the ConcordeAI folder isn’t read-only."})
                     return
                 self._send_json({"ok": True})
                 return
@@ -42258,15 +42242,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 except StaleProfile:
                     raise
                 except Exception as exc:
-                    self._send_json({"ok": False, "err": "couldn't update "
-                                     "ConcordeAI's host list: %s"
+                    self._send_json({"ok": False, "err": "Couldn’t update the host list: %s"
                                      % str(exc)[:120]})
                 return
             if self.path == "/api/remote/test":
                 conf = remote_conf()
                 if not conf.get("host"):
                     self._send_json({"ok": False,
-                                     "err": "no connection saved yet"})
+                                     "err": "No connection saved."})
                     return
                 rc, out = ssh_run(conf, "echo __ok__ && whoami && uname -sr",
                                   timeout=20)
@@ -43006,7 +42989,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except StaleProfile:
                 raise
             except (NotLanded, OSError):
-                self._send_json({"ok": False, "err": "couldn't save"},
+                self._send_json({"ok": False, "err": "Couldn’t save. Try again."},
                                 code=500)
                 return
             r["ok"] = True
@@ -45456,9 +45439,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # the client answers with POST /api/remote/approve.
                 rconf = remote_conf()
                 if not rconf.get("host"):
-                    emit("Set up a server connection first — the ⚙️ next "
-                         "to the Remote agent takes host, user and your "
-                         "SSH key.")
+                    emit("Set up the server connection first: host, user and SSH key, under the gear by the Remote agent.")
                 else:
                     autonomy = str(req_json.get("autonomy") or "auto")
                     if autonomy not in ("manual", "auto", "full"):
@@ -51821,13 +51802,13 @@ __CODE_ROWS__
       <div id="autonomy-seg" role="group" aria-label="Autonomy level">
         <button class="autoseg" data-a="manual" type="button">
           <span class="ai">🔒</span><b>Manual</b>
-          <span class="ad">approve every command</span></button>
+          <span class="ad">Approve every command</span></button>
         <button class="autoseg" data-a="auto" type="button">
           <span class="ai">⚡</span><b>Auto</b>
-          <span class="ad">diagnostics run · changes ask</span></button>
+          <span class="ad">Reads run. Changes ask.</span></button>
         <button class="autoseg" data-a="full" type="button">
           <span class="ai">🔥</span><b>Full auto</b>
-          <span class="ad">grinds · pauses only to destroy</span></button>
+          <span class="ad">Runs on. Asks only before destructive steps.</span></button>
       </div>
       <div class="set-h">Server connection</div>
       <div id="remote-row">
@@ -51838,14 +51819,14 @@ __CODE_ROWS__
         <input id="rm-port" placeholder="22" value="22"
                autocomplete="off" spellcheck="false">
       </div>
-      <input id="rm-key" placeholder="~/.ssh/id_ed25519  —  SSH key path (blank uses your ssh-agent)"
+      <input id="rm-key" placeholder="SSH key path (blank: ssh-agent)"
              autocomplete="off" spellcheck="false">
-      <input id="rm-jump" placeholder="jump host, if the server needs one  —  user@bastion:22"
+      <input id="rm-jump" placeholder="Jump host (optional)"
              autocomplete="off" spellcheck="false">
       <div id="remote-foot" class="ctlrow">
         <button class="about-btn slim" id="rm-save">Save</button>
         <button class="about-btn slim" id="rm-test">Test connection</button>
-        <button class="about-btn slim" id="rm-forget" hidden>Forget its old key</button>
+        <button class="about-btn slim" id="rm-forget" hidden>Forget old key</button>
       </div>
       <div id="rm-note"></div>
     </div>
@@ -52068,7 +52049,7 @@ __CODE_ROWS__
     </nav>
     <div id="task-main">
       <div id="task-head" class="ctlrow">
-        <input id="task-q" placeholder="Search tasks…" autocomplete="off"
+        <input id="task-q" placeholder="Search" autocomplete="off"
                spellcheck="false">
         <button class="about-btn slim" id="task-close">Close</button>
       </div>
@@ -53962,9 +53943,9 @@ function paintTaskList(){
     ? rows.map(t=>'<button class="trow" data-task="'+esc(t.n)+'">'
         +'<span class="ti">'+t.i+'</span>'
         +'<span class="tn">'+esc(t.n)+'</span>'
-        +(t.w?'<span class="twarn" title="Higher risk">⚠</span>':"")
+        +(t.w?'<span class="twarn" title="Could be hard to undo">⚠</span>':"")
         +'</button>').join("")
-    : '<div class="tempty">nothing matches “'+esc(q)+'”</div>';
+    : '<div class="tempty">Nothing matches “'+esc(q)+'”</div>';
 }
 function openTaskPicker(){
   $("#task-veil").hidden=false;
@@ -54014,27 +53995,26 @@ function riskCard(t){
   const card=document.createElement("div");
   card.className="riskcard";
   card.innerHTML='<div class="rktop"><span class="rkico">⚠</span>'
-    +'<div class="rktext"><b>This task has a higher risk of causing '
-    +'issues that may be challenging to undo</b>'
+    +'<div class="rktext"><b>This could be hard to undo.</b>'
     +'<p>'+esc(t.w)+'</p></div></div>'
     +'<div class="rkfoot">'
-    +'<button class="rkbtn go"><span class="rkemo">🤞</span>'
-    +'<span>Let’s go for it</span></button>'
-    +'<button class="rkbtn no"><span class="rkemo">🙅‍♂️</span>'
-    +'<span>Not today</span></button></div>';
+    +'<button class="rkbtn go">'
+    +'<span>Go ahead</span></button>'
+    +'<button class="rkbtn no">'
+    +'<span>Skip</span></button></div>';
   div.querySelector(".body").appendChild(card);
   inner.appendChild(div);
   chatPin(true);
   card.querySelector(".rkbtn.go").addEventListener("click",()=>{
     card.classList.add("decided");
     card.querySelector(".rkfoot").innerHTML=
-      '<span class="rkverdict">Right then — here we go.</span>';
+      '<span class="rkverdict">Running.</span>';
     startTask(t.n,1);                 // risk cleared -> next gate
   });
   card.querySelector(".rkbtn.no").addEventListener("click",()=>{
     card.classList.add("decided");
     card.querySelector(".rkfoot").innerHTML=
-      '<span class="rkverdict quiet">Skipped — nothing was run.</span>';
+      '<span class="rkverdict quiet">Skipped. Nothing ran.</span>';
   });
 }
 // the prereq card: a grey bug, why the extra tooling is needed, and each
@@ -54072,8 +54052,8 @@ async function remoteRefresh(){
       $("#rm-key").value=c.key||"";
       $("#rm-jump").value=c.jump||"";
       $("#rm-note").textContent=c.configured
-        ?"Saved. Test the connection, then just tell me what you need done."
-        :"Key-based SSH. On a fresh box, install your key first: "+keyCopyCmd("user","host");
+        ?"Saved. Test the connection, then say what to do."
+        :"Key-only SSH. On a new server, install your key first: "+keyCopyCmd("user","host");
     }
   }catch(e){}
 }
@@ -54083,7 +54063,7 @@ function keyCopyCmd(u,h){
   return IS_PC
     ?'type $env:USERPROFILE\\.ssh\\id_ed25519.pub | ssh '+u+"@"+h
       +' "umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys"'
-      +"  (in PowerShell; make a key first with  ssh-keygen -t ed25519  if you have none)"
+      +"  (PowerShell. No key yet: ssh-keygen -t ed25519)"
     :"ssh-copy-id "+u+"@"+h;
 }
 async function remoteSave(){
@@ -54097,15 +54077,15 @@ async function remoteSave(){
 }
 if($("#rm-save"))$("#rm-save").addEventListener("click",async()=>{
   const note=$("#rm-note");
-  if(!$("#rm-host").value.trim()){note.textContent="enter a host or IP";return;}
+  if(!$("#rm-host").value.trim()){note.textContent="Enter a host or IP.";return;}
   note.textContent="saving…";
-  note.textContent=await remoteSave()?"Saved ✓":"couldn't save";
+  note.textContent=await remoteSave()?"Saved":"Couldn’t save. Try again.";
 });
 if($("#rm-test"))$("#rm-test").addEventListener("click",async()=>{
   const note=$("#rm-note");
-  if(!$("#rm-host").value.trim()){note.textContent="enter a host first";return;}
+  if(!$("#rm-host").value.trim()){note.textContent="Enter a host first.";return;}
   note.textContent="saving + connecting…";
-  if(!await remoteSave()){note.textContent="couldn't save";return;}
+  if(!await remoteSave()){note.textContent="Couldn’t save. Try again.";return;}
   try{
     const r=await(await api("/api/remote/test",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"})).json();
@@ -54114,18 +54094,18 @@ if($("#rm-test"))$("#rm-test").addEventListener("click",async()=>{
     note.textContent=r.ok?"✓ connected — "+(r.detail||"ready")
       :"✗ "+(r.detail||"couldn't connect");
     $("#rm-forget").hidden=!(!r.ok&&r.changed);
-  }catch(e){note.textContent="network error";}
+  }catch(e){note.textContent="Couldn’t reach the app. Try again.";}
 });
 if($("#rm-forget"))$("#rm-forget").addEventListener("click",async()=>{
   const note=$("#rm-note");
   try{
     const r=await(await api("/api/remote/forget",{method:"POST",
       headers:{"Content-Type":"application/json"},body:"{}"})).json();
-    note.textContent=r.ok===false?(r.err||"couldn't forget it")
-      :r.removed?"Forgot its old key. Test the connection to accept the new one."
-      :"No old key was on file for this server.";
+    note.textContent=r.ok===false?(r.err||"Couldn’t remove the key. Try again.")
+      :r.removed?"Old key removed. Test the connection to trust the new one."
+      :"No old key for this server.";
     $("#rm-forget").hidden=true;
-  }catch(e){note.textContent="network error";}
+  }catch(e){note.textContent="Couldn’t reach the app. Try again.";}
 });
 // the CODE tab's two rows: always visible, plain radio behavior
 $$("#code-wrap .agent").forEach(el=>
@@ -54305,10 +54285,10 @@ function showApprove(host,d){
   // but every line is shown so the tap is never blind
   const n=String(d.cmd||"").split("\n").filter(x=>x.trim()).length;
   card.innerHTML='<div class="aptop">'
-    +(n>1?"proposed batch · "+n+" steps":"proposed command")
+    +(n>1?n+" steps":"Command")
     +'<span class="aprisk '+esc(d.risk||"write")+'">'
     +(AP_RISK[d.risk]||"changes")+'</span></div><pre></pre>'
-    +'<div class="apfoot"><button class="apbtn ok">Run it</button>'
+    +'<div class="apfoot"><button class="apbtn ok">Run</button>'
     +'<button class="apbtn no">Skip</button></div>'
     +'<div class="apverdict" hidden></div>';
   card.querySelector("pre").textContent=d.cmd||"";
@@ -56593,10 +56573,10 @@ async function send(){
   if(eng&&!eng.up){
     input.value="";input.style.height="auto";
     addMsg("user",text);
-    const help="⚠️ **"+model+"** isn't running ("+eng.note+").\n\n"+
-      (IS_PC?"Pick a tier instead, or install it in Settings \u203a Models.":
-      eng.cmd?"Start it in a terminal:\n\n```\n"+eng.cmd+"\n```\n\nOr pick a tier; those use what's installed.":
-      "Pick a tier; those use what's installed.");
+    const help="**"+model+"** isn't running ("+eng.note+"). "+
+      (IS_PC?"Pick a mode, or install it in Settings > Models.":
+      eng.cmd?"Pick a mode, or start it in a terminal:\n\n```\n"+eng.cmd+"\n```":
+      "Pick a mode; those use what's installed.");
     addMsg("assistant",help);
     return;
   }
@@ -57441,7 +57421,7 @@ async function syncChat(id,old,atLeast){
 // rail/pane picker. Clicking a task kicks off a GUIDED flow — the model
 // gathers requirements with interactive [[FORM]] cards, then walks you
 // through it (and runs it over SSH if a server is connected).
-const TASK_CATS=[["pop","Most Popular"],["sec","Security"],
+const TASK_CATS=[["pop","Popular"],["sec","Security"],
   ["pkg","Updates & Packages"],["diag","Monitoring"],
   ["svc","Services"],["net","Networking"],["stor","Storage & Backups"],
   ["env","Setup & Environment"]];
@@ -57454,39 +57434,18 @@ const TASK_CATS=[["pop","Most Popular"],["sec","Security"],
 // exact unit or PID), and system-wide change (reboot, upgrade, clock).
 const TASKS=[
   {n:"Harden this system with sane defaults",i:"\u{1F512}",c:"sec",pop:1,
-   w:"Hardening touches sshd, the firewall and user accounts together — "
-     +"the three fastest ways to lock yourself out of a remote box. "
-     +"Disabling password auth before your key is proven, or enabling a "
-     +"firewall that doesn't allow your SSH port, ends the session with "
-     +"no way back in but your provider's console. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"Changes sshd, the firewall and user accounts: the three ways to lock yourself out. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm you’re still in."},
   {n:"Disable password auth and enforce key-only SSH",i:"\u{1F511}",c:"sec",
-   w:"This is irreversible from the outside. If your key isn't installed "
-     +"correctly for the user you'll log in as, there is no second way "
-     +"in — password login is gone and the console becomes your only "
-     +"option. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"If your key isn’t installed for the user you log in as, the console is the only way back. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Change the SSH port and update the firewall",i:"\u{1F6AA}",c:"sec",
-   w:"Two changes that must agree exactly: sshd starts listening on the "
-     +"new port and the firewall must already allow it. Apply them out "
-     +"of order, or mistype either number, and the next connection has "
-     +"nowhere to land. SELinux can also block a non-standard port "
-     +"outright. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"The firewall must allow the new port before sshd moves to it, and SELinux can block it. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Set up UFW with a basic allow list",i:"\u{1F6E1}\uFE0F",c:"sec",pop:1,
-   w:"A firewall's default-deny takes effect the moment it's enabled. If "
-     +"the rule allowing your SSH port is missing, wrong, or on the "
-     +"wrong port, the connection you're reading this over dies "
-     +"instantly. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"Default-deny starts the moment it’s on. A missing SSH rule cuts this connection. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Install and configure fail2ban",i:"\u{1F6AB}",c:"sec",
-   w:"fail2ban bans addresses that look like they're guessing passwords "
-     +"— and yours is as bannable as anyone's. A tight retry limit plus "
-     +"a few reconnects while testing can jail you out of your own box "
-     +"for hours. I'll put your current IP on the ignore list before "
-     +"the service ever starts."},
+   w:"fail2ban can ban your own address after a few reconnects. Your current IP goes on the ignore list before it starts."},
   {n:"Create a non-root sudo user and disable root login",i:"\u{1F464}",
    c:"sec",
-   w:"Disabling root login is safe only once the new user is proven to "
-     +"work — correct group, working password or key, and sudo that "
-     +"actually elevates. If any link in that chain is wrong, you lose "
-     +"root and the only account that could have replaced it. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"Root login goes only after the new user, its key and its sudo are proved. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Audit which users can log in and which have sudo",i:"\u{1F9FE}",c:"sec"},
   {n:"Run a security audit and show me what's exposed",i:"\u{1F575}\uFE0F",
    c:"sec",pop:1},
@@ -57494,48 +57453,21 @@ const TASKS=[
    pop:1},
   {n:"Review open ports and tell me what's listening",i:"\u{1F4CB}",c:"sec"},
   {n:"Rotate SSH host keys",i:"\u{1F513}",c:"sec",
-   w:"Replacing host keys makes every client that has ever connected "
-     +"refuse the next connection with a loud man-in-the-middle warning "
-     +"— including your own machine, your deploy scripts and any CI. "
-     +"Existing sessions survive; new ones are blocked until each "
-     +"client's known_hosts is updated. I'll keep this session open and "
-     +"give you the new fingerprints before you need them."},
+   w:"Every client that has connected before, including this Mac and any CI, will refuse the next connection until its known_hosts is updated. This session stays open and you get the new fingerprints first."},
   {n:"Enable and configure SELinux/AppArmor",i:"\u{1F9F1}",c:"sec",
-   w:"Switching mandatory access control to enforcing can silently "
-     +"block services that worked a minute ago — including sshd on a "
-     +"non-standard port. SELinux in particular may need a full "
-     +"filesystem relabel and a reboot to come up clean, and a "
-     +"mislabelled box can boot into an unusable state. I'll go through "
-     +"permissive mode first and read what it would have blocked."},
+   w:"Enforcing mode can block services that worked a minute ago, sshd included, and SELinux may need a relabel and a reboot. Permissive mode runs first to see what it would block."},
   {n:"Update everything and tell me if a reboot is needed",i:"\u{2B06}\uFE0F",
    c:"pkg",
-   w:"Package upgrades restart the services they touch, so anything "
-     +"running can drop mid-update, and a config file that ships in a "
-     +"new version may replace or conflict with yours. Kernel and libc "
-     +"updates need a reboot to take effect — and a reboot is the "
-     +"moment you find out whether the box comes back. I'll tell you "
-     +"what changed and what needs restarting rather than rebooting on "
-     +"my own."},
+   w:"Upgrades restart the services they touch and may replace config files. Kernel updates need a reboot. You get the list of what changed and what needs a restart; nothing reboots on its own."},
   {n:"Enable unattended security updates",i:"\u{1F504}",c:"pkg"},
   {n:"Clean up orphaned packages and old kernels",i:"\u{1F4E6}",c:"pkg",
-   w:"Autoremove decides what's orphaned from package metadata, not "
-     +"from what you actually use — manually installed dependencies and "
-     +"anything installed outside the package manager can be swept up "
-     +"with it. Removing the wrong kernel, or the one you're currently "
-     +"booted into, leaves a box that won't come back from its next "
-     +"reboot. I'll show you the full removal list first and always "
-     +"keep the running kernel plus one."},
+   w:"Autoremove goes by package metadata, not by what you use, and the wrong kernel leaves a server that won’t boot. You see the full list first; the running kernel plus one always stays."},
   {n:"Show me what's installed that I probably don't need",i:"\u{1F5C2}\uFE0F",
    c:"pkg"},
   {n:"Hold a package at its current version",i:"\u{1F4CC}",c:"pkg"},
   {n:"Clear the package cache and reclaim space",i:"\u{1F9F9}",c:"pkg"},
   {n:"Do a distro release upgrade",i:"\u{1F680}",c:"pkg",
-   w:"The heaviest thing on this list. A release upgrade replaces "
-     +"thousands of packages, rewrites config across the system, takes "
-     +"a long time, and requires a reboot you cannot skip — and if it "
-     +"fails partway the box can be left unbootable with no console "
-     +"access. Third-party repositories routinely break it. Take a "
-     +"snapshot or image first; I'll check for one before starting."},
+   w:"Replaces thousands of packages, takes a long time and needs a reboot. A failure partway can leave the server unbootable; third-party repositories often break it. Take a snapshot first; it is checked for before starting."},
   {n:"Why is my disk full?",i:"\u{1F4BE}",c:"diag",pop:1},
   {n:"What's eating my memory right now?",i:"\u{1F4CA}",c:"diag"},
   {n:"Show me the top CPU consumers",i:"\u{1F525}",c:"diag"},
@@ -57552,94 +57484,41 @@ const TASKS=[
   {n:"Create a systemd service for my app",i:"\u{1F501}",c:"svc"},
   {n:"Restart a service and confirm it came back healthy",i:"\u{267B}\uFE0F",
    c:"svc",
-   w:"\"Just restart it\" is how people take down the thing they were "
-     +"trying to fix — especially when the unit name is a guess, or the "
-     +"config it reloads has an error that only surfaces on start. A "
-     +"web server or database that fails to come back stays down until "
-     +"someone notices. I'll name the exact unit, test the config where "
-     +"the service supports it, and reload instead of restarting when "
-     +"that's enough."},
+   w:"A restart with a guessed unit name or a broken config leaves the service down. The exact unit is named, the config tested where possible, and a reload used when it is enough."},
   {n:"Install Docker and add my user to the group",i:"\u{1F433}",c:"svc",
    pop:1,
-   w:"Two things worth knowing. Membership of the docker group is "
-     +"effectively root — anyone in it can mount the host filesystem "
-     +"inside a container and write anywhere. And Docker installs its "
-     +"own iptables rules that can bypass or reorder a UFW allow list "
-     +"you've already set up, quietly exposing published ports you "
-     +"thought were firewalled. I'll flag both as we go."},
+   w:"The docker group is effectively root, and Docker’s own iptables rules can bypass a UFW allow list and expose published ports. Both are flagged as they come up."},
   {n:"Set up nginx as a reverse proxy",i:"\u{1F6A6}",c:"svc",
-   w:"If nginx is already serving something, a new config that fails to "
-     +"parse — or that grabs port 80/443 while another service holds it "
-     +"— takes the existing site down on reload. I'll validate with "
-     +"nginx -t before any reload and keep the old config to fall back "
-     +"to."},
+   w:"A config that fails to parse, or fights for port 80/443, takes the current site down on reload. nginx -t runs before any reload and the old config is kept."},
   {n:"Show me all cron jobs and systemd timers",i:"\u{23F0}",c:"svc"},
   {n:"Disable a service from starting at boot",i:"\u{1F6D1}",c:"svc",
-   w:"Disabling the wrong unit is a problem you don't discover until "
-     +"the next reboot, when the box comes back without networking, "
-     +"without sshd, or without the database everything else depends "
-     +"on. Some units are also pulled in by others, so disabling one "
-     +"can stop more than you meant. I'll confirm exactly what it is "
-     +"and what depends on it first."},
+   w:"The wrong unit shows up at the next reboot: no network, no sshd, no database. Some units pull in others. What it is and what depends on it is confirmed first."},
   {n:"Find and kill a runaway process",i:"\u{1F52A}",c:"svc",
-   w:"Killing by name or by a pattern match hits everything that "
-     +"matches — which routinely includes a database, the SSH daemon "
-     +"you're connected through, or the search command itself. I'll "
-     +"show you the exact PID, what it is and what it's doing, then "
-     +"signal that one number, starting politely before anything "
-     +"forceful."},
+   w:"Killing by name or pattern can hit a database or the sshd you’re connected through. You see the exact PID and what it is; only that one is signalled, gently first."},
   {n:"Show me my network config and public IP",i:"\u{1F310}",c:"net"},
   {n:"Set a static IP on this interface",i:"\u{1F9ED}",c:"net",
-   w:"Network settings apply to the very interface you're connected "
-     +"over. A wrong gateway, netmask or interface name doesn't fail "
-     +"loudly — it drops your session mid-command and the box comes "
-     +"back unreachable. I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"This changes the interface you’re connected over; a wrong gateway or netmask leaves the server unreachable. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Diagnose why I can't reach an external host",i:"\u{1F4E1}",c:"net"},
   {n:"Set up a WireGuard VPN",i:"\u{1F517}",c:"net",pop:1,
-   w:"A VPN rewrites routing and firewall rules on a box you reach over "
-     +"the network. A full-tunnel AllowedIPs of 0.0.0.0/0 applied on "
-     +"the server side, or a NAT rule naming the wrong interface, can "
-     +"blackhole its traffic — including the SSH session you're using. "
-     +"I'll keep this session open the whole time, prove a second connection still works before anything is finalised, and set a timed revert that undoes it unless you confirm you're still in."},
+   w:"A VPN rewrites routing and firewall rules; a full-tunnel AllowedIPs or a wrong NAT interface can cut off the server, this session included. This session stays open, a second connection is proved first, and a timed revert undoes it unless you confirm."},
   {n:"Set the hostname and fix /etc/hosts",i:"\u{1F4DB}",c:"net"},
   {n:"Test bandwidth and latency to a target",i:"\u{1F55B}",c:"net"},
   {n:"Show me disk usage by directory, largest first",i:"\u{1F4BD}",c:"stor"},
   {n:"Mount a new volume and make it persist across reboots",
    i:"\u{1F5C4}\uFE0F",c:"stor",
-   w:"The persistence half is the risky half: a wrong device name or "
-     +"UUID in /etc/fstab doesn't fail now, it fails at the next boot, "
-     +"and a box that can't mount a required filesystem drops to an "
-     +"emergency shell you can't reach over SSH. Formatting the wrong "
-     +"block device destroys whatever was on it. I'll identify the "
-     +"device by UUID, mount by hand to prove it, and validate fstab "
-     +"before it's trusted."},
+   w:"A wrong UUID in /etc/fstab fails at the next boot and drops the server to a shell SSH can’t reach; formatting the wrong device destroys it. The device is found by UUID, mounted by hand first, and fstab validated."},
   {n:"Set up automated backups to remote storage",i:"\u{1F9F0}",c:"stor",
    pop:1},
   {n:"Set up log rotation so logs stop filling the disk",i:"\u{1F500}",
    c:"stor"},
   {n:"Sync a directory to another server",i:"\u{1F4E4}",c:"stor",
-   w:"File sync is one flag away from file deletion. rsync's --delete "
-     +"makes the destination match the source exactly, so a reversed "
-     +"source and destination, or a trailing slash in the wrong place, "
-     +"wipes real data at the far end. Every run starts as a --dry-run "
-     +"you get to read before anything moves."},
+   w:"rsync --delete with the source and destination reversed, or a misplaced trailing slash, wipes real data. Every run starts as a --dry-run you read first."},
   {n:"Free up space by clearing caches and old logs",i:"\u{1F9FD}",c:"stor",
-   w:"Cleanup commands are usually built from a path in a variable. If "
-     +"that variable comes back empty, a tidy-up aimed at a cache "
-     +"directory becomes a recursive delete starting at the filesystem "
-     +"root. Truncating a log a running service still holds open can "
-     +"also confuse or crash it. I'll show you what's actually large, "
-     +"delete by explicit literal path — never a constructed one — and "
-     +"use logrotate rather than removing logs by hand."},
+   w:"A cleanup built from an empty variable deletes from the filesystem root, and truncating a live log can crash its service. You see what is large; deletes use literal paths and logrotate handles logs."},
   {n:"Set up Python with a virtualenv for this project",i:"\u{1F40D}",
    c:"env"},
   {n:"Set the timezone and enable NTP sync",i:"\u{1F30F}",c:"env",
-   w:"Looks harmless, and mostly is — but a large jump in system time "
-     +"invalidates TLS certificates that suddenly aren't valid yet or "
-     +"have \"expired\", breaks Kerberos tickets, and confuses anything "
-     +"doing time-based auth like TOTP or signed API requests. Sessions "
-     +"and cron schedules can behave strangely the instant the clock "
-     +"moves. I'll tell you how far off it is before changing it."},
+   w:"A big jump in system time breaks TLS, Kerberos, TOTP and signed requests, and confuses cron. You see how far off the clock is before it changes."},
   {n:"Configure swap on a box that doesn't have any",i:"\u{1F4A4}",c:"env"},
   {n:"Show me this system's specs and distro info",i:"\u{1F4DD}",c:"env"},
   {n:"Set up my shell with sensible defaults and aliases",i:"\u{1F41A}",
@@ -57757,10 +57636,9 @@ function paintSuggest(){
     box.innerHTML=pool.slice(0,6).map(t=>
       '<button class="sugg task" type="button" data-task="'+esc(t.n)+'">'
       +t.i+" "+esc(t.n)
-      +(t.w?'<span class="twarn" title="Higher risk — I\'ll explain '
-        +'before anything runs">⚠</span>':"")+'</button>').join("")
+      +(t.w?'<span class="twarn" title="Could be hard to undo. Asks first.">⚠</span>':"")+'</button>').join("")
       +'<button class="sugg more" type="button" id="task-more" '
-      +'title="All server tasks">⋯</button>';
+      +'title="All tasks">⋯</button>';
     box.hidden=false;
     // measure-and-trim to ONE row, but the "…" chip always survives.
     // rAF NEVER FIRES IN A HIDDEN DOCUMENT (the Browser pane, a
@@ -58320,25 +58198,25 @@ async function wsRefresh(){
     const st=await(await api("/api/workspace")).json();
     if(st.ok){
       $("#ws-path").value=st.root;
-      $("#ws-note").textContent=st.files+" readable files indexed";
+      $("#ws-note").textContent=st.files+" files indexed";
     }else{
-      $("#ws-note").textContent="point it at a folder to ask about your code";
+      $("#ws-note").textContent="Choose a folder to ask about its code.";
     }
   }catch(e){}
 }
 $("#ws-set").addEventListener("click",async()=>{
   const root=$("#ws-path").value.trim();
   if(!root)return;
-  $("#ws-note").textContent="checking…";
+  $("#ws-note").textContent="Checking…";
   try{
     // a POST (6b320): choosing the folder writes a pref
     const st=await(await api("/api/workspace/set",{method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({root})})).json();
     $("#ws-note").textContent=st.ok
-      ?st.files+" readable files indexed"
-      :(st.err||"that didn't work");
-  }catch(e){$("#ws-note").textContent="couldn't reach the app";}
+      ?st.files+" files indexed"
+      :(st.err||"That didn’t work. Try again.");
+  }catch(e){$("#ws-note").textContent="Couldn’t reach the app. Try again.";}
 });
 
 /* ------------------------------------------------------- funnels */
@@ -60586,7 +60464,7 @@ $("#ck-models").addEventListener("click",async e=>{
     if(!d.ok){inp.value="";inp.placeholder=d.err||"didn\u2019t save";return;}
     const cs=await(await api("/api/cloud")).json();
     ckBoard(cs.providers,cs.active,cs.balance||{});
-  }catch(e2){inp.placeholder="network error";}
+  }catch(e2){inp.placeholder="Couldn’t reach the app. Try again.";}
 });
 /* ------------------------------------------ Settings › Your servers (6b334)
    Model servers the person owns. /api/servers gives each one's
