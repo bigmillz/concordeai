@@ -17220,10 +17220,10 @@ folder (documents and setting gone, files untouched), chats off, the gate shut u
 open without, the handler's wiring, the pause and the dev-copy gate, the model and its update rule, the
 page's privacy line, pane, pills and the one Horizon token block; live on the copy: a folder and a new chat
 indexed within seconds and found over the wire, "/" and a missing folder refused, an unindexed path never
-opened, Forget over the wire, the key and the token required. **Thirteen mutants** each turn a check red: the
+opened, Forget over the wire, the key and the token required. **Fourteen mutants** each turn a check red: the
 gate left open, records given to a cloud-bound answer, a server seat refused the records, the private flag never set, the injection rule dropped,
 the question before the records, the cosine floor gone, the fusion threshold gone, forget leaving documents,
-hidden folders read, an unchanged file re-read, the heading path lost, a dev copy loading the model unasked.
+hidden folders read, an unchanged file re-read, the heading path lost, a dev copy loading the model unasked, the pause spinning on a kick.
 
 **UI.** Minimal, for the Settings builder to fold in: a "Your stuff" pane (the privacy line, the status in
 plain words, "Include my chats", the folders as hairline rows with "Forget this folder", a path field and
@@ -17238,13 +17238,49 @@ need it). Retrieval: **hit@5 31/31, hit@1 26/31** with both lanes (two runs, ide
 31/31, hit@1 21/31. Search latency with the worker resident: median 21 ms (46 max); words alone 1 ms; a cold
 worker adds its load (~3 s, the 8-bit weights). Indexing from nothing: the 222 files and 99 chats parsed,
 chunked and all 331 chunks embedded in about 10 s once the worker is up (a full rebuild logged at 43 s
-included a 30 s error back-off from the schema race that is fixed now, see below). The answer eval
-(`tools/know_eval/run_eval.py`, Fast on this Mac, with and without the index, blind A/B packets judged by
-Opus subagents) was started on this Mac's resident Gemma 4 26B and is NOT finished at this commit: the
-with/without judge scores are still owed (the runner and the blind packets are in `tools/know_eval/`).
+included a 30 s error back-off from the schema race that is fixed now, see below).
+
+**Measured, answers.** `tools/know_eval/run_eval.py` asked the 31 questions on Fast (this Mac's resident
+Gemma 4 26B), with the index and without; with it, 31/31 answers used the records and cited them, no
+errors. Four Opus judges scored the blind A/B packets (`judge_packets.py` adds the person's records on the
+topic, the same for both answers; the key was opened only after) 1 to 10 on correctness against the
+reference, grounding and usefulness. **With the index: 31 wins, 0 ties, 0 losses.** Overall 8.52 against
+2.03 (mean difference +6.48, smallest +2); correctness 8.48 / 1.13, grounding 9.48 / 8.23, usefulness
+8.55 / 1.48. Without it the model says it has no record (honest, so its grounding stays high) or gives
+generic advice. No answer leaked an unrelated record, the rules or a path, and none followed an
+instruction from a record (this corpus plants none; the injection rule is the gauntlet's to test). The
+judges flagged four small unsupported details in with-answers: three are dates the records' own labels
+carry (a file's date, which the judges' copy of the records left out), one a mild inference (why a
+backend was dropped). The weakest with-answer is the rent contract's notice period: the 60 days were found
+and cited, then hedged into generic tenancy rules (4 against 2). Time: median 5.36 s with, 2.62 s without
+(mean 6.3 against 4.2): the records lengthen the prompt.
 
 **Fixed while measuring:** a Settings poll and the indexer opening a fresh index together met "database is
 locked" on the DDL (the schema is now made once, under a retry, and only read after); Read everything again
 deleted the index file under the indexer's open connection, which locked the database for everyone (rows are
 cleared now, the file stays); after the model's download landed the loop slept its full four-minute poll
 before embedding (it now returns in ten seconds while work is pending).
+
+**Fixed for the gauntlet:** the first full run stopped with a NameError. `know_private_now` sits in the
+profile section and reads `_tl_search`, which is declared past the sections, so the older check that execs
+the real `cloud_allowed` into its own namespace (`_ns26`) had no thread-local to read. `_prof_in` now brings
+the real declaration along when a check brings none (the gate itself is unchanged). Two Settings pins grew
+the new pane: the rail order (Your stuff right after Personality, under Account) and the count of pane
+descriptions (six).
+
+**The pause spun (a real bug, found by the second run hanging).** `_know_loop` waits out an answer, a
+benchmark or an update with `wake.wait(KNOW_BUSY_S)`, but a kick (`know_kick(now=True)`, which every chat
+store write makes) leaves `wake` set, and nothing in the pause cleared it: every wait returned at once and
+the indexer read `know_busy` about 2.3 million times a second, a whole core and the GIL, for as long as the
+answer or update ran. The pause now spends the wake. The second gauntlet run showed it at its worst: every
+namespace check that writes chats started an indexer in the test process, and there `know_busy` hits a
+NameError and answers busy forever, so 47 spinning threads starved the run for four and a half hours (ISO-7
+and the emit check went red on the timing alone) until the coordinator stopped it. `_prof_in` now stubs
+`know_kick`, as the know section's own namespace already did (the live copies run the real indexer), and
+`know_kick` only starts for a profile's ctx (a check's bare folder path had started 29 threads that died at
+once on `base.cancel`). A new rule runs the real loop with a kick waiting and counts the busy reads (5 in
+half a second; the mutant, millions), so there are fourteen mutants now, each caught (checked on their own,
+and against a windowless copy on 9893: a folder and a chat indexed in seconds, then 0 % CPU).
+
+**Scorecard: owed.** The full gauntlet runs again once the 7.0 beta's run has the machine; until then this
+commit has the offline checks above, not a full sweep.
