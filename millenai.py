@@ -126,6 +126,9 @@ MACHINE_STATE = frozenset((
     # model) pairs that refused one, the context each server model was last
     # loaded with and the thread's "reuse it" flag: engine facts, nothing personal
     "_srv_think", "_srv_think_refused", "_srv_ctx_seen", "_srv_sticky",
+    # (6b522) the tokenizers loaded for documents and each model's context and
+    # KV size: engine facts, nothing personal
+    "_doc_toks", "_doc_ctx_seen",
     # (6b346) the wakes this thread did for the question in hand: (server name,
     # woke?), taken (and so emptied) before each chat resolves and again
     # right after the headers, so none outlives its request or its profile
@@ -26249,6 +26252,10 @@ def server_only_request(req: dict, ctx) -> bool:
     agent; a picture goes to the same server. It never touches this
     computer's engines, so a benchmark running here doesn't turn it away
     (6b334); making a picture, a video or a file takes the hold later."""
+    if doc_request_docs(req) is not None:
+        # a .md or .txt file is read on this Mac whatever the pick (6b522):
+        # the turn takes this computer's hold like any local answer
+        return False
     if srv_only_tier(req.get("tier")) and not req.get("agent"):
         # "<server> Only" (6b337): one model on that server, or a line
         # saying there isn't one; this computer's engines are not asked
@@ -29865,11 +29872,12 @@ class MuseChannels:
 
 def stream_ollama(tag: str, messages: list, emit,
                   giant: bool = False, big: bool = False,
-                  label: str = "", thinking: bool = False) -> None:
+                  label: str = "", thinking: bool = False, num_ctx: int = 0) -> None:
     """Stream NDJSON from Ollama, calling emit(text_chunk) as tokens arrive.
     `big` is any model over BIG_MODEL_BYTES, `giant` one over GIANT_GB;
     label: the catalog name the usage ledger records (6b325); thinking: a
-    Muse row's strength (muse_level), its only use here (6b533)."""
+    Muse row's strength (muse_level), its only use here (6b533); num_ctx: a
+    document turn's context (6b522), sent as options.num_ctx."""
     options = {"temperature": 0.75}
     extra = {}
     muse = MuseChannels() if label in MUSE_ROWS else None
@@ -29885,6 +29893,13 @@ def stream_ollama(tag: str, messages: list, emit,
         # off the split that keeps attention on the card and the experts
         # in RAM.
         options["num_ctx"] = GIANT_CTX
+    if num_ctx:
+        # A DOCUMENT TURN (6b522): the context the model can hold here, its own
+        # maximum capped by free memory (doc_ctx_use). It wins over GIANT_CTX,
+        # which caps a context for the same reason; Ollama's own default
+        # (a few thousand tokens, or whatever the GPU suggests) would cut the
+        # document from its start without a word
+        options["num_ctx"] = int(num_ctx)
     if giant:
         if tag in OLLAMA_THINK_OFF:
             # Ollama turns thinking ON when a request doesn't say, and
@@ -30232,8 +30247,11 @@ def _bench_guarded(fn):
 
 
 @_bench_guarded
-def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
-    """Stream one model's answer, handling engine startup and templates."""
+def run_model(label: str, messages: list, emit, thinking: bool = False,
+              num_ctx: int = 0) -> None:
+    """Stream one model's answer, handling engine startup and templates.
+    num_ctx: a document turn's context on Ollama (6b522); MLX has no such
+    option, and doc_answer counts the prompt against it instead."""
     # NO 70B fallback: an unknown label used to route to llama3.3:70b on
     # Ollama — a 40 GB model on a 48 GB Mac. Its runner got OOM-killed,
     # Ollama respawned it, repeat forever ("llama-server won't stop
@@ -30272,6 +30290,7 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
             if kind == "ollama":
                 stream_ollama(target, msgs, _tap, label=label,
                               giant=model_is_giant(label),
+                              num_ctx=num_ctx,
                               big=MODEL_MEM_BYTES.get(label, 0)
                               > BIG_MODEL_BYTES, thinking=thinking)
             else:
@@ -30338,6 +30357,626 @@ def run_model(label: str, messages: list, emit, thinking: bool = False) -> None:
                     # the missing ingredient.
                     _need_engine(label, timeout=45.0)
             time.sleep(1.5 * attempts)
+
+
+# ==== doc attach (6b522): begin ====
+# A DOCUMENT IS READ ON THIS MAC (6b522, per Patrick). A .md or .txt file
+# attached with the paperclip is read whole (UTF-8, no 50,000-character
+# slice), its size and tokens are on its chip, and the turn that carries it
+# runs on ONE model of this Mac and nothing else: no cloud call of any kind,
+# no server (the person's own included), no web search, no council, no
+# memory pass. The file rides the turn as <document name="...">...</document>
+# before the person's words. When the turn would fill more than DOC_LIMIT of
+# the context the model can hold here (ctx_use: its own maximum, capped by
+# the memory left after its weights), the page asks first: keep the start,
+# summarise it in parts on the same model, or remove it. The server applies
+# the same budget itself and never trusts the page alone. Other text files
+# (.csv, .json, code...) keep the old path unless they ride with a .md or
+# .txt. NOTES 6b522 has the numbers and the audit of every side path.
+DOC_LOCAL_RX = re.compile(r"\.(?:md|txt)$", re.I)
+DOC_MAX_DOCS = 2             # files a turn carries, as before
+DOC_MAX_CHARS = 2_000_000    # the page's 2 MB file cap, in characters
+DOC_OTHER_CHARS = 50_000     # any other text file, as before (the page slices it too)
+DOC_LIMIT = 0.70             # the share of ctx_use one turn may fill
+DOC_ANSWER_ROOM = 2048       # tokens kept for the answer
+DOC_SUM_ROOM = 1024          # tokens kept for each part's summary
+DOC_SUM_WORDS = 250          # what each part's summary is asked to stay under
+DOC_CHUNK_MAX = 32768        # the most one summary reads, however big ctx_use is
+DOC_CTX_FALLBACK = 8192      # a model whose context can't be read (said so)
+DOC_CTX_FLOOR = 4096         # ctx_use never goes below this
+DOC_MEM_RESERVE = 2_000_000_000   # memory left for macOS and the app
+DOC_CHARS_PER_TOK = 4        # the estimate where the model's tokenizer isn't here
+DOC_HISTORY = 6              # earlier messages a document turn keeps
+DOC_NOTE_ROOM = 96           # tokens kept for each document's partial/summary note
+DOC_VISION = "Qwen 3.5 Vision 9B"   # reads the pictures when a turn has both
+DOC_MODES = ("full", "truncate", "split")
+DOC_ASK = "Summarize the attached file(s) and note anything notable."
+DOC_FRAME = ("The user attached the following document(s). Their contents are "
+             "real data provided by the user — read them and answer from "
+             "them directly and factually.")
+DOC_SUM_SYSTEM = ("You summarise one part of a long document for a reader who "
+                  "will answer a question from the summaries of all its parts. "
+                  "Keep every fact, figure, name, date and decision that could "
+                  "bear on the question. Write only the summary.")
+# the app's words say PC off a Mac (6b317)
+DOC_HERE = pc_words("this Mac")
+# the words follow design/COPY.md: what happened, then what to do
+DOC_NO_MODEL = pc_words(
+    "\u26a0\ufe0f No model on this Mac can read this file, so nothing was sent. "
+    "Install one in Settings \u203a Models.")
+_doc_toks = {}          # tokenizer.json path -> its Tokenizer (machine: no person's data)
+_doc_ctx_seen = {}      # label -> (ctx_max, src, kv bytes a token) (machine)
+_doc_lock = threading.Lock()
+# chats a document was read in (user key, chat id) -> time: /api/title names
+# them on this Mac, never by a server or a provider
+_doc_chats = profile_cache("_doc_chats", {})
+
+
+class DocStopped(Exception):
+    """The reader hung up (Stop) while a document was being summarised."""
+
+
+def doc_is_local(name) -> bool:
+    """A .md or .txt file: read on this Mac (6b522)."""
+    return bool(DOC_LOCAL_RX.search(str(name or "").strip()))
+
+
+def doc_request_docs(req):
+    """The files of a chat request when one of them is a .md or .txt (the
+    turn is then read on this Mac), else None: [{name, text, mode, local}],
+    at most DOC_MAX_DOCS, each text capped as the page caps it. A file's mode
+    is the page's choice ("full", "truncate", "split"); anything else, and
+    every file that isn't .md or .txt, is "full"."""
+    out = []
+    for d in ((req.get("docs") or []) if isinstance(req, dict) else []):
+        if not isinstance(d, dict) or not isinstance(d.get("text"), str) \
+                or not d["text"].strip():
+            continue
+        name = str(d.get("name") or "file")[:200]
+        loc = doc_is_local(name)
+        mode = d.get("mode") if loc and d.get("mode") in DOC_MODES else "full"
+        out.append({"name": name, "mode": mode, "local": loc,
+                    "text": d["text"][:DOC_MAX_CHARS if loc else DOC_OTHER_CHARS]})
+        if len(out) >= DOC_MAX_DOCS:
+            break
+    return out if any(d["local"] for d in out) else None
+
+
+def doc_name_attr(name) -> str:
+    """A file's name as the wrapper's attribute: one line, `"` (and &, <, >,
+    ') escaped, so a name can't end the attribute or the tag."""
+    n = re.sub(r"[\x00-\x1f\x7f]+", " ", str(name or "")).strip()[:200]
+    return html.escape(n or "file", quote=True)
+
+
+_DOC_CLOSE_RX = re.compile(r"<(\s*)/(\s*)(document)", re.I)
+
+
+def doc_neutralise(text) -> str:
+    """A literal </document> inside a file is written <\\/document> (the
+    slash escaped, as JSON escapes it): the model reads the same words, and
+    the file can't close its own wrapper. Any case, spaces anywhere."""
+    return _DOC_CLOSE_RX.sub(
+        lambda m: "<" + m.group(1) + "\\/" + m.group(2) + m.group(3), str(text or ""))
+
+
+def doc_wrap(name, text) -> str:
+    return '<document name="%s">\n%s\n</document>' % (doc_name_attr(name),
+                                                        doc_neutralise(text))
+
+
+def doc_message(docs, question, notes=()) -> str:
+    """The turn's user message: the frame (the documents are real data the
+    user provided; without it a model read ZEBRA-42 and denied it existed,
+    NOTES 1.20.0), a line for each document that is partial or summarised,
+    each document wrapped, and the person's own words last (DOC_ASK when
+    there are none)."""
+    head = "\n".join([DOC_FRAME] + [str(n) for n in notes if n])
+    return (head + "\n\n"
+            + "\n\n".join(doc_wrap(d["name"], d["text"]) for d in docs)
+            + "\n\n" + (str(question or "").strip() or DOC_ASK))
+
+
+def _doc_snapshot(repo) -> str:
+    """The newest cached snapshot folder of an MLX repo, or ''."""
+    try:
+        snaps = glob.glob(os.path.join(_hf_model_dir(repo), "snapshots", "*",
+                                       "config.json"))
+        return os.path.dirname(max(snaps, key=os.path.getmtime)) if snaps else ""
+    except (OSError, ValueError):
+        return ""
+
+
+def doc_tokenizer(label):
+    """label's own tokenizer: its MLX build's tokenizer.json in the Hugging
+    Face cache, read from disk (nothing is fetched) and loaded once per
+    file, with the tokenizers package mlx_lm brings. None when the build
+    isn't cached or the package isn't there: the counts are then
+    estimates."""
+    repo = MLX_REPOS.get(label)
+    snap = _doc_snapshot(repo) if repo else ""
+    path = os.path.join(snap, "tokenizer.json") if snap else ""
+    if not path or not os.path.isfile(path):
+        return None
+    with _doc_lock:
+        if path in _doc_toks:
+            return _doc_toks[path]
+    try:
+        from tokenizers import Tokenizer
+        tok = Tokenizer.from_file(path)
+    except Exception:
+        tok = None
+    with _doc_lock:
+        _doc_toks[path] = tok
+    return tok
+
+
+class DocCounter:
+    """Token counts in one model's terms: its own tokenizer when it is here
+    (exact), else characters / DOC_CHARS_PER_TOK (an estimate, the "≈" on
+    the chip)."""
+
+    def __init__(self, label):
+        self.tok = doc_tokenizer(label)
+        self.exact = self.tok is not None
+
+    def count(self, text) -> int:
+        text = str(text or "")
+        if not text:
+            return 0
+        if self.tok is None:
+            return -(-len(text) // DOC_CHARS_PER_TOK)
+        return len(self.tok.encode(text, add_special_tokens=False).ids)
+
+    def ends(self, text):
+        """Where each token of text ends, as character offsets, never going
+        back; None for an estimate (a token every DOC_CHARS_PER_TOK
+        characters)."""
+        if self.tok is None:
+            return None
+        out, hi = [], 0
+        for _s, e in self.tok.encode(str(text or ""), add_special_tokens=False).offsets:
+            hi = max(hi, e)
+            out.append(hi)
+        return out
+
+
+def _doc_config(repo):
+    """An MLX build's cached config.json, its text_config laid over it (a
+    multimodal build keeps the language model's figures there), or None."""
+    snap = _doc_snapshot(repo) if repo else ""
+    if not snap:
+        return None
+    try:
+        with open(os.path.join(snap, "config.json"), encoding="utf-8") as f:
+            c = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(c, dict):
+        return None
+    for k in ("text_config", "llm_config"):
+        if isinstance(c.get(k), dict):
+            c = dict(c, **c[k])
+    return c
+
+
+def _doc_int(v) -> int:
+    if isinstance(v, list):          # a per-layer list (some GGUFs): the largest
+        v = max([x for x in v if isinstance(x, (int, float))] or [0])
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _doc_kv_cfg(c) -> int:
+    """KV-cache bytes a token from a config. AN ESTIMATE: layers x KV heads x
+    head_dim x 2 (keys and values) x 2 bytes (fp16). It counts every layer
+    as full attention, so it overstates a model with sliding-window or
+    linear-attention layers (Gemma 4, Qwen 3.6): the cap it sets errs on
+    the safe side."""
+    layers = _doc_int(c.get("num_hidden_layers"))
+    heads = _doc_int(c.get("num_attention_heads"))
+    kvh = _doc_int(c.get("num_key_value_heads")) or heads
+    hd = _doc_int(c.get("head_dim")) or (
+        _doc_int(c.get("hidden_size")) // heads if heads else 0)
+    return layers * kvh * hd * 2 * 2 if layers and kvh and hd else 0
+
+
+def _doc_ollama_info(tag) -> dict:
+    """Ollama's /api/show model_info for a tag ({} when it can't say)."""
+    try:
+        req = urllib.request.Request(
+            ollama_url("/api/show"), data=json.dumps({"model": tag}).encode(),
+            headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            mi = json.loads(r.read().decode("utf-8")).get("model_info")
+        return mi if isinstance(mi, dict) else {}
+    except Exception:
+        return {}
+
+
+def _doc_gguf(mi):
+    """(context_length, KV bytes a token) from Ollama's model_info, the
+    same estimate as _doc_kv_cfg (its own key and value lengths)."""
+    arch = str(mi.get("general.architecture") or "")
+    num = lambda k: _doc_int(mi.get(arch + "." + k)) if arch else 0
+    layers = num("block_count")
+    kvh = num("attention.head_count_kv") or num("attention.head_count")
+    kl, vl = num("attention.key_length"), num("attention.value_length")
+    if not (kl and vl):
+        heads = num("attention.head_count")
+        kl = vl = num("embedding_length") // heads if heads else 0
+    return num("context_length"), (layers * kvh * (kl + vl) * 2
+                                   if layers and kvh and kl else 0)
+
+
+def doc_ctx_info(label):
+    """(ctx_max, src, kv): the most context `label` supports and where it was
+    read: "ollama" (/api/show's <arch>.context_length, for a model on an
+    Ollama route), "config" (max_position_embeddings in its MLX build's
+    cached config.json, or text_config's), or "fallback" (DOC_CTX_FALLBACK,
+    a safe figure, when neither says); and its KV-cache bytes a token (0
+    when unknown). Kept once read; a fallback is asked again next time."""
+    with _doc_lock:
+        if label in _doc_ctx_seen:
+            return _doc_ctx_seen[label]
+    kind, target = MODEL_ROUTES.get(label, (None, None))
+    ctx, src, kv = 0, "", 0
+    if kind == "ollama" and target:
+        ctx, kv = _doc_gguf(_doc_ollama_info(target))
+        src = "ollama" if ctx else ""
+    cfg = _doc_config(MLX_REPOS.get(label))
+    if cfg:
+        if not ctx:
+            ctx = _doc_int(cfg.get("max_position_embeddings"))
+            src = "config" if ctx else ""
+        kv = kv or _doc_kv_cfg(cfg)
+    if not ctx:
+        return DOC_CTX_FALLBACK, "fallback", kv
+    with _doc_lock:
+        _doc_ctx_seen[label] = (ctx, src, kv)
+    return ctx, src, kv
+
+
+def _doc_resident(label) -> bool:
+    """label's weights are already in memory (so they aren't counted twice)."""
+    kind, target = MODEL_ROUTES.get(label, (None, None))
+    if kind == "mlx":
+        return _engine_up(target)
+    if kind == "ollama":
+        return target in (_ollama_loaded() or [])
+    return False
+
+
+def doc_ctx_use(label, ctx_max, kv):
+    """(ctx_use, capped): ctx_max, capped by what fits in this computer's
+    free memory: the RAM left after the model's weights (CATALOG's mem_gb,
+    nothing when they are already loaded) and DOC_MEM_RESERVE, over its KV
+    bytes a token, in steps of 1,024. A 256K context would push a 48 GB
+    Mac into swap. Free memory is read as model_fits_memory reads it."""
+    ctx_use, capped = int(ctx_max), False
+    if kv and HAS_PSUTIL:
+        vm = psutil.virtual_memory()
+        avail = max(vm.available, vm.total - vm.used)
+        weights = 0 if _doc_resident(label) else MODEL_MEM_BYTES.get(label, 0)
+        fit = int(max(0, avail - weights - DOC_MEM_RESERVE) // kv)
+        fit = max(DOC_CTX_FLOOR, fit // 1024 * 1024)
+        if fit < ctx_use:
+            ctx_use, capped = fit, True
+    hook = _hook_arg("doc-ctx")          # a dev copy's test hook: a smaller ctx_use
+    if hook.isdigit() and 0 < int(hook) < ctx_use:
+        ctx_use, capped = int(hook), True
+    return ctx_use, capped
+
+
+def doc_limit(ctx_use) -> int:
+    """The tokens one document turn may fill: DOC_LIMIT (70%) of ctx_use."""
+    return int(int(ctx_use) * DOC_LIMIT)
+
+
+def doc_ctx_note(label, ctx_max, src, ctx_use, capped) -> str:
+    if src == "fallback":
+        return "Context unknown. Using %s tokens." % "{:,}".format(ctx_use)
+    if capped:
+        return ("Free memory limits it to %s of %s tokens."
+                % ("{:,}".format(ctx_use), "{:,}".format(ctx_max)))
+    return "Reads up to %s tokens here." % "{:,}".format(ctx_use)
+
+
+def doc_system_text(prefs, agent_system="") -> str:
+    """The system prompt of a document turn: the app's own (or a prompt
+    agent's), the time, and the name and standing instructions the person
+    wrote in Settings."""
+    s = (agent_system or SYSTEM_PROMPT["content"]) + (
+        "\n\nRIGHT NOW for the user it is %s (their local time)."
+        % _venue_stamp("%A, %B %-d, %Y, around %-I%p"))   # the hour, as the chat's own prompt (6b531): the engine's prompt cache survives a turn
+    p = prefs if isinstance(prefs, dict) or hasattr(prefs, "get") else {}
+    name = str(p.get("user_name") or "").strip()[:80]
+    if name:
+        s += "\n\nThe user's name is " + name + "."
+    persona = str(p.get("persona") or "").strip()[:2000]
+    if persona:
+        s += ("\n\nThe user has set standing instructions for how you should "
+              "respond, in their own words:\n\"" + persona + "\"\nFollow them "
+              "without restating them; the current message wins a conflict.")
+    return s
+
+
+def doc_fixed(counter, system, history, docs, question) -> int:
+    """Tokens a turn takes besides its documents' text: the system prompt,
+    the earlier messages, the frame, notes and wrappers, the question, and
+    DOC_ANSWER_ROOM for the answer."""
+    shell = doc_message([{"name": d["name"], "text": ""} for d in docs], question)
+    return (counter.count(system)
+            + sum(counter.count(m.get("content")) for m in history or [])
+            + counter.count(shell) + DOC_ANSWER_ROOM)
+
+
+def doc_measure(label, docs, question="", system="", history=()):
+    """What the chip and the warning bar show (POST /api/doc/measure): each
+    document's tokens in `label`'s terms, the model's context, and the 70%
+    line. need = documents + doc_fixed (with the question); over = need >
+    limit70."""
+    c = DocCounter(label)
+    ctx_max, src, kv = doc_ctx_info(label)
+    ctx_use, capped = doc_ctx_use(label, ctx_max, kv)
+    limit = doc_limit(ctx_use)
+    per = [c.count(d["text"]) for d in docs]
+    fixed = doc_fixed(c, system, history, docs, "")
+    q = c.count(question)
+    need = sum(per) + fixed + q
+    return {"label": label, "engine": MODEL_ROUTES.get(label, ("",))[0],
+            "tokens": sum(per), "exact": c.exact,
+            "docs": [{"name": d["name"], "tokens": n, "chars": len(d["text"])}
+                     for d, n in zip(docs, per)],
+            "ctx_max": ctx_max, "ctx_src": src, "ctx_use": ctx_use,
+            "capped": capped, "kv": kv,
+            "ctx_note": doc_ctx_note(label, ctx_max, src, ctx_use, capped),
+            "limit70": limit, "fixed": fixed, "q_tokens": q,
+            "answer_room": DOC_ANSWER_ROOM, "need": need, "over": need > limit}
+
+
+def _doc_fmt(n) -> str:
+    return "{:,}".format(int(n))
+
+
+def doc_truncate(text, budget, counter):
+    """(text, kept, total): the start of text within `budget` tokens, the
+    marker included. The cut is at the end of a paragraph when one lies in
+    the last fifth of what fits (else a line's, else a word's), and
+    "[truncated: kept the first N of M tokens]" follows it. Text that fits
+    comes back as it is (kept == total)."""
+    from bisect import bisect_right
+    text = str(text or "")
+    ends = counter.ends(text)
+    total = len(ends) if ends is not None else counter.count(text)
+    if total <= budget:
+        return text, total, total
+    mark = "\n\n[truncated: kept the first %s of %s tokens]"
+    # the marker's own tokens, and a margin: a cut re-counted alone can
+    # differ by a token or two at its edge
+    keep = max(0, int(budget) - counter.count(mark % (_doc_fmt(total), _doc_fmt(total))) - 8)
+    cut = ((ends[keep - 1] if keep else 0) if ends is not None
+           else keep * DOC_CHARS_PER_TOK)
+    head = text[:cut]
+    for sep in ("\n\n", "\n", " "):
+        p = head.rfind(sep)
+        if p >= len(head) * 0.8:
+            head = head[:p]
+            break
+    head = head.rstrip()
+    kept = bisect_right(ends, len(head)) if ends is not None else counter.count(head)
+    return head + mark % (_doc_fmt(kept), _doc_fmt(total)), kept, total
+
+
+_DOC_HEAD_RX = re.compile(r"(?m)^#{1,6}[ \t]")     # a markdown heading opens a section
+_DOC_PARA_RX = re.compile(r"\n[ \t]*\n")           # a blank line ends a paragraph
+
+
+def doc_split(text, limit, counter):
+    """text in parts of at most `limit` tokens each, in order, together the
+    whole text (whitespace-only parts left out): split at markdown headings,
+    a section still too long at its paragraphs (blank lines), a paragraph
+    still too long at token boundaries; then neighbours are packed together
+    while they fit."""
+    from bisect import bisect_right
+    text = str(text or "")
+    ends = counter.ends(text)
+    cap = max(32, int(limit) - 16)      # each part re-counted alone may differ at its edges
+
+    def ntok(a, b):
+        if ends is None:
+            return -(-(b - a) // DOC_CHARS_PER_TOK)
+        return bisect_right(ends, b) - bisect_right(ends, a)
+
+    def cuts(a, b, rx, at_start):
+        pts = sorted({(m.start() if at_start else m.end())
+                      for m in rx.finditer(text, a, b)} - {a, b})
+        edges = [a] + [p for p in pts if a < p < b] + [b]
+        return list(zip(edges, edges[1:]))
+
+    def hard(a, b):
+        out = []
+        while a < b:
+            if ends is None:
+                e = a + cap * DOC_CHARS_PER_TOK
+            else:
+                k = bisect_right(ends, a)
+                e = ends[min(k + cap, len(ends)) - 1] if k < len(ends) else b
+            e = min(b, max(e, a + 1))
+            out.append((a, e))
+            a = e
+        return out
+
+    pieces = []
+    for a, b in cuts(0, len(text), _DOC_HEAD_RX, True):
+        if ntok(a, b) <= cap:
+            pieces.append((a, b))
+            continue
+        for pa, pb in cuts(a, b, _DOC_PARA_RX, False):
+            pieces += [(pa, pb)] if ntok(pa, pb) <= cap else hard(pa, pb)
+    parts, cur = [], None
+    for a, b in pieces:
+        if cur and ntok(cur[0], b) <= cap:
+            cur = (cur[0], b)
+        else:
+            if cur:
+                parts.append(cur)
+            cur = (a, b)
+    if cur:
+        parts.append(cur)
+    return [text[a:b] for a, b in parts if text[a:b].strip()]
+
+
+def doc_sum_prompt(name, i, n, part, question):
+    """The ask for one part's summary, focused on the person's question."""
+    return [{"role": "system", "content": DOC_SUM_SYSTEM},
+            {"role": "user", "content": (
+                DOC_FRAME + "\n\n" + doc_wrap("%s (part %d of %d)" % (name, i, n), part)
+                + "\n\nThat is part %d of %d of the document. Summarise this part "
+                  "in at most %d words, focused on the question below, and say in "
+                  "one line what else it covers. If nothing in it bears on the "
+                  "question, say so in one line.\n\nQUESTION: %s"
+                % (i, n, DOC_SUM_WORDS, question))}]
+
+
+def doc_local_pick(tier="", model="", models=None, agent="", images=False):
+    """(label, why): the model of THIS Mac a document turn runs on (6b522),
+    never a server's or the cloud's. With a picture: the picture model here
+    (DOC_VISION) when it is installed and fits. A prompt agent: its best
+    local pick. A mode (Fast, Thinking, Pro, Max): its best local pick, in
+    resolve_tier's own order. A model picked by hand (or the Advanced
+    list): the first that is this Mac's. Anything else (Cloud Only and its
+    picks, "<server> Only", a server's model): this Mac's best that fits,
+    Fast's pick here. ("", "none") when no model of this Mac is installed
+    and fits."""
+    pulled = ollama_pulled_tags() or set()
+
+    def ok(l):
+        return (isinstance(l, str) and l in MODEL_ROUTES and not server_label(l)
+                and model_cached(l, pulled) and model_fits_memory(l)
+                and not slow_giant(l))
+    tier = {"Smart": "Fast", "Best": "Fast", "Power": "Pro"}.get(tier, tier)
+    if images and ok(DOC_VISION):
+        return DOC_VISION, "picture"
+    a = AGENTS.get(agent) if agent else None
+    if a and not a.get("research") and not a.get("remote"):
+        al = resolve_agent(agent)[0]
+        if ok(al):
+            return al, "agent"
+    t = TIERS.get(tier) if isinstance(tier, str) else None
+    if t and not t.get("cloud_only"):
+        pick = next((l for l in _tier_ready(tier) if ok(l)), "")
+        if pick:
+            return pick, "mode"
+    elif not tier:
+        for l in [m for m in (models or []) if isinstance(m, str)] + [str(model or "")]:
+            if ok(l):
+                return l, "picked"
+    best = (next((l for l in _tier_ready("Fast") if ok(l)), "")
+            or next((l for l in MERGE_RANK if ok(l) and l not in BLEND_EXCLUDE), "")
+            or next((l for l in MERGE_RANK if ok(l)), ""))
+    return (best, "best") if best else ("", "none")
+
+
+def doc_answer(label, docs, question, history, system, emit, step, status,
+               gone=lambda: False, images=None) -> dict:
+    """Answer a turn that carries documents on `label`, a model of this Mac,
+    and nothing else (6b522). The budget: the documents may take
+    doc_limit(ctx_use) less doc_fixed. Over it, a document marked "split" is
+    summarised part by part on the same model (each part within the 70%
+    line with DOC_SUM_ROOM for its summary, DOC_CHUNK_MAX at most), then
+    whatever is still over keeps its start with the marker, the room shared
+    by size: a "truncate", or a "full" the page let through (said so). A
+    document that fits is sent whole whatever its mode. Ollama gets
+    options.num_ctx = ctx_use; mlx_lm has no such option, so the count here
+    is the limit there. Streams the answer through emit; returns what it
+    did."""
+    c = DocCounter(label)
+    ctx_max, src, kv = doc_ctx_info(label)
+    ctx_use, capped = doc_ctx_use(label, ctx_max, kv)
+    limit = doc_limit(ctx_use)
+    run_kw = ({"num_ctx": ctx_use}
+              if MODEL_ROUTES.get(label, ("",))[0] == "ollama" else {})
+    q = str(question or "").strip() or DOC_ASK
+    hist = [m for m in (history or []) if isinstance(m, dict)]
+    docs = [dict(d) for d in docs]
+    fixed = doc_fixed(c, system, hist, docs, q)
+    room = max(0, limit - fixed)
+    for d in docs:
+        d["tok"] = c.count(d["text"])
+    total = sum(d["tok"] for d in docs)
+    info = {"label": label, "ctx_max": ctx_max, "ctx_src": src, "ctx_use": ctx_use,
+            "capped": capped, "limit": limit, "fixed": fixed, "tokens": total,
+            "exact": c.exact, "num_ctx": run_kw.get("num_ctx", 0), "parts": 0,
+            "sum_s": 0.0, "truncated": [], "forced": []}
+    step("read", "Read on " + DOC_HERE + ": " + label, "done",
+         "%s%s tokens, %s fit" % ("" if c.exact else "\u2248", _doc_fmt(total),
+                                  _doc_fmt(limit)))
+    notes = []
+    if total > room:
+        room = max(0, room - DOC_NOTE_ROOM * len(docs))    # a note will be said
+        for d in docs:
+            if d.get("mode") != "split":
+                continue
+            shell = sum(c.count(m["content"]) for m in doc_sum_prompt(d["name"], 99, 99, "", q))
+            parts = doc_split(d["text"], max(256, min(DOC_CHUNK_MAX, limit - shell - DOC_SUM_ROOM)), c)
+            n, sums, t0 = len(parts), [], time.time()
+            for i, part in enumerate(parts, 1):
+                if gone():
+                    raise DocStopped()
+                step("council", "Summarizing part %d of %d" % (i, n), "run", d["name"])
+                status("Summarizing part %d of %d" % (i, n))
+                got = []
+
+                def tap(ch, _g=got):
+                    _g.append(ch)
+                    if len(_g) % 32 == 0 and gone():
+                        raise DocStopped()
+                run_model(label, doc_sum_prompt(d["name"], i, n, part, q), tap, **run_kw)
+                sums.append("[Part %d of %d]\n%s" % (
+                    i, n, strip_think("".join(got)).strip() or "(no summary came back)"))
+            info["parts"] += n
+            info["sum_s"] += time.time() - t0
+            step("council", "Summarized %d parts" % n, "done",
+                 "%.0f s" % (time.time() - t0))
+            d.update(name="%s (summaries of %d parts)" % (d["name"], n),
+                     text="\n\n".join(sums))
+            d["tok"] = c.count(d["text"])
+            notes.append("The document “%s” holds summaries of the file’s "
+                         "%d parts, each written for this question; it is not the file "
+                         "itself." % (d["name"], n))
+        total = sum(d["tok"] for d in docs)
+    if total > room:
+        for d in docs:
+            share = room * d["tok"] // total if total else 0
+            if d["tok"] <= share:
+                continue
+            d["text"], kept, whole = doc_truncate(d["text"], share, c)
+            d["tok"] = c.count(d["text"])
+            info["truncated"].append([d["name"], kept, whole])
+            notes.append("The document “%s” is partial: only its first %s of "
+                         "%s tokens are here, and the rest was left out. Answer from "
+                         "what is here, and say so when the answer may be in the "
+                         "missing part." % (d["name"], _doc_fmt(kept), _doc_fmt(whole)))
+            if d.get("mode") != "truncate":
+                # the page let a "full" through over the line (or the
+                # summaries were still too long): the server cuts it, and says so
+                info["forced"].append(d["name"])
+                status("%s was cut to its first %s of %s tokens."
+                       % (d["name"], _doc_fmt(kept), _doc_fmt(whole)))
+    msgs = ([{"role": "system", "content": system}] + hist
+            + [{"role": "user", "content": doc_message(docs, q, notes)}])
+    if images:
+        msgs[-1]["images"] = list(images)
+    info["sent"] = c.count(msgs[-1]["content"])
+    info["prompt"] = sum(c.count(m["content"]) for m in msgs)
+    step("draft", "Writing the answer", "run", label)
+    _stream_guarded(label, msgs, emit, status, None,
+                    "kept the part before it wandered", run_kw=run_kw)
+    return info
+# ==== doc attach (6b522): end ====
 
 
 # ================================================ the hardware benchmark
@@ -32918,7 +33557,7 @@ class _Degenerate(RuntimeError):
 
 
 def _stream_guarded(label: str, msgs: list, emit, status,
-                    fallback: str, note: str) -> bool:
+                    fallback: str, note: str, run_kw=None) -> bool:
     """Stream one model, discarding everything if the output collapses.
 
     The drafts in a blend are each checked before use, but the final text —
@@ -32939,7 +33578,9 @@ def _stream_guarded(label: str, msgs: list, emit, status,
             emit(chunk)
 
         try:
-            run_model(label, msgs, guarded)
+            # run_kw: run_model's options for this call (a document turn's
+            # num_ctx, 6b522)
+            run_model(label, msgs, guarded, **(run_kw or {}))
             if _looks_degenerate("".join(seen)):
                 raise _Degenerate
             rate_frame(emit, _t_first[0], sum(len(c) for c in seen))
@@ -40901,6 +41542,162 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     # ----------------------------------------------------------------- POST
+    # ---------------------------------------------- a document turn (6b522)
+    def _chat_doc(self, req_json, messages, tier, model_name, images, docs):
+        """A chat turn that carries a .md or .txt file (6b522, per Patrick):
+        ONE model of this Mac reads it and nothing else runs. The chat
+        handler calls this once the question is saved and the hold on this
+        computer's engines is taken (server_only_request is False for a
+        document turn), before anything of the tier is resolved; everything
+        after is here. No cloud call (no draft, critic, compositor, query
+        plan or title), no server (the person's own included), no web
+        search, no council, no memory pass; the chat's title is written on
+        this Mac too (/api/title reads _doc_chats). NOTES 6b522 lists every
+        side path and why each is safe."""
+        user_base = self.ctx
+        _cid = str((self._turn or {}).get("id") or "")
+        for _k in [k for k, v in list(_doc_chats.items()) if time.time() - v > 300]:
+            _doc_chats.pop(_k, None)
+        if _cid:
+            _doc_chats[(user_base.name, _cid)] = time.time()
+        last = messages[-1] if messages and isinstance(messages[-1], dict) else {}
+        question = str(last.get("content") or "").strip()
+        history = [{"role": m["role"], "content": str(m.get("content") or "")}
+                   for m in messages[:-1][-DOC_HISTORY:]
+                   if isinstance(m, dict) and m.get("role") in ("user", "assistant")]
+        agent = str(req_json.get("agent") or "")
+        models = req_json.get("models") if isinstance(req_json.get("models"), list) else None
+        label, why = doc_local_pick(tier, model_name, models, agent, bool(images))
+        # a picture with the document is read by the picture model here, in
+        # the same turn; with none installed the pictures are left out, said
+        b64s = ([u.split(",", 1)[1] if u.startswith("data:") else u for u in images]
+                if images and label == DOC_VISION else None)
+        system = doc_system_text(user_prefs(user_base),
+                                 (AGENTS.get(agent) or {}).get("system", "")
+                                 if why == "agent" else "")
+        kind = MODEL_ROUTES.get(label, ("",))[0] if label else ""
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("X-Accel-Buffering", "no")
+        self.send_header("X-Web-Search", "0")
+        if self._turn:
+            self._turn["searched"] = False
+            self.send_header("X-Chat-Id", self._turn["id"])
+        self.send_header("X-Models", header_text(label))
+        self.end_headers()
+
+        # the stream's own plumbing, as the chat handler's: writes under a
+        # lock, kept for the saved turn, a heartbeat while a model loads or
+        # a part is summarised (it re-sends the last status: nothing leaves)
+        wlock = threading.Lock()
+        last_write = [time.time()]
+        last_status = ["reading the document"]
+        hb_stop = threading.Event()
+
+        def _write(data: bytes):
+            with wlock:
+                try:
+                    self.wfile.write(data)
+                    self.wfile.flush()
+                except OSError:
+                    if self._turn is not None:
+                        self._turn["aborted"] = True
+                    raise
+                last_write[0] = time.time()
+                if self._turn is not None:
+                    self._turn["wire"].append(data)
+
+        def _heartbeat():
+            while not hb_stop.wait(5):
+                if time.time() - last_write[0] > 20:
+                    try:
+                        _write(f"{NUL}STATUS:{last_status[0]}{NUL}".encode("utf-8"))
+                    except Exception:
+                        return
+        ctx_thread(target=_heartbeat, daemon=True).start()
+        sent = [0]
+        said = [False]
+
+        def emit(chunk: str):
+            if user_base.cancel.is_set():
+                raise StaleProfile("the profile changed")
+            if not isinstance(chunk, Ctl):
+                chunk = strip_special(chunk).replace(NUL, "")
+            if not chunk:
+                return
+            sent[0] += len(chunk)
+            _write(chunk.encode("utf-8"))
+
+        def memit(chunk: str):
+            if (chunk and not isinstance(chunk, (Ctl, AppText))
+                    and str(chunk).strip()):
+                said[0] = True
+            emit(chunk)
+
+        def step(sid: str, lbl: str, state: str = "run", detail: str = ""):
+            try:
+                _write((NUL + "STEP:" + json.dumps(
+                    {"id": sid, "l": lbl, "s": state, "d": str(detail)[:70]})
+                    + NUL).encode("utf-8"))
+            except Exception:
+                pass
+
+        def status(text: str):
+            text = str(text).replace(NUL, "")
+            last_status[0] = text
+            _write(f"{NUL}STATUS:{text}{NUL}".encode("utf-8"))
+
+        try:
+            if not label:
+                step("read", "No model on " + DOC_HERE, "done", "Nothing sent")
+                emit(AppText(DOC_NO_MODEL))
+                return
+            status("Read on " + DOC_HERE + ": " + label)
+            step("read", "Read on " + DOC_HERE + ": " + label, "run",
+                 "Stays on " + DOC_HERE)
+            if images and not b64s:
+                status("Pictures left out. No picture model on " + DOC_HERE + ".")
+            doc_answer(label, docs, question, history, system, memit, step, status,
+                       gone=lambda: _client_gone(self.connection), images=b64s)
+            if sent[0]:
+                step("draft", "Answer written", "done", "%d chars" % sent[0])
+        except (DocStopped, BrokenPipeError, ConnectionResetError):
+            pass                     # Stop: the page hung up
+        except StaleProfile:
+            raise
+        except Exception as exc:
+            try:
+                emit("\n" + offline_hint(kind, exc))
+            except (BrokenPipeError, ConnectionResetError, StaleProfile):
+                pass
+        finally:
+            hb_stop.set()
+            # the local ledgers, as any answer's: the quality line and the
+            # usage count. No memory pass (6b522): a document's words never
+            # become remembered facts, and no other model reads them
+            if not user_base.cancel.is_set():
+                try:
+                    qpath = user_base.path(QUALITY_FILE)
+                    if os.path.exists(qpath) and os.path.getsize(qpath) > 2_000_000:
+                        user_base.remove(QUALITY_FILE)
+                    user_base.append(QUALITY_FILE, (json.dumps({
+                        "ts": int(time.time()), "tier": tier, "model": label,
+                        "searched": False, "chars": sent[0],
+                    }) + "\n").encode("utf-8"), mode=0o644)
+                except StaleProfile:
+                    pass            # a stale line lands nowhere, as it should
+                except Exception:
+                    pass
+                if said[0]:
+                    try:
+                        usage_put({"t": round(time.time(), 1), "a": 1, "m": label[:80]})
+                    except StaleProfile:
+                        pass
+                    except Exception:
+                        pass
+
     def _do_POST(self):
         if not self._gate():
             return
@@ -41990,6 +42787,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                      and cloud_allowed() else None)
             # a chat "<server> Only" just answered is named by that
             # server's model or not at all (6b337): never a local one
+            # a chat a document was read in (6b522) is named on this Mac,
+            # never by a server or a provider
+            _dc = _doc_chats.get((self.ctx.name, _tcid)) if _tcid else None
+            if _dc and time.time() - _dc < 300:
+                self._send_json({"title": make_title(txt, ask_server=False)
+                                 if txt else ""})
+                return
             _so = (_srv_only_chats.get((self.ctx.name, _tcid))
                    if _tcid else None)
             _co = bool(_tcid and time.time() - _cloud_only_chats.get(
@@ -42354,6 +43158,39 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/import/"):
             self._import_post()              # bring your chats (6b529)
+        if self.path == "/api/doc/measure":
+            # A FILE'S TOKENS AND THE MODEL'S CONTEXT (6b522): what the chip
+            # and the warning bar show, for the model of this Mac the turn
+            # would run on (doc_local_pick, from the page's own pick). Reads
+            # the tokenizer and config from the cache and asks Ollama's
+            # /api/show; no engine is loaded and nothing leaves the computer.
+            d = self._json_body()
+            raw = d.get("docs") if isinstance(d.get("docs"), list) else [d]
+            mdocs = [{"name": str(x.get("name") or "file")[:200],
+                      "text": x["text"][:DOC_MAX_CHARS]}
+                     for x in raw if isinstance(x, dict)
+                     and isinstance(x.get("text"), str)][:DOC_MAX_DOCS]
+            if not mdocs:
+                self._send_json({"err": "Nothing to measure."}, code=400)
+                return
+            _ms = d.get("models") if isinstance(d.get("models"), list) else None
+            _ma = str(d.get("agent") or "")
+            label, why = doc_local_pick(str(d.get("tier") or ""), str(d.get("model") or ""),
+                                        _ms, _ma, bool(d.get("images")))
+            if not label:
+                self._send_json({"err": DOC_NO_MODEL, "label": "", "exact": False,
+                                 "tokens": sum(-(-len(x["text"]) // DOC_CHARS_PER_TOK)
+                                               for x in mdocs)})
+                return
+            _mh = [{"role": h["role"], "content": str(h.get("content") or "")}
+                   for h in (d.get("history") if isinstance(d.get("history"), list) else [])
+                   if isinstance(h, dict) and h.get("role") in ("user", "assistant")][-DOC_HISTORY:]
+            m = doc_measure(label, mdocs, str(d.get("question") or ""),
+                            doc_system_text(user_prefs(self.ctx),
+                                            (AGENTS.get(_ma) or {}).get("system", "")
+                                            if why == "agent" else ""), _mh)
+            m["why"] = why
+            self._send_json(m)
             return
         if self.path != "/api/chat":
             self.send_error(404)
@@ -42481,6 +43318,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _last_cloud.pop((self.ctx.name, _title_cid), None)
         _srv_only_chats.pop((self.ctx.name, _title_cid), None)   # 6b337
         _cloud_only_chats.pop((self.ctx.name, _title_cid), None)  # 6b357
+        _doc_chats.pop((self.ctx.name, _title_cid), None)         # 6b522
         for _k in [k for k, v in list(_last_cloud.items())
                    if time.time() - v[1] > 300]:
             _last_cloud.pop(_k, None)
@@ -42502,6 +43340,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if isinstance(tier, str) and tier in MODE_ALIASES \
                 and MODE_ALIASES[tier] in TIERS:
             tier = MODE_ALIASES[tier]
+        # A .MD OR .TXT FILE IS READ ON THIS MAC (6b522, per Patrick): the turn
+        # leaves here, after the mode's brand name is read (6b534) and before the tier, the server, the cloud or the web
+        # search is looked at, and runs on one local model (_chat_doc)
+        _ldocs = doc_request_docs(req_json)
+        if _ldocs is not None:
+            self._chat_doc(req_json, messages, tier, model_name, images, _ldocs)
+            return
         # Cloud Only, or one of its modes or picks (6b440): "cloud:fast",
         # ":think", ":pro", "cloud:m:<provider>"
         _cl_mode, _cl_pid = cloud_tier_parse(tier)
@@ -47889,6 +48734,30 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   color:var(--dim);font-size:12px;line-height:18px;text-align:center;
   cursor:pointer}
 .docchip b:hover{color:#fff}
+/* a .md or .txt file (6b522): its size and tokens on the chip, a mark when it
+   isn't valid UTF-8, what was chosen for it; the bar above the composer when
+   the message would fill more than 70% of what the model reads here */
+/* the name keeps its own ellipsis, so the chip shows its whole × */
+.docchip.dloc{max-width:380px;padding-right:16px;overflow:visible}
+.docchip .dcn{overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:150px}
+.docchip .dcm{font-style:normal;color:var(--dim);font-size:11.5px;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+.docchip .dcmode{font-style:normal;color:var(--accent);font-size:11px;white-space:nowrap;
+  cursor:pointer}
+.docchip.dbad{border-color:rgba(255,190,90,.55)}
+.docchip .dcbad{color:#ffbe5a}
+#docwarn{max-width:780px;margin:0 auto 8px;padding:10px 12px;border-radius:12px;
+  border:1px solid rgba(255,190,90,.45);background:rgba(40,32,18,.72);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  font-size:12.5px;color:var(--text);line-height:1.45;pointer-events:auto}
+#docwarn[hidden]{display:none}
+#docwarn .dw-n{color:var(--dim);font-size:11.5px;margin-top:2px}
+#docwarn .dw-b{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+#docwarn button{font:inherit;font-size:12px;padding:5px 12px;border-radius:8px;
+  border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);cursor:pointer}
+#docwarn button:hover{background:rgba(255,255,255,.12)}
+#docwarn.nudge{animation:dwnudge .45s}
+@keyframes dwnudge{0%,100%{transform:none}30%{transform:translateX(-4px)}60%{transform:translateX(4px)}}
 .sentimgs{display:flex;gap:8px;margin-top:8px}
 .sentimgs img{max-height:140px;max-width:46%;border-radius:12px;
   border:1px solid var(--line)}
@@ -50635,6 +51504,33 @@ __HZ_FONTS__
   .hz #hz-effort:not(.compact){order:9;flex:1 1 100%;gap:10px}
   .hz #hz-effort:not(.compact) .hz-sl{width:120px}
 }
+/* ---- attached files (6b522) in the Horizon composer: glass chips with the digits in mono, the
+   70% bar as glass lit from below with pill buttons; aligned with the composer in a conversation */
+.hz #imgchips{max-width:none;margin:0 0 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hz #imgchips[hidden]{display:none}
+.hz .docchip{font-family:var(--hz-font-ui);font-size:13px;color:var(--hz-ink);height:30px;padding:0 10px;border-radius:10px;
+  background:var(--hz-glass);border:1px solid var(--hz-glass-line-2);box-shadow:inset 0 -10px 24px -16px rgba(159,192,255,.35)}
+.hz .docchip .dcm{font-family:var(--hz-font-mono);font-size:11px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.hz .docchip .dcmode{color:var(--hz-accent);font-family:var(--hz-font-ui);font-size:12px}
+.hz .docchip.dbad{border-color:rgba(242,179,61,.5)}
+.hz .docchip .dcbad{color:var(--hz-warn)}
+.hz .docchip b{background:rgba(3,4,10,.9);border:1px solid var(--hz-glass-line);color:var(--hz-ink-2)}
+.hz #docwarn{max-width:none;margin:0 0 10px;padding:14px 16px;border-radius:16px;border:1px solid var(--hz-glass-line-2);
+  background:var(--hz-glass-2);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35);
+  font-family:var(--hz-font-ui);font-size:13.5px;line-height:1.45;color:var(--hz-ink)}
+.hz #docwarn[hidden]{display:none}
+.hz #docwarn .dw-t b{font-weight:500}
+.hz #docwarn .dw-n{font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-2);margin-top:4px;font-variant-numeric:tabular-nums}
+.hz #docwarn .dw-b{gap:8px;margin-top:12px}
+.hz #docwarn button{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--hz-glass-line-2);background:rgba(255,255,255,.06);
+  color:var(--hz-ink);font:500 13px var(--hz-font-ui)}
+.hz #docwarn button:hover{background:rgba(255,255,255,.1)}
+.hz #docwarn button:focus-visible{outline:none;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
+.hz #docwarn.nudge{animation:dwnudge .45s}
+.hz #main:not(:has(#hero)) #imgchips,.hz #main:not(:has(#hero)) #docwarn{max-width:var(--hz-read-w);margin-left:calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2)}
+@media (max-width:860px){.hz #main:not(:has(#hero)) #imgchips,.hz #main:not(:has(#hero)) #docwarn{max-width:none;margin-left:0}}
+.hz .novideo #docwarn.nudge{animation:none}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -51107,6 +52003,8 @@ __CODE_ROWS__
          composer's width without having to restate it -->
     <div id="suggest" hidden></div>
     <div id="imgchips" hidden></div>
+    <!-- a .md or .txt file too long for the model here asks first (6b522) -->
+    <div id="docwarn" hidden role="alert"></div>
     <!-- a benchmark is running: said here, the composer kept (6b331) -->
     <div id="bm-busy" hidden></div>
     <!-- Horizon (6b526): the glow under the glass, placed by hzGlowFit -->
@@ -54917,7 +55815,8 @@ function userBody(body,text,docs){
   row.innerHTML=m[1].split(", ").map(n=>{
     const d=(docs||[]).find(x=>x.name===n);
     return '<span class="docchip2" title="'+esc(n)+'">'+ICO.file+'<span>'+esc(n)+'</span>'
-      +(d&&d.tok?'<span class="mono">~'+fmtTok(d.tok)+'</span>':"")+'</span>';}).join("");
+      +(d&&d.tok?'<span class="mono">'+(d.exact?"":"~")+fmtTok(d.tok)+'</span>':"")   // measured (6b522) or estimated
+      +(d&&d.mode&&d.mode!=="full"?'<span class="mono">'+(d.mode==="split"?"summarized":"truncated")+'</span>':"")+'</span>';}).join("");
   body.appendChild(row);
 }
 // no caret on the streaming line: 6b257 retired it per Patrick ("get rid of that pulsing grey
@@ -55329,20 +56228,132 @@ sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()
 // and the request routes to the vision engine. Downscaled client-side so
 // a 12 MP photo doesn't ride the wire.
 let pendingImages=[],pendingDocs=[];
+// A .MD OR .TXT FILE (6b522, per Patrick): read whole as UTF-8, its size and
+// tokens on the chip (chars/4 at once, marked \u2248, then the model's own
+// count from /api/doc/measure), and a bar above the composer when the message
+// would fill more than 70% of what that model reads here: Truncate, Split &
+// summarize, Remove. Other text files keep the old path. Clicks are taken by
+// one listener on each container: a repaint replaces the chips' HTML.
+const DOC_LOCAL=/\.(md|txt)$/i;
+const DOC_MODE_TXT={truncate:"Truncated",split:"Summarized"};
+let docBudget=null,docErr="",docSeq=0;
+function docSize(n){
+  return n<1024?n+" B":n<1048576?(n/1024).toFixed(n<10240?1:0)+" KB":(n/1048576).toFixed(1)+" MB";}
+function docK(n){n=Math.max(0,Math.round(n||0));
+  return n>=1e6?(n/1e6).toFixed(2)+"M":n>=1000?(n/1000).toFixed(n<1e4?1:0)+"K":String(n);}
+// the tooltip adds what the chip can't show: the whole name, who counted,
+// the context here (design/COPY.md: no line that repeats the label)
+function docTip(d){
+  const t=[d.name,d.exact&&docBudget
+    ?(d.tok||0).toLocaleString()+" tokens, counted by "+docBudget.label
+    :"About "+(d.tok||0).toLocaleString()+" tokens"];
+  if(docBudget&&docBudget.ctx_note)t.push(docBudget.ctx_note);
+  else if(docErr)t.push(docErr);
+  if(d.bad)t.push("Some characters couldn\u2019t be read.");
+  return t.join("\n");
+}
 function paintChips(){
   const w=$("#imgchips");
   w.hidden=!pendingImages.length&&!pendingDocs.length;
   w.innerHTML=pendingImages.map((d,i)=>
     '<span class="imgchip"><img src="'+d+'">'+
     '<b data-k="i" data-i="'+i+'" title="Remove">×</b></span>').join("")
-   +pendingDocs.map((d,i)=>
-    '<span class="docchip" title="'+esc(d.name)+'">📄 '+esc(d.name.slice(0,22))+
+   +pendingDocs.map((d,i)=>d.local
+    ?'<span class="docchip dloc'+(d.bad?' dbad':'')+'" title="'+esc(docTip(d))+'">📄 '
+      +'<span class="dcn">'+esc(d.name)+'</span><i class="dcm">'+docSize(d.bytes||0)+'</i>'
+      +'<i class="dcm">'+(d.exact?'':'\u2248')+docK(d.tok)+' tokens</i>'
+      +(d.bad?'<i class="dcm dcbad">Not UTF-8</i>':'')
+      +(DOC_MODE_TXT[d.mode]?'<i class="dcmode" data-k="m" data-i="'+i+'" title="Undo">'
+        +DOC_MODE_TXT[d.mode]+'</i>':'')
+      +'<b data-k="d" data-i="'+i+'" title="Remove">×</b></span>'
+    :'<span class="docchip" title="'+esc(d.name)+'">📄 '+esc(d.name.slice(0,22))+
     '<b data-k="d" data-i="'+i+'" title="Remove">×</b></span>').join("");
-  w.querySelectorAll("b").forEach(b=>b.addEventListener("click",()=>{
-    (b.dataset.k==="i"?pendingImages:pendingDocs).splice(+b.dataset.i,1);
-    paintChips();
-  }));
+  paintDocWarn();
 }
+$("#imgchips").addEventListener("click",e=>{
+  const b=e.target.closest("[data-k]");if(!b)return;
+  const i=+b.dataset.i;
+  if(b.dataset.k==="m"){if(pendingDocs[i])pendingDocs[i].mode="full";paintChips();return;}
+  (b.dataset.k==="i"?pendingImages:pendingDocs).splice(i,1);
+  paintChips();docMeasure();
+});
+// the tokens the message needs, the page's way: the files (the model's count),
+// what the server says the rest takes (system, frame, room for the answer),
+// and the words in the composer at four characters a token
+function docNeed(){
+  if(!docBudget||!docBudget.limit70)return 0;
+  let n=docBudget.fixed||0;
+  pendingDocs.forEach(d=>{n+=d.local?(d.tok||0):Math.ceil((d.text||"").length/4);});
+  return n+Math.ceil(input.value.length/4);
+}
+// over the 70% line with a file nobody has chosen for yet
+function docAsks(){
+  return !!(docBudget&&docBudget.limit70&&docNeed()>docBudget.limit70
+    &&pendingDocs.some(d=>d.local&&d.mode==="full"));
+}
+function paintDocWarn(nudge){
+  const w=$("#docwarn");
+  if(!docAsks()){w.hidden=true;w.innerHTML="";return;}
+  const loc=pendingDocs.filter(d=>d.local),b=docBudget;
+  const tok=loc.reduce((n,d)=>n+(d.tok||0),0),need=docNeed();
+  // the line is 70% of what the model holds here (b.ctx_use); the room for the
+  // files is the line less everything else the message takes
+  // no model name in the line (NORTHSTAR: real models only in details); the title carries it
+  w.innerHTML='<div class="dw-t" title="'+esc(b.label)+'"><b>'+esc(loc.length>1?loc.length+" files":loc[0].name)+'</b> '
+    +(loc.length>1?"are":"is")+' too long for the model on '+(typeof IS_PC!=="undefined"&&IS_PC?"this PC":"this Mac")+'.</div>'
+    +'<div class="dw-n">Needs '+docK(need)+' tokens. '+docK(b.limit70)+' fit'
+    +(b.capped?' in free memory.':'.')+'</div>'
+    +'<div class="dw-b"><button type="button" data-dw="truncate" title="Sends the first '
+    +docK(Math.max(0,b.limit70-(need-tok)))+' tokens">Truncate</button>'
+    +'<button type="button" data-dw="split" title="Summarizes each part, then answers">Split &amp; summarize</button>'
+    +'<button type="button" data-dw="remove">Remove</button></div>';
+  w.hidden=false;
+  if(nudge){w.classList.remove("nudge");void w.offsetWidth;w.classList.add("nudge");}
+}
+$("#docwarn").addEventListener("click",e=>{
+  const b=e.target.closest("button[data-dw]");if(!b)return;
+  if(b.dataset.dw==="remove"){
+    // the biggest file goes; the bar stays if what is left is still over
+    let at=-1;
+    pendingDocs.forEach((d,i)=>{if(d.local&&(at<0||(d.tok||0)>(pendingDocs[at].tok||0)))at=i;});
+    if(at>=0)pendingDocs.splice(at,1);
+    paintChips();docMeasure();return;
+  }
+  pendingDocs.forEach(d=>{if(d.local)d.mode=b.dataset.dw;});
+  paintChips();
+});
+// the model the message would run on, as send() names it
+function docSel(){
+  const a=advOn&&adv?advSendList():[];
+  return a.length?{tier:"",model:"",models:a,agent:agent}:{tier:tier,model:model,models:council,agent:agent};
+}
+function docSelKey(){return JSON.stringify([docSel(),pendingImages.length>0]);}
+async function docMeasure(){
+  const loc=pendingDocs.filter(d=>d.local),my=++docSeq;
+  if(!loc.length){docBudget=null;docErr="";paintDocWarn();return;}
+  const key=docSelKey();
+  try{
+    const r=await api("/api/doc/measure",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(Object.assign(docSel(),{docs:loc.map(d=>({name:d.name,text:d.text})),
+        images:pendingImages.length>0,question:input.value,
+        // the earlier messages the turn will carry (its last six), for the server's sum
+        history:askCtx(messages).slice(-6).map(m=>({role:m.role,content:String(m.content||"")}))}))});
+    const j=await r.json();
+    if(my!==docSeq)return;
+    loc.forEach((d,k)=>{const m=(j.docs||[])[k];if(m){d.tok=m.tokens;d.exact=!!j.exact;}});
+    docBudget=j.ctx_use?Object.assign(j,{key:key}):null;
+    docErr=j.err||"";
+  }catch(e){if(my===docSeq){docBudget=null;docErr="";}}
+  paintChips();
+}
+// the pick changed (paintModels): measured again for the new model
+function docSelChanged(){
+  if(pendingDocs.some(d=>d.local)&&(!docBudget||docBudget.key!==docSelKey()))docMeasure();
+}
+input.addEventListener("input",()=>{if(docBudget)paintDocWarn();});
+// the model chip's words change with every pick (tier, model, Advanced): the
+// file's numbers follow it. Watched from here, so paintModels is untouched
+new MutationObserver(docSelChanged).observe($("#chip-model"),{childList:true,characterData:true,subtree:true});
 function addImageFile(f){
   if(pendingImages.length>=3)return;
   const img=new Image();
@@ -55365,6 +56376,20 @@ function addImageFile(f){
 async function addDocFile(f){
   if(pendingDocs.length>=2)return;
   try{
+    if(DOC_LOCAL.test(f.name)){
+      // UTF-8, WHOLE (6b522): a strict decode says whether the file is valid
+      // UTF-8; one that isn't is still read, what couldn't be read as U+FFFD,
+      // and the chip says so. No 50,000-character slice; the 2 MB cap stands
+      const buf=await f.arrayBuffer();
+      let text,bad=false;
+      try{text=new TextDecoder("utf-8",{fatal:true}).decode(buf);}
+      catch(e){text=new TextDecoder("utf-8").decode(buf);bad=true;}
+      if(!text.trim())return;
+      pendingDocs.push({name:f.name,text,local:true,bytes:f.size,bad,
+        tok:Math.ceil(text.length/4),exact:false,mode:"full"});
+      paintChips();docMeasure();
+      return;
+    }
     const text=(await f.text()).slice(0,50000);
     if(text.trim()){pendingDocs.push({name:f.name,text});paintChips();}
   }catch(e){}
@@ -55521,6 +56546,16 @@ async function send(){
   if(benchOn||generating)return;
   const text=input.value.trim();
   if(!text&&!pendingImages.length&&!pendingDocs.length)return;
+  // A FILE OVER THE LINE ASKS FIRST (6b522): measured again when the pick
+  // changed since, and while the bar waits for a choice nothing is sent
+  if(pendingDocs.some(d=>d.local)){
+    if(!docBudget||docBudget.key!==docSelKey()){
+      sendAsking=true;
+      try{await docMeasure();}finally{sendAsking=false;}
+      if(generating)return;
+    }
+    if(docAsks()){paintDocWarn(true);return;}
+  }
 
   // FUNNEL LANE (6b257, per Patrick): a typed answer IS an answer.
   // Mid-funnel (in the funnel's OWN chat), free text answers the
@@ -55585,7 +56620,8 @@ async function send(){
   messages.push({role:"user",content:shown});
   // the attached files ride as chips with their size in tokens (6b528)
   const uDiv=addMsg("user",shown,null,null,null,null,null,null,
-    {docs:sentDocs.map(d=>({name:d.name,tok:Math.ceil(String(d.text||"").length/4)}))});
+    {docs:sentDocs.map(d=>({name:d.name,tok:d.local&&d.tok?d.tok:Math.ceil(String(d.text||"").length/4),   // the model's own count (6b522) when it was measured
+      exact:!!(d.local&&d.exact),mode:d.mode||""}))});
   if(sentImages.length){
     const row=document.createElement("div");row.className="sentimgs";
     sentImages.forEach(d=>{const im=new Image();im.src=d;row.appendChild(im);});
