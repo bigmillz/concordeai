@@ -18681,3 +18681,93 @@ Playwright at 390 and 1440: no page errors, no API response over 400.
   names a person sees are the Greek ones since 6b534. Pins: the bar's line (`too long for the model on ` and its
   title) re-pinned; 6b522's node-drawn chip and bar check and its copy lint hold on the merged source.
 
+## 6b537 — the shell is the app: release.sh ships the Tauri bundle, the updater carries Python installs into it, CI builds the rest (7.0 beta prep, per Patrick)
+
+On `shell-beta`, from `integ-1` with `rust-shell` (61219c2, 6b532) merged in: one conflict, the
+`_KNOWN_ENV` tuple (both sides had added names; union), and 6b532's NOTES entry moved from the top
+of the file into id order. Nothing was cut or pushed: this branch builds and proves; the owner cuts.
+
+**What ships from here.** `release.sh` builds the macOS asset with `build_shell_dmg.sh`: the Tauri
+shell's `ConcordeAI.app` (universal, `--target universal-apple-darwin`; both Apple targets are
+installed in this Mac's rustup now), into the same styled `ConcordeAI-<version>.dmg` through
+`build_dmg.sh` (which takes the bundle as given when `DMG_APP_READY=1`, and builds the Python app
+as before without it). `packaging/shell_stamp.py` stamps the shell's `version` from `APP_VERSION`
+and writes the sidecar's first-run files into `shell/src-tauri/sidecar/` (git-ignored): `launch.sh`
+extracted from `build_macos_app.sh`'s LAUNCH heredoc, so the venv bootstrap stays one script, and
+the hash-pinned `crypto-requirements.txt`. After the bundle is built, `CFBundleVersion` is set to
+`APP_BUILD` (Tauri writes the version there; the tag the updater compares is `v<APP_BUILD>`),
+`CFBundleShortVersionString` re-asserted, the bundle signed again (`CONCORDE_SIGN_IDENTITY`, ad hoc
+without it) and verified, and both keys, the bundle id, the executable name, the five resources and
+`Resources/millenai.py == millenai.py` are read back; `release.sh` reads the two keys off the bundle
+once more before it publishes. `./release.sh --dry-run [ARG]` needs no `gh`, stamps nothing, builds
+the DMG and the Windows zip, verifies, prints what a real cut would publish and exits before the
+commit. Run here: `--dry-run beta 7.0.0` → "7.0 beta 1 (build 278) as tag v278 (prerelease)";
+universal build 1:47 wall (arm64 alone 1:09); `ConcordeAI-7.0.0.dmg` 5.6 MB (3.5 MB arm64-only),
+`ConcordeAI.app` 12 MB, `ConcordeAI-7.0.0-Windows.zip` 1.0 MB.
+
+**The Windows asset stays the Python app's** (the zip from `build_windows.sh`, the MSI from
+`windows-installer.yml`), recommended for 7.0: the shell runs the server from the venv at
+`%LOCALAPPDATA%\MillenAI\venv`, which the frozen Windows app never makes, so a shell MSI would open
+on the "can't find its Python engine" page; the Windows updater is a browser download of the MSI,
+so switching later changes no contract; and no Windows run of the shell has happened. The shell's
+Windows MSI/NSIS and Linux .deb/AppImage come from Actions as artifacts for testing.
+
+**The updater, proven before it was pinned.** `_SWAP_SCRIPT` waits for `<app>/Contents/MacOS/`
+(the Python launcher `MillenAI` or the shell `ConcordeAI`) instead of `MillenAI` alone, swaps the
+bundle whole and `open -n`s whatever the new bundle is; `Resources/millenai.py` sits at the same
+place in both layouts, so `_app_bundle_path` needed nothing. The shell got `watch_sidecar`: a clean
+exit of the server (the updater's `os._exit(0)`) quits the shell, so the helper's wait ends and the
+relaunch is the new bundle; any other end shows the log's tail. `bootstrap_venv`: a fresh Mac with
+no venv runs the bundled `launch.sh --bootstrap` behind a "Setting up" page, then starts the server
+(macOS only; `CONCORDE_PYTHON` skips it). A dev copy may point the feed at a stand-in with
+`MILLENAI_UPDATE_API` (`UPDATE_API`, honoured only under `DEV_HOME`; the real app reads GitHub
+whatever its environment says), and the three GitHub calls go through the constant. The offer's
+display strips ONE trailing .0 like `short_version` (6b242): the loop here turned "7.0 beta 2" into
+"7 beta 2". Proof, against a fake `api.github.com` + asset server on 9878 and a fake `open` on PATH
+that records the relaunch instead of launching (scratchpad `shellbeta/updproof/proof.py`, 19/19):
+an old Python install (main's millenai.py, 6.1.0/276, in a temp `.app`) on the stable channel is
+not offered the beta; on the beta channel it is offered v277, downloads, hands off, exits 0, the
+helper swaps it into the shell bundle (CFBundleVersion 277, executable ConcordeAI, MillenAI gone,
+`launch.sh` and the pins present, no quarantine, no mount, no `.new`) and asks for `open -n <app>`;
+then that shell install updates to a build-278 DMG the same way. Windowed, with the built bundle
+as a dev copy on 9895: window on screen with the Horizon home, boot cookie and token working (`/`
+200 with the cookie, 403 without; `/api/stats` 200 with the token, 403 without), ready 0.9 s after
+exec; the Quit Apple event sent to the shell's pid stopped shell and server in 0.81 s (port closed,
+note dropped); an `/api/update/install` over the API had the shell gone on its own 1.67 s later,
+the bundle swapped to 278 and the relaunch requested. Screenshot by `screencapture -l` in the
+scratchpad (`shellbeta/smoke/shell-window.png`).
+
+**CI (edited, not pushed).** `shell-build.yml` runs on `release: published` (and dispatch, and
+pushes of `shell/**` to `rust-shell`/`shell-beta`), checks out the release's tag, stamps with
+`shell_stamp.py`, builds Windows (msi,nsis) and Linux (deb,appimage) and uploads them as run
+artifacts; it attaches nothing, because the Windows updater offers the first `.msi` without
+"arm64" in its name and would hand the shell MSI to every Python install. The macOS rows are gone
+from it: the Mac asset is `release.sh`'s. `nightly.yml` builds the shell DMG (`build_shell_dmg.sh`,
+with rustup's two Apple targets, tauri-cli and the cargo cache), so a nightly-channel install on the
+shell is never offered the Python app back; the zip is unchanged. Pushing it means: the next push to
+main that touches the listed paths builds the nightly with the shell (first run cold: ~15 min*
+for the Rust toolchain and tauri-cli; ~5 min* warm), and every published release adds two shell
+jobs (~10 min* each cold).
+
+**Signing.** `security find-identity -v -p codesigning`: 0 valid identities. The beta is ad-hoc
+signed like every build so far: a download is blocked by Gatekeeper until Privacy & Security ▸ Open
+Anyway (the DMG's window says so); the in-app update strips quarantine, so updates never prompt.
+A Developer ID Application certificate in the login keychain (`CONCORDE_SIGN_IDENTITY="Developer
+ID Application: …"`) plus notarisation credentials (`APPLE_ID`/`APPLE_PASSWORD`/`APPLE_TEAM_ID` or an
+API key, read by `cargo tauri build`) would make it open clean; hardened runtime then needs the
+microphone entitlement and, while the venv's dylibs run in-process, nothing more (the venv lives
+outside the bundle).
+
+**Checks.** Four 6b537 checks over `release.sh`, `build_shell_dmg.sh`, `build_dmg.sh`,
+`shell_stamp.py`, `tauri.conf.json`, `main.rs`, the three workflows and the source (the swap
+pattern is rendered and run as a regex against both executables' command lines and the server's),
+and 16 mutants each of which must break one; the 6b443 pin on the swap's pgrep line moved to the
+new pattern. Run standalone (the gauntlet's lock folders were other sessions'): 10/10 with every
+existing check that reads the build scripts or workflows; `ast.parse` clean; pincheck 2164 literal
+pins, 0 real failures (its one line is the absent half of an `or`). Full gauntlet: owed to the
+integration run before the cut.
+
+**Not done, for the cut.** The full gauntlet on this branch; a run of the shell on Intel (the
+universal binary is built, not run there); the Windows shell at all; Linux has no venv path yet; a
+beta from a fresh Mac exercises `bootstrap_venv` for the first time (it needs the Apple CLT's
+python3 and the internet, as the Python app's first run did).
