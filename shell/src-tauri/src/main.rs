@@ -11,7 +11,8 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
@@ -36,6 +37,74 @@ const TL_Y: f64 = 38.0;
 
 /// How long to give the server to write its note before giving up.
 const SERVER_START_TIMEOUT: Duration = Duration::from_secs(180);
+
+/// A sidecar that stops on its own (a crash, a signal, anything but the
+/// updater's clean exit) is started again, at most this many times in a
+/// row (shell-polish); a run that lasted STEADY counts as healthy and
+/// clears the tally. After the last try the window says so plainly.
+const MAX_RESTARTS: u32 = 3;
+const STEADY: Duration = Duration::from_secs(60);
+
+static RESTARTS: AtomicU32 = AtomicU32::new(0);
+/// Set by Quit before the sidecar is stopped, so nothing restarts it.
+static QUITTING: AtomicBool = AtomicBool::new(false);
+
+/// CONCORDE_SHELL_TIMING=1 prints each launch milestone's time since the
+/// process started to stderr (shell-polish; how the launch was measured).
+static T0: OnceLock<Instant> = OnceLock::new();
+fn mark(what: &str) {
+    if std::env::var_os("CONCORDE_SHELL_TIMING").is_some() {
+        let t = T0.get_or_init(Instant::now).elapsed();
+        eprintln!("[shell-timing] {:>7.1} ms  {}", t.as_secs_f64() * 1000.0, what);
+    }
+}
+
+/// NO BLANK WINDOW, THE PAGE FADES IN (shell-polish, per Patrick: "do
+/// better on the Rust version"). The window and the webview are the night
+/// from their first frame (NIGHT); on the app's own page this script, run
+/// at document start in the main frame only, keeps the body out of sight
+/// until the page's script has run and laid it out (DOMContentLoaded and
+/// two frames, a timer beside each frame because a hidden window never
+/// fires one), then fades it in over 240 ms, none under reduced motion.
+/// The page is revealed after 2.5 s whatever happens, and the style is
+/// removed once it is in (no class, no attribute), so the page is left as it was written.
+/// It holds no secret and runs nowhere but http://127.0.0.1.
+const FADE_IN: &str = r#"(function(){
+  if (location.protocol !== "http:" || location.hostname !== "127.0.0.1") return;
+  var calm = false;
+  try { calm = matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) {}
+  var st = document.createElement("style");
+  var bg = "html{background-color:#03040a}";
+  st.textContent = bg + "html>body{opacity:0}";
+  (document.head || document.documentElement).appendChild(st);
+  var done = false;
+  function reveal(){
+    if (done) return; done = true;
+    st.textContent = calm ? "" : bg + "html>body{transition:opacity .24s ease-out}";
+    setTimeout(function(){ st.remove(); }, calm ? 0 : 400);
+  }
+  function frame(f){ var g = false; var h = function(){ if (!g) { g = true; f(); } };
+    try { requestAnimationFrame(h); } catch (e) {} setTimeout(h, 50); }
+  var ready = function(){ frame(function(){ frame(reveal); }); };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", ready);
+  else ready();
+  setTimeout(reveal, 2500);
+})();"#;
+
+/// The calm state while a stopped sidecar is started again: a veil over
+/// whatever the window shows (the page, or the night), its words only.
+/// The bare veil drags the window like the header it covers.
+const RECONNECTING: &str = r#"(function(){
+  if (!document.documentElement || document.getElementById("shell-reconnect")) return;
+  var d = document.createElement("div");
+  d.id = "shell-reconnect"; d.setAttribute("role", "status"); d.setAttribute("data-tauri-drag-region", "");
+  d.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;"
+    + "background:rgba(3,4,10,.78);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);color:#c9d0e2;"
+    + "font:15px/1.5 -apple-system,system-ui,sans-serif;letter-spacing:.01em;opacity:0;transition:opacity .3s ease-out;cursor:default";
+  d.textContent = "Reconnecting…";
+  document.documentElement.appendChild(d);
+  setTimeout(function(){ d.style.opacity = "1"; }, 16);
+})();"#;
 
 // ------------------------------------------------------------------ bridge
 
@@ -84,6 +153,56 @@ const BRIDGE_SHIM: &str = r#"(function(){
 })();"#;
 
 // ------------------------------------------------------------------ sidecar
+
+/// THE SERVER'S BYTECODE, CACHED (shell-polish). `python3 millenai.py`
+/// compiles the whole 3.4 MB file at every launch, because a script run as
+/// __main__ never uses a .pyc: 0.29 s of the sidecar's ~0.4 s boot on an M4
+/// Pro, measured. This runs the same file the same way (as __main__, its
+/// path as argv[0] and __file__, its folder first on sys.path, so its own
+/// code and anything that relaunches it cannot tell), but takes the code
+/// object through the import system's loader, which keeps it under
+/// CONCORDE_PYCACHE (outside the signed bundle) and recompiles whenever the
+/// source's mtime or size changes, or the Python does. Anything wrong with
+/// the cache falls back to compiling, as before; the server's own errors
+/// are never caught here. The path stays on the command line, so every
+/// `pgrep -f millenai.py` still finds the server.
+const BOOT_PY: &str = r#"import os as _cb_os, sys as _cb_sys
+_cb_p = _cb_sys.argv[1]
+_cb_sys.argv = _cb_sys.argv[1:]
+_cb_sys.path[0] = _cb_os.path.dirname(_cb_p)
+_cb_pre = _cb_os.environ.pop("CONCORDE_PYCACHE", "")
+_cb_code = _cb_ld = None
+try:
+    import importlib.machinery as _cb_m
+    _cb_ld = _cb_m.SourceFileLoader("__main__", _cb_p)
+    if _cb_pre:
+        _cb_old = (_cb_sys.pycache_prefix, _cb_sys.dont_write_bytecode)
+        _cb_sys.pycache_prefix, _cb_sys.dont_write_bytecode = _cb_pre, False
+        try:
+            _cb_code = _cb_ld.get_code("__main__")
+        finally:
+            _cb_sys.pycache_prefix, _cb_sys.dont_write_bytecode = _cb_old
+except Exception:
+    _cb_code = None
+if _cb_code is None:
+    with open(_cb_p, "rb") as _cb_f:
+        _cb_code = compile(_cb_f.read(), _cb_p, "exec")
+_cb_g = _cb_sys.modules["__main__"].__dict__
+_cb_g.update(__file__=_cb_p, __cached__=None)
+if _cb_ld is not None:
+    _cb_g["__loader__"] = _cb_ld
+exec(_cb_code, _cb_g)
+"#;
+
+/// Where the cached bytecode lives: the user's Caches folder for the app
+/// on a Mac, a dev copy's own folder for a dev copy (6b319), the data
+/// folder's cache/ elsewhere.
+fn pycache_dir(home: &Path) -> PathBuf {
+    if std::env::var("MILLENAI_DEV").ok().as_deref() != Some("1") && cfg!(target_os = "macos") {
+        return PathBuf::from(expand_tilde("~/Library/Caches/MillenAI/pyc"));
+    }
+    home.join("cache").join("pyc")
+}
 
 struct Sidecar {
     child: Mutex<Option<Child>>,
@@ -242,8 +361,9 @@ fn exit_meaning(code: Option<i32>) -> &'static str {
 fn show_error(app: &AppHandle, title: &str, why: &str, log: &str) {
     // the window shows about:blank until the server is up; the message
     // is a whole document of its own, loaded as a data: URL (no race
-    // with the blank page's load), in the Horizon night
-    let Some(w) = app.get_webview_window("main") else { return };
+    // with the blank page's load), in the Horizon night. The sidecar now
+    // starts before the window is built, so wait a moment for it.
+    let Some(w) = main_window(app) else { return };
     let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let html = format!(
         "<!doctype html><html><head><meta charset=utf-8><style>\
@@ -305,14 +425,75 @@ fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool {
     ok && py.exists()
 }
 
+/// The window, waiting up to 3 s for it: the sidecar starts before the
+/// window is built (shell-polish), so an early message may race it.
+fn main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    let t0 = Instant::now();
+    loop {
+        if let Some(w) = app.get_webview_window("main") {
+            return Some(w);
+        }
+        if t0.elapsed() > Duration::from_secs(3) {
+            return None;
+        }
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
+/// Whether a stop is worth a restart: not the updater's clean exit (0,
+/// which quits the shell) and not a setting the server refuses (2) or a
+/// launch that wanted a window of its own (4): those stop the same way
+/// every time. A crash, a signal, a busy port (1) or a folder still held
+/// by the copy that just died (3) may well start the next time.
+fn restartable(code: Option<i32>) -> bool {
+    !matches!(code, Some(0) | Some(2) | Some(4))
+}
+
+fn exit_label(code: Option<i32>) -> String {
+    code.map(|c| c.to_string()).unwrap_or_else(|| "signal".into())
+}
+
+/// A stop the shell will try to recover from: the veil goes up over the
+/// page and a new sidecar starts after a short pause (1 s, 2 s, 4 s), or,
+/// after MAX_RESTARTS tries in a row, the plain error page says so.
+fn recover(app: AppHandle, code: Option<i32>, log_path: &Path) {
+    if QUITTING.load(Ordering::SeqCst) {
+        return;
+    }
+    let n = RESTARTS.fetch_add(1, Ordering::SeqCst) + 1;
+    if !restartable(code) || n > MAX_RESTARTS {
+        let why = if restartable(code) {
+            format!(
+                "It kept stopping, even after {} restarts: {} (exit {}). Quit ConcordeAI and open it again; the log below says why.",
+                MAX_RESTARTS,
+                exit_meaning(code),
+                exit_label(code)
+            )
+        } else {
+            format!("The server stopped: {} (exit {}).", exit_meaning(code), exit_label(code))
+        };
+        show_error(&app, "ConcordeAI's server stopped", &why, &tail_of(log_path, 30));
+        return;
+    }
+    mark(&format!("sidecar stopped (exit {}), restart {} of {}", exit_label(code), n, MAX_RESTARTS));
+    if let Some(w) = main_window(&app) {
+        let _ = w.eval(RECONNECTING);
+    }
+    std::thread::sleep(Duration::from_secs(1 << (n - 1)));
+    start_sidecar(app);
+}
+
 /// THE SIDECAR'S END IS THE SHELL'S (6b537). The updater (millenai.py's
 /// _do_update) exits the server with 0 and leaves a helper waiting for
 /// this process to be gone before it swaps the bundle and relaunches it
 /// with `open -n`; a clean exit of the server therefore quits the shell,
 /// the way the Python app's own exit closed its window. Any other end
-/// (a crash, a signal) shows the log's tail instead of a dead page. Quit
-/// takes the child out of the state first, so the watcher simply stops.
+/// (a crash, a signal) starts it again behind a "Reconnecting…" veil, up
+/// to MAX_RESTARTS times in a row, then shows the log's tail instead of a
+/// dead page (shell-polish). Quit takes the child out of the state first,
+/// so the watcher simply stops.
 fn watch_sidecar(app: AppHandle, log_path: PathBuf) {
+    let since = Instant::now();
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_millis(200));
         let Some(sc) = app.try_state::<Sidecar>() else { return };
@@ -324,26 +505,29 @@ fn watch_sidecar(app: AppHandle, log_path: PathBuf) {
                     g.take();
                     s
                 }
-                Ok(None) => continue,
+                Ok(None) => {
+                    // a run that held up this long was healthy: the next
+                    // stop starts a fresh tally of tries
+                    if since.elapsed() > STEADY {
+                        RESTARTS.store(0, Ordering::SeqCst);
+                    }
+                    continue;
+                }
                 Err(_) => return,
             }
         };
         if status.code() == Some(0) {
             app.exit(0);
         } else {
-            let why = format!(
-                "The server stopped: {} (exit {}).",
-                exit_meaning(status.code()),
-                status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into())
-            );
-            show_error(&app, "ConcordeAI's server stopped", &why, &tail_of(&log_path, 30));
+            recover(app, status.code(), &log_path);
         }
         return;
     });
 }
 
 /// Start the server and, once it has written its notes, point the window
-/// at it. On its own thread: the window is already up and dark meanwhile.
+/// at it. On its own thread: the window is up and dark meanwhile (it is
+/// built while Python starts, shell-polish).
 fn start_sidecar(app: AppHandle) {
     std::thread::spawn(move || {
         let home = data_home();
@@ -376,7 +560,10 @@ fn start_sidecar(app: AppHandle) {
         let log_path = log_dir(&home).join("shell-server.log");
 
         let mut cmd = Command::new(&py);
-        cmd.arg(&script)
+        cmd.arg("-c")
+            .arg(BOOT_PY)
+            .arg(&script)
+            .env("CONCORDE_PYCACHE", pycache_dir(&home))
             .current_dir(script.parent().unwrap_or(Path::new(".")))
             .env("MILLENAI_SHELL", "tauri")
             .env("PYTHONUNBUFFERED", "1");
@@ -395,6 +582,9 @@ fn start_sidecar(app: AppHandle) {
             }
         }
         cmd.stdin(Stdio::null());
+        if QUITTING.load(Ordering::SeqCst) {
+            return;
+        }
         let mut child = match cmd.spawn() {
             Ok(c) => c,
             Err(e) => {
@@ -402,18 +592,31 @@ fn start_sidecar(app: AppHandle) {
                 return;
             }
         };
+        mark("sidecar spawned");
         let pid = child.id();
         let t0 = Instant::now();
         let mut note: Option<InstanceNote> = None;
         let mut boot: Option<BootNote> = None;
         while t0.elapsed() < SERVER_START_TIMEOUT {
+            if QUITTING.load(Ordering::SeqCst) {
+                let _ = child.kill();
+                let _ = child.wait();
+                return;
+            }
             if let Ok(Some(status)) = child.try_wait() {
-                let why = format!(
-                    "The server stopped before it was ready: {} (exit {}).",
-                    exit_meaning(status.code()),
-                    status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into())
-                );
-                show_error(&app, "ConcordeAI couldn't start", &why, &tail_of(&log_path, 30));
+                // a stop before it was ready is tried again like any other
+                // (a port or the folder's lock still held by the copy that
+                // just died); one that will stop the same way is said at once
+                if !restartable(status.code()) || RESTARTS.load(Ordering::SeqCst) >= MAX_RESTARTS {
+                    let why = format!(
+                        "The server stopped before it was ready: {} (exit {}).",
+                        exit_meaning(status.code()),
+                        exit_label(status.code())
+                    );
+                    show_error(&app, "ConcordeAI couldn't start", &why, &tail_of(&log_path, 30));
+                } else {
+                    recover(app, status.code(), &log_path);
+                }
                 return;
             }
             if note.is_none() {
@@ -437,6 +640,7 @@ fn start_sidecar(app: AppHandle) {
             let _ = child.kill();
             return;
         };
+        mark("sidecar ready (notes read)");
         // the boot code is spent by the first load; it is never kept here
         let _ = std::fs::remove_file(&boot_path);
         if let Some(sc) = app.try_state::<Sidecar>() {
@@ -447,7 +651,7 @@ fn start_sidecar(app: AppHandle) {
             *b.inner.lock().unwrap() = Some((note.port, note.token.clone()));
         }
         let url = format!("http://127.0.0.1:{}/?boot={}", note.port, boot.code);
-        if let Some(w) = app.get_webview_window("main") {
+        if let Some(w) = main_window(&app) {
             if let Ok(u) = Url::parse(&url) {
                 let _ = w.navigate(u);
             }
@@ -457,7 +661,10 @@ fn start_sidecar(app: AppHandle) {
 
 /// Stop the server: SIGTERM first (its handler saves a streaming answer,
 /// stops its engines and drops its note), SIGKILL if it hasn't gone in 8 s.
+/// QUITTING first, so neither the watcher nor a start under way brings it
+/// back.
 fn stop_sidecar(app: &AppHandle) {
+    QUITTING.store(true, Ordering::SeqCst);
     let Some(sc) = app.try_state::<Sidecar>() else { return };
     let child = sc.child.lock().ok().and_then(|mut g| g.take());
     let Some(mut child) = child else { return };
@@ -580,16 +787,112 @@ fn mark_fullscreen(w: &tauri::WebviewWindow) {
     }
 }
 
+// ------------------------------------------------------------ window state
+
+/// WHERE THE WINDOW WAS (shell-polish): its outer position and inner size
+/// in points, and whether it was zoomed, kept in the data folder's
+/// shell-window.json (a dev copy's in its own folder) and put back at the
+/// next launch when it still lands on a screen. Full screen and a
+/// minimised window are never recorded; a zoomed one keeps the size it
+/// unzooms to.
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Default)]
+struct WinState {
+    x: f64,
+    y: f64,
+    w: f64,
+    h: f64,
+    #[serde(default)]
+    zoomed: bool,
+}
+
+#[derive(Default)]
+struct WinMemo {
+    last: Mutex<Option<WinState>>,
+}
+
+fn win_state_path() -> PathBuf {
+    data_home().join("shell-window.json")
+}
+
+fn note_window(w: &tauri::WebviewWindow) {
+    if w.is_fullscreen().unwrap_or(false) || w.is_minimized().unwrap_or(false) || !w.is_visible().unwrap_or(true) {
+        return;
+    }
+    let Some(memo) = w.app_handle().try_state::<WinMemo>() else { return };
+    let Ok(mut g) = memo.last.lock() else { return };
+    if w.is_maximized().unwrap_or(false) {
+        if let Some(s) = g.as_mut() {
+            s.zoomed = true;
+        }
+        return;
+    }
+    let (Ok(sf), Ok(pos), Ok(size)) = (w.scale_factor(), w.outer_position(), w.inner_size()) else { return };
+    *g = Some(WinState {
+        x: pos.x as f64 / sf,
+        y: pos.y as f64 / sf,
+        w: size.width as f64 / sf,
+        h: size.height as f64 / sf,
+        zoomed: false,
+    });
+}
+
+fn save_window_state(app: &AppHandle) {
+    let Some(memo) = app.try_state::<WinMemo>() else { return };
+    let Some(s) = memo.last.lock().ok().and_then(|g| *g) else { return };
+    if let Ok(js) = serde_json::to_string(&s) {
+        let p = win_state_path();
+        let tmp = p.with_extension("json.tmp");
+        if std::fs::write(&tmp, js).is_ok() {
+            let _ = std::fs::rename(&tmp, &p);
+        }
+    }
+}
+
+/// The saved place, if it is sane and at least 160 × 120 points of it
+/// fall on a screen that is there now (a display unplugged since).
+fn restored_window(app: &AppHandle) -> Option<WinState> {
+    let s: WinState = read_json(&win_state_path())?;
+    if !(s.x.is_finite() && s.y.is_finite() && s.w.is_finite() && s.h.is_finite()) {
+        return None;
+    }
+    let s = WinState { w: s.w.clamp(940.0, 10000.0), h: s.h.clamp(620.0, 10000.0), ..s };
+    let on_screen = app.available_monitors().ok()?.iter().any(|m| {
+        let sf = m.scale_factor();
+        let (mx, my) = (m.position().x as f64 / sf, m.position().y as f64 / sf);
+        let (mw, mh) = (m.size().width as f64 / sf, m.size().height as f64 / sf);
+        let ow = (s.x + s.w).min(mx + mw) - s.x.max(mx);
+        let oh = (s.y + s.h).min(my + mh) - s.y.max(my);
+        ow >= 160.0 && oh >= 120.0
+    });
+    on_screen.then_some(s)
+}
+
+/// Bring the window back: a Dock click, a second launch, or a closed
+/// window being reopened.
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
 fn open_window(app: &AppHandle) -> tauri::Result<()> {
     let nav_app = app.clone();
-    let mut b = WebviewWindowBuilder::new(app, "main", WebviewUrl::External("about:blank".parse().unwrap()))
+    let restored = restored_window(app);
+    let b = WebviewWindowBuilder::new(app, "main", WebviewUrl::External("about:blank".parse().unwrap()))
         .title("ConcordeAI")
         .inner_size(1320.0, 860.0)
-        .min_inner_size(940.0, 620.0)
-        .center()
+        .min_inner_size(940.0, 620.0);
+    let b = match restored {
+        Some(s) => b.inner_size(s.w, s.h).position(s.x, s.y),
+        None => b.center(),
+    };
+    let mut b = b
         .background_color(NIGHT)
         .theme(Some(tauri::Theme::Dark))
         .initialization_script(BRIDGE_SHIM)
+        .initialization_script(FADE_IN)
         // only the app's own origin and the shell's own page load in this
         // window; anything else (a link in an answer) goes to the browser
         .on_page_load(|w, payload| {
@@ -598,6 +901,9 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
             }
             if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
                 mark_fullscreen(&w);
+                if payload.url().host_str() == Some("127.0.0.1") {
+                    mark("page loaded");
+                }
             }
         })
         .on_navigation(move |url: &Url| {
@@ -651,11 +957,39 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
     }
     let _ = &mut b;
     let w = b.build()?;
+    mark("window built");
+    if restored.map(|s| s.zoomed).unwrap_or(false) {
+        let _ = w.maximize();
+    }
+    note_window(&w);
     let w2 = w.clone();
-    w.on_window_event(move |ev| {
-        if let tauri::WindowEvent::Resized(_) = ev {
+    w.on_window_event(move |ev| match ev {
+        tauri::WindowEvent::Resized(_) => {
             mark_fullscreen(&w2);
+            note_window(&w2);
         }
+        tauri::WindowEvent::Moved(_) => note_window(&w2),
+        // CLOSING HIDES IT ON A MAC (shell-polish): the app stays in the
+        // Dock with its server and the page as they were (an answer still
+        // streaming goes on), and a Dock click or a second launch brings
+        // the window back (show_main). Quit is Cmd+Q, as in any Mac app.
+        // Full screen is left first, so no empty Space is left behind.
+        #[cfg(target_os = "macos")]
+        tauri::WindowEvent::CloseRequested { api, .. } => {
+            api.prevent_close();
+            save_window_state(&w2.app_handle());
+            if w2.is_fullscreen().unwrap_or(false) {
+                let _ = w2.set_fullscreen(false);
+                let w3 = w2.clone();
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(800));
+                    let _ = w3.hide();
+                });
+            } else {
+                let _ = w2.hide();
+            }
+        }
+        _ => {}
     });
     let _ = nav_app;
     Ok(())
@@ -690,22 +1024,22 @@ fn probe_hook(app: AppHandle) {
 }
 
 fn main() {
+    mark("process start");
     let ctx = tauri::generate_context!();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             // a second launch brings the window forward, like
-            // /api/window/focus did for a second Python launch (6b310)
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.show();
-                let _ = w.set_focus();
-            }
+            // /api/window/focus did for a second Python launch (6b310),
+            // and back from a close (it is only hidden)
+            show_main(app);
         }))
         .plugin(tauri_plugin_opener::init())
         .manage(Bridge::default())
         .manage(Sidecar { child: Mutex::new(None) })
+        .manage(WinMemo::default())
         .invoke_handler(tauri::generate_handler![api_token])
         .setup(|app| {
+            mark("setup");
             let handle = app.handle().clone();
             let menu = build_menu(&handle)?;
             app.set_menu(menu)?;
@@ -716,8 +1050,11 @@ fn main() {
                     }
                 }
             });
-            open_window(&handle)?;
+            // Python first, the window while it boots (shell-polish): the
+            // sidecar's start is most of a launch, so it starts the moment
+            // the app is set up and the window is built beside it
             start_sidecar(handle.clone());
+            open_window(&handle)?;
             // a debug build's test hook: CONCORDE_SHELL_QUIT_AFTER=<secs>
             // quits through the same path as Cmd+Q (ExitRequested), so a
             // script can prove the sidecar stops with the shell
@@ -738,8 +1075,18 @@ fn main() {
         })
         .build(ctx)
         .expect("ConcordeAI's window couldn't be built");
-    app.run(|app, event| match event {
-        RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app),
-        _ => {}
+    app.run(|app, event| {
+        // a Quit Apple event (Cmd+Q, the Dock's Quit) may end the loop with
+        // Exit alone, so the place is written at either
+        if matches!(event, RunEvent::ExitRequested { .. } | RunEvent::Exit) {
+            save_window_state(app);
+        }
+        match event {
+            RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app),
+            // a Dock click with the window closed opens it again
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { .. } => show_main(app),
+            _ => {}
+        }
     });
 }
