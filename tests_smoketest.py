@@ -15658,6 +15658,7 @@ def _ns9(src=None, d=None, hooks=("profiles",), crash=None, spy=None):
     for k_, v_ in (("usage_flush", lambda: None), ("_stop_speaking", lambda: None),
                    ("_say_lock", _t9.RLock()), ("_after_switch", lambda c, m: None)):
         ns.setdefault(k_, v_)
+    ns["know_kick"] = lambda *a, **k: None   # (6b530) no indexer thread in the test process
     ns["READ_FAIL"] = {}
     if crash:
         def _cp(step, _c=crash):
@@ -26717,7 +26718,7 @@ check("auto sleep (live): minutes are brought into 5..1440 by the gateway, a bad
       and all(z_ == {"ok": False, "kind": "gone", "err": "That server isn’t in Settings › Your servers any more."}
               or z_.get("kind") == "gone" for z_ in _z4g)
       and _z_calls == 1
-      and _z5[1] == {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+      and _z5[1] == {"ok": False, "kind": "old", "err": "Needs a newer server kit."}
       and _z6[1].get("ok") is False and _z6[1].get("kind") == "offline"
       and _z6s[1].get("ok") is False and _z6s[1].get("kind") == "offline"
       and _z7[1].get("ok") is True and _z7[1]["sleep"] == {"enabled": True, "minutes": 5, "supported": True},
@@ -26853,9 +26854,9 @@ _l56_n2 = len(_o1("/log")["log"])
 _l56_f2 = _svchat(text="make a video of a red balloon", tier="Fast")
 _l56_fs2 = [d_ for t_, d_ in _l56_f2[2] if t_ == "STATUS"]
 _l56_fparts = {
-    "picture line": any(s_ == "%s couldn\u2019t make the picture (couldn\u2019t make it). Trying another way." % _SVN for s_ in _l56_fs),
+    "picture line": any(s_ == "%s couldn\u2019t make the picture (couldn\u2019t make it). Trying here." % _SVN for s_ in _l56_fs),
     "picture old way": "Gemini key" in _l56_f1[1] and "![" not in _l56_f1[1] and _l56_f1[1].strip() == _l56_c0[1].strip(),
-    "video line": any(s_ == "%s couldn\u2019t make the video (couldn\u2019t make it). Trying another way." % _SVN for s_ in _l56_fs2),
+    "video line": any(s_ == "%s couldn\u2019t make the video (couldn\u2019t make it). Trying here." % _SVN for s_ in _l56_fs2),
     "video old way": "Gemini key" in _l56_f2[1] and "[[vid:" not in _l56_f2[1],
     "let go": bool(_l56_gen(_l56_lg4)) and _l56_gen(_l56_lg4)[-1]["method"] == "DELETE"}
 check("server pictures (live): a job that fails says so in one line and the old way runs unchanged (no picture, the "
@@ -26874,7 +26875,7 @@ _l56_lg5 = _o1("/log")["log"][_l56_n2:]
 _l56_os = [d_ for t_, d_ in _l56_o1[2] if t_ == "STATUS"]
 check("server pictures (live): a server that is off is said in one line, nothing is made anywhere else but the old way, and "
       "the next ask within a minute doesn't wait on it",
-      any(s_ == "%s couldn’t make the picture (didn’t answer). Trying another way." % _SVN for s_ in _l56_os)
+      any(s_ == "%s couldn’t make the picture (didn’t answer). Trying here." % _SVN for s_ in _l56_os)
       and "Gemini key" in _l56_o1[1] and "Gemini key" in _l56_o2[1] and not _l56_gen(_l56_lg5),
       "%r" % [_l56_os[-2:], _l56_o2[1][:100], len(_l56_gen(_l56_lg5))])
 _svq("/api/servers/test", "POST", {"id": _sid34})          # a good check clears the mark
@@ -27332,7 +27333,7 @@ o.prev=findStep(2,3,-1)===1&&findStep(0,3,-1)===2&&findStep(0,1,-1)===0;
 o.start=findStep(-1,3,1)===0&&findStep(-1,3,-1)===2&&findStep(0,0,1)===-1&&findStep(-1,0,-1)===-1;
 // what the count says
 o.count=findCountText(0,7,"a")==="1 of 7"&&findCountText(6,7,"a")==="7 of 7"
-       &&findCountText(-1,0,"a")==="No matches"&&findCountText(0,0,"")===""&&findCountText(2,3,"")==="";
+       &&findCountText(-1,0,"a")==="Nothing found"&&findCountText(0,0,"")===""&&findCountText(2,3,"")==="";
 // review of 6b352: at most 500 marks, the count says "500+", and a short
 // query is not re-applied while an answer streams
 o.more=findCountText(2,500,"a",true)==="3 of 500+"&&findCountText(2,500,"a",false)==="3 of 500";
@@ -27368,7 +27369,7 @@ _FD_MUT = [
     ("next", "return (cur+dir+n)%n;", "return Math.min(cur+dir,n-1);"),
     ("prev", "return (cur+dir+n)%n;", "return Math.max(cur+dir,0);"),
     ("start", "return dir<0?n-1:0;", "return 0;"),
-    ("count", '"No matches"', '"0 of 0"'),
+    ("count", '"Nothing found"', '"0 of 0"'),
     ("count", '(cur+1)+" of "+n', 'cur+" of "+n'),
     ("case", "gi", "gu"),
     ("more", '+(more?"+":"")', ""),
@@ -29472,8 +29473,8 @@ def _m42c_rows(src):
     out["off"] = (R["off"]["off"] is True and R["off"]["pct"] is None
                   and R["off"]["title"] == "Desk · Radeon RX 6900 XT · 16 GB · not answering")
     out["old"] = all(R[k]["off"] is False and R[k]["pct"] is None
-                     and R[k]["title"] == "Desk · Radeon RX 6900 XT · 16 GB · usage not reported "
-                                          "(update the server kit)" for k in ("old", "nulls"))
+                     and R[k]["title"] == "Desk · Radeon RX 6900 XT · 16 GB · Usage not reported. "
+                                          "Update the server kit." for k in ("old", "nulls"))
     out["fresh"] = (R["fresh"]["title"] == "Desk · Radeon RX 6900 XT · 16 GB" and R["fresh"]["pct"] is None
                     and R["fresh"]["off"] is False and R["stale"] == [True, False])
     out["names"] = R["names"] == ["GEFORCE RTX 4090", "NVIDIA", "RADEON RX 7600/7600 XT/76…", "ARC B580",
@@ -29482,7 +29483,7 @@ def _m42c_rows(src):
                    and not any(t_.endswith("more") for t_ in R["many"][1]) and not R["many"][3].endswith("more")
                    and R["many"][1][1] == "Srv1 \u00b7 VRAM" and R["many"][3] == "Srv2 \u00b7 VRAM")
     # the server's memory only while the kit reads no card memory (6b342's row, kept for an older kit)
-    nk = "Desk \u00b7 VRAM \u00b7 usage not reported (update the server kit)"
+    nk = "Desk \u00b7 VRAM \u00b7 Usage not reported. Update the server kit."
     mem = R["mem"]
     out["mem"] = (mem[0] == {"id": "a1:m", "name": "DESK MEMORY", "title": "Desk \u00b7 memory \u00b7 22 of 62 GB in use",
                              "pct": 35, "off": False}
@@ -29637,7 +29638,7 @@ _M42_MUT = [
     ("the bar drawn from the server's memory, not the card's (6b452)", "ru=vram?vu:rU,rt=vram?vt:rT,", "ru=rU,rt=rT,"),
     ("the server's memory never shown when the card's is unread", "vram=vu!=null&&vt!=null,ram=!vram&&rU!=null&&rT!=null,",
      "vram=vu!=null&&vt!=null,ram=false,"),
-    ("an older kit's memory shown as a reading", ':u.ok?"usage not reported (update the server kit)":""];', ':""];'),
+    ("an older kit's memory shown as a reading", ':u.ok?"Usage not reported. Update the server kit.":""];', ':""];'),
     ("the memory reading not kept", "u.ram=d.ram||null;u.fails=0;", "u.ram=null;u.fails=0;"),
     ("memory kept through a miss", "u.gpu=null;u.ram=null;u.fails++;", "u.gpu=null;u.fails++;"),
     ("no backing off", "return fails<=0?3000:fails===1?10000:30000;", "return 3000;"),
@@ -29649,9 +29650,9 @@ _M42_MUT = [
     ("more than two servers' rows", "const rows=all.slice(0,SRV_METER_MAX).map(s=>{", "const rows=all.map(s=>{"),
     ("more than two servers read", "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).slice(0,SRV_METER_MAX);\n}",
      "filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]);\n}"),
-    ("a \"+N more\" left in the second server's titles", "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");\n",
-     "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"usage not reported (update the server kit)\":\"\");t.push(all.length>SRV_METER_MAX?\"+1 more\":\"\");\n"),
-    ("an older kit shown as a reading", ':u.ok?"usage not reported (update the server kit)":"");', ':"");'),
+    ("a \"+N more\" left in the second server's titles", "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"Usage not reported. Update the server kit.\":\"\");\n",
+     "t.push(off?\"not answering\":busy!=null?busy+\"% busy\"\n      :u.ok?\"Usage not reported. Update the server kit.\":\"\");t.push(all.length>SRV_METER_MAX?\"+1 more\":\"\");\n"),
+    ("an older kit shown as a reading", ':u.ok?"Usage not reported. Update the server kit.":"");', ':"");'),
     ("a profile switch leaving the rows", "if(gone){srvUseDead=true;srvAllClose();srvMetersSync();return;}", "if(gone){return;}"),
     ("the dead flag ignored when drawing", "const rows=srvUseDead?[]:srvMeterRows(srvList,srvUse);",
      "const rows=srvMeterRows(srvList,srvUse);"),
@@ -29878,13 +29879,13 @@ def _m53c_link(src):
     R, err = _m53_node(src)
     out = {}
     out["count"] = R["count"] == [0, 0, 0, 1, 2, 3] and R["countKinds"] == [0, 0, 0, 0]
-    out["word"] = R["word"] == ["+1 server more", "+2 servers more", "+3 servers more", "+12 servers more"]
+    out["word"] = R["word"] == ["+1 more", "+2 more", "+3 more", "+12 more"]
     out["none_to_two"] = (R["k1"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
                           and R["k2"] == ["t-head", "meter-row", "meter-row", "srv-meters"]
                           and R["back2"] == R["k2"])
     out["third"] = (R["k3"] == ["t-head", "meter-row", "meter-row", "srv-meters", "srv-more"]
-                    and R["link"] == ["+1 server more", "srv-more", "button", True, 5]
-                    and R["link5"] == ["+3 servers more", True, 1])
+                    and R["link"] == ["+1 more", "srv-more", "button", True, 5]
+                    and R["link5"] == ["+3 more", True, 1])
     out["titles"] = (len(R["titles"]) == 4 and not any(t.endswith("more") for t in R["titles"]))
     out["gone"] = R["none"] == ["t-head", "meter-row", "meter-row"]
     return all(out.values()), [out, err]
@@ -30000,8 +30001,8 @@ def _m54c_text(src):
 
 
 _M53_CHECKS = [
-    ("servers more: no link with one or two servers (the card as it is), \"+N servers more\" from a third "
-     "(\"+1 server more\" singular), gone again, and the old \"+N more\" title text is gone (node)", _m53c_link),
+    ("servers more: no link with one or two servers (the card as it is), \"+N more\" from a third "
+     "(copy-2: one form, no singular), gone again, and no \"more\" left in the rows' titles (node)", _m53c_link),
     ("servers more: the dialog's rows hold every paired server: answering, not answering, an older kit's "
      "\"usage not reported\", \"not read\" past the card's two, no card named (node)", _m53c_rows),
     ("servers more: the dialog opens, takes focus, repaints from the same readings with no request, shows a "
@@ -30042,8 +30043,7 @@ _M53_MUT = [
      'filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX+1);'),
     ("an unpaired server counted", '(list||[]).filter(s=>s.paired&&s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);',
      '(list||[]).filter(s=>s.gpu&&SRV_GPU[s.gpu.vendor]).length-SRV_METER_MAX);'),
-    ("the singular wrong", 'n===1?" server more":" servers more"', 'n===1?" servers more":" servers more"'),
-    ("a count that is not the number left", 'return "+"+n+(n===1', 'return "+"+(n+1)+(n===1'),
+    ("a count that is not the number left", 'function srvMoreWord(n){return "+"+n+" more";}', 'function srvMoreWord(n){return "+"+(n+1)+" more";}'),
     ("the link kept when a server goes", "if(!more){if(link)link.remove();}", "if(!more){}"),
     ("the link left when the rows go", 'const gl=document.getElementById("srv-more");if(gl)gl.remove();', ""),
     ("the link before the rows", "if(tel.lastChild!==link)tel.appendChild(link);", "if(!link.parent)tel.insertBefore(link,box);"),
@@ -30094,8 +30094,8 @@ _M53_MUT = [
      '  $("#chip-model").textContent=tierLabel();\n}'),
     ("the cloud read not moving it", "  cloudChipSet(cs);      // the composer's chip reads the same answer (6b354)\n", ""),
     ("the power switch not moving it", "  if(ok)cloudChipLoad();\n", ""),
-    ("the chip shown from the start", 'title="Cloud models are on" hidden><i></i><b>cloud</b>', 'title="Cloud models are on"><i></i><b>cloud</b>'),
-    ("another tooltip", 'title="Cloud models are on" hidden>', 'title="Cloud is on" hidden>'),
+    ("the chip shown from the start", 'title="Cloud models on" hidden><i></i><b>cloud</b>', 'title="Cloud models on"><i></i><b>cloud</b>'),
+    ("another tooltip", 'title="Cloud models on" hidden>', 'title="Cloud is on" hidden>'),
     ("a colour that isn't blue", ".srv-chip.cloud{--ac:#7cc4ff}", ".srv-chip.cloud{--ac:#ed1c24}"),
 ]
 _m53m = []
@@ -30200,7 +30200,7 @@ def _w46c_settings(src):
     for k, v in cases.items():
         _w46_router(ns, {"/v1/sleep-config": [v]}, [])
         got[k] = ns["server_sleep_get"](ctx, sid)
-    out["errors"] = (got["old"] == {"ok": False, "kind": "old", "err": "Update the server kit to use sleep."}
+    out["errors"] = (got["old"] == {"ok": False, "kind": "old", "err": "Needs a newer server kit."}
                      and got["offline"]["kind"] == "offline" and got["server"]["kind"] == "server"
                      and got["server2"]["kind"] == "server" and got["server3"]["kind"] == "server"
                      and got["server4"]["kind"] == "server"
@@ -30342,7 +30342,7 @@ def _w46c_wake(src):
     h1 = src.index("server_refresh_modes(self.ctx)", h0)
     h2 = src.index("for _wn, _wok in server_take_wake_notes():", h1)
     out["handler"] = (h0 < h1 < h2 and src.index("def status(text: str):", h1) < h2
-                      and 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)' in src[h2:h2 + 200])
+                      and 'status(("%s is awake." if _wok else "%s didn\\u2019t wake.") % _wn)' in src[h2:h2 + 200])
     # first-token deadlines start after the wake: the wake is in the refresh, before any deadline is set
     # only real, private networks get a broadcast of their own
     ifs = [("en0", "192.168.1.20", "255.255.255.0"), ("docker0", "172.17.0.1", "255.255.0.0"),
@@ -30416,17 +30416,17 @@ def _w46c_ui(src):
                                   None, None, None, None, {"v": 7, "clamped": False}]
     v = R["view"]
     out["view"] = (v[0] == v[1] == {"disabled": True, "unknown": True, "checked": False, "minutes": None,
-                                    "hint": "Reading it from the server\u2026"}
-                   and v[2]["disabled"] and v[2]["unknown"] and v[2]["hint"] == "Update the server kit to use sleep."
+                                    "hint": "Reading\u2026"}
+                   and v[2]["disabled"] and v[2]["unknown"] and v[2]["hint"] == "Needs a newer server kit."
                    and v[3] == {"disabled": True, "unknown": True, "checked": False, "minutes": None,
-                                "hint": "Couldn\u2019t read the setting. The server isn\u2019t answering."}
+                                "hint": "The server isn\u2019t answering."}
                    and v[4]["hint"] == "Nope." and v[4]["disabled"] and v[5]["hint"] == "Couldn\u2019t read the setting."
                    and v[6] == {"disabled": True, "unknown": False, "checked": True, "minutes": 45,
-                                "hint": "This server can\u2019t sleep (no deep sleep)."}
+                                "hint": "This server can\u2019t sleep."}
                    and v[7] == {"disabled": False, "unknown": False, "checked": False, "minutes": 45,
-                                "hint": "Sleeps after this long with no questions, and wakes when you ask."}
+                                "hint": "Sleeps after this long idle. Wakes when you ask."}
                    and v[8]["disabled"] is False and v[8]["checked"] is True and v[8]["minutes"] == 5
-                   and v[8]["hint"].endswith("Waking it from here needs wake-on-LAN set up on the server."))
+                   and v[8]["hint"].endswith("Needs Wake-on-LAN on the server."))
     n = R["next"]
     out["next"] = (n[0] == {"st": "ok", "enabled": True, "minutes": 45, "supported": True, "wakeable": True}
                    and n[1] == {"st": "old"}
@@ -30440,11 +30440,11 @@ def _w46c_ui(src):
                    and h[1] == ('<div class="srv-sleep"><div class="srv-row"><label class="srv-pref">'
                                 '<input type="checkbox" data-a="sleepon" checked><span>Sleep when idle</span></label>'
                                 '<span class="srv-mins"><input type="number" min="5" max="1440" step="1" inputmode="numeric" '
-                                'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes with no questions before it sleeps">'
-                                '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long with no questions, '
-                                'and wakes when you ask.</div><div class="srv-relay"><div class="srv-wakerow"><button class="about-btn slim" '
+                                'data-a="sleepmin" data-k="smin" value="45" aria-label="Minutes idle before sleep">'
+                                '<span>minutes</span></span></div><div class="srv-hint">Sleeps after this long idle. '
+                                'Wakes when you ask.</div><div class="srv-relay"><div class="srv-wakerow"><button class="about-btn slim" '
                                 'data-a="relayopen" aria-expanded="false">Advanced<span class="srv-disc" aria-hidden="true"></span></button></div></div></div>')
-                   and "<input" not in h[2] and "Reading it from the server\u2026" in h[2] and "Sleep when idle" in h[2]
+                   and "<input" not in h[2] and "Reading\u2026" in h[2] and "Sleep when idle" in h[2]
                    and "&lt;b&gt;x&lt;/b&gt; &amp; y" in h[3] and "<b>x</b>" not in h[3] and "<input" not in h[3]
                    and "<input" not in h[4] and 'value="30"' not in h[4] and "checked" not in h[4])
     # THE SERVER HOLDS IT (6b375): a read that fails shows "couldn't read", never an off switch or a
@@ -30459,7 +30459,7 @@ def _w46c_ui(src):
                         and wr[2] == {"st": "off"} and wr[3] == {"st": "old"}
                         and wr[4] == {"st": "ok", "enabled": False, "minutes": 60, "supported": True, "wakeable": True}
                         and all(x["unknown"] and not x["checked"] and x["minutes"] is None and x["disabled"] for x in un)
-                        and "Couldn\u2019t read the setting. The server isn\u2019t answering." in R["htmlOff"]
+                        and "The server isn\u2019t answering." in R["htmlOff"]
                         and "<input" not in R["htmlOff"] and "<input" not in R["htmlErr"])
     # the card carries it, loads it with the pane, and the strings have no product name
     a = src.index("function srvSleepParse(raw){")
@@ -30675,7 +30675,7 @@ _W46_MUT = [
     ("woken by reading the setting", '    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"',
      '    server_wake_if_down(e)\n    try:\n        st, js = _srv_json(e, method, "/v1/sleep-config"'),
     ("the wake's notes kept from an earlier request", "server_take_wake_notes()           # none left from an earlier request on this thread (6b346)\n", ""),
-    ("the chat not told", 'status(("Woke %s." if _wok else "%s didn\\u2019t wake.") % _wn)', "pass"),
+    ("the chat not told", 'status(("%s is awake." if _wok else "%s didn\\u2019t wake.") % _wn)', "pass"),
     ("the wake after the headers made before them", "        if _so_wake and _srv_only:\n", "        if False:\n"),
     ("no status while it waits", 'r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None)',
      'r = server_wake(e, None, alive, wait_s, skip.is_set if skip is not None else None)'),
@@ -30694,7 +30694,7 @@ _W46_MUT = [
     ("the last opening's values shown while it loads", 'gs.forEach(s=>{srvSleep[s.id]={st:"load"};});',
      'gs.forEach(s=>{if(!srvSleep[s.id])srvSleep[s.id]={st:"load"};});'),
     ("a failed read called off", 'if(k==="offline"||!k)return {st:"off"};', 'if(k==="offline"||!k)return {st:"ok",enabled:false,minutes:30,supported:true};'),
-    ("an old kit usable", 'else if(z.st==="old")v.hint="Update the server kit to use sleep.";', 'else if(z.st==="old")v.hint="";'),
+    ("an old kit usable", 'else if(z.st==="old")v.hint="Needs a newer server kit.";', 'else if(z.st==="old")v.hint="";'),
     ("no deep sleep usable", "else if(z.supported===false)v.hint", "else if(false)v.hint"),
     ("an old kit's answer lost", 'if(k==="old")return {st:"old"};', ""),
     ("the pane not loading the setting", "loadServers(true).then(srvSleepLoadAll);", "loadServers(true);"),
@@ -30916,8 +30916,8 @@ def _l30c_ui(src):
     w = R["wake"]
     wo = R["wakeOff"]
     out = {}
-    out["button"] = ('data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>' in w[0] and w[1] == "" and 'data-a="lansettings"' not in w[0])
-    out["amber"] = ("isn’t allowing local-network access" in w[2] and 'data-a="lansettings"' in w[2]
+    out["button"] = ('data-a="waketest">Wake server</button>' in w[0] and w[1] == "" and 'data-a="lansettings"' not in w[0])
+    out["amber"] = ("Local network access is off (Settings &gt; Privacy &amp; Security &gt; Local Network)." in w[2] and 'data-a="lansettings"' in w[2]
                     and "srv-amber" in w[2])
     out["in the card"] = ('data-a="waketest"' in w[3] and 'data-a="waketest"' in w[4] and 'data-a="waketest"' not in w[5]
                           and '<input type="checkbox" data-a="sleepon"' in w[4])
@@ -30971,7 +30971,7 @@ _L30_MUT = [
     ("the sleep switch not asking", "                srv_lan_touch_bg(self.ctx, [sid])    # the switch", "                pass    # the switch"),
     ("the button on every card", "function srvWakeBtn(s){\n  if(!srvLan||!s.wakeable)return \"\";", "function srvWakeBtn(s){\n  if(false)return \"\";"),
     ("the amber line always", "(s.lan_blocked?'<div class=\"srv-hint srv-amber\">'", "(true?'<div class=\"srv-hint srv-amber\">'"),
-    ("the blocked wording lost", "isn\\u2019t letting ConcordeAI use the local network.", "isn\\u2019t working."),
+    ("the blocked wording lost", "Local network access is off. Turn on ConcordeAI in System Settings > Privacy & Security > Local Network.", "Local network access is off."),
 ]
 _l30m = []
 for _d30, _o30, _n30 in _L30_MUT:
@@ -31167,9 +31167,9 @@ def _l31c_post(src):
                           and json.loads(h["body"]) == {"macs": [_L30_MAC]} and "?" not in h["path"]
                           and _L31_TOK.encode() not in h["body"]
                           and ns["_srv_relay_state"].get(sid) == {"ok": True, "err": ""})
-        for mode, kind, err in (("401", "token", "Relay refused the token."),
-                                ("403", "denied", "Relay doesn’t allow this server."),
-                                ("429", "limited", "Relay is limiting wake-ups. Try again in a moment.")):
+        for mode, kind, err in (("401", "token", "The relay refused the token."),
+                                ("403", "denied", "The relay doesn’t allow this server."),
+                                ("429", "limited", "The relay is limiting wake-ups. Try again in a moment.")):
             st["mode"] = mode
             r = ns["_srv_relay_post"](e)
             out[mode] = r["ok"] is False and r["kind"] == kind and r["err"] == err and ns["_srv_relay_state"][sid] == {"ok": False, "err": err}
@@ -31254,9 +31254,9 @@ def _l31c_wake(src):
         s2 = _l31_wait(ns, sid)
         time.sleep(0.1)
         pv = ns["_srv_public"](ns["_srv_read"](ctx)[0])
-        out["both refused"] = (ns["_srv_wake_blocked"].get(sid) is True and s2 == {"ok": False, "err": "Relay refused the token."}
+        out["both refused"] = (ns["_srv_wake_blocked"].get(sid) is True and s2 == {"ok": False, "err": "The relay refused the token."}
                                and pv["lan_blocked"] is True and pv["status"]["relay_ok"] is False
-                               and pv["status"]["relay_err"] == "Relay refused the token.")
+                               and pv["status"]["relay_err"] == "The relay refused the token.")
         # a slow relay is not waited for
         st["mode"], st["sleep"] = "ok", 1.5
         ns["_srv_wake_at"].clear()
@@ -31325,7 +31325,7 @@ def _l31c_test(src):
                        and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is False)
         st["mode"] = "401"
         r = ns["server_wake_test"](ctx, sid)
-        out["both refused"] = (r["ok"] is False and r["blocked"] is True and r["relay"] == {"ok": False, "err": "Relay refused the token."}
+        out["both refused"] = (r["ok"] is False and r["blocked"] is True and r["relay"] == {"ok": False, "err": "The relay refused the token."}
                                and ns["_srv_public"](ns["_srv_read"](ctx)[0])["lan_blocked"] is True)
         # 6b456: the broadcast leaves without error but the relay says no: ok stays
         # true for the broadcast, and the relay's own failure travels with it
@@ -31333,7 +31333,7 @@ def _l31c_test(src):
         ns["_srv_udp"] = lambda pkt, addr: events.append("udp")
         r = ns["server_wake_test"](ctx, sid)
         out["sent, relay refused"] = (r["ok"] is True and r["blocked"] is False and r["failed"] == 0
-                                      and r["relay"] == {"ok": False, "err": "Relay refused the token."})
+                                      and r["relay"] == {"ok": False, "err": "The relay refused the token."})
         st["mode"] = "ok"
         # relay only: no broadcast, no Mac needed, the card's words
         events.clear()
@@ -31341,8 +31341,8 @@ def _l31c_test(src):
         ns["IS_MAC"] = False
         ns["_srv_udp"] = lambda pkt, addr: events.append("UDP")
         r = ns["server_wake_test"](ctx, sid, True)
-        out["relay only ok"] = (r == {"ok": True, "kind": "ok", "err": "Relay answered: wake-up sent."} and events == ["relay"])
-        for mode, kind, err in (("401", "token", "Relay refused the token."), ("403", "denied", "Relay doesn’t allow this server.")):
+        out["relay only ok"] = (r == {"ok": True, "kind": "ok", "err": "The relay sent the wake-up."} and events == ["relay"])
+        for mode, kind, err in (("401", "token", "The relay refused the token."), ("403", "denied", "The relay doesn’t allow this server.")):
             st["mode"] = mode
             r = ns["server_wake_test"](ctx, sid, True)
             out["relay only " + mode] = r == {"ok": False, "kind": kind, "err": err}
@@ -31466,16 +31466,16 @@ for _n31, _o31, _d31 in _l31_run(_MILLENAI_SRC):
 
 _L31_MUT = [
     ("the token in the view", '"has_token": bool(e.get("relay_token"))}', '"has_token": e["relay_token"].reveal()}'),
-    ("any scheme", '    if u.scheme not in ("http", "https"):\n        return "", "Start the address', '    if False:\n        return "", "Start the address'),
+    ("any scheme", '    if u.scheme not in ("http", "https"):\n        return "", "Start with http', '    if False:\n        return "", "Start with http'),
     ("any port", '    if port is not None and not 1 <= port <= 65535:', '    if False:'),
     ("a login in the address", 'if ("@" in u.netloc or "?" in s or', 'if ("?" in s or'),
-    ("a path in the address", 'u.path not in ("", "/")):\n        return "", "Type the address only, like http://10.0.0.5:8080."',
-     'False):\n        return "", "Type the address only, like http://10.0.0.5:8080."'),
+    ("a path in the address", 'u.path not in ("", "/")):\n        return "", "Enter the address only, like http://10.0.0.5:8080."',
+     'False):\n        return "", "Enter the address only, like http://10.0.0.5:8080."'),
     ("the wrong header", '"X-Relay-Token": tok.reveal()', '"X-Relay-Token": "x"'),
     ("the wrong path", 'conn.request("POST", "/v1/wake"', 'conn.request("POST", "/wake"'),
     ("no cards in the body", 'json.dumps({"macs": list(e.get("wake") or [])})', 'json.dumps({"macs": []})'),
     ("a redirect not named", '        if 300 <= st < 400:\n', '        if False:\n'),
-    ("the token in an answer", 'return done(False, "token", "Relay refused the token.")', 'return done(False, "token", "Relay refused the token %s." % tok.reveal())'),
+    ("the token in an answer", 'return done(False, "token", "The relay refused the token.")', 'return done(False, "token", "The relay refused the token %s." % tok.reveal())'),
     ("a relay never asked", '        ctx_thread(target=_ask, daemon=True).start()\n', '        pass\n'),
     ("the relay waited for", '        ctx_thread(target=_ask, daemon=True).start()\n', '        _ask()\n'),
     ("blocked though the relay answered (wake)", '_srv_wake_blocked[e["id"]] = refused and not r["ok"]', '_srv_wake_blocked[e["id"]] = refused'),
@@ -31533,8 +31533,8 @@ process.stdout.write(JSON.stringify(R));
     R = json.loads(p.stdout)
     out = {}
     row = '<div class="srv-wakerow"><button class="about-btn slim" data-a="waketest"'
-    out["label"] = ('>Wake up server</button>' in R["closed"] and "Test wake-up" not in R["closed"]
-                    and "Test wake" not in src and "Wake up server" in src)
+    out["label"] = ('>Wake server</button>' in R["closed"] and "Test wake-up" not in R["closed"]
+                    and "Test wake" not in src and "Wake server" in src)
     for k in ("closed", "unknown", "open", "blocked"):
         c = R[k]
         wb = c.index('data-a="waketest"')
@@ -31558,10 +31558,10 @@ for _n36, _o36, _d36 in _l36_run(_MILLENAI_SRC):
     check("wake row: " + _n36, _o36, _d36)
 
 _L36_MUT = [
-    ("old label", '>Wake up server</button>', '>Test wake-up</button>'),
+    ("old label", '>Wake server</button>', '>Test wake-up</button>'),
     ("advanced first", "return '<div class=\"srv-relay\"><div class=\"srv-wakerow\">'+srvWakeBtn(s)\n    +'<button class=\"about-btn slim\" data-a=\"relayopen\"",
      "return '<div class=\"srv-relay\"><div class=\"srv-wakerow\">'\n    +'<button class=\"about-btn slim\" data-a=\"relayopen\""),
-    ("own row again", "return '<button class=\"about-btn slim\" data-a=\"waketest\" title", "return '<div class=\"srv-row\"><button class=\"about-btn slim\" data-a=\"waketest\" title"),
+    ("own row again", "return '<button class=\"about-btn slim\" data-a=\"waketest\">", "return '<div class=\"srv-row\"><button class=\"about-btn slim\" data-a=\"waketest\">"),
     ("no rule", ".srv-sleep{margin-top:12px;padding-top:10px;border-top:1px solid var(--line-soft)}", ".srv-sleep{margin-top:12px}"),
     ("row never wraps", ".srv-wakerow{display:flex;flex-wrap:wrap;", ".srv-wakerow{display:flex;"),
 ]
@@ -32171,14 +32171,14 @@ def _g56c_make(src):
     # it can't: one line, nothing emitted, the old way goes on; the server is marked down
     r6 = _g56_run_make(ns, ctx, states=[{"state": "failed"}])
     out["failed"] = (r6[0] is False and r6[3] == [] and r6[5][-1] == "Desktop couldn’t make the picture "
-                     "(couldn’t make it). Trying another way." and r6[4][-1][2] == "done"
+                     "(couldn’t make it). Trying here." and r6[4][-1][2] == "done"
                      and r6[4][-1][1] == "Desktop couldn’t make the picture")
     def off():
         raise ns["ServerError"]("offline", "Desktop didn’t answer.")
     ns["_srv_seen"][sid]["gen_at"] = time.time()
     r7 = _g56_run_make(ns, ctx, post=off)
     out["offline"] = (r7[0] is False and r7[5][-1] == "Desktop couldn’t make the picture (didn’t answer). "
-                      "Trying another way." and ns["server_label_down"](ctx, "Desktop · x") is True)
+                      "Trying here." and ns["server_label_down"](ctx, "Desktop · x") is True)
     # marked down, the next ask doesn't wait on it
     r8 = _g56_run_make(ns, ctx)
     out["skipped_while_down"] = r8[0] is False and r8[2] == [] and r8[3] == [] and r8[4] == [] and r8[5] == []
@@ -32395,13 +32395,13 @@ _G56_MUT = [
     ("a graph can ride along", 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000])', 'body = dict(opts, kind=kind, prompt=str(prompt or "")[:1000], workflow={"1": {}})'),
     ("a job id believed unchecked", '    if not (isinstance(jid, str) and _SRV_GEN_ID.fullmatch(jid)):', '    if not isinstance(jid, str):'),
     ("a job abandoned when the reader's pipe breaks", '                except (BrokenPipeError, ConnectionResetError):\n                    # the reader left between two polls', '                except ZeroDivisionError:\n                    # the reader left between two polls'),
-    ("a failure answered with nothing", '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return False',
-     '        status("%s couldn’t make the %s (%s). Trying another way." % (name, what, why))\n        return True'),
+    ("a failure answered with nothing", '        status("%s couldn’t make the %s (%s). Trying here." % (name, what, why))\n        return False',
+     '        status("%s couldn’t make the %s (%s). Trying here." % (name, what, why))\n        return True'),
     ("a server that failed not marked down", '        if k in ("offline", "tls", "crypto") and not getattr(exc, "slow", False):\n            server_mark_down(', '        if False:\n            server_mark_down('),
     ("a WebP clip saved as a video", '    sub = VIDEO_SUB if ctype == "video/mp4" else IMAGE_SUB', '    sub = VIDEO_SUB if kind == "video" else IMAGE_SUB'),
     ("Stop going on to another way", '        step("srvgen", "Stopped", "done", "")\n        return True', '        step("srvgen", "Stopped", "done", "")\n        return False'),
     ("a wake not said", '    for _wn, _wok in server_take_wake_notes():\n        status(', '    for _wn, _wok in []:\n        status('),
-    ("a full disk covered by another way", '    except OSError:\n        emit(AppText("⚠️ %s made the %s, but', '    except ZeroDivisionError:\n        emit(AppText("⚠️ %s made the %s, but'),
+    ("a full disk covered by another way", '    except OSError:\n        emit(AppText("%s made the %s, but', '    except ZeroDivisionError:\n        emit(AppText("%s made the %s, but'),
     ("a stale profile covered up", '    except StaleProfile:\n        raise\n    except OSError:\n        emit(AppText(', '    except (StaleProfile, OSError):\n        emit(AppText('),
     ("the settings not kept beside the file", '            ctx.write("%s/%s.render.json" % (sub, iid), used)', '            pass'),
     ("a write outside the profile's writer", '        ctx.write_bytes("%s/%s%s" % (sub, iid, ext), data, mode=0o600)',
@@ -32754,8 +32754,8 @@ _S7_MUT = [
     ("a removal not on the sheet sent", '            or not set(rm) <= set(ms["rm"].get(plan) or [])):', '            or False):', [3]),
     ("a stale seen sent", '    if (not ms or ms["seen"] != seen or', '    if (not ms or', [3]),
     ("a sheet used twice", '        _srv_mstate.pop(e["id"], None)      # a sheet is good for one change\n', '', [3]),
-    ("the in-use model not named", '"changed. Try again when it\\u2019s done." % (_srv_text(js.get("name"), 80)',
-     '"changed. Try again when it\\u2019s done." % (""', [3]),
+    ("the in-use model not named", '"%s is in use on %s. Try again when it’s done." % (_srv_text(js.get("name"), 80)',
+     '"%s is in use on %s. Try again when it’s done." % (""', [3]),
     ("busy said as an error", '    if st == 409 and code == "busy":', '    if False:', [3]),
     ("the list sent unchecked", "    if (not _srv_tag_list(add) or not _srv_tag_list(rm) or set(add) & set(rm)",
      "    if (False", [3]),
@@ -34667,7 +34667,10 @@ def _cm_page(src):
     cm = src[src.index("function cloudSubModes(){"):src.index("function tierLabel(){")]
     pp = src[src.index("function popPlace(rr,w,h,iw,ih){"):src.index("function placeTierPop(el,box){")]
     bl = src[src.index("function modeRow("):src.index("// the engine menu's server rows (6b337)")]
-    js = (esc + 'const SRV_SEP=" \\u00b7 ";let tier="Fast",advOn=false,tierOff={},tierInfo={},model="x",srvLoaded=true,srvList=[];'
+    # the chip speaks the mode's brand name (6b526; copy-2 "<mode>, cloud only: <model>"): the page's own
+    # MODE_NAMES table and modeName ride along, so the real cloudTierShown runs and follows a rename
+    mn = src[src.index("const MODE_NAMES="):src.index("\n", src.index("const modeName=")) + 1]
+    js = (esc + mn + 'const SRV_SEP=" \\u00b7 ";let tier="Fast",advOn=false,tierOff={},tierInfo={},model="x",srvLoaded=true,srvList=[];'
           + 'function isSrvMode(t){return typeof t==="string"&&t.indexOf("srv:")===0;}function srvTierParse(t){return {id:"",mode:""};}'
           + "function srvModeOf(){return null;}" + bl + cm + pp
           + "const out={};"
@@ -34730,7 +34733,7 @@ def _cm_page(src):
             o["rows2"].count(' off"') == 3 and "no key yet</span>" in o["rows2"] and 'title="Add a key under Settings"' in o["rows2"]
             and "no key yet</span>" in o["row2"]),
         "no blend line in the sub-menu": "blend" not in o["rows1"] and "engblend" not in o["rows0"] + o["rows2"],
-        "chip": o["chip"] == ["Fast · Claude", "Thinking · cloud only", "Pro · cloud only", "Gemini only", "Kimi K3 only", "Max", "Cloud Only", "Fast"],
+        "chip": o["chip"] == ["Alpha, cloud only: Claude", "Gamma, cloud only", "Sigma, cloud only", "Gemini only", "Kimi K3 only", "Max", "Cloud Only", "Fast"],
         "bubble of a mode: the models and the promise": ("Groq · gpt" in o["pop"][0] and "Nothing runs on this computer." in o["pop"][0]
                                                          and "Fast · cloud only" in o["pop"][0]),
         "bubble of an unavailable pick: why": "Key rejected." in o["pop"][1] and "Claude only" in o["pop"][1],
@@ -34871,7 +34874,7 @@ _CM_MUT = [
      'cands = []\n        except Exception:\n            cands = []\n    seats = []'),
     ("Max without its cloud models", '    cloud = [l for l, _c in cloud_bench()]\n    n = len(labels) + len(cloud)', '    cloud = []\n    n = len(labels) + len(cloud)'),
     ("Max never greyed", '            "available": n > 0, "count": n,', '            "available": True, "count": n,'),
-    ("Max without the cost warning", '            "warn": "Uses every model, including paid cloud keys. Each question can spend money "\n                    "on every key you have."}',
+    ("Max without the cost warning", '            "warn": "Every model, paid cloud keys included. Each question can spend money "\n                    "on every key you have."}',
      '            "warn": ""}'),
     ("Max's blend from a sick provider", '    pids = [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES]\n    by = _cloud_by_pid("composite", pids)',
      '    pids = [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES]\n    by = {p: {"name": p.title(), "model": ""} for p in pids}'),
@@ -34905,11 +34908,11 @@ _CM_MUT = [
      "+(on&&!advOn?\" on\":\"\")\n    +'\" data-t=\"'+esc(t)+'\" tabindex=\"0\"'"),
     ("greyed rows without the tooltip", "off&&inf.why?inf.why:\"\",tier===t", "\"\",tier===t"),
     ("greyed rows without the reason", "modeRow(t,ic,n,off?(inf.short||\"unavailable\"):\"\"", "modeRow(t,ic,n,\"\""),
-    ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast · "+inf.models[0]:p.mode+" · cloud only";',
-     '  return p.mode+" · cloud only";'),
+    ("the chip names no model", '  return p.mode==="Fast"&&(inf.models||[])[0]?"Alpha, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";',
+     '  return modeName(p.mode)+", cloud only";'),
     ("a pick's chip", '  if(p.mode==="Model")return inf.name?inf.name+" only"', '  if(p.mode==="Model")return "Cloud Only"+""'),
     ("Max's chip names a seat", '  if(t==="Max")return "Max";', '  if(false)return "Max";'),
-    ("Max's bubble without the warning", "    +'<span class=\"note warn\">'+esc(info.warn||\"Uses every model, including paid cloud keys.\")+'</span>';", "    +'';"),
+    ("Max's bubble without the warning", "    +'<span class=\"note warn\">'+esc(info.warn||\"Every model, paid cloud keys included.\")+'</span>';", "    +'';"),
     ("a row's name unescaped", "<span class=\"enm\">'+esc(nm)+'</span>'\n    +'<span class=\"edsc\">'+esc(dsc)", "<span class=\"enm\">'+nm+'</span>'\n    +'<span class=\"edsc\">'+esc(dsc)"),
     ("Max back in Cloud Only", "function cloudSubModes(){return [[\"fast\",\"Fast\",\"⚡️\"],[\"think\",\"Thinking\",\"🧠\"],\n  [\"pro\",\"Pro\",\"✨\"]];}",
      "function cloudSubModes(){return [[\"fast\",\"Fast\",\"⚡️\"],[\"think\",\"Thinking\",\"🧠\"],\n  [\"pro\",\"Pro\",\"✨\"],[\"max\",\"Max\",\"🚀\"]];}"),
@@ -34973,7 +34976,7 @@ def _mc_server(src):
     off = _cm_ns(src, allp, **dict(base, cloud_allowed=lambda only=False: False, server_compositor=srvpen))
     r_off = off["mode_comp_choices"](object(), ["A", "B"], 2)
     got["cloud power off: the cloud greyed, the server's pen the default"] = (
-        r_off["def"] == "Desk · gemma4:26b" and all(c["ok"] is False and c["why"] == "cloud power is off"
+        r_off["def"] == "Desk · gemma4:26b" and all(c["ok"] is False and c["why"] == "Cloud models are off"
                                                       for c in r_off["cands"] if c["kind"] == "cloud"))
     got["one model: nothing to blend, no rows"] = ns["mode_comp_choices"](object(), ["A"], 0) is None
     got["a default the lists don't hold comes first"] = ns["_comp_row"]("Lab · x:7b", "Lab · x:7b", [])["cands"][0]["id"] == "Lab · x:7b"
@@ -35089,9 +35092,9 @@ def _mc_council(src):
     cl, calls, out, st = go("gemini", ladder_fail=("gemini",))
     got["a cloud pen that fails: the mode's own ladder behind it"] = cl == ["gemini", "claude"]
     cl, calls, out, st = go("kimi")
-    got["a pen that can't write it now: the default, said"] = (cl == ["claude"] and any("Kimi K3 can\u2019t write the answer right now, so the usual compositor does" in s for s in st))
+    got["a pen that can't write it now: the default, said"] = (cl == ["claude"] and any("Kimi K3 is unavailable. The default compositor writes it." in s for s in st))
     cl, calls, out, st = go("")
-    got["no pen: the default, nothing said"] = cl == ["claude"] and not any("can\u2019t write" in s for s in st)
+    got["no pen: the default, nothing said"] = cl == ["claude"] and not any("The default compositor writes it." in s for s in st)
     cl, calls, out, st = go("Desk · q")
     got["a server pen: the merge there, no cloud ladder"] = cl == [] and [c[1] for c in calls] == ["Desk · q"]
     cl, calls, out, st = go("Desk · gone")
@@ -35099,7 +35102,7 @@ def _mc_council(src):
     cl, calls, out, st = go("Gemma 4 12B")
     got["a pen of this computer writes it, no cloud"] = cl == [] and [c[1] for c in calls] == ["Gemma 4 12B"]
     cl, calls, out, st = go("gemini", over={"cloud_allowed": lambda: False})
-    got["cloud power off: a cloud pen sits out"] = cl == [] and any("Gemini can\u2019t write" in s for s in st)
+    got["cloud power off: a cloud pen sits out"] = cl == [] and any("Gemini is unavailable. The default compositor writes it." in s for s in st)
     # a mode on one server alone: its cloud pen (with cloud power on), the server's own pen behind it
     srvl = ("Desk · a", "Desk · b")
     cl, calls, out, st = go("gemini", run_kw={"srv_only": True}, labels=srvl,
@@ -35219,7 +35222,7 @@ def _mc_page(src):
         and "Gemini \u00b7 g" in o["dCloud"] and "Ollama1 \u00b7 b" in o["dSrv"] and "Claude" in o["dMax"],
         "compositor section: the default marked, the current highlighted": (
             '<div class="pch">Compositor' in o["dThink"] and o["dThink"].count('class="pdef"') == 1
-            and re.search(r'class="pcand on" data-k="Thinking" data-c="claude"[^>]*><span class="pcn">claude</span><span class="pcw">cloud</span><span class="pdef">default', o["dThink"])
+            and re.search(r'class="pcand on" data-k="Thinking" data-c="claude"[^>]*><span class="pcn">claude</span><span class="pcw">cloud</span><span class="pdef">Default', o["dThink"])
             and o["dThink"].count("pcand on") == 1),
         "a greyed choice: disabled, its reason": 'class="pcand off" data-k="Thinking" data-c="kimi" disabled title="resting until 3:15"' in o["dThink"]
         and "resting until 3:15</span>" in o["dThink"],
@@ -35233,7 +35236,7 @@ def _mc_page(src):
                                                                and o["send4"] == "Ollama1 \u00b7 b" and o["send5"] == "groq"),
         "the default picked again: back to following the default": json.loads(o["pick2"][0]) == {"srv:a1b2c3d4:max": "Ollama1 \u00b7 b"},
         "a pick that can't write it now: shown, and said": 'class="pcand on off" data-k="Thinking" data-c="kimi"' in o["dThink3"]
-        and "kimi can\u2019t write it right now, so the default does." in o["dThink3"],
+        and "kimi is unavailable. The default writes it." in o["dThink3"],
         "an old one-cloud-model pick goes to Thinking, saved, said": (o["retire"][:3] == ["cloud:think", "cloud:think", "Fast"]
                                                                        and o["retire"][3] == '{"tier":"cloud:think"}'),
         "the safe triangle": o["aim"] == [True, False, False, False, False, True],
@@ -35313,7 +35316,7 @@ _MC_MUT = [
     ("Cloud Only not marked for its modes", '  const on=!advOn&&(tier==="Cloud Only"||isCloudMode(tier));', '  const on=!advOn&&tier==="Cloud Only";'),
     ("no (i) on a row", "+'<span class=\"einfo\" role=\"button\" aria-label=\"What '+esc(nm)+' uses\">i</span></div>';", "+'</div>';"),
     # the pop-out and its compositor
-    ("the default not marked", "      +(x.id===c.def?'<span class=\"pdef\">default</span>':\"\")+'</button>').join(\"\")", "      +'</button>').join(\"\")"),
+    ("the default not marked", "      +(x.id===c.def?'<span class=\"pdef\">Default</span>':\"\")+'</button>').join(\"\")", "      +'</button>').join(\"\")"),
     ("the pick not highlighted", "  const cur=mine?mine.id:c.def;", "  const cur=c.def;"),
     ("a greyed choice clickable", "      +(x.ok?\"\":' disabled title=\"'+esc(x.why||\"unavailable\")+'\"')+'>'", "      +'>'"),
     ("Fast given a compositor section", '  if(!c||!Array.isArray(c.cands)||!c.cands.length)return "";', '  if(!c)return "<div class=\\"pch\\">Compositor</div>";'),
@@ -35348,7 +35351,7 @@ _MC_MUT = [
     ("a server pen ignored", '    if _pen_kind == "server":\n        _merge_srv = _pen              # the person\'s pick on the server (6b442)\n', ""),
     ("a cloud pen not first", "        _ladder = [_pen] + ([] if srv_only else\n", "        _ladder = ([] if srv_only else\n"),
     ("a cloud pen with nothing behind it", "                            [c for c in _ladder if _provider_of(c) != pen])", "                            [])"),
-    ("the fallback not said", '    status("compositing\\u2026" if _pen_kind or not pen else', '    status("compositing\\u2026" if True else'),
+    ("the fallback not said", '    status("Writing the final answer\\u2026" if _pen_kind or not pen else', '    status("Writing the final answer\\u2026" if True else'),
     ("any cloud pen taken", "        c = next((c for c in ladder or [] if _provider_of(c) == pen), None) if cloud_ok else None",
      "        c = {\"pid\": pen, \"name\": pen}"),
     ("any server pen taken", '        m = next((m for m in srv_pool or [] if m.get("label") == pen), None)', '        m = {"label": pen}'),
@@ -35358,7 +35361,7 @@ _MC_MUT = [
     ("a server's mode skips its cloud pen", '    if srv_only and _merge_srv is None and _pen_kind != "cloud":', '    if srv_only and _merge_srv is None:'),
     ("cloud power ignored for a pen", "            cloud_ok=cloud_only or cloud_plan is not None or cloud_allowed(),", "            cloud_ok=True,"),
     ("a resting key offered", '        ok = pid in on and not gate\n', '        ok = not gate\n'),
-    ("cloud power off not said", '                                       "" if cloud_allowed() else "cloud power is off")\n', '                                       "")\n'),
+    ("cloud power off not said", '                                       "" if cloud_allowed() else "Cloud models are off")\n', '                                       "")\n'),
     ("the main default not the ladder's", "            return _provider_of(lad[0]), lad[0][\"name\"]", "            return \"gemini\", lad[0][\"name\"]"),
     ("Max's rows in another order", "                     _comp_cloud_cands(max_cloud_ladder(),\n                                       [p for p in MAX_COMPOSITOR_ORDER if p in PROVIDER_BASES])",
      "                     _comp_cloud_cands(max_cloud_ladder(), CLOUD_STRENGTH[::-1])"),
@@ -38551,7 +38554,7 @@ check("horizon: the night is one GPU canvas over the app's own aerial (same-orig
       and 'v.src="/static/sky/"+c.i+".mov";' in _hz_js and "v.playbackRate=c.rate;" in _hz_js
       and "float hi=smoothstep(hiT,hiT+.54,l);" in _hz_js and "smoothstep(0.,rise,uv.y)" in _hz_js
       and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
-      and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:(full?0:32);" in _hz_js
+      and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:0;" in _hz_js   # (6b542 on beta-1) no gap below Full any more
       and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
       and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};" in _hz_js
       and "S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};" in _hz_js
@@ -39028,8 +39031,8 @@ _C530_MUT = [
      'return question_block + "\\n\\n" + pack + "\\n\\n" + KNOW_RULES'),
     ("the cosine floor gone", "if s >= KNOW_VEC_FLOOR), reverse=True)", "), reverse=True)"),
     ("the fusion threshold gone", "        if s < KNOW_MIN_FUSED:\n            continue\n", ""),
-    ("forget leaves the documents", "        for i in ids:\n            _know_drop_doc(c, i)\n        c.commit()\n    finally:\n        c.close()\n    _know_state(base)[\"mat\"] = None\n    return len(ids)",
-     "        c.commit()\n    finally:\n        c.close()\n    _know_state(base)[\"mat\"] = None\n    return len(ids)"),
+    ("forget leaves the documents", "        for i in ids:\n            _know_drop_doc(c, i)\n        _know_commit(c, base)\n    finally:\n        c.close()\n    _know_state(base)[\"mat\"] = None\n    return len(ids)",
+     "        _know_commit(c, base)\n    finally:\n        c.close()\n    _know_state(base)[\"mat\"] = None\n    return len(ids)"),
     ("hidden folders read", 'dirs[:] = sorted(x for x in dirs if not x.startswith(".") and x not in KNOW_SKIP_DIRS)',
      'dirs[:] = sorted(x for x in dirs if x not in KNOW_SKIP_DIRS)'),
     ("an unchanged file re-read", "            if key in have and have[key][1] == sig:\n                continue\n            if n >= budget:",
