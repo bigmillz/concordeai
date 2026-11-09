@@ -11,6 +11,8 @@ randomness, a fixed file ID).
                                    (scanned), a blank page, text
   tests/fixtures/pdf/locked.pdf    2 pages behind a user password (RC4, the
                                    standard security handler, revision 2)
+  tests/fixtures/pdf/owner.pdf     1 page encrypted with an owner password only
+                                   (opens; says "OWNER-MARK")
   tests/fixtures/pdf/unicode.pdf   1 page: Hebrew and Arabic (right to left),
                                    Greek, Japanese, an "fi" ligature and Arabic
                                    presentation forms, through a ToUnicode map
@@ -110,8 +112,9 @@ def build(pages, fonts=b"", extra=(), enc=None) -> bytes:
     enc_num = None
     if enc:
         enc_num = num
-        objs[enc_num] = (b"<< /Filter /Standard /V 1 /R 2 /Length 40 /P %d /O <%s> /U <%s> >>"
-                         % (enc.P, enc.O.hex().encode(), enc.U.hex().encode()))
+        objs[enc_num] = getattr(enc, "dict_bytes", None) or (
+            b"<< /Filter /Standard /V 1 /R 2 /Length 40 /P %d /O <%s> /U <%s> >>"
+            % (enc.P, enc.O.hex().encode(), enc.U.hex().encode()))
         num += 1
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offs = {}
@@ -186,6 +189,13 @@ def scanned_pdf() -> bytes:
     return build(pages, extra=[img])
 
 
+def owner_pdf() -> bytes:
+    """Encrypted with an owner password only (the user password empty): it
+    opens and reads, as every reader opens it."""
+    pages = [(_text_stream(["Opening hours, owner-protected.", "OWNER-MARK"]), F1)]
+    return build(pages, enc=_Enc(b"", b"owner-6b546"))
+
+
 def locked_pdf() -> bytes:
     pages = [(_text_stream(["Members' list, behind a password.", "LOCK-MARK"]), F1),
              (_text_stream(["Second page."]), F1)]
@@ -236,6 +246,38 @@ def unicode_pdf() -> bytes:
     return build([(_text_stream(lines, font=b"F2"), res)], extra=[("stream", tu)])
 
 
+class _AesDeclared:
+    """An /Encrypt dictionary that declares AES-128 (V 4, R 4, AESV2) with
+    an empty user password, its content left as plain text: enough for a
+    reader to see AES and stop (the stdlib has no AES). For the pypdf
+    path's lock check only; built at run time, not written to the repo."""
+    P = -44
+
+    def __init__(self):
+        ok = hashlib.md5((b"owner-aes" + _PAD)[:32]).digest()
+        for _ in range(50):
+            ok = hashlib.md5(ok).digest()
+        o = _rc4(ok, _PAD)
+        for i in range(1, 20):
+            o = _rc4(bytes(b ^ i for b in ok), o)
+        k = hashlib.md5(_PAD + o + (self.P & 0xFFFFFFFF).to_bytes(4, "little") + FILE_ID).digest()
+        for _ in range(50):
+            k = hashlib.md5(k[:16]).digest()
+        u = _rc4(k, hashlib.md5(_PAD + FILE_ID).digest())
+        for i in range(1, 20):
+            u = _rc4(bytes(b ^ i for b in k), u)
+        self.dict_bytes = (b"<< /Filter /Standard /V 4 /R 4 /Length 128 /CF << /StdCF << /AuthEvent /DocOpen "
+                           b"/CFM /AESV2 /Length 16 >> >> /StmF /StdCF /StrF /StdCF /P %d /O <%s> /U <%s> >>"
+                           % (self.P, o.hex().encode(), (u + b"\0" * 16).hex().encode()))
+
+    def obj(self, num, data):
+        return data
+
+
+def aes_declared() -> bytes:
+    return build([(_text_stream(["Behind AES."]), F1)], enc=_AesDeclared())
+
+
 def big(n: int, words_per_page: int = 60) -> bytes:
     """n pages, each with its number and some neutral words (built at run time)."""
     filler = ("The shelves are sorted by subject and then by author. ") * (words_per_page // 10)
@@ -245,7 +287,7 @@ def big(n: int, words_per_page: int = 60) -> bytes:
 
 
 FIXTURES = {"text.pdf": text_pdf, "scanned.pdf": scanned_pdf,
-            "locked.pdf": locked_pdf, "unicode.pdf": unicode_pdf}
+            "locked.pdf": locked_pdf, "unicode.pdf": unicode_pdf, "owner.pdf": owner_pdf}
 
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)

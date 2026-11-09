@@ -297,6 +297,14 @@ def _profile_caches_clear() -> int:
 #   pycparser 2.23 (3.9) and 3.0 (3.10 on), pure Python.
 # Not covered: free-threaded builds (3.14t), Linux, Python 3.8 and
 # older, Windows ARM64 on Python 3.9 or 3.10.
+# THE PDF READER OFF A MAC rides the same pins (6b546, approved by
+# Patrick on 2026-11-09): pypdf 6.9.2, pure Python, BSD-3-Clause, one
+# py3-none-any wheel (333,744 bytes, sha256 checked against the download
+# that day). Not on macOS (PDFKit reads PDFs there) and not before
+# Python 3.11, where it would need typing_extensions, which isn't pinned
+# (such a PC says "PDF needs an update on this computer."). Its AES
+# support needs the `cryptography` extra, not pinned either: an
+# AES-encrypted PDF is refused as locked.
 CRYPTO_REQS = r"""pynacl==1.6.2 \
     --hash=sha256:c949ea47e4206af7c8f604b8278093b674f7c79ed0d4719cc836902bf4517465 \
     --hash=sha256:5811c72b473b2f38f7e2a3dc4f8642e3a3e9b5e7317266e4ced1fba85cae41aa \
@@ -341,6 +349,8 @@ pycparser==2.23 ; python_version < "3.10" \
     --hash=sha256:e5c6e8d3fbad53479cab09ac03729e0a9faf2bee3db8208a550daf5af81a5934
 pycparser==3.0 ; python_version >= "3.10" \
     --hash=sha256:b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992
+pypdf==6.9.2 ; sys_platform != "darwin" and python_version >= "3.11" \
+    --hash=sha256:662cf29bcb419a36a1365232449624ab40b7c2d0cfc28e54f42eeecd1fd7e844
 """
 
 
@@ -492,6 +502,11 @@ if __name__ == "__main__" and sys.argv[1:2] == ["--crypto-selftest"]:
         _res.update(nacl=nacl.__version__, cffi=cffi.__version__)
     except Exception:
         pass
+    try:
+        import pypdf        # the PDF reader off a Mac (6b546); the build checks it is frozen in
+        _res.update(pypdf=pypdf.__version__)
+    except Exception:
+        pass
     _txt = json.dumps(_res)
     if len(sys.argv) > 2:
         with open(sys.argv[2], "w", encoding="utf-8") as _fh:
@@ -499,6 +514,118 @@ if __name__ == "__main__" and sys.argv[1:2] == ["--crypto-selftest"]:
     elif sys.stdout is not None:
         print(_txt)
     sys.exit(0 if _st[0] else 1)
+
+
+# ==== pdf reader worker (6b546): begin ====
+# A PDF'S TEXT OFF A MAC (6b546, per Patrick). Where PDFKit isn't there
+# (Windows, Linux) the app reads a PDF with pypdf, pinned in CRYPTO_REQS
+# (pure Python, BSD-3-Clause), in a child process of its own:
+#   python millenai.py --pdf-text <file.pdf> <max s> <max chars> <out>
+# (a frozen exe: MillenAI.exe --pdf-text ...). It writes the same JSON
+# lines as the Mac's helper (shell/pdftext) to <out>, a 0600 file under
+# run/, so the server parses both the same way and can kill a child that
+# hangs. It runs here, before anything else: no window, no port, no data
+# folder. Nothing in it reaches the network. An AES-encrypted PDF needs
+# pypdf's `cryptography` extra, which isn't pinned: it is refused as
+# locked, as a password PDF is. RC4 (pypdf's own) opens when its user
+# password is empty.
+def _pdf_page_ink(page) -> bool:
+    """A page with no text: is anything drawn on it? A picture or a form
+    in its resources, or a paint operator in its content (an inline
+    picture, a fill, a stroke, a shading)."""
+    try:
+        res = page.get("/Resources")
+        res = res.get_object() if res is not None else None
+        xo = res.get("/XObject") if res is not None else None
+        xo = xo.get_object() if xo is not None else None
+        for k in (xo or {}):
+            if xo[k].get_object().get("/Subtype") in ("/Image", "/Form"):
+                return True
+        c = page.get_contents()
+        data = c.get_data() if c is not None else b""
+    except Exception:
+        return False
+    return bool(re.search(rb"(?:^|[\s\]\)>])(?:BI|Do|sh|f\*?|F|S|s|B\*?|b\*?)(?=[\s\[\(</]|$)", data))
+
+
+def _pdf_is_aes(reader) -> bool:
+    """The PDF is encrypted with AES (V 5, or a crypt filter AESV2/AESV3),
+    which pypdf reads only with `cryptography` (or pycryptodome)."""
+    try:
+        e = reader.trailer["/Encrypt"].get_object()
+        if int(e.get("/V", 0)) >= 5:
+            return True
+        cf = e.get("/CF")
+        cf = cf.get_object() if cf is not None else {}
+        return any(str(cf[k].get_object().get("/CFM")) in ("/AESV2", "/AESV3") for k in cf)
+    except Exception:
+        return False
+
+
+def _pdf_aes_ok() -> bool:
+    import importlib.util
+    return any(importlib.util.find_spec(m) is not None for m in ("cryptography", "Crypto"))
+
+
+def _pdf_text_worker(argv) -> int:
+    try:
+        path, max_s, max_chars, out = argv[0], float(argv[1]), int(argv[2]), argv[3]
+    except (IndexError, ValueError):
+        return 2
+    fh = open(out, "a", encoding="utf-8")
+
+    def emit(d):
+        fh.write(json.dumps(d) + "\n")
+        fh.flush()
+    try:
+        try:
+            import logging
+            logging.getLogger("pypdf").setLevel(logging.CRITICAL)
+            import pypdf
+        except Exception:
+            emit({"ev": "err", "why": "no reader"})
+            return 0
+        try:
+            r = pypdf.PdfReader(path, strict=False)
+            if r.is_encrypted:
+                try:
+                    # AES without `cryptography` (not pinned): refused as locked
+                    opened = 0 if _pdf_is_aes(r) and not _pdf_aes_ok() else r.decrypt("")
+                except Exception:
+                    opened = 0
+                if not opened:
+                    emit({"ev": "locked"})
+                    return 0
+            n = len(r.pages)
+        except Exception:
+            emit({"ev": "err", "why": "open"})
+            return 0
+        emit({"ev": "open", "pages": n})
+        t0, chars = time.time(), 0
+        for i in range(n):
+            if time.time() - t0 > max_s:
+                emit({"ev": "done", "read": i, "why": "time"})
+                return 0
+            try:
+                page = r.pages[i]
+                s = page.extract_text() or ""
+            except Exception:
+                page, s = None, ""
+            emit({"ev": "page", "n": i + 1, "text": s,
+                  "ink": bool(page is not None and not s.strip() and _pdf_page_ink(page))})
+            chars += len(s)
+            if chars >= max_chars:
+                emit({"ev": "done", "read": i + 1, "why": "chars"})
+                return 0
+        emit({"ev": "done", "read": n, "why": "end"})
+        return 0
+    finally:
+        fh.close()
+
+
+if __name__ == "__main__" and sys.argv[1:2] == ["--pdf-text"]:
+    sys.exit(_pdf_text_worker(sys.argv[2:]))
+# ==== pdf reader worker (6b546): end ====
 
 
 # DEV AND TEST COPIES LIVE IN THEIR OWN FOLDER (0a item 2, 6b319). A dev
@@ -1192,7 +1319,7 @@ def drop_run_file(path):
 
 
 RUN_FILE_KINDS = (("ssh-", ".conf"), ("say-", ".txt"), ("prompt-", ".json"),
-                  ("stage-", ""), (".pdf-", ".pdf"))   # a PDF being read (6b546)
+                  ("stage-", ""), (".pdf-", ".pdf"), (".pdf-", ".jsonl"))   # a PDF being read (6b546)
 
 
 def sweep_run_files() -> int:
@@ -22931,6 +23058,73 @@ def _ensure_mlx_engine(pip=None, now=None):
                         "note": _mlx_engine["note"]})
 
 
+# THE PDF READER FOLLOWS THE APP (6b546): a venv off a Mac made before this
+# build has PyNaCl, so _ensure_crypto_deps never runs pip again and pypdf
+# never comes. At a start, the same way as the MLX engine: the copy holding
+# the instance lock, its own venv only (_crypto_install_blocker), one try
+# per build and Python, again 3 days after a failure; pypdf's pin alone,
+# hash-checked, no dependency. A frozen exe carries it (build_windows_exe.ps1).
+PDF_READER_RECORD = "pdf-reader.json"
+_pdf_install = {"state": "idle", "note": ""}
+
+
+def _pdf_reader_why_not(have=None, py=None) -> str:
+    """'' when this copy should install pypdf's pin now, else why not."""
+    if IS_MAC:
+        return "PDFKit reads PDFs on a Mac"
+    py = tuple(sys.version_info[:2]) if py is None else tuple(py)
+    if py < (3, 11):
+        return "the PDF reader needs Python 3.11 or newer (this venv runs %d.%d)" % py
+    have = _pdf_pypdf_ok() if have is None else have
+    if have:
+        return "installed"
+    return _crypto_install_blocker()
+
+
+def _ensure_pdf_reader(pip=None, now=None):
+    """At a start, on a thread of its own: pypdf here, or one install of its
+    pin, or why not (_pdf_install). Never blocks the boot."""
+    pip = pip or _crypto_pip
+    why = _pdf_reader_why_not()
+    if why:
+        _pdf_install.update(state="skipped", note=why)
+        return
+    for _ in range(300):                    # PyNaCl's own pip call first: one pip in the venv at a time
+        if _crypto_install.get("state") != "installing":
+            break
+        time.sleep(1)
+    key = "%s+pypdf" % _crypto_key()
+    rec = None
+    try:
+        with open(os.path.join(app_dir(), PDF_READER_RECORD), encoding="utf-8") as f:
+            rec = json.load(f)
+    except (OSError, ValueError):
+        rec = None
+    go, why = _crypto_should_try(rec, key, time.time() if now is None else now)
+    if not go:
+        _pdf_install.update(state="failed", note=why)
+        return
+    _pdf_install.update(state="installing", note="")
+    ok, why = pip(sys.executable, crypto_reqs(only=("pypdf",)))
+    import importlib
+    importlib.invalidate_caches()
+    if ok and _pdf_pypdf_ok():
+        _pdf_install.update(state="done", note="")
+    else:
+        _pdf_install.update(state="failed", note=why or "the PDF reader didn't install")
+        print("  (PDF reader: %s)" % _pdf_install["note"])
+    try:
+        d = app_dir()
+        os.makedirs(d, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=d, prefix=".pdf-reader-", suffix=".tmp")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump({"key": key, "ok": _pdf_install["state"] == "done",
+                       "at": int(time.time()), "note": _pdf_install["note"]}, f)
+        _replace_into(tmp, os.path.join(d, PDF_READER_RECORD))
+    except OSError:
+        pass
+
+
 # why accounts are off: what an account action says, and what the
 # Account pane says (the pane is passive: it sent nothing, review)
 ACCOUNT_OFF = {
@@ -31447,14 +31641,43 @@ _DOC_PDF_CTRL_RX = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\ufeff\ufffe\uffff
 
 def _pdf_helper_path():
     """The PDFKit helper: bundled beside this file (the .app's Resources) or
-    built in the repo (shell/pdftext/build.sh). None off a Mac, when it
-    isn't built, or with a dev copy's `pdf-none` hook (the Windows path)."""
-    if "pdf-none" in TEST_HOOKS or not IS_MAC:
+    built in the repo (shell/pdftext/build.sh). None off a Mac or when it
+    isn't built."""
+    if not IS_MAC:
         return None
     for p in (resource(DOC_PDF_HELPER), resource("shell", "pdftext", DOC_PDF_HELPER)):
         if os.path.isfile(p) and os.access(p, os.X_OK):
             return p
     return None
+
+
+def _pdf_pypdf_ok() -> bool:
+    """pypdf can be imported here (it is never imported in this process:
+    the worker child does that)."""
+    try:
+        import importlib.util
+        return importlib.util.find_spec("pypdf") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _pdf_reader():
+    """(kind, argv) of what reads a PDF here: ("pdfkit", [helper]) on a Mac
+    with its helper; off a Mac ("pypdf", the --pdf-text worker of this
+    app, run by this Python or this frozen exe) when pypdf is installed;
+    else ("", None), and the chip says DOC_PDF_NEEDS. A Mac never falls
+    back to pypdf. A dev copy's `pdf-none` hook is the no-reader path,
+    its `pdf-pypdf` hook takes the pypdf path on a Mac (the gauntlet)."""
+    if "pdf-none" in TEST_HOOKS:
+        return "", None
+    if IS_MAC and "pdf-pypdf" not in TEST_HOOKS:
+        h = _pdf_helper_path()
+        return ("pdfkit", [h]) if h else ("", None)
+    if not _pdf_pypdf_ok():
+        return "", None
+    if getattr(sys, "frozen", False):
+        return "pypdf", [sys.executable, "--pdf-text"]
+    return "pypdf", [sys.executable, os.path.abspath(__file__), "--pdf-text"]
 
 
 def pdf_clean(text) -> str:
@@ -31551,37 +31774,60 @@ def pdf_extract(data: bytes) -> dict:
         return {"ok": False, "err": DOC_PDF_BAD}
     if len(data) > DOC_PDF_MAX_BYTES:
         return {"ok": False, "err": DOC_PDF_BIG}
-    helper = _pdf_helper_path()
-    if not helper:
+    kind, argv = _pdf_reader()
+    if not kind:
         return {"ok": False, "err": DOC_PDF_NEEDS, "needs": True}
     d = os.path.join(app_dir(), "run")
     os.makedirs(d, mode=0o700, exist_ok=True)
     fd, path = tempfile.mkstemp(dir=d, prefix=".pdf-", suffix=".pdf")
+    outp = ""
     lines, t0, cap = [], time.time(), pdf_read_s()
     p = None
+    nowin = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     try:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
-        p = subprocess.Popen([helper, path, "%g" % cap, str(DOC_MAX_CHARS)],
-                             stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                             stderr=subprocess.DEVNULL)
-        killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)
-        killer.daemon = True
-        killer.start()
-        try:
-            for raw in p.stdout:
-                lines.append(raw.decode("utf-8", "replace"))
-        finally:
-            killer.cancel()
-            p.wait(timeout=5)
+        if kind == "pdfkit":
+            # the Mac's helper streams its lines on stdout
+            p = subprocess.Popen(argv + [path, "%g" % cap, str(DOC_MAX_CHARS)],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL)
+            killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)
+            killer.daemon = True
+            killer.start()
+            try:
+                for raw in p.stdout:
+                    lines.append(raw.decode("utf-8", "replace"))
+            finally:
+                killer.cancel()
+                p.wait(timeout=5)
+        else:
+            # the pypdf worker writes them to a 0600 file of its own: a
+            # windowed frozen exe has no stdout to write to
+            ofd, outp = tempfile.mkstemp(dir=d, prefix=".pdf-", suffix=".jsonl")
+            os.close(ofd)
+            p = subprocess.Popen(argv + [path, "%g" % cap, str(DOC_MAX_CHARS), outp],
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                 stderr=subprocess.DEVNULL, creationflags=nowin)
+            try:
+                p.wait(timeout=cap + DOC_PDF_GRACE_S)
+            except subprocess.TimeoutExpired:
+                p.kill()
+                p.wait(timeout=5)
+            with open(outp, encoding="utf-8", errors="replace") as f:
+                lines = f.read().splitlines()
     except Exception:
         if p is not None and p.poll() is None:
             p.kill()
         return {"ok": False, "err": DOC_PDF_BAD}
     finally:
         drop_run_file(path)
+        drop_run_file(outp)
     out = pdf_parse(lines)
+    if kind == "pypdf" and lines and '"no reader"' in lines[0]:
+        out = {"ok": False, "err": DOC_PDF_NEEDS, "needs": True}
     out["secs"] = round(time.time() - t0, 2)
+    out["reader"] = kind
     return out
 # ==== pdf attach (6b546): end ====
 
@@ -67676,6 +67922,8 @@ if __name__ == "__main__":
         ctx_thread(target=_ensure_crypto_deps, daemon=True).start()
         # the MLX engine at its pin (6b497), the same way, after PyNaCl's pip
         ctx_thread(target=_ensure_mlx_engine, bind=False, daemon=True).start()
+        # and the PDF reader off a Mac (6b546), the same way
+        ctx_thread(target=_ensure_pdf_reader, bind=False, daemon=True).start()
     start_managed_engines()
     if not HAS_SEARCH:
         print("  (web search disabled — pip install ddgs to enable)")

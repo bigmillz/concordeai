@@ -12953,12 +12953,13 @@ _lines7 = _cr7["crypto_reqs"]().splitlines() if "crypto_reqs" in _cr7 else []
 _pins7 = [ln.split(" --hash")[0].strip() for ln in _lines7]
 _nh7 = [ln.count("--hash=sha256:") for ln in _lines7]
 _hx7 = re.findall(r"--hash=sha256:(\S+)", _req7)
-check("CRYPTO_REQS pins PyNaCl, cffi and pycparser by version, marker and every wheel's sha256",
+check("CRYPTO_REQS pins PyNaCl, cffi and pycparser (and the PDF reader off a Mac, 6b546) by version, marker and every wheel's sha256",
       _pins7 == ['pynacl==1.6.2', 'cffi==2.0.0 ; python_version < "3.10"',
                  'cffi==2.1.1 ; python_version >= "3.10"',
                  'pycparser==2.23 ; python_version < "3.10"',
-                 'pycparser==3.0 ; python_version >= "3.10"']
-      and _nh7 == [4, 4, 29, 1, 1] and len(set(_hx7)) == 39
+                 'pycparser==3.0 ; python_version >= "3.10"',
+                 'pypdf==6.9.2 ; sys_platform != "darwin" and python_version >= "3.11"']
+      and _nh7 == [4, 4, 29, 1, 1, 1] and len(set(_hx7)) == 40
       and all(re.fullmatch(r"[0-9a-f]{64}", x) for x in _hx7)
       # the Windows zip, where cffi is already loaded: pynacl's pin alone
       and _cr7["crypto_reqs"](only=("pynacl",)).splitlines() == _lines7[:1],
@@ -40640,18 +40641,46 @@ if sys.platform == "darwin" and not os.access(_HELPER546, os.X_OK) and _sh546.wh
     _sp522.run(["./shell/pdftext/build.sh"], env=dict(os.environ, CONCORDE_PDFTEXT_ARCH="native"),
                capture_output=True, timeout=300)
 _SWIFT546 = open(os.path.join("shell", "pdftext", "pdftext.swift"), encoding="utf-8").read()
+# THE PDF READER OFF A MAC (pypdf, approved 2026-11-09): its pin from CRYPTO_REQS, hash-checked, into a folder of
+# this run's own (the marker that keeps it off a Mac dropped for the install), on PYTHONPATH for the worker children
+# the checks start. SMOKE_PDF_WHEELS names a folder holding the pinned wheel, so a run needn't reach PyPI.
+_PYPDF546 = os.path.join(_tf522.mkdtemp(), "pypdf")
+
+
+def _reqs546(src):
+    """CRYPTO_REQS (a raw string whose lines start at column 0) and crypto_reqs, from src."""
+    return re.search(r'^CRYPTO_REQS = r""".*?"""\n', src, re.M | re.S).group(0) + _def522(src, "crypto_reqs")
+
+
+_cr546 = {"re": re}
+exec(_reqs546(_MILLENAI_SRC), _cr546)
+_rq546 = os.path.join(_tf522.mkdtemp(), "pypdf-req.txt")
+with open(_rq546, "w") as _fh546:
+    _fh546.write(re.sub(r" ;[^-]*(--hash)", r" \1", _cr546["crypto_reqs"](only=("pypdf",))))
+_ipy546 = _sp522.run([sys.executable, "-m", "pip", "install", "--quiet", "--disable-pip-version-check",
+                      "--only-binary=:all:", "--require-hashes", "--no-deps", "--target", _PYPDF546]
+                     + (["--no-index", "--find-links", os.environ["SMOKE_PDF_WHEELS"]]
+                        if os.environ.get("SMOKE_PDF_WHEELS") else []) + ["-r", _rq546],
+                     capture_output=True, text=True, timeout=300)
 
 
 def _ns546(src, mac=True, hooks=(), hook_args=None):
-    """The doc section (6b522's stand-ins) and the pdf section, exec'd together; app_dir a temp folder."""
+    """The doc section (6b522's stand-ins) and the pdf section, exec'd together; app_dir a temp folder. The pypdf
+    worker the section starts is src's own worker section, written out as a script of its own (__file__)."""
     ns = _ns522(src)
     d = _tf522.mkdtemp()
     ha = dict(hook_args or {})
+    wk = os.path.join(d, "worker546.py")
+    with open(wk, "w", encoding="utf-8") as fh:
+        fh.write("import json, re, sys, time\n" + src[src.index("# ==== pdf reader worker (6b546): begin ===="):
+                                                     src.index("# ==== pdf reader worker (6b546): end ====")])
     ns.update({"subprocess": _sp522, "tempfile": _tf522, "IS_MAC": mac, "TEST_HOOKS": frozenset(hooks),
                "resource": lambda *p: os.path.join(os.getcwd(), *p), "app_dir": lambda: d,
-               "_hook_arg": lambda n: ha.get(n, ""), "_app546": d})
+               "_hook_arg": lambda n: ha.get(n, ""), "_app546": d, "sys": sys, "__file__": wk})
     exec(_def522(src, "drop_run_file"), ns)
     exec(src[src.index("# ==== pdf attach (6b546): begin ===="):src.index("# ==== pdf attach (6b546): end ====")], ns)
+    # pypdf is on the children's PYTHONPATH, never this process's path: found where the children will find it
+    ns["_pdf_pypdf_ok"] = lambda: os.path.isdir(os.path.join(os.environ.get("PYTHONPATH") or "/nonexistent", "pypdf"))
     return ns
 
 
@@ -40730,7 +40759,7 @@ def _c546_units(src, swift):
     # the Windows path: no helper off a Mac (and with the pdf-none hook), and said so
     nw, nh = _ns546(src, mac=False), _ns546(src, hooks=("pdf-none",))
     got["off a Mac a PDF says it needs an update, and nothing is read"] = (
-        nw["_pdf_helper_path"]() is None and nh["_pdf_helper_path"]() is None
+        nw["_pdf_helper_path"]() is None and nh["_pdf_reader"]() == ("", None)
         and nw["pdf_extract"](_FX546["text.pdf"]) == {"ok": False, "err": "PDF needs an update on this computer.",
                                                        "needs": True}
         and (sys.platform != "darwin" or ns["_pdf_helper_path"]() is not None))
@@ -40761,7 +40790,7 @@ def _c546_units(src, swift):
             and rx["scanned.pdf"]["scanned"] == 1 and rx["scanned.pdf"]["scanned_pages"] == [2]
             and rx["scanned.pdf"]["blank"] == 1 and "SCAN-MARK-END" in rx["scanned.pdf"]["text"]
             and rx["locked.pdf"] == {"ok": False, "err": "This PDF is locked.", "locked": True,
-                                     "secs": rx["locked.pdf"].get("secs")}
+                                     "secs": rx["locked.pdf"].get("secs"), "reader": "pdfkit"}
             and all(ln in rx["unicode.pdf"]["text"] for ln in
                     ["\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd", "\u0645\u0631\u062d\u0628\u0627",
                      "\u0627\u0644\u0628\u0627\u0628", "\u039a\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1",
@@ -40770,11 +40799,72 @@ def _c546_units(src, swift):
             and big["text"].endswith("pages were read.]") and big["secs"] < 8
             and hg["ok"] and hg["read"] == 1 and hg["partial"] and hs < 5
             and not [f for f in left if f.endswith(".pdf")])
+    # the pypdf path (Windows, Linux), forced on this Mac by the pdf-pypdf hook: the same output as PDFKit's
+    old_pp = os.environ.get("PYTHONPATH")
+    os.environ["PYTHONPATH"] = _PYPDF546
+    try:
+        npy = _ns546(src, hooks=("pdf-pypdf",))
+        kind, argv = npy["_pdf_reader"]()
+        px = {n: npy["pdf_extract"](b) for n, b in _FX546.items()}
+        aes = npy["pdf_extract"](_mk546.aes_declared())
+        npt = _ns546(src, hooks=("pdf-pypdf",), hook_args={"pdf-read-s": "0.05"})
+        pbig = npt["pdf_extract"](_mk546.big(20000))
+        npc = _ns546(src, hooks=("pdf-pypdf",))
+        npc["DOC_MAX_CHARS"] = 20_000
+        pchars = npc["pdf_extract"](_mk546.big(400))
+        nph = _ns546(src, hooks=("pdf-pypdf",), hook_args={"pdf-read-s": "0.2"})
+        nph["DOC_PDF_GRACE_S"] = 1
+        nph["_pdf_reader"] = lambda: ("pypdf", [sys.executable, "-c", "import time; time.sleep(8)"])
+        t0 = time.time()
+        phg = nph["pdf_extract"](_FX546["text.pdf"])
+        phs = time.time() - t0
+        os.environ["PYTHONPATH"] = os.path.join(_PYPDF546, "absent")
+        nnone = _ns546(src, mac=False)
+        nnone["_pdf_pypdf_ok"] = lambda: True          # importable as far as the finder knows, but no pypdf
+        pnone = nnone["pdf_extract"](_FX546["text.pdf"])
+    finally:
+        if old_pp is None:
+            os.environ.pop("PYTHONPATH", None)
+        else:
+            os.environ["PYTHONPATH"] = old_pp
+    nmac = _ns546(src)
+    nmac["_pdf_helper_path"] = lambda: None
+    nmac["_pdf_pypdf_ok"] = lambda: True
+    nwin = _ns546(src, mac=False)
+    nwin["_pdf_pypdf_ok"] = lambda: True
+    keep = {k: {kk: vv for kk, vv in v.items() if kk not in ("secs", "reader")} for k, v in px.items()}
+    left = [f for d_ in (npy["_app546"], npt["_app546"], npc["_app546"], nph["_app546"])
+            for f in (os.listdir(os.path.join(d_, "run")) if os.path.isdir(os.path.join(d_, "run")) else [])]
+    if sys.platform == "darwin":
+        mac_out = {n: {kk: vv for kk, vv in ns["pdf_extract"](b).items() if kk not in ("secs", "reader")}
+                   for n, b in _FX546.items()}
+    else:
+        mac_out = keep
+    got["the pypdf path (Windows, Linux): the same page lines, scan, blank, lock and text as PDFKit's; an "
+        "owner-only RC4 PDF opens; AES without `cryptography` is refused as locked; the caps; a hang killed; "
+        "nothing left; a Mac never falls back to it; no pypdf says it needs an update"] = (
+        _ipy546.returncode == 0 and kind == "pypdf" and argv[-1] == "--pdf-text"
+        and all(v.get("reader") == "pypdf" for v in px.values())
+        and keep == mac_out and keep["text.pdf"]["ok"] and keep["scanned.pdf"]["scanned_pages"] == [2]
+        and keep["scanned.pdf"]["blank"] == 1 and keep["locked.pdf"]["err"] == "This PDF is locked."
+        and "OWNER-MARK" in keep["owner.pdf"].get("text", "")
+        and "\u05e9\u05dc\u05d5\u05dd \u05e2\u05d5\u05dc\u05dd" in keep["unicode.pdf"]["text"]
+        and "file and floor" in keep["unicode.pdf"]["text"]
+        and aes.get("err") == "This PDF is locked." and aes.get("locked") is True
+        and pbig["ok"] and pbig["why"] == "time" and pbig["partial"] and 0 < pbig["read"] < 20000
+        and pchars["ok"] and pchars["why"] == "chars" and pchars["chars"] <= 20_000 and pchars["partial"]
+        and phg["ok"] is False and phs < 5 and not left
+        and pnone == {"ok": False, "err": "PDF needs an update on this computer.", "needs": True,
+                      "secs": pnone.get("secs"), "reader": "pypdf"}
+        and nmac["_pdf_reader"]() == ("", None) and nwin["_pdf_reader"]()[0] == "pypdf"
+        and _ns546(src, mac=False, hooks=("pdf-none", "pdf-pypdf"))["_pdf_reader"]() == ("", None))
     # local only
     sec = src[src.index("# ==== pdf attach (6b546): begin ===="):src.index("# ==== pdf attach (6b546): end ====")]
     rt = src[src.index('        if self.path == "/api/doc/pdf":'):src.index('        if self.path == "/api/doc/measure":')]
-    got["local only: no network, engine or other path in the section or the helper; the route reads and answers"] = (
-        _lint546(sec, swift) and not _lint546(sec + "\nimport urllib.request\n", swift)
+    wsec = src[src.index("# ==== pdf reader worker (6b546): begin ===="):src.index("# ==== pdf reader worker (6b546): end ====")]
+    got["local only: no network, engine or other path in the section, the pypdf worker or the helper; the route reads and answers"] = (
+        _lint546(sec + wsec, swift) and not _lint546(sec + "\nimport urllib.request\n", swift)
+        and src.index("# ==== pdf reader worker (6b546): end ====") < src.index("\ndef _real_app_dir(")   # it runs before anything else
         and not _lint546(sec, swift + "\nlet s = URLSession.shared\n")
         and "self._send_json(pdf_extract(self.rfile.read(n) if n > 0 else b\"\"))" in rt
         and "n > DOC_PDF_MAX_BYTES" in rt and rt.count("(") <= 12
@@ -40871,9 +40961,53 @@ def _c546_build():
         and "-target arm64-apple-macos11" in bs and "-target x86_64-apple-macos11" in bs and "lipo -create" in bs)}
 
 
+def _c546_install(src):
+    """pypdf's pin rides CRYPTO_REQS (every installer of those pins takes it off a Mac); a venv made before it gets
+    it at a start, the MLX engine's way; the frozen exe carries it and its self-test says so."""
+    ps = open("build_windows_exe.ps1", encoding="utf-8").read()
+    ns = {"re": re, "os": os, "json": json, "time": time, "tempfile": _tf522, "sys": sys}
+    exec(_reqs546(src) + _def522(src, "_crypto_should_try")
+         + _def522(src, "CRYPTO_RETRY_S") + _def522(src, "PDF_READER_RECORD") + _def522(src, "_pdf_install")
+         + _def522(src, "_pdf_reader_why_not") + _def522(src, "_ensure_pdf_reader"), ns)
+    import math as _m546
+    d = _tf522.mkdtemp()
+    calls, have = [], [False]
+
+    def pip(py, reqs):
+        calls.append(reqs)
+        have[0] = True
+        return True, ""
+    ns.update({"math": _m546, "IS_MAC": False, "_pdf_pypdf_ok": lambda: have[0], "_crypto_install_blocker": lambda: "",
+               "_crypto_install": {"state": "done"}, "_crypto_key": lambda: "999 3.12.1", "app_dir": lambda: d,
+               "_replace_into": os.replace, "_crypto_pip": pip})
+    ns["_ensure_pdf_reader"]()
+    first = dict(ns["_pdf_install"])
+    have[0] = False
+    ns["_ensure_pdf_reader"]()                      # installed, then gone: no second try the same day
+    second = dict(ns["_pdf_install"])
+    w = ns["_pdf_reader_why_not"]
+    ns["IS_MAC"] = True
+    on_mac = w(have=False, py=(3, 12))
+    ns["IS_MAC"] = False
+    pin = "pypdf==6.9.2 ; sys_platform != \"darwin\" and python_version >= \"3.11\" --hash=sha256:" \
+          "662cf29bcb419a36a1365232449624ab40b7c2d0cfc28e54f42eeecd1fd7e844"
+    return {"pypdf rides the pins off a Mac from Python 3.11; an older venv gets it at a start, one try a build; the "
+            "frozen exe carries it and its self-test checks it": (
+        ns["crypto_reqs"](only=("pypdf",)).strip() == pin
+        and calls == [pin + "\n"] and first["state"] == "done" and second["state"] == "failed"
+        and on_mac == "PDFKit reads PDFs on a Mac" and w(have=True, py=(3, 12)) == "installed"
+        and w(have=False, py=(3, 10)).startswith("the PDF reader needs Python 3.11") and w(have=False, py=(3, 12)) == ""
+        and "        ctx_thread(target=_ensure_pdf_reader, bind=False, daemon=True).start()\n" in src
+        and '$pyiArgs += @("--collect-submodules", "pypdf")' in ps
+        and 'if ([version]$stj.python -ge [version]"3.11" -and $stj.pypdf -ne "6.9.2") {' in ps
+        and "        import pypdf        # the PDF reader off a Mac (6b546)" in src
+        and 'if __name__ == "__main__" and sys.argv[1:2] == ["--pdf-text"]:\n    sys.exit(_pdf_text_worker(sys.argv[2:]))' in src
+        and '(".pdf-", ".jsonl")' in src[src.index("RUN_FILE_KINDS = "):src.index("def sweep_run_files")])}
+
+
 def _c546_all(src, swift):
     out = {}
-    for fn, args in ((_c546_units, (src, swift)), (_c546_page, (src,)), (_c546_build, ())):
+    for fn, args in ((_c546_units, (src, swift)), (_c546_page, (src,)), (_c546_build, ()), (_c546_install, (src,))):
         try:
             for k, v in fn(*args).items():
                 out[k] = bool(v)
@@ -40897,13 +41031,23 @@ _C546_MUT = [
     ("the character cap ignored", "            if got and size > cap:", "            if False:"),
     ("split not on the pages", 'DOC_PDF_MARK_RX if doc_is_pdf(d["name"]) else None)', "None)"),
     ("a PDF not a local document", 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt|pdf)$", re.I)', 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt)$", re.I)'),
-    ("read off a Mac", '    if "pdf-none" in TEST_HOOKS or not IS_MAC:', '    if "pdf-none" in TEST_HOOKS:'),
-    ("a hung helper waited for", "        killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)", "        killer = threading.Timer(3600, p.kill)"),
-    ("the copy left behind", "    finally:\n        drop_run_file(path)\n    out = pdf_parse(lines)", "    finally:\n        pass\n    out = pdf_parse(lines)"),
+    ("PDFKit off a Mac", "    if not IS_MAC:\n        return None\n    for p in (resource(DOC_PDF_HELPER)", "    for p in (resource(DOC_PDF_HELPER)"),
+    ("a hung helper waited for", "            killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)", "            killer = threading.Timer(3600, p.kill)"),
+    ("the copy left behind", "    finally:\n        drop_run_file(path)\n", "    finally:\n"),
     ("a PDF sliced as text", "    else if(DOC_PDF.test(f.name))addPdfFile(f);\n    else if(f.size<2_000_000)addDocFile(f);", "    else if(f.size<2_000_000)addDocFile(f);"),
     ("sent while being read", "    try{await Promise.all(pendingDocs.filter(d=>d.busy).map(d=>d.wait));}finally{sendAsking=false;}", "    sendAsking=false;"),
     ("the scanned count off the chip", "+(d.scanned?'<i class=\"dcm dcbad\">'+docPl(d.scanned,\"scanned page\")+' skipped</i>':'')", ""),
-    ("the server asked", "    helper = _pdf_helper_path()\n", "    helper = _pdf_helper_path()\n    ollama_url('/api/show')\n"),
+    ("the server asked", "    kind, argv = _pdf_reader()\n", "    kind, argv = _pdf_reader()\n    ollama_url('/api/show')\n"),
+    ("pypdf: a scan not flagged", '"ink": bool(page is not None and not s.strip() and _pdf_page_ink(page))})', '"ink": False})'),
+    ("pypdf: no time cap", "            if time.time() - t0 > max_s:\n                emit(", "            if False:\n                emit("),
+    ("pypdf: AES read without cryptography", "opened = 0 if _pdf_is_aes(r) and not _pdf_aes_ok() else r.decrypt(\"\")", "opened = r.decrypt(\"\")"),
+    ("pypdf: a password PDF read", "                if not opened:\n                    emit({\"ev\": \"locked\"})", "                if False:\n                    emit({\"ev\": \"locked\"})"),
+    ("pypdf: a hang waited for", "                p.wait(timeout=cap + DOC_PDF_GRACE_S)", "                p.wait()"),
+    ("pypdf: its lines left behind", "        drop_run_file(outp)\n", ""),
+    ("a Mac falls back to pypdf", '        return ("pdfkit", [h]) if h else ("", None)', '        if h:\n            return ("pdfkit", [h])'),
+    ("no pypdf reads as broken", "        out = {\"ok\": False, \"err\": DOC_PDF_NEEDS, \"needs\": True}\n    out[\"secs\"]", "        pass\n    out[\"secs\"]"),
+    ("pypdf on a Mac's pins", 'pypdf==6.9.2 ; sys_platform != "darwin" and python_version', 'pypdf==6.9.2 ; python_version'),
+    ("an old venv never gets pypdf", "    ok, why = pip(sys.executable, crypto_reqs(only=(\"pypdf\",)))", "    ok, why = True, \"\""),
 ]
 _c546_caught = []
 for _mn, _ma, _mb in _C546_MUT:
