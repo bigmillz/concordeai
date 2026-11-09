@@ -1,10 +1,15 @@
-**ConcordeAI 6.1 RC1**
+**ConcordeAI 7.0 beta 1**
 
-The first release candidate of 6.1. Chats no longer get lost, and the app only answers its own window.
+The first beta of 7.0: a new look, a native window, and a new way to pick how hard it thinks.
 
-- **Chats stay put.** The app saves each question the moment you ask it and each answer as it finishes, or as far as it got if you press Stop or quit. Funnels save every step, the summary included. The old 60-chat limit is gone, pinned chats are never cleared, and a chat file that can't be read is never treated as empty.
-- **Backdrops that vary.** The shelf keeps day and night clips apart, finishes half-downloaded clips first, remembers what you've seen, and changes scene every hour with a crossfade.
-- **Maps draw again**, on OpenFreeMap's dark style.
-- **One window, one owner.** The app answers only its own window, with a key and a per-launch token; the old web version, browser mode and anything arriving through a proxy are gone.
-- **Settings** always opens on About, links the website, and calls the beta channel Prerelease.
-- **Weather** for a zip code names the zip.
+- **A native Mac app.** On the Mac, ConcordeAI now runs in its own window built in Rust, one universal app for Apple silicon and Intel Macs. Its window is up in a fraction of a second, and it is all app: no title bar, a clean menu bar, and the traffic lights sit in the header.
+- **Horizon.** A new home under a live night sky, with a calmer chat and sidebar. Settings › About has Effects (Calm, Balanced, Full) if you want more or less motion.
+- **Plain modes.** Fast, Thinking, Pro, Max and Deep, with an effort slider from Low to Ultra.
+- **Bring your chats.** Drop a ChatGPT, Claude or Gemini export on the window, or use ConcordeAI › Import Chats…. Everything is read on your computer.
+- **It knows your stuff.** Ask about your own notes and past chats, and answers cite them. They stay on your machines.
+- **PDFs.** Attach a PDF and it's read on your computer, page by page.
+- **Dictation** starts as you press and writes as you speak.
+- **Recents** can show the last day, week or month, and remembers your choice.
+
+First open on a Mac: System Settings › Privacy & Security › Open Anyway. On Windows: More info › Run anyway.
+
