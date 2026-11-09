@@ -51238,6 +51238,17 @@ __HZ_FONTS__
 .hz #hz-effort.compact .hz-pick{height:30px;padding:0 9px 0 11px}
 .hz #hz-effort.compact .hz-pick b{font-size:13px}
 .hz #hz-effort.compact .hz-elevel{min-width:0;font-size:12.5px}
+/* ---- a mode switch (6b540): the name rolls like a slot while the chip's width morphs (the two
+   names share one clipped cell); the chosen row's light travels into the chip, which lights for
+   a moment; one sweep runs along the composer's top edge. Nothing of this exists while idle. */
+.hz .hz-pick b.roll{display:grid;overflow:hidden;position:relative}
+.hz .hz-pick b.roll>span{grid-area:1/1;white-space:nowrap;will-change:transform,opacity}
+.hz .hz-pick.lit{background:rgba(207,224,255,.16)}
+.hz .hz-streak{position:fixed;left:-72px;top:-.5px;width:72px;height:1px;border-radius:1px;pointer-events:none;z-index:41;opacity:0;transform-origin:100% 50%;
+  background:linear-gradient(90deg,rgba(207,224,255,0),rgba(207,224,255,.9) 70%,#fff);box-shadow:0 0 6px rgba(159,192,255,.85)}
+.hz .hz-sweep{position:absolute;left:0;top:-1px;width:200px;height:2px;border-radius:1px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(207,224,255,0),rgba(207,224,255,.95) 50%,rgba(207,224,255,0));box-shadow:0 0 10px rgba(159,192,255,.7)}
+.hz .hz-sweep[hidden]{display:none}
 /* ---- history rows under the composer */
 #hz-history{display:none}
 .hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;margin-top:34px;pointer-events:auto}
@@ -51319,6 +51330,7 @@ __HZ_FONTS__
 .hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hz-mark .hz-glint,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}
 .hz .novideo #hz-wash,.hz .novideo #hz-wash.bloom{animation:none!important;opacity:.1}
 .hz .novideo #composer::before{animation:none;opacity:0!important}
+.hz .novideo .hz-streak,.hz .novideo .hz-sweep{display:none}
 .hz.hz-pause #hz-sky *,.hz.hz-pause #hz-cglow,.hz.hz-pause .hz-sl-halo,.hz.hz-pause #hero .greet .bloom,.hz.hz-pause #hero .greet .sheen,.hz.hz-pause #hz-mark .hz-glint{animation-play-state:paused!important}
 .hz.hz-pause .hz-elevel.shim,.hz.hz-pause .hz-ldie,.hz.hz-pause .chat-item.hz-live .ct{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
@@ -51328,6 +51340,7 @@ __HZ_FONTS__
   .hz .hz-mdl,.hz .hz-opt .ms,.hz #hz-menu{transition:none!important}
   .hz #composer::before{animation:none;opacity:0!important}
   .hz #hz-aurw,.hz .hz-sl-thumb,.hz .hz-sl-fill{transition:none!important}
+  .hz .hz-streak,.hz .hz-sweep{display:none}
 }
 /* ---- the Look and Effects rows in Settings > About, in the pane's own row style */
 #look-row,#fx-level-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
@@ -52848,8 +52861,22 @@ function paintModels(){
     const old=el.querySelector(".rank"); if(old)old.remove();
   });
   if(globalThis.hzReady)hzModesPaint();       // Horizon's slider follows the tier (6b526)
+  chipNameFade($("#chip-model"),tierLabel());  // Classic: a 120 ms fade on a change (6b540)
   $("#chip-model").textContent=tierLabel();
   paintCloudChip();
+}
+// THE CLASSIC CHIP'S NAME CHANGES WITH A 120 MS FADE (6b540): Horizon's roll and its
+// rules stay under .hz, so Classic gets the simple fade and nothing else; still with
+// effects off or reduced motion, and never on the first paint or a hidden chip. A fade
+// still running is cancelled first, so quick switches never stack.
+function chipNameFade(el,text){
+  if(!el||!el.animate||el.textContent===text||!el.textContent||!el.offsetParent)return;
+  if(el._fade){el._fade.cancel();el._fade=null;}
+  let still=(typeof noVideo!=="undefined"&&noVideo);
+  try{still=still||matchMedia("(prefers-reduced-motion: reduce)").matches;}catch(e){}
+  if(still)return;
+  el._fade=el.animate([{opacity:0},{opacity:1}],{duration:120,easing:"ease-out"});
+  el._fade.onfinish=()=>{el._fade=null;};
 }
 function selectModel(name){
   if(!name)return;  // rows without a model (Power Mode) don't select
@@ -64090,7 +64117,8 @@ function hzSkyBoot(){
     hzBlur(gl,pB,quad,S.B.t,S.W,S.H,S.h1,2.4,0);hzBlur(gl,pB,quad,S.h1.t,S.h1.w,S.h1.h,S.v1,0,1.2);
     hzBlur(gl,pB,quad,S.v1.t,S.v1.w,S.v1.h,S.h2,2.4,0);hzBlur(gl,pB,quad,S.h2.t,S.h2.w,S.h2.h,S.v2,0,1.6);
     hzBlur(gl,pB,quad,S.v2.t,S.v2.w,S.v2.h,S.sk,7,0);
-    S.neon+=(S.neonTo-S.neon)*.025;
+    // the neon eases to its level over about 1.2 s (a .4 s constant), the same at 30 and 60 fps (6b540)
+    const dn=Math.min(.1,(nowT-(S.lastN||nowT))/1000);S.lastN=nowT;S.neon+=(S.neonTo-S.neon)*(1-Math.exp(-dn/.4));
     gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
     gl.uniform1f(pA.U.time,t);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,S.neon);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
     gl.useProgram(pS);quad(pS);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,S.W,S.H);
@@ -64502,9 +64530,9 @@ function hzModesPaint(){
     hzControlsWire(host);
   }
   const t=typeof tier==="string"?tier:"",on=ms.indexOf(t)>=0;
-  const nm=host.querySelector(".hz-pick b");
-  nm.textContent=on?modeName(t):hzOffLabel(t);
-  host.querySelector(".hz-pick").setAttribute("aria-label","Mode, "+nm.textContent);
+  const nm=host.querySelector(".hz-pick b"),label=on?modeName(t):hzOffLabel(t);
+  hzModeFx(nm,label);                          // the name rolls on a switch (6b540)
+  host.querySelector(".hz-pick").setAttribute("aria-label","Mode, "+label);
   hzEffortPaint();
   const menu=$("#hz-menu");if(menu&&menu.classList.contains("open"))hzMenuBuild();
 }
@@ -64600,8 +64628,10 @@ function hzMenuWire(){
   menu.addEventListener("focusin",e=>{const o=e.target.closest(".hz-opt");if(o)hzMenuHover(o);});
   menu.addEventListener("click",e=>{const o=e.target.closest(".hz-opt");if(!o)return;e.stopPropagation();
     if(o.classList.contains("off"))return;
-    const m=o.dataset.t;hzMenuClose(true);
-    if(m&&m!==tier&&typeof setTier==="function")setTier(m);});
+    const m=o.dataset.t,nb=o.querySelector(":scope>b");
+    hzS.fxFrom=nb?nb.getBoundingClientRect():null;      // the streak starts at the row's name (6b540)
+    hzMenuClose(true);
+    if(m&&m!==tier&&typeof setTier==="function")setTier(m);else hzS.fxFrom=null;});
   menu.addEventListener("keydown",e=>{
     const os=[...menu.querySelectorAll(".hz-opt")],i=os.indexOf(document.activeElement);if(!os.length)return;
     if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();os[i<0?0:(i+(e.key==="ArrowDown"?1:os.length-1))%os.length].focus();}
@@ -64617,6 +64647,91 @@ function hzPlaceEffort(){
   const home=!!$("#hero");
   if(home&&eff.parentElement!==crow){crow.insertBefore(eff,$("#model-chip"));eff.classList.remove("compact");hzMenuClose(false);hzModesPaint();}
   else if(!home&&eff.parentElement!==slot){slot.appendChild(eff);eff.classList.add("compact");hzMenuClose(false);hzModesPaint();}
+}
+// ---- a mode switch (6b540, per Patrick: "some sort of slide or transition when people
+// switch modes"). The chip's name rolls like a slot: the old name up and out with a touch
+// of blur, the new one rising from below (260 ms) while the chip's width morphs to fit, no
+// jump. The chosen row sends a thin streak of ice light into the chip as the menu closes
+// (320 ms), then one soft sweep of light runs once along the composer's top edge, from the
+// chip toward the far corner (600 ms). The sky already follows the mode (S.level) and eases
+// there over about 1.2 s; no mode hue is invented. The newest switch wins: whatever is in
+// flight is finished at once, its end state written, never stacked. Reduced motion, or
+// Effects not Full: a 120 ms crossfade of the name and nothing else. Every animation runs
+// with a timer beside it (a hidden document never finishes one), fills forwards until its
+// task ends, and nothing of this exists while idle (the sweep is display:none, the streak
+// is removed).
+function hzFxCtl(){return {tasks:new Set(),to:"",cancel(){[...this.tasks].forEach(t=>t.fin(true));}};}
+// one task: its animations, its end state, its own clock. fin(cut): cut = finished early by a newer switch
+function hzFxTask(ctl,anims,end,ms){
+  const t={over:false,tm:0,fin(cut){if(t.over)return;t.over=true;ctl.tasks.delete(t);clearTimeout(t.tm);
+    anims.forEach(a=>{try{a.cancel();}catch(e){}});end(!!cut);}};
+  ctl.tasks.add(t);
+  let left=anims.length;const one=()=>{if(--left<=0)t.fin(false);};
+  anims.forEach(a=>{a.onfinish=one;});
+  t.tm=setTimeout(()=>t.fin(false),ms+80);
+  return t;
+}
+// the switch rule: a target already in hand is a no-op (a repaint during a roll never cuts
+// it); a different one finishes whatever is in flight at once, then starts
+function hzFxSwitch(ctl,text,start){if(ctl.to===text)return false;ctl.cancel();ctl.to=text;start();return true;}
+function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}
+// the name: a roll (full) or a crossfade (still); the width morphs with it. The first
+// paint, or a page without the animation API, writes the name plainly.
+function hzNameRoll(b,text,full){
+  const from=b.textContent;
+  if(from===text)return;
+  if(!from||!b.animate){b.textContent=text;return;}
+  const w0=b.offsetWidth;b.textContent=text;const w1=b.offsetWidth;
+  const o=document.createElement("span"),n=document.createElement("span");
+  o.textContent=from;n.textContent=text;
+  b.textContent="";b.append(o,n);b.classList.add("roll");b.style.width=w0+"px";
+  const ms=full?260:120,F={duration:ms,fill:"forwards"},out={...F,easing:"cubic-bezier(.65,0,.35,1)"},inn={...F,easing:"cubic-bezier(.16,1,.3,1)"};
+  const anims=full?[
+    o.animate([{transform:"translateY(0)",opacity:1,filter:"blur(0)"},{transform:"translateY(-110%)",opacity:0,filter:"blur(2px)"}],out),
+    n.animate([{transform:"translateY(110%)",opacity:0,filter:"blur(2px)"},{transform:"translateY(0)",opacity:1,filter:"blur(0)"}],inn),
+    b.animate([{width:w0+"px"},{width:w1+"px"}],inn)]
+  :[o.animate([{opacity:1},{opacity:0}],F),n.animate([{opacity:0},{opacity:1}],F),b.animate([{width:w0+"px"},{width:w1+"px"}],F)];
+  hzFxTask(hzS.fx,anims,()=>{b.classList.remove("roll");b.style.width="";b.textContent=text;},ms);
+}
+// the chip's switch: the roll, and in full the streak from the chosen row (when a row chose
+// it; a keyboard switch has none) and the sweep along the composer's edge
+function hzModeFx(b,text){
+  const row=hzS.fxFrom;hzS.fxFrom=null;
+  // Classic keeps the chip hidden and has none of these rules: the name is written plainly
+  if(!document.documentElement.classList.contains("hz")){hzS.fx.cancel();hzS.fx.to=text;b.textContent=text;return;}
+  hzFxSwitch(hzS.fx,text,()=>{
+    const full=hzFxFull()&&!!b.animate&&!!b.textContent;
+    hzNameRoll(b,text,full);
+    if(!full)return;
+    if(row)hzStreak(row,b);
+    hzSweep(b);
+  });
+}
+// the chosen row's light travels into the chip as the menu closes: a thin ice streak, its
+// head leading, fixed over the page; the chip lights for a moment as it lands
+function hzStreak(row,b){
+  const to=b.getBoundingClientRect();if(!row||!to.width)return;
+  const x0=row.left+Math.min(row.width,24),y0=row.top+row.height/2,x1=to.left+to.width/2,y1=to.top+to.height/2;
+  const dx=x1-x0,dy=y1-y0;if(Math.hypot(dx,dy)<8)return;
+  const ang=(Math.atan2(dy,dx)*180/Math.PI).toFixed(2);
+  const s=document.createElement("i");s.className="hz-streak";s.setAttribute("aria-hidden","true");document.body.appendChild(s);
+  const at=k=>"translate("+(x0+dx*k).toFixed(1)+"px,"+(y0+dy*k).toFixed(1)+"px) rotate("+ang+"deg)";
+  const a=s.animate([{transform:at(0)+" scaleX(.2)",opacity:0},{transform:at(.25)+" scaleX(1)",opacity:1,offset:.25},
+    {transform:at(1)+" scaleX(.6)",opacity:.9,offset:.9},{transform:at(1)+" scaleX(0)",opacity:0}],{duration:320,easing:"cubic-bezier(.65,0,.35,1)",fill:"forwards"});
+  const pick=b.closest(".hz-pick");
+  hzFxTask(hzS.fx,[a],cut=>{s.remove();if(pick&&!cut){pick.classList.add("lit");setTimeout(()=>pick.classList.remove("lit"),220);}},320);
+}
+// one soft sweep along the composer's top edge, from the chip's x toward the far corner
+function hzSweep(b){
+  const c=$("#composer");if(!c)return;
+  const cr=c.getBoundingClientRect(),br=b.getBoundingClientRect();if(!cr.width)return;
+  const r=28,W=200,x=Math.max(r,Math.min(cr.width-r,br.left+br.width/2-cr.left)),x1=x<cr.width/2?cr.width-r:r;
+  let s=c.querySelector(":scope>.hz-sweep");
+  if(!s){s=document.createElement("i");s.className="hz-sweep";s.setAttribute("aria-hidden","true");c.appendChild(s);}
+  s.hidden=false;
+  const a=s.animate([{transform:"translateX("+(x-W/2).toFixed(1)+"px)",opacity:0},{opacity:1,offset:.18},{opacity:.9,offset:.7},
+    {transform:"translateX("+(x1-W/2).toFixed(1)+"px)",opacity:0}],{duration:600,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
+  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},600);
 }
 // ---- the header's first button and the sidebar: closed on the home unless
 // opened, open in a conversation unless hidden; the drawer under 760px
@@ -64886,7 +65001,7 @@ function hzInit(){
   hzS={gen:false,genLocal:false,srvWorking:"",intro:false,blurred:false,introTimers:[],tracers:new Set(),salt:salt,
     reduced:!!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches),
     debug:hzDebugParse(HZ_DEBUG),gpu:null,mem:null,seed:1,rnd:hzRng(1),dayKey:-1,skyAt:0,accel:"",inUse:new Set(),
-    effort:null,clip:null,liveChat:null,liveV:"",watch:new Set(),titles:new Map(),sendFrom:null};
+    effort:null,clip:null,liveChat:null,liveV:"",watch:new Set(),titles:new Map(),sendFrom:null,fx:hzFxCtl(),fxFrom:null};
   if(hzS.debug&&hzS.debug.intro!=null&&root.classList.contains("hz"))root.classList.add("hz-intro");
   hzReady=true;
   try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}

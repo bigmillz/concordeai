@@ -40762,6 +40762,88 @@ check("6b529 an imported chat continued here: the messages brought in keep the o
       and '_m["imp"] = 1' in _IMP_SEG and 'for _m in chat.get("messages") or []:' in _IMP_SEG, "")
 # ==== bring your chats (6b529): end ====
 
+# ==== THE MODE SWITCH (6b540, per Patrick: "some sort of slide or transition when people switch
+# modes"): the chip's name rolls like a slot (260 ms) while its width morphs; the chosen row's light
+# travels into the chip (320 ms); one sweep runs along the composer's top edge (600 ms); the sky's
+# neon eases to the mode's level over about 1.2 s at any frame rate. The newest switch wins. Reduced
+# motion or Effects not Full: a 120 ms crossfade of the name only; Classic a 120 ms fade; nothing
+# of it exists while idle. Every rule under .hz; the still rules in both still blocks.
+def _mfx_rules(css, js):
+    rm = css[css.index("@media (prefers-reduced-motion:reduce){\n  .hz #hz-sky *"):]
+    rm = rm[:rm.index("\n}")]
+    return (".hz .hz-pick b.roll{display:grid;overflow:hidden;position:relative}" in css
+            and ".hz .hz-pick b.roll>span{grid-area:1/1;white-space:nowrap;will-change:transform,opacity}" in css
+            and ".hz .hz-pick.lit{background:rgba(207,224,255,.16)}" in css
+            and ".hz .hz-streak{position:fixed;left:-72px;top:-.5px;width:72px;height:1px;border-radius:1px;pointer-events:none;z-index:41;opacity:0;transform-origin:100% 50%;" in css
+            and ".hz .hz-sweep{position:absolute;left:0;top:-1px;width:200px;height:2px;border-radius:1px;pointer-events:none;opacity:0;" in css
+            and ".hz .hz-sweep[hidden]{display:none}" in css
+            and ".hz .novideo .hz-streak,.hz .novideo .hz-sweep{display:none}" in css
+            and ".hz .hz-streak,.hz .hz-sweep{display:none}" in rm
+            and 'function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
+            and "hzModeFx(nm,label);" in js and 'setAttribute("aria-label","Mode, "+label);' in js
+            and 'const ms=full?260:120,F={duration:ms,fill:"forwards"}' in js
+            and '{duration:320,easing:"cubic-bezier(.65,0,.35,1)",fill:"forwards"}' in js
+            and '{duration:600,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"}' in js
+            and "t.tm=setTimeout(()=>t.fin(false),ms+80);" in js            # the clock beside every animation: a hidden document never finishes one
+            and "hzS.fxFrom=nb?nb.getBoundingClientRect():null;" in js
+            and 'if(!document.documentElement.classList.contains("hz")){hzS.fx.cancel();hzS.fx.to=text;b.textContent=text;return;}' in js
+            and "S.neon+=(S.neonTo-S.neon)*(1-Math.exp(-dn/.4));" in js and "S.neon+=(S.neonTo-S.neon)*.025;" not in js
+            and "fx:hzFxCtl(),fxFrom:null};" in js)
+
+
+check("6b540 the mode switch: the roll, the streak, the sweep and the eased neon are in the page, every rule under .hz, still under reduced motion and effects off; the mutants (a sweep that stays in layout, an animation with no clock, a still rule dropped, the lit chip's rule outside .hz) are caught",
+      _mfx_rules(_hz_css, _hz_js) and _hz_scoped(_hz_css)
+      and not _mfx_rules(_hz_css.replace(".hz .hz-sweep[hidden]{display:none}", ""), _hz_js)
+      and not _mfx_rules(_hz_css, _hz_js.replace("t.tm=setTimeout(()=>t.fin(false),ms+80);", ""))
+      and not _mfx_rules(_hz_css.replace("  .hz .hz-streak,.hz .hz-sweep{display:none}\n}", "}"), _hz_js)
+      and not _hz_scoped(_hz_css.replace(".hz .hz-pick.lit{", ".lit{"))
+      and _MILLENAI_SRC.count(".hz-streak") == _hz_css.count(".hz-streak") + _hz_js.count(".hz-streak"), "")
+# Classic: the chip's name fades in over 120 ms on a change, outside Horizon's script, and the pinned
+# paint line (22268, 29665) is untouched; still with effects off or reduced motion
+check("6b540 Classic: the chip's name gets a 120 ms fade on a change and nothing else; the paint line it precedes is the one the hooks pin",
+      '  chipNameFade($("#chip-model"),tierLabel());  // Classic: a 120 ms fade on a change (6b540)\n  $("#chip-model").textContent=tierLabel();\n  paintCloudChip();\n}' in _MILLENAI_SRC
+      and 'el._fade=el.animate([{opacity:0},{opacity:1}],{duration:120,easing:"ease-out"});' in _MILLENAI_SRC
+      and 'if(!el||!el.animate||el.textContent===text||!el.textContent||!el.offsetParent)return;' in _MILLENAI_SRC
+      and 'still=still||matchMedia("(prefers-reduced-motion: reduce)").matches;' in _MILLENAI_SRC
+      and "chipNameFade" not in _hz_js and "chipNameFade" not in _hz_css, "")
+# the switch logic, run in node with stand-in animations: a repaint to the target in hand never cuts
+# the roll; a newer switch finishes the older one at once (its end written once, as cut, its animations
+# cancelled); a task ends once on its animations' finish, or on its clock when nothing finishes
+_mfx_js = _hz_js[_hz_js.index("function hzFxCtl()"):_hz_js.index("function hzFxFull()")]
+
+
+def _mfx_node(src):
+    f = os.path.join(_SMOKE_TMP, "modefx539.js")
+    open(f, "w").write(src + r"""
+const mk=()=>({c:0,onfinish:null,cancel(){this.c++;}});
+const o={},ctl=hzFxCtl();
+let aEnd=[],bEnd=[],cEnd=[],started=[];
+const a1=mk(),a2=mk(),b1=mk(),c1=mk();
+o.first=hzFxSwitch(ctl,"Alpha",()=>{started.push("A");hzFxTask(ctl,[a1,a2],cut=>aEnd.push(cut),260);});
+o.repaintNoop=hzFxSwitch(ctl,"Alpha",()=>started.push("A2"))===false&&aEnd.length===0&&ctl.tasks.size===1;
+o.second=hzFxSwitch(ctl,"Gamma",()=>{started.push("B");hzFxTask(ctl,[b1],cut=>bEnd.push(cut),260);});
+o.olderCut=JSON.stringify(aEnd)==="[true]"&&a1.c===1&&a2.c===1&&ctl.tasks.size===1&&ctl.to==="Gamma";
+b1.onfinish();b1.onfinish();
+o.finishOnce=JSON.stringify(bEnd)==="[false]"&&b1.c===1&&ctl.tasks.size===0;
+hzFxTask(ctl,[c1],cut=>cEnd.push(cut),0);      // never finishes: the clock ends it
+setTimeout(()=>{o.clock=JSON.stringify(cEnd)==="[false]"&&ctl.tasks.size===0;o.started=started.join("");
+  setTimeout(()=>{o.quiet=JSON.stringify([aEnd,bEnd,cEnd])==="[[true],[false],[false]]";process.stdout.write(JSON.stringify(o));},400);},200);
+""")
+    try:
+        return json.loads(subprocess.run(["node", f], capture_output=True, text=True, timeout=30).stdout or "null")
+    except Exception:
+        return None
+
+
+_mfx_o = _mfx_node(_mfx_js)
+_mfx_m1 = _mfx_node(_mfx_js.replace("if(t.over)return;", ""))                          # an end that runs twice
+_mfx_m2 = _mfx_node(_mfx_js.replace('if(ctl.to===text)return false;', ""))             # a repaint that cuts the roll
+check("6b540 the switch logic in node: the latest wins, a repaint never cuts, the older switch is finished once as cut, a task ends once on its finish or its clock; the mutants (a double end, a repaint that cuts) are caught",
+      _mfx_o == {"first": True, "repaintNoop": True, "second": True, "olderCut": True, "finishOnce": True,
+                 "clock": True, "started": "AB", "quiet": True}
+      and _mfx_m1 != _mfx_o and _mfx_m2 != _mfx_o, "%r %r %r" % (_mfx_o, _mfx_m1, _mfx_m2))
+# ==== the mode switch (6b540): end ====
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:

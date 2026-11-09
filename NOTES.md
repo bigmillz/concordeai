@@ -18798,3 +18798,75 @@ second site now sweep every occurrence (docattach brought a second `network erro
 `testing the key…`, `send failed —` and `Sharpening it`). Re-matching every row's old text against the result
 found no other docattach string a row covers; its new strings keep their words. Prerelease (6b318) and the
 Cloud pane's disclosure sentence stay as before.
+
+## 6b540 — mode-fx: a slide when the mode changes (per Patrick: "Can we add some sort of slide or transition when people switch modes?")
+
+The owner saw Horizon ("absolutely beautiful and a dream come true") and asked for a transition on a mode
+switch. Built so it reads as part of the same design: magic but classy, alive but not busy; motion only
+from the real input (the switch), nothing of it alive while idle. Branch `mode-fx` from copy-2 (dcf330e).
+
+**What happens on a switch** (the home's chip, the conversation header's compact chip, or ⌘K's
+"Switch to", all through `hzModesPaint` → `hzModeFx`):
+1. **The name rolls.** The chip's `b` becomes a clipped grid cell (`b.roll`) holding the old and the new
+   name; the old slides up and out with a 2px blur, the new rises from below (260 ms, the arrival ease);
+   the cell's width animates from the old name's width to the new one's, measured on the spot, so the
+   chip morphs and nothing jumps. At the end the cell is a plain `b` again.
+2. **The choice travels.** The menu's click remembers the chosen row's name rect (`hzS.fxFrom`); a 72×1px
+   ice streak (`.hz-streak`, fixed, head leading, rotated to its path) runs from the row into the chip as
+   the menu closes (320 ms) and the chip lights for 220 ms (`.hz-pick.lit`). Then one soft sweep
+   (`.hz-sweep`, 200×2px in `#composer`, display:none when idle) runs once along the composer's top edge
+   from the chip's x toward the far corner (600 ms). A keyboard switch has no row, so no streak.
+3. **The sky answers, a little.** The neon aurora already follows the mode (`S.level(m,e)`); its approach
+   was `.025` a frame, so it settled in ~0.7 s at 60 fps and ~1.3 s at Balanced's 30 fps. It is time-based
+   now (a .4 s constant, 95% in 1.2 s) at any frame rate. No mode hue invented; no extra breath added:
+   the level's own change is the answer, and light stays tied to Effort (OVERRIDE 4).
+4. **The byline.** Not rolled, deliberately: nothing in this build shows "Concorde <Mode>" for the *next*
+   answer. Every byline names the mode the server actually ran (`runInfo.mode`, 6b528), so rolling it on a
+   switch would misreport. `hzNameRoll(b,text,full)` is generic; if a next-answer byline ever appears, it is
+   one call.
+5. **Rapid switching.** `hzFxCtl` holds the live tasks and the target in hand (`to`); `hzFxSwitch` makes a
+   repaint to the same target a no-op (an engine poll's paint never cuts a roll) and a different target
+   finish whatever is in flight at once (animations cancelled, end state written, `cut=true`, so a cut streak
+   never lights the chip), then start. Each `hzFxTask` ends once: on its animations' finish, or on its own
+   clock (`ms+80`) — a hidden document never finishes an animation (CLAUDE.md trap). Animations fill
+   forwards until their task ends, so there is no pre-state flash between finish and the end write.
+6. **Still.** `hzFxFull()` = `hzMotionOK() && Effects Full`. Reduced motion, Effects off, Balanced, hidden or
+   long-unfocused: a 120 ms crossfade of the two names (same cell, opacity only, the width still morphs)
+   and nothing else. The CSS says the same twice over (`.hz .novideo .hz-streak,.hz .novideo .hz-sweep`
+   and the reduced-motion block). **Classic:** `chipNameFade` gives `#chip-model` a 120 ms fade-in on a
+   change and nothing else — not a true crossfade: a crossfade needs two layers, and Classic gets no new
+   CSS. The pinned paint line (`$("#chip-model").textContent=tierLabel();` in 22268/29665) is untouched;
+   the fade is the line before it. `hzModeFx` writes the name plainly when `html.hz` is absent (the first
+   round let the sweep's bare `<i>` into Classic's composer for 600 ms: a 2px flex gap; caught by the
+   measurement, fixed before commit).
+
+**Departures from the brief.** The byline (4, above). The Classic "crossfade" is a fade-in. Balanced is
+the app's default Effects level (`hzFxLevel()` is "balanced" unless `millen.fxlevel` says full), so most
+people see the crossfade until they choose Full in Settings > About — the brief's rule, followed; the
+owner may want Balanced to get the roll too (one word in `hzFxFull`).
+
+**Measured** (Playwright's bundled Chromium, headless, 1440×900, Full effects, this M4 Pro; no chat sent):
+- script: `hzModeFx` 0.77 ms a switch on average over 20; the whole `setTier` 1.15 ms average, 1.5 ms max.
+- no layout shift: `#composer` rect [340,545,760,138] on the home and [374,818,640,60] in a conversation,
+  identical before, at 0/60/130/200/300/500/700/1200 ms and after.
+- hittable throughout: `document.elementFromPoint` at the chip's centre resolves inside `.hz-pick` at every
+  sample, home and conversation.
+- idle: `document.getAnimations()` 11 before and 11 again 1.2 s after; no `.hz-streak` left; the sweep
+  `hidden`; `hzS.fx.tasks.size` 0.
+- rapid: four switches 30 ms apart → one roll from the previous target to the last (text "AlphaGamma",
+  2 spans), then "Gamma" alone, clean.
+- reduced motion / Balanced: three 120 ms animations (opacity, opacity, width), no streak, no sweep.
+  Classic: one 120 ms animation on `#chip-model`, nothing else.
+- the sweep is real, not imagined: the top-edge row brightens from ~97 to 138 (home) and ~56 to 119
+  (conversation) grey levels where the sweep is, in the mid-sweep stills.
+- zero page errors, zero API responses ≥400 across five contexts.
+
+**Checks.** `ast.parse` both files; both inline scripts `node --check`; `pincheck.py` 2,180 pins with the
+one pre-existing `MEMORY USED` red; the three new gauntlet checks pass in isolation (the gauntlet was not
+run: the owner's copies hold 9901–9903). **Pins added**, none changed: the exact CSS and JS substrings, the
+still rules in both blocks, `_hz_scoped` with a mutant that really leaves `.hz` (`.lit{` — note `_hz_scoped`
+accepts any selector containing `.hz`, so `.hz-streak{` would pass it), the Classic fade and its pinned
+neighbour, and a node run of `hzFxCtl`/`hzFxTask`/`hzFxSwitch` with stand-in animations (latest wins,
+repaint never cuts, older cut once, finish once, clock once) with two mutants (a double end, a repaint
+that cuts). Video and stills in `scratchpad/modefx/` (`mode-switch.mp4`, `.gif` under 8 MB, `.webm`,
+`still-*.png`, `crop-*.png`). Dev copy on 9893 in `MillenAI-dev-modefx`, killed by PID.
