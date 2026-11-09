@@ -40824,8 +40824,8 @@ check("every millen.* key the page writes to browser storage is kept by storeBoo
 def _corner_geo(rs, css):
     tx = float(re.search(r"const TL_X: f64 = ([\d.]+);", rs).group(1))
     ty = float(re.search(r"const TL_Y: f64 = ([\d.]+);", rs).group(1))
-    pad = int(re.search(r"html\.tl\.hz\.sbhide body:not\(:has\(#main #hero\)\) #hz-top\{padding-left:(\d+)px\}", css).group(1))
-    row = int(re.search(r"html\.tl\.hz #main:not\(:has\(#hero\)\) #hz-top\{height:(\d+)px\}", css).group(1))
+    pad = int(re.search(r"html\.tl:not\(\.tl-fs\)\.hz\.sbhide body:not\(:has\(#main #hero\)\) #hz-top\{padding-left:(\d+)px\}", css).group(1))
+    row = int(re.search(r"html\.tl:not\(\.tl-fs\)\.hz #main:not\(:has\(#hero\)\) #hz-top\{height:(\d+)px\}", css).group(1))
     rpad = int(re.search(r"#hz-right\{padding-left:(\d+)px\}", css).group(1))
     return {"gap": pad - (tx + 2 * 23 + 14), "centre": ty - 2, "row": row, "pad": pad, "rpad": rpad, "tx": tx}
 _cn_css = page[page.index("/* ---- THE MAC SHELL'S CORNER"):page.index("</style>", page.index("/* ---- THE MAC SHELL'S CORNER"))]
@@ -40837,10 +40837,10 @@ check("the Mac shell's corner: the lights sit centred on the 72 px header row, t
       and _cn["gap"] >= 16 and _cn["centre"] == _cn["row"] / 2 and _cn["row"] == 72
       and _cn["pad"] % 8 == 0 and _cn["tx"] % 8 == 0
       and _cn["rpad"] == _cn["pad"] - 24          # the right group carries what the left reserves
-      and "html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top," in _cn_css
-      and "html.tl.hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}" in _cn_css
-      and "html.tl.hz #brand-row .vghost{display:none}" in _cn_css
-      and "html.tl:not(.hz) #brand-row{padding-left:78px;margin-top:7px}" in _cn_css
+      and "html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top," in _cn_css
+      and "html.tl:not(.tl-fs).hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}" in _cn_css
+      and "html.tl:not(.tl-fs).hz #brand-row .vghost{display:none}" in _cn_css
+      and "html.tl:not(.tl-fs):not(.hz) #brand-row{padding-left:78px;margin-top:7px}" in _cn_css
       and 'if("0"==="1")document.documentElement.classList.add("tl");' in page
       and '"1" if (SHELL and IS_MAC) else "0")' in _MILLENAI_SRC
       and '<header id="hz-top" aria-label="Window" data-tauri-drag-region>' in page
@@ -40853,6 +40853,36 @@ _cn_m = [_corner_geo(_rs_main, _cn_css.replace("#hz-top{padding-left:96px}", "#h
 check("the Mac shell's corner, mutants: a short reservation, lights off the row's centre and a 56 px row are each caught",
       _cn_m[0]["gap"] < 16 and _cn_m[1]["centre"] != _cn_m[1]["row"] / 2
       and _cn_m[2]["centre"] != _cn_m[2]["row"] / 2, "%r" % _cn_m)
+# THE MENU BAR, CURATED (per Patrick: "basically looked like one perfect window"): the app
+# menu, Edit, View, Window and nothing else; no default-menu builder, no File or Help, no
+# Services or Show All, Reload in debug builds only; the page's items call the page's own
+# functions; the name follows the product name (the Nightly's says so); full screen drops
+# the lights' zone
+_rs_menu = _rs_main[_rs_main.index("fn build_menu("):_rs_main.index("fn menu_action(")]
+_rs_act = _rs_main[_rs_main.index("fn menu_action("):_rs_main.index("fn mark_fullscreen(")]
+check("the shell's menu bar is the curated one: ConcordeAI (About, Settings… ⌘,, Check for Updates…, Hide, Hide Others, Quit), Edit's six, View (Toggle Sidebar ⌘\\, Enter Full Screen), Window (Minimize, Zoom); no default menu, File, Help, Services or Show All; Reload only in debug; each page item wired; full screen marked",
+      "Menu::default" not in _rs_main and "Menu::with_items(app, &[&app_menu, &edit, &view, &window])" in _rs_menu
+      and set(re.findall(r'Submenu::with_items\(\s*app,\s*(&name|"\w+")', _rs_menu)) == {"&name", '"Edit"', '"View"', '"Window"'}
+      and all(x in _rs_menu for x in ("PredefinedMenuItem::undo(", "PredefinedMenuItem::redo(", "PredefinedMenuItem::cut(",
+                                      "PredefinedMenuItem::copy(", "PredefinedMenuItem::paste(", "PredefinedMenuItem::select_all(",
+                                      "PredefinedMenuItem::hide(", "PredefinedMenuItem::hide_others(", "PredefinedMenuItem::quit(",
+                                      "PredefinedMenuItem::about(", "PredefinedMenuItem::fullscreen(", "PredefinedMenuItem::minimize(",
+                                      "PredefinedMenuItem::maximize(app, Some(\"Zoom\"))"))
+      and not any(x in _rs_menu for x in ("services(", "show_all(", "close_window(", '"File"', '"Help"'))
+      and '"settings", "Settings\\u{2026}", true, Some("CmdOrCtrl+,")' in _rs_menu
+      and '"sidebar", "Toggle Sidebar", true, Some("CmdOrCtrl+Backslash")' in _rs_menu
+      and "#[cfg(debug_assertions)]\n    let reload" in _rs_menu
+      and "#[cfg(not(debug_assertions))]\n    let view = Submenu::with_items(app, \"View\", true, &[&sidebar, &fullscreen])?;" in _rs_menu
+      and "let name = app.package_info().name.clone();" in _rs_menu and '"ConcordeAI"' not in _rs_menu
+      and '"updates", "Check for Updates\\u{2026}", !nightly' in _rs_menu
+      and '"settings" => Some("typeof openAbout===\'function\'&&openAbout()")' in _rs_act
+      and "hzSidebarToggle()" in _rs_act and "about-check" in _rs_act
+      and "function openAbout(" in _MILLENAI_SRC and "function hzSidebarToggle(" in _MILLENAI_SRC
+      and 'id="about-check"' in _MILLENAI_SRC
+      and "if let Some(js) = menu_action(ev.id().as_ref())" in _rs_main
+      and "mark_fullscreen(&w2)" in _rs_main and "classList.toggle('tl-fs'" in _rs_main
+      and "html.tl:not(.tl-fs)" in _cn_css and "html.tl." not in _cn_css.replace("html.tl:not(.tl-fs)", ""),
+      "")
 # the measuring hook exists in a debug build only
 check("the shell's probe hook (CONCORDE_SHELL_PROBE) is compiled into debug builds only",
       _rs_main.count("#[cfg(debug_assertions)]\nfn probe_hook") == 1

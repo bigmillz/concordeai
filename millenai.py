@@ -52438,24 +52438,25 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
    header that starts at the window's left edge reserves 96 px, so the sidebar toggle starts 16 px or
    more right of the green button; every header row is 72 px, so the lights sit on its centre line;
    the sidebar's top row gives the lights its left and keeps the pen at its right, and the lockup
-   stays in the header. The bare header and the sidebar's top row drag the window. */
-html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
-html.tl.hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-left:96px}
-html.tl.hz #main:not(:has(#hero)) #hz-top{height:72px}
-html.tl.hz #hz-top{pointer-events:auto}
-html.tl.hz #brand-row .vghost{display:none}
-html.tl #brand-row #newchat{margin-left:auto}
+   stays in the header. The bare header and the sidebar's top row drag the window. In full screen
+   the lights are gone and so is their zone: the shell marks html.tl-fs. */
+html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
+html.tl:not(.tl-fs).hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-left:96px}
+html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #hz-top{height:72px}
+html.tl:not(.tl-fs).hz #hz-top{pointer-events:auto}
+html.tl:not(.tl-fs).hz #brand-row .vghost{display:none}
+html.tl:not(.tl-fs) #brand-row #newchat{margin-left:auto}
 /* Classic in the shell: its sidebar is the only place the lockup shows, so the lockup stays and
    starts 20 px right of the green button, the row's centre on the lights' line (16 + 7 + 26 / 2) */
-html.tl:not(.hz) #brand-row{padding-left:78px;margin-top:7px}
-html.tl.hz.hz-sbopen #main:has(#hero) #hz-mark,html.tl.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:inline-block}
+html.tl:not(.tl-fs):not(.hz) #brand-row{padding-left:78px;margin-top:7px}
+html.tl:not(.tl-fs).hz.hz-sbopen #main:has(#hero) #hz-mark,html.tl:not(.tl-fs).hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:inline-block}
 /* the lanes stay centred on the header whatever the corner takes: on the home the two side groups
    share the room equally (the spacers step out), and where the header reserves the lights' 72 px
    the right group carries the same 72 px, so the reservation moves nothing */
-html.tl.hz #main:has(#hero) #hz-brand,html.tl.hz #main:has(#hero) #hz-right{flex:1 1 0;min-width:0}
-html.tl.hz #main:has(#hero) #hz-right{justify-content:flex-end}
-html.tl.hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}
-html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-right{padding-left:72px}
+html.tl:not(.tl-fs).hz #main:has(#hero) #hz-brand,html.tl:not(.tl-fs).hz #main:has(#hero) #hz-right{flex:1 1 0;min-width:0}
+html.tl:not(.tl-fs).hz #main:has(#hero) #hz-right{justify-content:flex-end}
+html.tl:not(.tl-fs).hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}
+html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-right{padding-left:72px}
 </style>
 </head>
 <body>

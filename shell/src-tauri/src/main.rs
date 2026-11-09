@@ -482,27 +482,39 @@ fn stop_sidecar(app: &AppHandle) {
 
 // ------------------------------------------------------------------ window
 
+/// THE MENU BAR, CURATED (per Patrick: "basically looked like one perfect
+/// window"): the app menu, Edit, View and Window, nothing else. No File or
+/// Help, no Services, no developer items in a release. Every item works:
+/// Edit's are the native responders (without them copy and paste stop in
+/// the webview); Settings, Check for Updates and Toggle Sidebar call the
+/// page's own functions (menu_action). The app's name comes from the bundle's
+/// product name, so the Nightly's menu says "ConcordeAI Nightly"; the
+/// Nightly's updater is off, so its Check for Updates is greyed.
 fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
+    let name = app.package_info().name.clone();
+    let nightly = app.config().identifier.ends_with(".nightly");
     let about = AboutMetadata {
-        name: Some("ConcordeAI".into()),
+        name: Some(name.clone()),
         version: Some(app.package_info().version.to_string()),
         comments: Some("Local-first AI. Models run on your own machine.".into()),
         ..Default::default()
     };
+    let settings = MenuItem::with_id(app, "settings", "Settings\u{2026}", true, Some("CmdOrCtrl+,"))?;
+    let updates = MenuItem::with_id(app, "updates", "Check for Updates\u{2026}", !nightly, None::<&str>)?;
     let app_menu = Submenu::with_items(
         app,
-        "ConcordeAI",
+        &name,
         true,
         &[
-            &PredefinedMenuItem::about(app, Some("About ConcordeAI"), Some(about))?,
+            &PredefinedMenuItem::about(app, Some(&format!("About {}", name)), Some(about))?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::services(app, None)?,
+            &settings,
+            &updates,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::hide(app, None)?,
+            &PredefinedMenuItem::hide(app, Some(&format!("Hide {}", name)))?,
             &PredefinedMenuItem::hide_others(app, None)?,
-            &PredefinedMenuItem::show_all(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::quit(app, Some("Quit ConcordeAI"))?,
+            &PredefinedMenuItem::quit(app, Some(&format!("Quit {}", name)))?,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -519,8 +531,14 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::select_all(app, None)?,
         ],
     )?;
+    let sidebar = MenuItem::with_id(app, "sidebar", "Toggle Sidebar", true, Some("CmdOrCtrl+Backslash"))?;
+    let fullscreen = PredefinedMenuItem::fullscreen(app, Some("Enter Full Screen"))?;
+    #[cfg(debug_assertions)]
     let reload = MenuItem::with_id(app, "reload", "Reload", true, Some("CmdOrCtrl+R"))?;
-    let view = Submenu::with_items(app, "View", true, &[&reload])?;
+    #[cfg(debug_assertions)]
+    let view = Submenu::with_items(app, "View", true, &[&sidebar, &fullscreen, &reload])?;
+    #[cfg(not(debug_assertions))]
+    let view = Submenu::with_items(app, "View", true, &[&sidebar, &fullscreen])?;
     let window = Submenu::with_items(
         app,
         "Window",
@@ -528,12 +546,35 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &PredefinedMenuItem::minimize(app, None)?,
             &PredefinedMenuItem::maximize(app, Some("Zoom"))?,
-            &PredefinedMenuItem::fullscreen(app, None)?,
-            &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::close_window(app, None)?,
         ],
     )?;
     Menu::with_items(app, &[&app_menu, &edit, &view, &window])
+}
+
+/// What a menu item of the page's asks of it: the same functions the
+/// page's own buttons call (Settings opens on About, the update check is
+/// About's button, the sidebar folds the one way the header's button does).
+fn menu_action(id: &str) -> Option<&'static str> {
+    match id {
+        "settings" => Some("typeof openAbout==='function'&&openAbout()"),
+        "updates" => Some(
+            "typeof openAbout==='function'&&(openAbout(),document.getElementById('about-check')&&document.getElementById('about-check').click())",
+        ),
+        "sidebar" => Some("typeof hzSidebarToggle==='function'&&hzSidebarToggle()"),
+        "reload" => Some("location.reload()"),
+        _ => None,
+    }
+}
+
+/// Full screen hides the traffic lights, so the page drops their zone
+/// (html.tl-fs); the class follows every resize and every page load.
+fn mark_fullscreen(w: &tauri::WebviewWindow) {
+    if let Ok(fs) = w.is_fullscreen() {
+        let _ = w.eval(&format!(
+            "document.documentElement.classList.toggle('tl-fs',{})",
+            fs
+        ));
+    }
 }
 
 fn open_window(app: &AppHandle) -> tauri::Result<()> {
@@ -548,9 +589,12 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
         .initialization_script(BRIDGE_SHIM)
         // only the app's own origin and the shell's own page load in this
         // window; anything else (a link in an answer) goes to the browser
-        .on_page_load(|_w, payload| {
+        .on_page_load(|w, payload| {
             if cfg!(debug_assertions) {
                 eprintln!("[shell] page {:?} {}", payload.event(), payload.url());
+            }
+            if matches!(payload.event(), tauri::webview::PageLoadEvent::Finished) {
+                mark_fullscreen(&w);
             }
         })
         .on_navigation(move |url: &Url| {
@@ -603,7 +647,13 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
             .traffic_light_position(tauri::LogicalPosition::new(TL_X, TL_Y));
     }
     let _ = &mut b;
-    let _w = b.build()?;
+    let w = b.build()?;
+    let w2 = w.clone();
+    w.on_window_event(move |ev| {
+        if let tauri::WindowEvent::Resized(_) = ev {
+            mark_fullscreen(&w2);
+        }
+    });
     let _ = nav_app;
     Ok(())
 }
@@ -657,9 +707,9 @@ fn main() {
             let menu = build_menu(&handle)?;
             app.set_menu(menu)?;
             app.on_menu_event(|app, ev| {
-                if ev.id() == "reload" {
+                if let Some(js) = menu_action(ev.id().as_ref()) {
                     if let Some(w) = app.get_webview_window("main") {
-                        let _ = w.eval("location.reload()");
+                        let _ = w.eval(js);
                     }
                 }
             });
