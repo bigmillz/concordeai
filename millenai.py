@@ -3826,13 +3826,12 @@ def max_tier_row(ctx) -> dict:
     comp = max_compositor(ctx, labels)
     return {"desc": TIERS["Max"]["desc"], "models": labels, "cloud": cloud, "skipped": [],
             "available": n > 0, "count": n,
-            "why": "" if n else ("Nothing is available: download a model under Settings › "
-                                 "Models, pair a server, or add a key under Settings › "
-                                 "Cloud power."),
+            "why": "" if n else ("Nothing available. Add a model in Settings > Models, "
+                                 "pair a server, or add a key in Settings > Cloud."),
             "blend": blend_text(comp["label"]) if n > 1 else "",
             # who writes it, and who else could (6b442)
             "comp": max_comp_choices(ctx, labels) if n > 1 else None,
-            "warn": "Uses every model, including paid cloud keys. Each question can spend money "
+            "warn": "Every model, paid cloud keys included. Each question can spend money "
                     "on every key you have."}
 
 
@@ -3905,7 +3904,7 @@ def _comp_cloud_cands(ladder, order, gate=""):
             continue
         ok = pid in on and not gate
         out.append({"id": pid, "name": s["name"], "where": "cloud", "kind": "cloud", "ok": ok,
-                    "why": "" if ok else (gate or (s["why"] if not s["ok"] else "not used in this mode"))})
+                    "why": "" if ok else (gate or (s["why"] if not s["ok"] else "Not used in this mode"))})
     return out
 
 
@@ -3931,7 +3930,7 @@ def _comp_local_cands() -> list:
                 and not slow_giant(l)):
             fits = model_fits_memory(l)
             out.append({"id": l, "name": l, "where": "this computer", "kind": "local", "ok": fits,
-                        "why": "" if fits else "needs more memory"})
+                        "why": "" if fits else "Needs more memory"})
     return out[:COMP_LIST_MAX]
 
 
@@ -3966,7 +3965,7 @@ def mode_comp_choices(ctx, chosen: list, bench_n: int):
         srv = []
     return _comp_row(pid, label,
                      _comp_cloud_cands(compositor_ladder(), CLOUD_STRENGTH,
-                                       "" if cloud_allowed() else "cloud power is off")
+                                       "" if cloud_allowed() else "Cloud models are off")
                      + srv + _comp_local_cands())
 
 
@@ -4293,7 +4292,7 @@ TIERS = {
     # from the strongest brain this machine holds. A single engine keeps
     # it the quick path; the ladder still gives every machine its best.
     "Fast": {
-        "icon": "\u26a1\ufe0f", "desc": "the strongest model that fits",
+        "icon": "\u26a1\ufe0f", "desc": "The strongest model that fits",
         # Gemma 4 26B outranks the Qwen 35B MoE deliberately (A/B'd
         # 2026-08-04): identical accuracy on facts, extraction and trap
         # questions, but Gemma never collapsed, never slop-looped, and
@@ -4310,7 +4309,7 @@ TIERS = {
     # turbo pref already gives Fast the cloud when one exists. Old
     # clients still sending Best are aliased to Fast in do_POST.
     "Thinking": {
-        "icon": "\U0001f9e0", "desc": "a draft, a review, a fact-checked final",
+        "icon": "\U0001f9e0", "desc": "A draft, a review, a checked final",
         # strongest-first ladder: whatever the machine holds and the user
         # has installed autoselects \u2014 a Titan rig leads with the 235B, a
         # 16 GB laptop lands on Phi-4, nobody configures anything
@@ -4334,7 +4333,7 @@ TIERS = {
     # holds writes the final answer. Old clients sending Power are
     # aliased to Pro in do_POST.
     "Pro": {
-        "icon": "\u2728", "desc": "every model that fits, blended",
+        "icon": "\u2728", "desc": "Every model that fits, blended",
         "picks": [],          # purely memory-driven
         "count": 99,
         # no quality filtering — if it can run, it takes part
@@ -4347,7 +4346,7 @@ TIERS = {
     # included. Choosing it is the opt-in, as for Cloud Only. The merge is
     # written by the first available and healthy of MAX_COMPOSITOR_ORDER.
     "Max": {
-        "icon": "\U0001f680", "desc": "every model: here, your servers, the cloud",
+        "icon": "\U0001f680", "desc": "Every model: here, your servers, the cloud",
         "picks": [], "count": 99, "all": True, "max": True,
     },
     # VERA RUBIN (6b519, per Patrick: "emulate a Vera Rubin ... where it just
@@ -4374,7 +4373,7 @@ TIERS = {
     # tier that cannot answer is worse than no tier at all.
     "Cloud Only": {
         "icon": "☁️",
-        "desc": "your API keys only — nothing runs on this machine",
+        "desc": "Your keys only. Nothing runs here.",
         "picks": [],
         "count": 0,
         "cloud_only": True,
@@ -5192,7 +5191,7 @@ def build_model_rows() -> str:
                 f' data-model="{label}">'
                 f'<span class="ico">{info["icon"]}</span>{label}'
                 + ("" if ok else
-                   '<span class="memtag">APPLE SILICON ONLY</span>')
+                   '<span class="memtag">Apple silicon only</span>')
                 + f'<span class="size">{info["size"]}</span></div>')
     return "\n".join(out)
 
@@ -27211,27 +27210,23 @@ def server_mode_state(e, mode: str, speeds=None) -> dict:
         out.update(ok=False, why="%s lists no models for general questions." % n)
     k = len(seats)
     if out["asleep"]:
-        note = "%s is asleep: it wakes when you ask, then %s runs on its models alone." % (n, mode)
+        note = "%s is asleep. It wakes when you ask; %s then runs on it alone." % (n, mode)
     elif not out["ok"]:
         note = "When %s answers, %s runs on its models alone." % (n, mode)
     elif how == "smallest":
-        note = ("Nothing on %s is known to fit its card whole, so this is its smallest "
-                "model, alone, and it may use system memory." % n)
+        note = ("Nothing on %s fits its card, so its smallest model answers alone and may spill into memory." % n)
     elif mode == "Fast":
-        note = ("The strongest model on %s for a quick answer that fits its card, with a "
-                "second pass on it." % n)
+        note = ("%s’s strongest model that fits its card, with a second pass." % n)
     elif k == 1:
         note = "Only one model on %s suits %s, so it answers alone." % (n, mode)
     elif mode == "Max":
         note = "Every model on %s drafts (%d), then one writes the final answer there." % (n, k)
     elif mode == "Thinking":
         # one writer, a critic, a checked final (6b515)
-        note = ("The strongest model on %s drafts, a second reviews it, then %s "
-                "writes the final answer there and a quick model checks its facts."
+        note = ("%s’s strongest model drafts, a second reviews, %s writes the final and a quick model checks facts."
                 % (n, n))
     else:
-        note = ("%d models on %s draft, each rewrites its own from all of them, "
-                "then %s writes the merge there." % (k, n, n))
+        note = ("%d models on %s draft and revise, then %s writes the final." % (k, n, n))
         if mode == "Pro" and of > k:
             note += (" It seats %d of its %d: that many fit in the time a blend has."
                      % (k, of))
@@ -52061,24 +52056,20 @@ __CODE_ROWS__
 <!-- ADVANCED picker (6b248): hand-pick the council + the compositor -->
 <div id="adv-veil" hidden>
   <div id="adv-card">
-    <div class="set-h">Advanced — your own council</div>
-    <p class="advp">Pick exactly which minds draft an answer. Every
-    checked model answers your question; the compositor then reads all
-    the drafts and writes the single reply you see.</p>
+    <div class="set-h">Advanced</div>
+    <p class="advp">Choose which models draft. The compositor writes the final answer from the drafts.</p>
     <div class="adv-h">Local models</div>
     <div id="adv-local"></div>
     <div class="adv-h">Cloud models</div>
     <div id="adv-cloud"></div>
-    <div class="adv-h">Compositor — who holds the pen</div>
-    <p class="advp">One mind writes the final answer from every draft.
-    Stronger compositors keep more nuance; the local one keeps
-    everything on this machine.</p>
+    <div class="adv-h">Compositor</div>
+    <p class="advp">Writes the final answer. The local one keeps everything on this Mac.</p>
     <select id="adv-comp"></select>
     <p class="advp" id="adv-comp-why"></p>
     <div id="adv-note"></div>
     <div id="adv-foot">
       <button class="about-btn" id="adv-cancel">Cancel</button>
-      <button class="about-btn primary" id="adv-save">Use this council</button>
+      <button class="about-btn primary" id="adv-save">Done</button>
     </div>
   </div>
 </div>
@@ -53175,36 +53166,33 @@ function detHtml(name,info,ci){
   else if(info.available===false||(info.available!==undefined&&!list.length
      &&name==="Cloud Only")){
     h="<b>"+esc(name)+"</b>"
-      +'<div class="mline">no API key yet</div>'
-      +'<span class="note">add one under Settings › Cloud power — '
-      +'Gemini and Groq both have free tiers</span>';
+      +'<div class="mline">No key saved</div>'
+      +'<span class="note">Add one in Settings > Cloud. Gemini and Groq are free.</span>';
   }else if(name==="Cloud Only"){
     h="<b>"+esc(name)+"</b>"
       +list.map(m=>'<div class="mline mcloud">'+esc(m)
         +' <i>· cloud</i></div>').join("")
       +'<span class="note">'+(list.length>1
-        ?"all of them answer, then one writes the final answer"
-        :"streams straight from your key")
-      +' — nothing runs on this machine</span>';
+        ?"Every cloud model drafts; one writes the final."
+        :"Your key only. Nothing runs here.")
+      +'</span>';
   }else
   h="<b>"+esc(name)+"</b>"+
     (list.length
       ? list.map(m=>'<div class="mline">'+esc(m)
-          +(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':"")+'</div>').join("")+
+          +(m.indexOf(SRV_SEP)>=0?' <i>your server</i>':"")+'</div>').join("")+
         bench.map(m=>'<div class="mline mcloud">'+esc(m)
           +' <i>· cloud</i></div>').join("")+
         (cloudOn
-          ?'<span class="note"><i class="gcheck">✓</i> Cloud Enabled'
-            +(info.fastcloud?' — '+esc(info.fastcloud)+' answers first, '
-              +'this machine is the fallback':'')+'</span>'
-          :list.length>1?"":'<span class="note">single model — fastest</span>')
-      : '<div class="mline">nothing downloaded yet</div>')+
+          ?'<span class="note">'+(info.fastcloud?'Cloud answers first. This Mac is the fallback.':'Cloud on')+'</span>'
+          :list.length>1?"":'<span class="note">One model. Fastest.</span>')
+      : '<div class="mline">No models downloaded</div>')+
     // a mode with more server models than seats (6b339, final review)
     (info.srvcap
-      ? '<span class="note">seats '+info.srvcap.seated+' of the '+info.srvcap.of
-        +' models on your server: that many fit in the time a blend has</span>' : "")+
+          ? '<span class="note">'+info.srvcap.seated+' of '+info.srvcap.of
+            +' server models fit the time a blend has</span>' : "")+
     ((info.skipped||[]).length
-      ? '<span class="note">skipped, needs more memory: '+
+      ? '<span class="note">Needs more memory: '+
         esc(info.skipped.join(", "))+'</span>' : "");
   return h+compHtml(name,info);
 }
@@ -53225,9 +53213,9 @@ function compHtml(t,info){
       +(x.ok?"":' disabled title="'+esc(x.why||"unavailable")+'"')+'>'
       +'<span class="pcn">'+esc(x.name)+'</span>'
       +'<span class="pcw">'+esc(x.ok?(x.where||""):(x.why||"unavailable"))+'</span>'
-      +(x.id===c.def?'<span class="pdef">default</span>':"")+'</button>').join("")
+      +(x.id===c.def?'<span class="pdef">Default</span>':"")+'</button>').join("")
     +(mine&&!mine.ok?'<span class="note">'+esc(mine.name)
-      +' can’t write it right now, so the default does.</span>':"")
+      +' is unavailable. The default writes it.</span>':"")
     +'</div>';
 }
 // a compositor picked in the pop-out: kept per mode (prefs "comps"); the
@@ -53380,33 +53368,31 @@ const ADV_USE={
   "Ministral 3 14B":"long context, natural prose",
   "Qwen 3.5 9B":"reasoning, code and STEM",
   "Gemma 4 12B":"strong generalist, good merge writer",
-  "Gemma 4 26B":"the house heavyweight — best local compositor",
+  "Gemma 4 26B":"Strongest local model; best local compositor",
   "DeepSeek R1 8B":"step-by-step reasoning",
   "GPT-OSS 20B":"strong open reasoning",
   "Qwen 3.8 27B":"heavyweight generalist and coder",
   "Qwen 3.6 35B MoE":"heavyweight generalist, fast for its size",
   "Muse Glimmer 30B":"careful reasoner \u2014 thinks before it answers, slower",
-  "Devstral Small 2 24B":"agentic coder — the Code lane's first pick",
+  "Devstral Small 2 24B":"Coding agent; the Code lane’s first pick",
   "Qwen 3 Coder 30B MoE":"coder, fast for its size",
   "GPT-OSS 120B":"frontier-class open reasoning",
-  "GLM 5.3":"the largest open model \u2014 512 GB Macs",
+  "GLM 5.3":"Largest open model. 512 GB Macs.",
   "DeepSeek V3.2 671B":"frontier open model \u2014 512 GB Macs",
   "DeepSeek V3.1 671B":"frontier open model \u2014 workstations; slow unless it fits in GPU memory",
   "Qwen 3 Coder 480B":"frontier open coder \u2014 workstations; slow unless it fits in GPU memory",
 };
 const ADV_CLOUD={
-  gemini:["Gemini","fast frontier drafts · free tier"],
-  groq:["Groq","the fastest tokens anywhere · free tier"],
-  claude:["Claude","deep reasoning and careful prose · paid"],
-  kimi:["Kimi K3","frontier open model, 1M context · paid"]};
+  gemini:["Gemini","Fast frontier drafts. Free."],
+  groq:["Groq","Fastest tokens. Free."],
+  claude:["Claude","Deep reasoning, careful prose. Paid."],
+  kimi:["Kimi K3","Frontier open model, 1M context. Paid."]};
 const ADV_WHY={
-  "":"Automatic — the strongest available mind writes the final: "
-    +"Claude, then Kimi K3, then Gemini, then Groq, with local Gemma "
-    +"as the private fallback. The right default.",
-  claude:"Best for research, analysis and nuanced writing.",
-  kimi:"Best for long documents and coding advice — 1M-token context.",
-  gemini:"Best for quick general questions.",
-  groq:"Best when speed matters more than polish."};
+  "":"The strongest available model writes the final: Claude, Kimi K3, Gemini, Groq, then local Gemma.",
+  claude:"Research, analysis, careful writing.",
+  kimi:"Long documents and code. 1M-token context.",
+  gemini:"Quick general questions.",
+  groq:"Speed over polish."};
 function advChip(){
   if(advOn)$("#chip-model").textContent="Custom";
 }
@@ -53429,7 +53415,7 @@ async function openAdv(){
     +'<span class="au">'+esc(ADV_USE[m.label]||"capable generalist")
     +'</span></span></label>').join("")
     +advServerRows(sel))
-    ||'<p class="advp">no local models installed yet</p>';
+    ||'<p class="advp">No local models installed</p>';
   const pv=(cs||{}).providers||{};
   $("#adv-cloud").innerHTML=Object.keys(ADV_CLOUD).map(id=>{
     const ok=(pv[id]||{}).status==="ok";
@@ -53438,14 +53424,13 @@ async function openAdv(){
       +'<input type="checkbox" data-c="'+id+'"'
       +(ok?(sel.cloud.indexOf(id)>=0?" checked":""):" disabled")+'>'
       +'<span class="an"><b>'+nm+'</b>'
-      +'<span class="au">'+(ok?use:"no key — add one in Settings › Cloud power")
+      +'<span class="au">'+(ok?use:"No key. Add one in Settings > Cloud.")
       +'</span></span></label>';}).join("");
   // with the switch off the named clouds and a cloud compositor sit out
   // (6b326): say so rather than let them vanish from the answer
   if(cs&&cs.turbo===false&&Object.keys(ADV_CLOUD).some(id=>(pv[id]||{}).status==="ok"))
     $("#adv-cloud").insertAdjacentHTML("afterbegin",'<p class="advp" id="adv-cloud-off">'
-      +"Cloud power is off, so these and a cloud compositor sit out. Turn it on "
-      +"in Settings \u203a Cloud power.</p>");
+      +"Cloud models are off. Turn them on in Settings > Cloud.</p>");
   // compositor: automatic, each keyed cloud, and the local Gemmas. Never a
   // server's model: run_council has no server compositor (6b337)
   const comps=advCompList(pv,ready);
@@ -53466,18 +53451,16 @@ function advServerRows(sel){
     // still tickable so it can be taken out (6b339, UX review)
     const ghosts=sel.local.filter(l=>advGhost(l)&&l.indexOf(s.name+SRV_SEP)===0).map(l=>
       '<label class="advrow off"><input type="checkbox" data-l="'+esc(l)+'" checked>'
-      +'<span class="an"><b>'+esc(l)+'</b><span class="au">no longer on '+esc(s.name)
+      +'<span class="an"><b>'+esc(l)+'</b><span class="au">Not on '+esc(s.name)+' any more'
       +'</span></span></label>').join("");
-    return '<div class="advgrp"><b>'+esc(s.name)+'</b> <i>\u00b7 your server</i></div>'
+    return '<div class="advgrp"><b>'+esc(s.name)+'</b> <i>your server</i></div>'
       +ghosts
       +(ms.length?ms.map(m=>'<label class="advrow"><input type="checkbox" data-l="'
         +esc(m.label)+'"'+(sel.local.indexOf(m.label)>=0?" checked":"")+'>'
         +'<span class="an"><b>'+esc(m.label)+'</b><span class="au">'
         +esc("your server"+(srvWhere(m)?" \u00b7 "+srvWhere(m):""))+'</span></span></label>').join("")
-        :'<p class="advp">'+((s.status||{}).err?"not answering right now":"no models listed")+'</p>');
-  }).join("")+(gs.length?'<p class="advp">A server\u2019s models draft one after another on '
-    +'that server, never here or in the cloud. The compositor below writes the '
-    +'final answer and can\u2019t be one of them.</p>':"");
+        :'<p class="advp">'+((s.status||{}).err?"Not answering":"No models")+'</p>');
+  }).join("")+(gs.length?'<p class="advp">Server models draft on the server, one at a time. The compositor writes the final and can\u2019t be one of them.</p>':"");
 }
 // the compositor's choices: Automatic, each working cloud, the local Gemmas
 function advCompList(pv,ready){
@@ -53485,7 +53468,7 @@ function advCompList(pv,ready){
     .concat(Object.keys(ADV_CLOUD).filter(id=>(pv[id]||{}).status==="ok")
       .map(id=>[id,ADV_CLOUD[id][0]+" · cloud"]))
     .concat((ready||[]).filter(m=>/^Gemma/.test(m.label)&&m.label.indexOf(SRV_SEP)<0)
-      .map(m=>[m.label,m.label+" · local, private"]));
+      .map(m=>[m.label,m.label+" (local)"]));
 }
 // a pick whose server is paired and listing, and does not list it: it is gone
 // from there. A server that is off or lists nothing isn't judged.
@@ -53518,8 +53501,7 @@ function advPrune(){
 function advWhy(){
   const v=$("#adv-comp").value;
   $("#adv-comp-why").textContent=ADV_WHY[v]
-    ||(v?"Runs on this machine — private, nothing leaves your Mac. "
-        +"Best when privacy matters most.":"");
+    ||(v?"Runs on this Mac. Nothing leaves it.":"");
 }
 $("#adv-comp").addEventListener("change",advWhy);
 $("#adv-cancel").addEventListener("click",()=>{$("#adv-veil").hidden=true;});
@@ -53533,7 +53515,7 @@ $("#adv-save").addEventListener("click",()=>{
     .map(i=>i.dataset.c);
   if(!local.length){
     $("#adv-note").textContent=
-      "pick at least one local model — for pure cloud, use ☁️ Cloud Only";
+      "Choose at least one local model. For cloud only, use Cloud Only.";
     return;
   }
   adv={local:local,cloud:cloud,comp:$("#adv-comp").value};
@@ -53814,10 +53796,10 @@ async function cloudChipLoad(){
   chip.className=a.toLowerCase();
   chip.querySelector("b").textContent=a;
   chip.title=a==="MLX"
-    ?"Local models run on Apple Silicon through MLX"
+    ?"Local models run on Apple silicon (MLX)"
     :a==="AMD"?"Local models run on your AMD GPU"
     :a==="Intel"?"Local models run on your Intel Arc GPU"
-    :"Local models run on your NVIDIA GPU through CUDA";
+    :"Local models run on your NVIDIA GPU (CUDA)";
   chip.hidden=false;
 })();
 
@@ -53843,8 +53825,8 @@ async function paintTierAvail(){
     else if(tierOff[tier]&&!tierOff["Cloud Only"]){
       const was=tier,inf=tierInfo[was]||{};
       setTier("Cloud Only");
-      tierNote((inf.title||"That cloud model")+" can’t answer right now"
-        +(inf.short?" ("+inf.short+")":"")+", so this is back on Cloud Only.");
+      tierNote((inf.title||"That cloud model")+" is unavailable"
+        +(inf.short?" ("+inf.short+")":"")+". Back on Cloud Only.");
     }
   }
   if(tierOff[tier]&&!isSrvMode(tier))setTier("Fast");
@@ -58710,15 +58692,15 @@ async function pollEngines(){
         sz.textContent=MODEL_SIZES[el.dataset.model]||sz.textContent;
       }else if(!s.up&&s.supported!==false){
         sz.textContent=MODEL_SIZES[el.dataset.model]||sz.textContent;
-        el.title=s.note+" — click to download";
+        el.title=s.note+". Click to download.";
       }
       let mt=el.querySelector(".memtag");
       if(s.supported===false){
-        if(mt)mt.textContent="APPLE SILICON ONLY";
+        if(mt)mt.textContent="Apple silicon only";
       }else if(s.mem_ok===false){
         if(!mt){
           mt=document.createElement("span");mt.className="memtag";
-          mt.textContent="INSUFFICIENT MEMORY";
+          mt.textContent="Needs more memory";
           el.insertBefore(mt,el.querySelector(".size"));
         }
       }else if(mt)mt.remove();
@@ -61069,9 +61051,9 @@ function srvMenuRows(){
     return '<div class="engrow srvmenu'+(here?" on":"")+'" data-sv="'+esc(s.id)+'">'
       +'<span class="eico">\ud83d\udda5\ufe0f</span>'
       +'<span class="enm">'+esc(s.name)+'</span>'
-      +'<span class="edsc">'+esc(srvAsleep(s)?"your server \u00b7 asleep \u00b7 wakes when you ask"
-        :ms.length?"":(s.status||{}).err?"your server \u00b7 not answering"
-        :"your server \u00b7 no models listed")+'</span>'
+      +'<span class="edsc">'+esc(srvAsleep(s)?"Asleep. Wakes when you ask."
+        :ms.length?"":(s.status||{}).err?"Not answering"
+        :"No models")+'</span>'
       +'<span class="echev">\u203a</span></div>';
   }).join("");
 }
@@ -61146,7 +61128,7 @@ function srvTierPopHtml(name,info){
         ?'<div class="mline">'+esc(info.why||"not answering")+'</div>'
         :info.asleep?'<div class="mline">asleep \u00b7 wakes when you ask</div>'
         :mode?(info.models||[]).map(m=>'<div class="mline">'+esc(m)
-          +' <i>\u00b7 your server</i></div>').join("")
+          +' <i>your server</i></div>').join("")
         :'<div class="mline">'+esc(info.model||"")+'</div>')
     +'<span class="note">'+esc(info.note||"")+'</span>';
 }
@@ -61178,8 +61160,7 @@ function cloudPickRetire(t){
   if(cloudTierParse(t).mode!=="Model")return t;
   const was=cloudTierShown(t);
   prefSet({tier:"cloud:think"});
-  setTimeout(()=>tierNote(was+" isn’t in the menu any more, so this is on "
-    +"Thinking · cloud only."),0);
+  setTimeout(()=>tierNote(was+" is gone from the menu. Now on Gamma, cloud only."),0);
   return "cloud:think";
 }
 // CLOUD ONLY'S ROW AND SUB-MENU (6b442, per Patrick: "cloud only, which is
@@ -61218,10 +61199,10 @@ function maxTierPopHtml(info){
   const loc=info.models||[],cl=info.cloud||[];
   return "<b>Max</b>"
     +(info.available===false
-      ?'<div class="mline">'+esc(info.why||"nothing is available")+'</div>'
-      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':"")+'</div>').join("")
+      ?'<div class="mline">'+esc(info.why||"Nothing available")+'</div>'
+      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>your server</i>':"")+'</div>').join("")
         +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
-    +'<span class="note warn">'+esc(info.warn||"Uses every model, including paid cloud keys.")+'</span>';
+    +'<span class="note warn">'+esc(info.warn||"Every model, paid cloud keys included.")+'</span>';
 }
 // Vera Rubin's bubble (6b519): the machines and models it keeps busy, the promise, or why it is off
 function rubinTierPopHtml(info){
@@ -61230,7 +61211,7 @@ function rubinTierPopHtml(info){
     +'<div class="mline">Throws everything at one question and keeps improving it until you stop it.</div>'
     +(info.available===false
       ?'<div class="mline">'+esc(info.why||"nothing can run it")+'</div>'
-      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>· your server</i>':' <i>· this Mac</i>')+'</div>').join("")
+      :loc.map(m=>'<div class="mline">'+esc(m)+(m.indexOf(SRV_SEP)>=0?' <i>your server</i>':' <i>this Mac</i>')+'</div>').join("")
         +cl.map(m=>'<div class="mline mcloud">'+esc(m)+' <i>· cloud</i></div>').join(""))
     +'<span class="note">'+esc(info.note||"")+'</span>';
 }
@@ -61239,7 +61220,7 @@ function cloudTierShown(t){
   const p=cloudTierParse(t),inf=tierInfo[t]||{};
   if(p.mode==="Model")return inf.name?inf.name+" only":((cloudProvs().find(x=>x[0]===p.pid)||[0,"Cloud"])[1]+" only");
   if(!p.mode)return "Cloud Only";
-  return p.mode==="Fast"&&(inf.models||[])[0]?"Fast · "+inf.models[0]:p.mode+" · cloud only";
+  return p.mode==="Fast"&&(inf.models||[])[0]?"Alpha, cloud only: "+inf.models[0]:modeName(p.mode)+", cloud only";
 }
 // what the composer chip says: the model the mode resolved to
 function tierShown(t){
