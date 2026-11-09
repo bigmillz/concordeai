@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":143,\"est\":false}",
+  "X-Hurry": "7dbabd513f9ccb60"
+ },
+ "first_byte_s": 0.1,
+ "first_text_s": 18.24,
+ "elapsed_s": 25.49,
+ "events": [
+  {
+   "t": 0.1,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.46,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.46,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.46,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 25 passages"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.29,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.24,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.48,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.3,
+    "tok": 480,
+    "s": 7.2
+   }
+  },
+  {
+   "t": 25.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1921 chars"
+   }
+  },
+  {
+   "t": 25.48,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.1,
+   "Searching the web…"
+  ],
+  [
+   10.46,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.1
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.46
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.46
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 25 passages",
+   "t_s": 12.29
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.29
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.29
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1921 chars",
+   "t_s": 25.48
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.48
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "16 Cheap Places You Can Fly from NYC in 2026 - Global ViewpointThe Top 10 Cheape",
+   "u": "https://www.myglobalviewpoint.com/cheapest-places-to-fly-from-nyc/",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "The Top 10 Cheapest Destinations To Travel To From The U.S ...",
+   "u": "https://secretnyc.co/nyc-cheapest-flight-destinations-from-usa-2026/",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "10 Cheapest Places to Travel in NYC for Two Weeks",
+   "u": "https://www.bing.com/aclick?ld=e8SuCyrztZ9aJcThaHRWm9JDVUCUxfBqQb3tc_jM5Cz6q5-931YCVnpz5fL8SWCFAZyK3T6TT5znRkIpUgQ6Pzi5AkXi7oxXWqKW-y76FG89vNTAdagPZ_DniyFR5XTf60YPtY5DJ_ZlWFKoJ-bCCdMZt6bZE-d4SeRHxPKvpKgKETUR0TbkxkOaTXOuZMWpeMr5WKDg&u=aHR0cHMlM2ElMmYlMmZ3d3cuZ2V0eW91cmd1aWRlLmNvbSUyZmV4cGxvcmVyJTJmbmV3LXlvcmstY2l0eS10dGQ1OSUyZmNoZWFwLXRoaW5ncy10by1kby1pbi1ueWMlMmYlM2ZjbXAlM2RiaW5nJTI2YWRfaWQlM2Q3ODIwMjk2MzcxMDM1NiUyNmFkZ3JvdXBfaWQlM2QxMjUxMjQ0ODU0NjgzMjQwJTI2YmlkX21hdGNoX3R5cGUlM2RiYiUyNmNhbXBhaWduX2lkJTNkNDM0MTExNTM0JTI2ZGV2aWNlJTNkYyUyNmZlZWRfaXRlbV9pZCUzZCUyNmtleXdvcmQlM2R3d3cuZ2V0eW91cmd1aWRlLmNvbSUyNmxvY19pbnRlcmVzdF9tcyUzZDU5OTgxJTI2bG9jX3BoeXNpY2FsX21zJTNkMTQ3MDgyJTI2bWF0Y2hfdHlwZSUzZGIlMjZtc2Nsa2lkJTNkZDJjYjdhNDQ3MzIwMWNhYjYyMDUxMDlhMGQ0MzZlNjUlMjZuZXR3b3JrJTNkbyUyNnBhcnRuZXJfaWQlM2RDRDk1MSUyNnRhcmdldF9pZCUzZGRhdC0yMzMwMDAyNTc4NDUxODQ1JTI2dXRtX2FkZ3JvdXAlM2RjdCUyNTNEZHNhJTI1N0NmbiUyNTNEZjElMjZ1dG1fY2FtcGFpZ24lM2RjdCUyNTNEZHNhJTI1N0NsbiUyNTNEMjklMjUzQWVuJTI1N0N0YyUyNTNEYWxsJTI2dXRtX2tleXdvcmQlM2R3d3cuZ2V0eW91cmd1aWRlLmNvbSUyNnV0bV9tZWRpdW0lM2RwYWlkX3NlYXJjaCUyNnV0bV9xdWVyeSUzZENoZWFwZXN0JTI1MjBwbGFjZXMlMjUyMHRyYXZlbCUyNTIwTllDJTI1MjB3aW50ZXIlMjUyMHR3byUyNTIwd2Vla3MlMjZ1dG1fc291cmNlJTNkYmluZw&rlid=d2cb7a4473201cab6205109a0d436e65",
+   "d": ""
+  },
+  {
+   "t": "9 Cheap Winter Vacations From NYC (That Don’t Suck)",
+   "u": "https://www.overherenewyork.com/cheap-winter-vacations-from-nyc/",
+   "d": "2025-12-25"
+  },
+  {
+   "t": "New York City vs Hanoi: Travel Cost Comparison (2026) | TripVS",
+   "u": "https://www.tripvs.ai/compare/new-york-city-vs-hanoi",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living Comparison",
+   "u": "https://www.numbeo.com/cost-of-living/comparison.jsp",
+   "d": ""
+  },
+  {
+   "t": "Compare Cheap Flights & Book Airline Tickets to... | Skyscanner",
+   "u": "https://www.skyscanner.com/",
+   "d": ""
+  },
+  {
+   "t": "Cheap Flights, Airline Tickets & Airfares - Find Deals on Flights at...",
+   "u": "https://www.cheapflights.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.29,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.3,
+  "tok": 480,
+  "s": 7.2
+ },
+ "answer_raw": "Finding the absolute cheapest two-week trip depends on whether you prioritize low flight costs or low daily living expenses, as the two often pull in opposite directions.\n\nFor a two-week winter stay, your cheapest total cost will likely come from destinations with low cost-of-living indices where the flight is a significant but manageable chunk of the budget.\n\n## Option 1: The High-Value Long Haul\nIf you can stomach a longer flight to lower your daily spending, **Hanoi** is a strong contender. A mid-range 7-day trip there (including flights, accommodation, food, and transport) is estimated at **$650** [5]. Because the cost of living is roughly 57% more affordable than NYC, extending that to two weeks remains highly economical [5].\n\n## Option 2: The Short-Haul Tropical Escape\nIf you want to minimize travel time and flight costs, look toward the Caribbean or Florida.\n*   **Caribbean/Florida:** Roundtrip tickets to spots like **Miami, Cancun, or Puerto Rico** have been seen as low as **$232** [2].\n*   **Costa Rica:** Roundtrip flights have been found for approximately **$190** [8]. \n\nWhile these flights are cheap, your daily living costs (food, lodging, transport) will be significantly higher than in Southeast Asia, meaning a two-week stay may end up costing more in total than a trip to Hanoi [5].\n\n## Comparison of Total Trip Dynamics\n\n| Destination Type | Flight Cost | Living Cost | Total 2-Week Outlook |\n| :--- | :--- | :--- | :--- |\n| **Southeast Asia (e.g., Hanoi)** | Higher | **Very Low** | Likely the lowest total cost for a full two weeks [5]. |\n| **Caribbean/Florida** | **Very Low** | Higher | Best for short bursts; costs scale up quickly over 14 days [2][4]. |\n\nSince the provided data does not give specific two-week totals for the Caribbean or Costa Rica, you'll need to aggregate those flight prices with local lodging and food estimates to get a comparable number to the Hanoi budget.",
+ "answer": "Finding the absolute cheapest two-week trip depends on whether you prioritize low flight costs or low daily living expenses, as the two often pull in opposite directions.\n\nFor a two-week winter stay, your cheapest total cost will likely come from destinations with low cost-of-living indices where the flight is a significant but manageable chunk of the budget.\n\n## Option 1: The High-Value Long Haul\nIf you can stomach a longer flight to lower your daily spending, **Hanoi** is a strong contender. A mid-range 7-day trip there (including flights, accommodation, food, and transport) is estimated at **$650** [5]. Because the cost of living is roughly 57% more affordable than NYC, extending that to two weeks remains highly economical [5].\n\n## Option 2: The Short-Haul Tropical Escape\nIf you want to minimize travel time and flight costs, look toward the Caribbean or Florida.\n*   **Caribbean/Florida:** Roundtrip tickets to spots like **Miami, Cancun, or Puerto Rico** have been seen as low as **$232** [2].\n*   **Costa Rica:** Roundtrip flights have been found for approximately **$190** [8]. \n\nWhile these flights are cheap, your daily living costs (food, lodging, transport) will be significantly higher than in Southeast Asia, meaning a two-week stay may end up costing more in total than a trip to Hanoi [5].\n\n## Comparison of Total Trip Dynamics\n\n| Destination Type | Flight Cost | Living Cost | Total 2-Week Outlook |\n| :--- | :--- | :--- | :--- |\n| **Southeast Asia (e.g., Hanoi)** | Higher | **Very Low** | Likely the lowest total cost for a full two weeks [5]. |\n| **Caribbean/Florida** | **Very Low** | Higher | Best for short bursts; costs scale up quickly over 14 days [2][4]. |\n\nSince the provided data does not give specific two-week totals for the Caribbean or Costa Rica, you'll need to aggregate those flight prices with local lodging and food estimates to get a comparable number to the Hanoi budget.",
+ "chars": 1921,
+ "raw_bytes": 5030,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.84,
+ "rate_gen_tok_s": 66.24,
+ "id": "q19",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Cheapest places to travel",
+ "question": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:11:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -148,6 +148,7 @@ class DevCopy:
         self.logfile = logfile
         self.proc = self.key = self.token = None
         self.attached = False
+        self.extra_env = {}
 
     @property
     def cookie(self):
@@ -188,6 +189,7 @@ class DevCopy:
         env = {k: v for k, v in os.environ.items() if not k.startswith("MILLENAI_")}
         env.update(MILLENAI_DEV="1", MILLENAI_HOME=self.home, MILLENAI_NOWINDOW="1",
                    MILLENAI_PORT=str(self.port))
+        env.update(self.extra_env)      # --env: a dev copy's measuring knobs (6b520)
         os.makedirs(self.home, mode=0o700, exist_ok=True)
         os.chmod(self.home, 0o700)
         self._log = open(self.logfile, "a")
@@ -451,6 +453,8 @@ def main():
     ap.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", DEFAULT_LOCK_DIR))
     ap.add_argument("--no-lock", action="store_true")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between turns")
+    ap.add_argument("--env", action="append", default=[], metavar="MILLENAI_X=V",
+                    help="a dev-only knob for the copy, e.g. MILLENAI_FRESH_OFF=news (6b520); repeatable")
     ap.add_argument("--warmup", action="store_true",
                     help="ask one throwaway question on the tier first (not recorded): the copy learns "
                          "what the server's card refuses (6b516) and the first seats load before q01")
@@ -472,8 +476,14 @@ def main():
     lock = Lock(os.path.join(args.lock_dir, cfg["lock"]) if not args.no_lock else "",
                 "answer_eval %s pid %d" % (name, os.getpid()))
     copy = DevCopy(args.repo, args.python, home, args.port, os.path.join(run_dir, "devcopy.log"))
+    for kv in args.env:
+        k, _, v = kv.partition("=")
+        if not k.startswith("MILLENAI_") or k in ("MILLENAI_DEV", "MILLENAI_HOME", "MILLENAI_PORT"):
+            sys.exit("--env takes a dev copy's own MILLENAI_ knob, not %r" % k)
+        copy.extra_env[k] = v
     summary = {"name": name, "config": args.config, "where": cfg["where"], "started": time.strftime("%Y-%m-%dT%H:%M:%S"),
-               "repo": args.repo, "head": git_head(args.repo), "questions": [], "server": None, "persona": None}
+               "repo": args.repo, "head": git_head(args.repo), "questions": [], "server": None, "persona": None,
+               "env": dict(copy.extra_env)}
     paired = False
     try:
         lock.acquire()

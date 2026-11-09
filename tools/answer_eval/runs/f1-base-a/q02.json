@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.8,\"ftok\":155,\"est\":false}",
+  "X-Hurry": "1f8234210a3a40ff"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 14.28,
+ "elapsed_s": 23.14,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 7.3,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.3,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.3,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 36 passages"
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.28,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.14,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.5,
+    "tok": 500,
+    "s": 8.9
+   }
+  },
+  {
+   "t": 23.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2003 chars"
+   }
+  },
+  {
+   "t": 23.14,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   7.3,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.3
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.3
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 36 passages",
+   "t_s": 10.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.04
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.04
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2003 chars",
+   "t_s": 23.14
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.14
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "iPhone 14 review: Is it worth buying in 2026? - Back MarketIs iPhone 14 Worth It",
+   "u": "https://www.backmarket.com/en-us/c/iphone/iphone-14-test",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "iPhone 14 New Price Guide 2026: What You’ll Actually Pay",
+   "u": "https://electronics.alibaba.com/buyingguides/iphone-14-price-guide-2026-what-to-pay-when-to-skip",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "iPhone 16 vs iPhone 14 Pro Max | Specs, Prices Comparison",
+   "u": "https://swappie.com/en/compare/iphone-14-pro-max-vs-iphone-16/?reverseVisualOrder=true",
+   "d": ""
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026 - uptradeit.com",
+   "u": "https://uptradeit.com/blog/is-iphone-14-worth-buying",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "iPhone Fold Duo - Apple Foldable Price, Specs & Guides",
+   "u": "https://iphonefold.in/",
+   "d": "2026-09"
+  },
+  {
+   "t": "How Much Is It to Upgrade Your iPhone? A 2026 Cost Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/how-much-to-upgrade-your-iphone-in-2026",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "iPhone 17: Everything We Know | MacRumors",
+   "u": "https://www.macrumors.com/roundup/iphone-17/",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone - Compare Models - Apple",
+   "u": "https://www.apple.com/iphone/compare/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.5,
+  "tok": 500,
+  "s": 8.9
+ },
+ "answer_raw": "The newest iPhone models are the **iPhone 18 Pro** and **iPhone 18 Pro Max**, which were released during the September 2026 event [5].\n\n## Current Pricing and Models\nThe current flagship lineup and their starting prices are:\n\n*   **iPhone 18 Pro Max** — starts at $1,199 [7]\n*   **iPhone 18 Pro** — starts at $1,199 [7]\n*   **iPhone 17 Air** — $1,099 [7]\n*   **iPhone tevent 17** — $899 [7]\n\nThe **iPhone Fold Duo**, Apple's first foldable, also debuted in September 2026 with the 256GB model starting near ₹2,29,900 and the 1TB model near ₹2,89,900 [5].\n\n## Is it worth upgrading from an iPhone 14?\nUpgrading from an iPhone 14 to the iPhone 18 series is a massive leap in terms of hardware, processing power, and display technology. Since the iPhone 14 is now considered a budget-tier legacy device [2], you are moving from a two-generation-old chip to the current flagship silicon.\n\n**The case for upgrading:**\n*   **Performance:** You move from the A15 Bionic to the much more powerful architecture found in the 18 Pro series [1].\n*   **Display and Design:** You'll gain significant improvements in display technology and likely much thinner profiles if you opt for the iPhone 17 Air [7].\n*   **Lonely Longevity:** The iPhone 14 is still a capable device for budget-conscious users [1], but the 18 series represents the current ceiling of Apple's mobile technology [5].\n\n**The case against upgrading:**\n*   **Diminishing returns:** If your iPhone 14 still handles your daily tasks without bottlenecking, the jump to a $1,199 device might be hard to justify financially unless you specifically need the new camera systems or the A19/A20 level performance [7].\n*   **Cost:** The price gap between a budget-tier legacy device like the 14 and a $1,199 flagship is substantial [2][7].\n\nIf you want the absolute best, the **iPhone 18 Pro Max** is the current peak. If you want a more balanced flagship experience, the **iPhone 17** at $899 offers a high-end camera and A19 chip for a lower entry price [7].",
+ "answer": "The newest iPhone models are the **iPhone 18 Pro** and **iPhone 18 Pro Max**, which were released during the September 2026 event [5].\n\n## Current Pricing and Models\nThe current flagship lineup and their starting prices are:\n\n*   **iPhone 18 Pro Max** — starts at $1,199 [7]\n*   **iPhone 18 Pro** — starts at $1,199 [7]\n*   **iPhone 17 Air** — $1,099 [7]\n*   **iPhone tevent 17** — $899 [7]\n\nThe **iPhone Fold Duo**, Apple's first foldable, also debuted in September 2026 with the 256GB model starting near ₹2,29,900 and the 1TB model near ₹2,89,900 [5].\n\n## Is it worth upgrading from an iPhone 14?\nUpgrading from an iPhone 14 to the iPhone 18 series is a massive leap in terms of hardware, processing power, and display technology. Since the iPhone 14 is now considered a budget-tier legacy device [2], you are moving from a two-generation-old chip to the current flagship silicon.\n\n**The case for upgrading:**\n*   **Performance:** You move from the A15 Bionic to the much more powerful architecture found in the 18 Pro series [1].\n*   **Display and Design:** You'll gain significant improvements in display technology and likely much thinner profiles if you opt for the iPhone 17 Air [7].\n*   **Lonely Longevity:** The iPhone 14 is still a capable device for budget-conscious users [1], but the 18 series represents the current ceiling of Apple's mobile technology [5].\n\n**The case against upgrading:**\n*   **Diminishing returns:** If your iPhone 14 still handles your daily tasks without bottlenecking, the jump to a $1,199 device might be hard to justify financially unless you specifically need the new camera systems or the A19/A20 level performance [7].\n*   **Cost:** The price gap between a budget-tier legacy device like the 14 and a $1,199 flagship is substantial [2][7].\n\nIf you want the absolute best, the **iPhone 18 Pro Max** is the current peak. If you want a more balanced flagship experience, the **iPhone 17** at $899 offers a high-end camera and A19 chip for a lower entry price [7].",
+ "chars": 2003,
+ "raw_bytes": 3967,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.64,
+ "rate_gen_tok_s": 56.52,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-a",
+ "asked_at": "2026-10-25T19:00:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

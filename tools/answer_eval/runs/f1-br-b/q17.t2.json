@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.8,\"ftok\":128,\"est\":false}",
+  "X-Hurry": "fe1a088ab2bcd084"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 15.14,
+ "elapsed_s": 17.96,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 8.97,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.97,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.97,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.64,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 10.64,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.64,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.64,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.64,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.14,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 17.96,
+   "tag": "RATE",
+   "data": {
+    "tps": 61.7,
+    "tok": 174,
+    "s": 2.8
+   }
+  },
+  {
+   "t": 17.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "696 chars"
+   }
+  },
+  {
+   "t": 17.96,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.97,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.97
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.97
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 10.64
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.64
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.64
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.64
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "696 chars",
+   "t_s": 17.96
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 17.96
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis for Digital Nomads 2026...",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Best Neighborhoods for ...",
+   "u": "https://getnomadbro.com/blog/where-to-stay-in-florianopolis-best-neighborhoods-for-digital-nomads-in-2026",
+   "d": "2026-07-09"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Furnished apartments for rent in Florianópolis | Monthly ...",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Oct 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.64,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 61.7,
+  "tok": 174,
+  "s": 2.8
+ },
+ "answer_raw": "Pick **Lagoa da Conceição** for your six-month stay; it offers the best balance of community and work-ready infrastructure.\n\nBecause the provided sources do not list specific rental prices for one-bedroom apartments in Lagoa, I cannot give you an exact monthly rate. I can only tell you that the cost of living for a single person in Florianópolis—excluding rent—is approximately R$3,290.2 ($660.8) as of October 2026 [8].\n\nTo find the specific furnished rental price you need, you should check platforms like Airbnb [7] or Blueground [6] for current availability. If you use the exchange rate from October 23, 2026, where 1 BRL is $0.1982, you can convert the prices you find there into dollars.",
+ "answer": "Pick **Lagoa da Conceição** for your six-month stay; it offers the best balance of community and work-ready infrastructure.\n\nBecause the provided sources do not list specific rental prices for one-bedroom apartments in Lagoa, I cannot give you an exact monthly rate. I can only tell you that the cost of living for a single person in Florianópolis—excluding rent—is approximately R$3,290.2 ($660.8) as of October 2026 [8].\n\nTo find the specific furnished rental price you need, you should check platforms like Airbnb [7] or Blueground [6] for current availability. If you use the exchange rate from October 23, 2026, where 1 BRL is $0.1982, you can convert the prices you find there into dollars.",
+ "chars": 696,
+ "raw_bytes": 2933,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.69,
+ "rate_gen_tok_s": 61.7,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-b",
+ "asked_at": "2026-10-25T19:47:03",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances community, work-ready internet, and beach access, you should focus on **Lagoa da Conceição** or **Ingleses**.\n\nBecause Florianópolis is an island where neighborhoods have distinct microclimates and infrastructure, your choice will dictate whether you face a 40-minute commute or a short walk to coffee [1].\n\n## Primary Recommendations\n\n**Lagoa da Conceição** — Best for community and coworking\nThis area is the top choice for most nomads, especially if it is your first time in the city [1]. It offers a strong community and reliable internet, with many coworking spots where you can meet other remote workers [1][2]. Monthly coworking costs in Lagoa are typically around $150 as of July ess 2026 [2].\n\n**Ingleses (specifically Ingleses Norte)** — Best for lower costs and quiet\nThis is a better fit if you prioritize output over socializing [1]. You can find lower rents here, and the beaches are roughly a 10-minute walk away [1]. In Ingleses Norte, you can find modern flats with 1Gb optical internet to support heavy bandwidth needs [5].\n\n## Logistics and Infrastructure\n\n**Internet and Connectivity**\nFiber optic service—typically offering 300 to 500 Mbps—is available in most neighborhoods and costs between R$100 and R$150 per month [3]. While the speed is generally reliable across the city, the \"vibe\" of the neighborhood will determine how much you interact with the local tech scene [3].\n\n**Rental Market Trends**\nIf you are looking at long-term leases, be aware that asking rents increased by 9.13% in the 12 months leading to September 2026 [6]. This trend suggests you should verify current availability and local lease terms immediately upon arrival [4].\n\n| Feature | Lagoa da Conceição | Ingleses |\n| :--- | :--- | :--- |\n| **Primary Vibe** | Social & Community-heavy [1][2] | Work-focused & lower cost [1] |\n| **Internet** | High density of coworking [2] | Reliable fiber/1Gb options [5] |\n| **Beach Access** | Lagoon/waterfront centric [2] | Coastal/beach centric [5] |"
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

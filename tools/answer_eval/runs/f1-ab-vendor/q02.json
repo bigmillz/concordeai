@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.1,\"ftok\":168,\"est\":false}",
+  "X-Hurry": "cec247ff6657b2dd"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 17.72,
+ "elapsed_s": 26.17,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.96,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 39 passages"
+   }
+  },
+  {
+   "t": 12.96,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.96,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.96,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.72,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.17,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.9,
+    "tok": 455,
+    "s": 8.4
+   }
+  },
+  {
+   "t": 26.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1823 chars"
+   }
+  },
+  {
+   "t": 26.17,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 39 passages",
+   "t_s": 12.96
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.96
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.96
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1823 chars",
+   "t_s": 26.17
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.17
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "iPhone 16 vs iPhone 14 Pro Max | Specs, Prices Comparison",
+   "u": "https://swappie.com/en/compare/iphone-14-pro-max-vs-iphone-16/?reverseVisualOrder=true",
+   "d": ""
+  },
+  {
+   "t": "I put the iPhone 18 Pro vs. iPhone 16 Pro through a 7-round face-off: Is the upg",
+   "u": "https://tech.yahoo.com/phones/articles/put-iphone-18-pro-vs-043000058.html",
+   "d": "2026-10-05"
+  },
+  {
+   "t": "iPhone Price List 2026: Every Model and What to Pay",
+   "u": "https://geekblog.net/mobile/iphone-price-list-2026/",
+   "d": "2026-07-08"
+  },
+  {
+   "t": "Apple's New 2026 iPhone Lineup: Prices for Every Storage Tier",
+   "u": "https://www.macrumors.com/2026/09/12/how-much-each-iphone-18-pro-model-costs/",
+   "d": "2026-09-12"
+  },
+  {
+   "t": "iPhone 14 Pro makes the notch come alive, finally - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-14-pro-makes-the-notch-come-alive-finally/",
+   "d": "2022-09-09"
+  },
+  {
+   "t": "iPhone 18 Pro vs iPhone 15 Pro: Should you upgrade?",
+   "u": "https://www.trustedreviews.com/versus/iphone-18-pro-vs-iphone-15-pro",
+   "d": "2026-09-28"
+  },
+  {
+   "t": "iPhone - Compare Models - Apple",
+   "u": "https://www.apple.com/iphone/compare/",
+   "d": ""
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.96,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 53.9,
+  "tok": 455,
+  "s": 8.4
+ },
+ "answer_raw": "The newest iPhone models are the **iPhone 18 Pro** and **iPhone 18 Pro Max**, which were unveiled on September 9, 2026 [4].\n\n## Pricing and Storage\nThe pricing for the flagship Pro models reflects an increase due to rising DRAM and manufacturing costs associated with new chip architecture [2].\n\n*   **iPhone 18 Pro** — starts at **$1,199** (as of 2026-10-lua) [6].\n*   **iPhone 18 Pro Max** — listed as the top-tier flagship (as of 2026-09-12) [4].\n\nWhile the Pro models carry a premium, Apple increased base storage in 2025 to **256GB** to offset the higher entry price [2].\n\n## Is it worth the upgrade?\nIf you are coming from an iPhone 14, the jump to the 18 Pro series is substantial in terms of hardware cycles.\n\n**The Case for Upgrading**\n*   **Storage:** You will move from the likely lower base storage of your iPhone 14 to a minimum of **256GB** [2].\n*   **Camera and Video:** You'll gain access to features like the **48MP ultra-wide** camera and **4K 120 fps** slow-motion video [2].\n*   **Display/Interface:** You will move from the iPhone 14's design to the more interactive **Dynamic Island** interface [5].\n\n**The Case for Waiting**\n*   **Cost:** The $1,199 starting price is a significant jump over older models [6]. If you don't specifically need professional-grade cameras or the absolute best battery life, the **iPhone 17** (priced around **$799** as of 2026-07-08) or the **iPhone 17e** (around **$599** as of 2026-07-08) might offer better value-to-performance ratios [3].\n\nSince you are on an iPhone 14, you are skipping four generations of hardware. If your current phone's battery or processing power is hitting a wall, the 18 Pro represents a massive leap in architecture and features [2]. If you just want a reliable phone that works, the standard **iPhone 17** is the \"sweet spot\" for value [3].",
+ "answer": "The newest iPhone models are the **iPhone 18 Pro** and **iPhone 18 Pro Max**, which were unveiled on September 9, 2026 [4].\n\n## Pricing and Storage\nThe pricing for the flagship Pro models reflects an increase due to rising DRAM and manufacturing costs associated with new chip architecture [2].\n\n*   **iPhone 18 Pro** — starts at **$1,199** (as of 2026-10-lua) [6].\n*   **iPhone 18 Pro Max** — listed as the top-tier flagship (as of 2026-09-12) [4].\n\nWhile the Pro models carry a premium, Apple increased base storage in 2025 to **256GB** to offset the higher entry price [2].\n\n## Is it worth the upgrade?\nIf you are coming from an iPhone 14, the jump to the 18 Pro series is substantial in terms of hardware cycles.\n\n**The Case for Upgrading**\n*   **Storage:** You will move from the likely lower base storage of your iPhone 14 to a minimum of **256GB** [2].\n*   **Camera and Video:** You'll gain access to features like the **48MP ultra-wide** camera and **4K 120 fps** slow-motion video [2].\n*   **Display/Interface:** You will move from the iPhone 14's design to the more interactive **Dynamic Island** interface [5].\n\n**The Case for Waiting**\n*   **Cost:** The $1,199 starting price is a significant jump over older models [6]. If you don't specifically need professional-grade cameras or the absolute best battery life, the **iPhone 17** (priced around **$799** as of 2026-07-08) or the **iPhone 17e** (around **$599** as of 2026-07-08) might offer better value-to-performance ratios [3].\n\nSince you are on an iPhone 14, you are skipping four generations of hardware. If your current phone's battery or processing power is hitting a wall, the 18 Pro represents a massive leap in architecture and features [2]. If you just want a reliable phone that works, the standard **iPhone 17** is the \"sweet spot\" for value [3].",
+ "chars": 1823,
+ "raw_bytes": 3775,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.41,
+ "rate_gen_tok_s": 53.93,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-vendor",
+ "asked_at": "2026-10-25T20:16:02",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

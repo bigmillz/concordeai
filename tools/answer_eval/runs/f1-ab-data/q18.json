@@ -1,0 +1,320 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":22.8,\"ftok\":135,\"est\":false}",
+  "X-Hurry": "8ef90951365b97a8"
+ },
+ "first_byte_s": 6.73,
+ "first_text_s": 25.97,
+ "elapsed_s": 33.33,
+ "events": [
+  {
+   "t": 6.73,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 images found"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 6.73,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 6.73,
+   "tag": "PLACEHINT",
+   "data": [
+    {
+     "n": "Spanish Immersion",
+     "d": "",
+     "h": ""
+    },
+    {
+     "n": "Language Learning by Immersion",
+     "d": "",
+     "h": ""
+    }
+   ]
+  },
+  {
+   "t": 6.73,
+   "tag": "CTX",
+   "data": {
+    "loc": "not"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 6.73,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 18.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2030 chars"
+   }
+  },
+  {
+   "t": 18.79,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 18.79,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 25.97,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 32.58,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.0,
+    "tok": 482,
+    "s": 6.6
+   }
+  },
+  {
+   "t": 32.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1930 chars"
+   }
+  },
+  {
+   "t": 32.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 32.58,
+   "tag": "STEP",
+   "step": {
+    "id": "places",
+    "l": "Finding the places",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 33.32,
+   "tag": "STEP",
+   "step": {
+    "id": "places",
+    "l": "Found the places",
+    "s": "done",
+    "d": "0 pinned"
+   }
+  }
+ ],
+ "statuses": [
+  [
+   6.73,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   18.79,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 6.73
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 images found",
+   "t_s": 6.73
+  },
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 6.73
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2030 chars",
+   "t_s": 18.79
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 18.79
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1930 chars",
+   "t_s": 32.58
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 32.58
+  },
+  {
+   "id": "places",
+   "l": "Finding the places",
+   "s": "run",
+   "d": "",
+   "t_s": 32.58
+  },
+  {
+   "id": "places",
+   "l": "Found the places",
+   "s": "done",
+   "d": "0 pinned",
+   "t_s": 33.32
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Spanish Immersion: A Day in the Life in Marbella 🇪🇸 - YouTube",
+   "u": "https://www.youtube.com/watch?v=N41PlfbIiMg"
+  },
+  {
+   "t": "9 Best Cities to Learn Spanish in Spain for Language Enthusiasts",
+   "u": "https://www.spanishexpress.co.uk/9-best-cities-to-learn-spanish-in-spain-for-language-enthusiasts/"
+  },
+  {
+   "t": "best spanish immersion in latin america at Dalton Sanchez blog",
+   "u": "https://storage.googleapis.com/norfnnsgxxjlcxlxwhp-blog/best-spanish-immersion-in-latin-america.html"
+  },
+  {
+   "t": "Language Learning by Immersion | TikTok",
+   "u": "https://www.tiktok.com/discover/language-learning-by-immersion"
+  }
+ ],
+ "photos": [
+  "https://images.goabroad.com/image/upload/v1/images2/program_content/cover-1531390537.jpg",
+  "https://www.goabroad.com/_next/image?url=https%3A%2F%2Fimages.goabroad.com%2Fimage%2Fupload%2Fh_185%252Cw_400%252Cc_fill%252Cg_faces%3Aauto%252Cfl_progressive%252Cf_auto%2Fv1%2Fimages2%2Fa%2FADOF%2FOJW0bsWiU5ms9AyujclWJf3PwL1LWOykczJMxMZH_1678417108.jpg",
+  "https://www.goabroad.com/_next/image?url=https%3A%2F%2Fimages.goabroad.com%2Fimage%2Fupload%2Fh_120%252Cw_120%252Cc_fill%252Cg_faces%3Aauto%252Cfl_progressive%252Cf_auto%2Fv1%2Fimages2%2Fa%2FADOF%2F%2Fmobile%2FOJW0bsWiU5ms9AyujclWJf3PwL1LWOykczJMxMZH_1678417108.jpg"
+ ],
+ "run_frames": [
+  [
+   6.73,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 73.0,
+  "tok": 482,
+  "s": 6.6
+ },
+ "answer_raw": "Finding that balance between low cost and authentic immersion is the hardest part of planning a study season.\n\nFor your criteria—clear accents, low cost, and avoiding the \"tourist bubble\" trap—you should look toward university-driven cities or regions with high local density.\n\n**Salamanca, Spain** — This is widely considered one of the best for clear, standard Spanish. Because it is a massive university hub, the city revolves around students rather than just tourists, making it easier to find affordable housing and social circles that aren't just English-speaking bubbles.\n\n**Oaxaca, Mexico** — If you prefer Latin American Spanish, Oaxaca offers deep cultural immersion and a much lower cost of living than major hubs like Mexico City. The accent is distinct and clear, though you'll need to navigate more rugged infrastructure than in Europe.\n\n**Guatemala** — Often cited as one of the cheapest places to study, the accent (particularly in regions like Antigua or surrounding highlands) is known for being relatively clear and easy for learners to parse. It is a classic \"study season\" destination due to the low cost of living and established language schools.\n\n**Colombia** — While the entire country isn't a single city, regions in Colombia are often cited for being budget-friendly with very friendly locals. However, be wary of \"tourist bubbles\" in the most central districts of larger cities; look for residential neighborhoods slightly outside the main plazas to keep costs down and immersion high.\n\n| Destination | Accent Clarity | Budget Level | Immersion Risk |\n| :--- | :--- | :--- | :--- |\n| **Salamanca** | Very High | Moderate | Low (Student-centric) |\n| **Oaxaca** | High | Low | Moderate |\n| **Guatemala** | High | Very Low | Moderate |\n| **Colombia** | Moderate/High | Low | High (if staying in tourist hubs) |\n\nDo you have a preference for the climate or a specific level of Spanish you're starting from?",
+ "answer": "Finding that balance between low cost and authentic immersion is the hardest part of planning a study season.\n\nFor your criteria—clear accents, low cost, and avoiding the \"tourist bubble\" trap—you should look toward university-driven cities or regions with high local density.\n\n**Salamanca, Spain** — This is widely considered one of the best for clear, standard Spanish. Because it is a massive university hub, the city revolves around students rather than just tourists, making it easier to find affordable housing and social circles that aren't just English-speaking bubbles.\n\n**Oaxaca, Mexico** — If you prefer Latin American Spanish, Oaxaca offers deep cultural immersion and a much lower cost of living than major hubs like Mexico City. The accent is distinct and clear, though you'll need to navigate more rugged infrastructure than in Europe.\n\n**Guatemala** — Often cited as one of the cheapest places to study, the accent (particularly in regions like Antigua or surrounding highlands) is known for being relatively clear and easy for learners to parse. It is a classic \"study season\" destination due to the low cost of living and established language schools.\n\n**Colombia** — While the entire country isn't a single city, regions in Colombia are often cited for being budget-friendly with very friendly locals. However, be wary of \"tourist bubbles\" in the most central districts of larger cities; look for residential neighborhoods slightly outside the main plazas to keep costs down and immersion high.\n\n| Destination | Accent Clarity | Budget Level | Immersion Risk |\n| :--- | :--- | :--- | :--- |\n| **Salamanca** | Very High | Moderate | Low (Student-centric) |\n| **Oaxaca** | High | Low | Moderate |\n| **Guatemala** | High | Very Low | Moderate |\n| **Colombia** | Moderate/High | Low | High (if staying in tourist hubs) |\n\nDo you have a preference for the climate or a specific level of Spanish you're starting from?",
+ "chars": 1930,
+ "raw_bytes": 4182,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.48,
+ "rate_gen_tok_s": 65.56,
+ "id": "q18",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Spanish immersion cities",
+ "question": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-data",
+ "asked_at": "2026-10-25T20:13:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

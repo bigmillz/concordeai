@@ -1,0 +1,115 @@
+{
+ "name": "f1-br-a",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T19:36:33",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 28.11,
+   "chars": 2370,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 16.14,
+   "chars": 2705,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 23.71,
+   "chars": 1425,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 29.15,
+   "chars": 2353,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 22.79,
+   "chars": 352,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 22.93,
+   "chars": 1421,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 26.76,
+   "chars": 641,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 26.78,
+   "chars": 2128,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 24.29,
+   "chars": 976,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 41.25,
+   "chars": 2051,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 26.16,
+   "chars": 2061,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 25.2,
+   "chars": 2043,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 31.89,
+   "chars": 2233,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.48,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink acts as a passive thermal conductor that pulls heat away from a sensitive component, like a CPU, to prevent thermal throttling or hardware failure. It uses a large surface area—often throu"
+ },
+ "finished": "2026-10-25T19:42:59"
+}

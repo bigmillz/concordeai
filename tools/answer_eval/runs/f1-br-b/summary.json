@@ -1,0 +1,115 @@
+{
+ "name": "f1-br-b",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T19:43:00",
+ "repo": "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a26dbc29c597b632d",
+ "head": [
+  "349015d",
+  "fresh-1"
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 32.25,
+   "chars": 2363,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 13.84,
+   "chars": 2538,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 25.1,
+   "chars": 1532,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 22.25,
+   "chars": 1252,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 23.88,
+   "chars": 509,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 26.63,
+   "chars": 1536,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 23.1,
+   "chars": 404,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 26.67,
+   "chars": 2022,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 17.96,
+   "chars": 696,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 36.02,
+   "chars": 1516,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 26.6,
+   "chars": 1977,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 27.16,
+   "chars": 2015,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 32.17,
+   "chars": 2612,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.62,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink draws thermal energy away from a component and spreads it across a much larger surface area to increase the rate of dissipation. It typically uses conductive materials like **aluminum** or"
+ },
+ "finished": "2026-10-25T19:49:15"
+}

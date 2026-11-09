@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":147,\"est\":false}",
+  "X-Hurry": "a697045a392acbc9"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 23.96,
+ "elapsed_s": 27.34,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.99,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.99,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.99,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.32,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 20 passages"
+   }
+  },
+  {
+   "t": 17.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.32,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.32,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.96,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.34,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.1,
+    "tok": 200,
+    "s": 3.4
+   }
+  },
+  {
+   "t": 27.34,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "800 chars"
+   }
+  },
+  {
+   "t": 27.34,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.99,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.99
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.99
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 20 passages",
+   "t_s": 17.32
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.32
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.32
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "800 chars",
+   "t_s": 27.34
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.34
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Fed - Federal Open Market CommitteeFederal Reserve Board - HomeSelected Inte",
+   "u": "https://www.federalreserve.gov/monetarypolicy/fomc.htm",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "Federal Funds Effective Rate - FRED | St. Louis FedFederal Reserve Board - Imple",
+   "u": "https://fred.stlouisfed.org/series/RIFSPFFNB",
+   "d": "2026-10-22"
+  },
+  {
+   "t": "Fed Rate & FOMC Meeting Calendar 2026",
+   "u": "https://www.newtrading.io/fomc-meeting-calendar/",
+   "d": "2026-09-16"
+  },
+  {
+   "t": "Current Federal Funds Rate 2026 — Fed Rate History, FOMC ...",
+   "u": "https://wealthvieu.com/banking/interest-rates/federal-funds-rate/",
+   "d": "2026-09"
+  },
+  {
+   "t": "Federal Funds Effective Rate | FRED | St. Louis Fed",
+   "u": "https://fred.stlouisfed.org/graph/?g=1BTRC",
+   "d": ""
+  },
+  {
+   "t": "2026 FOMC Press Releases - Federal Reserve Board",
+   "u": "https://www.federalreserve.gov/newsevents/pressreleases/2026-press-fomc.htm",
+   "d": "2026-07-29"
+  },
+  {
+   "t": "Fed Minutes Show Another Rate Hike Is Likely This Year as Kevin Warsh's FOMC Bat",
+   "u": "https://www.fool.com/investing/2026/10/20/fed-minutes-show-another-rate-hike-is-likely-this/",
+   "d": "2026-10-20"
+  },
+  {
+   "t": "Fed meeting today: Live updates - CNBC",
+   "u": "https://www.cnbc.com/2026/09/16/fed-meeting-today-live-updates.html",
+   "d": "2026-09-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.32,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.1,
+  "tok": 200,
+  "s": 3.4
+ },
+ "answer_raw": "The current federal funds target range is **3.75% to 4.00%** as of September 2026 [2][4]. On October 21, 2026, the effective federal funds rate was reported at **3.88%** [2].\n\nAt its most recent meeting on September 16, 2026, the Federal Open Market Committee (FOMC) raised the benchmark interest rate by **25 basis points** to reach the current target range [2]. Following that decision, the Board of Governors voted to raise the interest rate paid on reserve balances to **3.90%**, effective September 17, 2026 [2].\n\nWhile the September hike is the most recent action, the Fed is currently facing persistent inflation—with a September 2026 CPI report showing prices rose 3.7% year over year—leading to speculation that another hike could occur at the upcoming October 28 or December 9 meetings [7].",
+ "answer": "The current federal funds target range is **3.75% to 4.00%** as of September 2026 [2][4]. On October 21, 2026, the effective federal funds rate was reported at **3.88%** [2].\n\nAt its most recent meeting on September 16, 2026, the Federal Open Market Committee (FOMC) raised the benchmark interest rate by **25 basis points** to reach the current target range [2]. Following that decision, the Board of Governors voted to raise the interest rate paid on reserve balances to **3.90%**, effective September 17, 2026 [2].\n\nWhile the September hike is the most recent action, the Fed is currently facing persistent inflation—with a September 2026 CPI report showing prices rose 3.7% year over year—leading to speculation that another hike could occur at the upcoming October 28 or December 9 meetings [7].",
+ "chars": 800,
+ "raw_bytes": 2831,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.32,
+ "rate_gen_tok_s": 59.17,
+ "id": "q04",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Fed funds rate",
+ "question": "What's the current federal funds rate and what did the Fed do at its most recent meeting?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-data",
+ "asked_at": "2026-10-25T20:10:42",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the current federal funds rate and what did the Fed do at its most recent meeting?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

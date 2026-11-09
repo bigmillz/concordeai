@@ -1,0 +1,115 @@
+{
+ "name": "f1-base-c",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-10-25T19:49:15",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/fresh1/base",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 28.63,
+   "chars": 1443,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 14.56,
+   "chars": 2445,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 27.17,
+   "chars": 2053,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 22.74,
+   "chars": 1675,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 26.07,
+   "chars": 378,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 21.73,
+   "chars": 1412,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 24.83,
+   "chars": 169,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 24.23,
+   "chars": 2750,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 20.44,
+   "chars": 1091,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 29.71,
+   "chars": 1764,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 26.5,
+   "chars": 2102,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 33.14,
+   "chars": 2671,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 28.09,
+   "chars": 2039,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 14.46,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink **conducts heat** away from a high-temperature component to increase the effective surface area of the device. This expanded area facilitates more efficient **heat transfer** through conve"
+ },
+ "finished": "2026-10-25T19:55:24"
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.1,\"ftok\":27,\"est\":false}",
+  "X-Hurry": "f6b3fddb1650a0fc"
+ },
+ "first_byte_s": 0.82,
+ "first_text_s": 20.09,
+ "elapsed_s": 29.7,
+ "events": [
+  {
+   "t": 0.82,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 14.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.04,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.09,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.7,
+   "tag": "RATE",
+   "data": {
+    "tps": 68.1,
+    "tok": 654,
+    "s": 9.6
+   }
+  },
+  {
+   "t": 29.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2617 chars"
+   }
+  },
+  {
+   "t": 29.7,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.82,
+   "Searching the web…"
+  ],
+  [
+   11.78,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.82
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.78
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.78
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 14.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.04
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.04
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2617 chars",
+   "t_s": 29.7
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.7
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "Cloud TPU documentation | Google Cloud Documentation",
+   "u": "https://docs.cloud.google.com/tpu/docs",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "Best GPU for AI in 2026: Local Hardware and Cloud Options",
+   "u": "https://www.thundercompute.com/blog/best-gpu-for-ai-guide",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "Why NVIDIA's most powerful GPU is so rarely sold to consumers",
+   "u": "https://www.msn.com/en-us/news/other/why-nvidias-most-powerful-gpu-is-so-rarely-sold-to-consumers/ar-AA2d1Wr0?ocid=BingNewsVerp",
+   "d": "2026-09-26"
+  },
+  {
+   "t": "Claude Haiku \\ Anthropic",
+   "u": "https://www.anthropic.com/claude/haiku",
+   "d": "2026-10-07"
+  },
+  {
+   "t": "TPU Developer Hub | Google Cloud",
+   "u": "https://cloud.google.com/products/tpu/tpu-developer",
+   "d": ""
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 68.1,
+  "tok": 654,
+  "s": 9.6
+ },
+ "answer_raw": "The most powerful compute for AI right now is a toss-up between NVIDIA's data-center GPUs and Google's custom TPUs, depending on whether you prioritize raw ecosystem dominance or specialized architectural efficiency.\n\n## The Hardware Landscape\n\nFor massive-scale AI, the industry is split between NVIDIA's GPU-centric stacks and Google's custom-built ASICs.\n\n*   **NVIDIA Data Center GPUs** — These are the industry standard for large-scale training and inference. They utilize **HBM (High Bandwidth Memory)** rather than the GDDR found in consumer cards, delivering **2-4x the memory bandwidth** [4]. High-end models like the **H100** or **L40S** support **FP8 via the Transformer Engine** to accelerate workloads [4].\n*   **Google TPUs (Tensor Processing Units)** — These are custom-developed ASICs designed specifically to accelerate machine learning workloads on Google Cloud [2]. \n*   **Workstation-class hardware** — For high-end local or specialized tasks, the **RTX PRO 6000 Blackwell** is described as the \"most powerful desktop GPU ever created\" [5]. It is used when workloads exceed the 32GB VRAM limit of standard consumer cards [4].\n\n## Who is using what?\n\nThe \"most powerful\" hardware often depends on who has the priority in the supply chain and how they have architected their cloud presence.\n\n**Anthropic and Claude**\nAnthropic has moved toward a **TPU-centric infrastructure** to avoid the competitive disadvantage of being third in NVIDIA's allocation queue [1]. They use **Google Cloud** as their primary hosting partner and have a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027 [1]. This allows their workloads to run natively on Google's infrastructure without the complexity of managing NVIDIA drivers or CUDA stacks [1].\n\n**Other Major Players**\n*   **NVIDIA's priority** — Historically, NVIDIA's most advanced GPUs are allocated first to **Microsoft (OpenAI)**, then to **Google**, and then to other providers [1].\n*   **Cloud Providers** — The massive shift toward GPU-accelerated computing has led top cloud providers to adopt NVIDIA's hardware to meet the demand for AI training and inference [3].\n\n| Hardware Type | Primary Use Case | Key Advantage |\n| :--- | :--- | :--- |\n| **NVIDIA Data Center GPUs** | Scaling massive models/training | Ecosystem, NVLink, and HBM bandwidth [4] |\n| **Google TPUs** | Large-scale ML workloads on Google Cloud | Native integration and hardware availability for partners [1][2] |\n| **Consumer GPUs** | Local development/smaller models | Limited to ~32GB VRAM; not for massive models [4] |",
+ "answer": "The most powerful compute for AI right now is a toss-up between NVIDIA's data-center GPUs and Google's custom TPUs, depending on whether you prioritize raw ecosystem dominance or specialized architectural efficiency.\n\n## The Hardware Landscape\n\nFor massive-scale AI, the industry is split between NVIDIA's GPU-centric stacks and Google's custom-built ASICs.\n\n*   **NVIDIA Data Center GPUs** — These are the industry standard for large-scale training and inference. They utilize **HBM (High Bandwidth Memory)** rather than the GDDR found in consumer cards, delivering **2-4x the memory bandwidth** [4]. High-end models like the **H100** or **L40S** support **FP8 via the Transformer Engine** to accelerate workloads [4].\n*   **Google TPUs (Tensor Processing Units)** — These are custom-developed ASICs designed specifically to accelerate machine learning workloads on Google Cloud [2]. \n*   **Workstation-class hardware** — For high-end local or specialized tasks, the **RTX PRO 6000 Blackwell** is described as the \"most powerful desktop GPU ever created\" [5]. It is used when workloads exceed the 32GB VRAM limit of standard consumer cards [4].\n\n## Who is using what?\n\nThe \"most powerful\" hardware often depends on who has the priority in the supply chain and how they have architected their cloud presence.\n\n**Anthropic and Claude**\nAnthropic has moved toward a **TPU-centric infrastructure** to avoid the competitive disadvantage of being third in NVIDIA's allocation queue [1]. They use **Google Cloud** as their primary hosting partner and have a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027 [1]. This allows their workloads to run natively on Google's infrastructure without the complexity of managing NVIDIA drivers or CUDA stacks [1].\n\n**Other Major Players**\n*   **NVIDIA's priority** — Historically, NVIDIA's most advanced GPUs are allocated first to **Microsoft (OpenAI)**, then to **Google**, and then to other providers [1].\n*   **Cloud Providers** — The massive shift toward GPU-accelerated computing has led top cloud providers to adopt NVIDIA's hardware to meet the demand for AI training and inference [3].\n\n| Hardware Type | Primary Use Case | Key Advantage |\n| :--- | :--- | :--- |\n| **NVIDIA Data Center GPUs** | Scaling massive models/training | Ecosystem, NVLink, and HBM bandwidth [4] |\n| **Google TPUs** | Large-scale ML workloads on Google Cloud | Native integration and hardware availability for partners [1][2] |\n| **Consumer GPUs** | Local development/smaller models | Limited to ~32GB VRAM; not for massive models [4] |",
+ "chars": 2617,
+ "raw_bytes": 4625,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.03,
+ "rate_gen_tok_s": 68.08,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-write",
+ "asked_at": "2026-10-25T20:21:35",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

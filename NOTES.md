@@ -17273,6 +17273,106 @@ holding 9902 by the killed baseline run; run 2 (def7dc1) **1242/1244**: two muta
 run 3 (04c6286): **1244/1244**, exit 0. After the Mac-only run's two fixes, run 4 (999b02f): **1245/1245**,
 exit 0.
 
+## 6b520 — fresh-1: fresh facts from free sources: date-filtered and news search, official data with no key, the vendor's own feed, snippet-only marks, every figure dated (per Patrick)
+
+On `fresh-1` from `origin/main` 672d6f1. Fresh facts were the bench's weakest category (3.0 of 10 in
+quality-2), with travel at 2.8. Patrick chose **free fixes only**: no paid search API, never his cloud keys.
+The server (Ollama1) is down and the owner is abroad, so everything was measured on this Mac's Fast tier
+(Gemma 4 26B, MLX). Every number is in `tools/answer_eval/RESULTS-fresh-1.md`.
+
+**1. Date-restricted search** (`FRESH_TIMELIMIT`, `_ddg_news`). On a question about now, the first engine's
+queries carry ddgs's past-year filter (bing honours it: "Fed interest rate decision" went from
+tradingeconomics and polymarket to CNBC's September decision and the Fed's calendar). The second engine stays
+unfiltered, so a long-lived reference page still comes back. One news search of the past month runs on the lead
+query, and a news row's own date now dates its source (`_src_date`). An ISO stamp with its time
+("2026-10-23T06:10") reads as a date now (`_SRC_DATE_RXS[0]`). ddgs's DuckDuckGo backend returns nothing from
+this network.
+
+**2. Free official data with no key** (`official_kinds`, `official_sources`), seated first in the pack as
+"OFFICIAL DATA". Every endpoint was tested from this Mac with the reader's browser User-Agent:
+
+- **BLS public API v1**: 14 average-price series and CPI-U headline and core in ONE request, kept 12 h. The
+  keyless API allows 25 queries a day per address, and bls.gov's pages and RSS 403.
+- **The Fed**: its monetary-policy RSS, then the latest statement page (the decision sentence and the vote),
+  then `fomccalendars.htm` (the next meeting; a "(Released …)" minutes date is not a meeting).
+- **The New York Fed's EFFR API**.
+- **Frankfurter**: the ECB's reference rates against the dollar, for a currency the question names.
+- **The Treasury's daily par yield curve.**
+
+FRED's `fredgraph.csv` and `/data/*.txt` timed out 4 of 4 and aren't used. Wikipedia's REST API answers, but
+it's not used: "newest iPhone" searches to the iPhone 4 article, and a summary is dated by its last edit, not
+by the fact. Rules keep the US averages to US prices: none for "eggs in Brazil" or "how much protein in
+chicken".
+
+**3. Blocked pages.**
+
+- A source whose page wasn't read is marked **SNIPPET ONLY**, and the writer hedges a figure from it.
+- **The vendor's own feed** (`VENDOR_FEEDS`, `vendor_news_block`): OpenAI's RSS answers though every
+  openai.com article 403s; so do Apple's, NVIDIA's, Google's, Google Cloud's, AMD's, AWS's and Microsoft's,
+  and Anthropic's news page (`_page_headlines`; its header date dates nothing).
+  - A question about now that names the vendor or its product gets the matching posts with their dates.
+  - A product the question names must be in the post ("ChatGPT model" counts GPT-n).
+  - On "latest", the launches lead.
+  - A feed with nothing on the question is left out.
+- **AMP** (`/amp`, `?amp=1`) gave the same 403, 503 or timeout. **The Wayback availability API** answers 429
+  from here. Both dropped.
+
+**4. Every figure dated** (`GROUND_DATING`, `GROUND_STALE`, `pack_dates`). The writer dates every current
+figure from its own source's date line, never today's date. The newer of two disagreeing sources wins, and
+official data beats an article. The key figures carry "(source dated …)". A question about now with no
+source in 12 months gets a "NOTHING RECENT" line naming the newest date.
+
+**Measured** (blind Opus judges, by turn, all builds of one turn in front of one judge):
+
+| comparison | overall | fresh | travel | high flags |
+|---|---|---|---|---|
+| 3 base runs against 3 branch runs, paired over 13 turns | **+0.28** (se 0.18) | **4.22 → 4.78** | 3.60 → 3.47 | **40 → 17** |
+
+- "As of" in the answers: 0–3 per run → 17–49.
+- Ablations (one run each, against `f1-br-a` regraded in the same wave; one run's noise is about ±0.45):
+
+  | taken out | overall |
+  |---|---|
+  | the dating rules and snippet marks | **−0.92** |
+  | the date filter and the news search | −0.62 |
+  | official data and vendor feeds | −0.15 |
+  | vendor feeds alone | −0.08; −0.23 (se 0.32) over 2 runs against 2 |
+
+- Official data carries the whole evidence-level gain: reference key facts found in the pack, base 27.0/50,
+  branch 30.5, branch without it 27.0. On answers its effect is inside noise, because base already found q04
+  and q06 from here.
+- First text: median 18–19 s → 18–20 s.
+
+**Still failing**: travel (q18 and q19 want judgement and ranges, not fresh facts; q21's airlines refuse a
+read), q01's chips (listicles; the 26B writer says Claude "runs mainly on TPUs"), q03 (a third-party
+"$2.50/hr" outranks DigitalOcean's docs), and a writer that won't estimate a rent it has the rate for.
+
+**Measuring knobs.** `MILLENAI_FRESH_OFF` (tl, news, official, vendor, dating, snippet) is honoured in a dev
+copy only (`fresh_ablate`). It and 6b518's `MILLENAI_FINAL_THINK` joined `_KNOWN_ENV`: the dev-copy guard
+refused that knob, so it could never have been set. `run_bench.py --env` passes a knob to its copy.
+`tools/answer_eval/blind_batches.py` writes blind by-turn batches and splits the judgments back;
+`paired.py` prints the paired table.
+
+**Gauntlet.**
+
+- 23 checks + a 24-mutant check (`# ==== fresh-1 (6b520)`), with the network stubbed:
+  - the kinds of official data, and their US-only rule
+  - the BLS block, CPI, one request for every series
+  - the Fed's decision, vote, next meeting and EFFR
+  - FX, Treasury
+  - RSS and Atom dates, the news page's headlines
+  - the vendor feed's launches and its off-topic rule
+  - the date filter reaching the engine, the news search and its dated rows
+  - the official source seated first and marked, snippet-only marks
+  - a timeless question untouched
+  - the dating rules, "nothing recent", dated key figures
+  - the knob a dev copy's only
+- Stale fixtures follow the code. 6b514's and 6b518's `_ddg_text` stubs take `timelimit`. 6b514's namespace
+  stubs `_official_get` and `_ddg_news`, so no check touches the network or the BLS quota.
+- The gauntlet on `fresh-1`: run 1 (349015d) stopped at 1174 passed on a NameError: the 6b516 check execs a slice
+  (`GROUND_RULES` .. `_ground_key`) whose grounded turn now calls `fresh_ablate`, `_gq_stamp` and `_src_months_ago`;
+  the slice gets them. Run 2 (2412ebc): **1221/1221**, exit 0.
+
 ## 6b521 — Vera Rubin never uses the cloud (per Patrick)
 
 Asked whether Vera Rubin may add a cloud writer each round while "Use cloud power" is on, Patrick chose

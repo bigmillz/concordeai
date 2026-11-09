@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.6,\"ftok\":122,\"est\":false}",
+  "X-Hurry": "21c02e91324966e0"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.85,
+ "elapsed_s": 26.67,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 30 passages"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.85,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.67,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.6,
+    "tok": 505,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 26.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2022 chars"
+   }
+  },
+  {
+   "t": 26.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 30 passages",
+   "t_s": 12.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.23
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.23
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2022 chars",
+   "t_s": 26.67
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.67
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis for Digital Nomads 2026...",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Best Neighborhoods for ...",
+   "u": "https://getnomadbro.com/blog/where-to-stay-in-florianopolis-best-neighborhoods-for-digital-nomads-in-2026",
+   "d": "2026-07-09"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Nomads.com - Best Places to Live for Digital Nomads (formerly Nomad...",
+   "u": "https://nomads.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 64.6,
+  "tok": 505,
+  "s": 7.8
+ },
+ "answer_raw": "For a six-month stay that balances community, work-ready internet, and beach access, you should focus on **Lagoa da Conceição** or **Ingleses**.\n\nBecause Florianópolis is an island where neighborhoods have distinct microclimates and infrastructure, your choice will dictate whether you face a 40-minute commute or a short walk to coffee [1].\n\n## Primary Recommendations\n\n**Lagoa da Conceição** — Best for community and coworking\nThis area is the top choice for most nomads, especially if it is your first time in the city [1]. It offers a strong community and reliable internet, with many coworking spots where you can meet other remote workers [1][2]. Monthly coworking costs in Lagoa are typically around $150 as of July ess 2026 [2].\n\n**Ingleses (specifically Ingleses Norte)** — Best for lower costs and quiet\nThis is a better fit if you prioritize output over socializing [1]. You can find lower rents here, and the beaches are roughly a 10-minute walk away [1]. In Ingleses Norte, you can find modern flats with 1Gb optical internet to support heavy bandwidth needs [5].\n\n## Logistics and Infrastructure\n\n**Internet and Connectivity**\nFiber optic service—typically offering 300 to 500 Mbps—is available in most neighborhoods and costs between R$100 and R$150 per month [3]. While the speed is generally reliable across the city, the \"vibe\" of the neighborhood will determine how much you interact with the local tech scene [3].\n\n**Rental Market Trends**\nIf you are looking at long-term leases, be aware that asking rents increased by 9.13% in the 12 months leading to September 2026 [6]. This trend suggests you should verify current availability and local lease terms immediately upon arrival [4].\n\n| Feature | Lagoa da Conceição | Ingleses |\n| :--- | :--- | :--- |\n| **Primary Vibe** | Social & Community-heavy [1][2] | Work-focused & lower cost [1] |\n| **Internet** | High density of coworking [2] | Reliable fiber/1Gb options [5] |\n| **Beach Access** | Lagoon/waterfront centric [2] | Coastal/beach centric [5] |",
+ "answer": "For a six-month stay that balances community, work-ready internet, and beach access, you should focus on **Lagoa da Conceição** or **Ingleses**.\n\nBecause Florianópolis is an island where neighborhoods have distinct microclimates and infrastructure, your choice will dictate whether you face a 40-minute commute or a short walk to coffee [1].\n\n## Primary Recommendations\n\n**Lagoa da Conceição** — Best for community and coworking\nThis area is the top choice for most nomads, especially if it is your first time in the city [1]. It offers a strong community and reliable internet, with many coworking spots where you can meet other remote workers [1][2]. Monthly coworking costs in Lagoa are typically around $150 as of July ess 2026 [2].\n\n**Ingleses (specifically Ingleses Norte)** — Best for lower costs and quiet\nThis is a better fit if you prioritize output over socializing [1]. You can find lower rents here, and the beaches are roughly a 10-minute walk away [1]. In Ingleses Norte, you can find modern flats with 1Gb optical internet to support heavy bandwidth needs [5].\n\n## Logistics and Infrastructure\n\n**Internet and Connectivity**\nFiber optic service—typically offering 300 to 500 Mbps—is available in most neighborhoods and costs between R$100 and R$150 per month [3]. While the speed is generally reliable across the city, the \"vibe\" of the neighborhood will determine how much you interact with the local tech scene [3].\n\n**Rental Market Trends**\nIf you are looking at long-term leases, be aware that asking rents increased by 9.13% in the 12 months leading to September 2026 [6]. This trend suggests you should verify current availability and local lease terms immediately upon arrival [4].\n\n| Feature | Lagoa da Conceição | Ingleses |\n| :--- | :--- | :--- |\n| **Primary Vibe** | Social & Community-heavy [1][2] | Work-focused & lower cost [1] |\n| **Internet** | High density of coworking [2] | Reliable fiber/1Gb options [5] |\n| **Beach Access** | Lagoon/waterfront centric [2] | Coastal/beach centric [5] |",
+ "chars": 2022,
+ "raw_bytes": 4143,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.95,
+ "rate_gen_tok_s": 64.64,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-b",
+ "asked_at": "2026-10-25T19:46:43",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

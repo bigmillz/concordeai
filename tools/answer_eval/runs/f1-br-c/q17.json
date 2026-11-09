@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":134,\"est\":false}",
+  "X-Hurry": "8c395e7645a59c25"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.49,
+ "elapsed_s": 23.64,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 23 passages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.18,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.49,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.64,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.7,
+    "tok": 484,
+    "s": 7.2
+   }
+  },
+  {
+   "t": 23.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1937 chars"
+   }
+  },
+  {
+   "t": 23.64,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 23 passages",
+   "t_s": 12.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.18
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.18
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1937 chars",
+   "t_s": 23.64
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.64
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026"
+  },
+  {
+   "t": "Best beaches in Florianópolis: a complete 2026... - Career Gappers",
+   "u": "https://careergappers.com/florianopolis-beaches/",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "THE BEST Florianopolis Neighborhoods to Visit (2026) - Tripadvisor",
+   "u": "https://www.tripadvisor.com/Attractions-g303576-Activities-c47-t34-Florianopolis_State_of_Santa_Catarina.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.18,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.7,
+  "tok": 484,
+  "s": 7.2
+ },
+ "answer_raw": "For a six-month stay that balances safety, beach access, and connectivity, **Ingleses Norte** and the **gastronomic district** are your strongest contenders, though the \"best\" depends on whether you prioritize a coastal resort feel or an urban, walkable vibe.\n\n## Neighborhood Options\n\n**Ingleses Norte**\nThis area offers a direct beach lifestyle, with some rentals located just a two-minute walk from Ingleses Beach [4]. It is a practical choice for a medium-term stay, as it provides proximity to local amenities like the Floripa Mall (roughly 15 miles away) [4].\n\n**The Gastronomic District**\nIf you prefer being closer to the city center while maintaining a distinct local vibe, look at the area adjacent to the UDESC campus. This district is roughly 4 miles from the city center and offers modern rental options, including units with 1Gb optical internet [4].\n\n## Planning Considerations\n\n**Internet and Connectivity**\nYou won't have trouble with bandwidth. In most neighborhoods, fiber optic connections ranging from 300 to 500 Mbps are available for R$100 to R$150 per month (as of November 2025) [1]. If your work requires higher throughput, look specifically for listings advertising 1Gb optical internet [4].\n\n**Safety and Logistics**\nFlorianópolis is the safest state capital in Brazil, with a 2024 homicide rate of 7.9 per 100,000 residents, significantly lower than the national average [2]. Because the city does not have one central hub with a radiating quality corridor, you should evaluate each neighborhood based on your individual \"friction\" levels—such as your morning call schedule versus local walking distances [1][6].\n\n**Rental Market Trends**\nBe prepared for rising costs; asking rents increased by 9.13% in the 12 months leading up to September 2026 [5]. While a long-term lease is often more cost-effective than short-term rentals, the market is competitive, and one-bedroom units are particularly popular [5].",
+ "answer": "For a six-month stay that balances safety, beach access, and connectivity, **Ingleses Norte** and the **gastronomic district** are your strongest contenders, though the \"best\" depends on whether you prioritize a coastal resort feel or an urban, walkable vibe.\n\n## Neighborhood Options\n\n**Ingleses Norte**\nThis area offers a direct beach lifestyle, with some rentals located just a two-minute walk from Ingleses Beach [4]. It is a practical choice for a medium-term stay, as it provides proximity to local amenities like the Floripa Mall (roughly 15 miles away) [4].\n\n**The Gastronomic District**\nIf you prefer being closer to the city center while maintaining a distinct local vibe, look at the area adjacent to the UDESC campus. This district is roughly 4 miles from the city center and offers modern rental options, including units with 1Gb optical internet [4].\n\n## Planning Considerations\n\n**Internet and Connectivity**\nYou won't have trouble with bandwidth. In most neighborhoods, fiber optic connections ranging from 300 to 500 Mbps are available for R$100 to R$150 per month (as of November 2025) [1]. If your work requires higher throughput, look specifically for listings advertising 1Gb optical internet [4].\n\n**Safety and Logistics**\nFlorianópolis is the safest state capital in Brazil, with a 2024 homicide rate of 7.9 per 100,000 residents, significantly lower than the national average [2]. Because the city does not have one central hub with a radiating quality corridor, you should evaluate each neighborhood based on your individual \"friction\" levels—such as your morning call schedule versus local walking distances [1][6].\n\n**Rental Market Trends**\nBe prepared for rising costs; asking rents increased by 9.13% in the 12 months leading up to September 2026 [5]. While a long-term lease is often more cost-effective than short-term rentals, the market is competitive, and one-bedroom units are particularly popular [5].",
+ "chars": 1937,
+ "raw_bytes": 4054,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.48,
+ "rate_gen_tok_s": 67.73,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-c",
+ "asked_at": "2026-10-25T19:59:09",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

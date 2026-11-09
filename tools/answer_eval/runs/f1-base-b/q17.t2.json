@@ -1,0 +1,321 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.9,\"ftok\":134,\"est\":false}",
+  "X-Hurry": "2af8a5fe7f1c3d4f"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 15.01,
+ "elapsed_s": 18.82,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 8.42,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.42,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.42,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 10.65,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.65,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.65,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.01,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 18.82,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.3,
+    "tok": 252,
+    "s": 3.8
+   }
+  },
+  {
+   "t": 18.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1011 chars"
+   }
+  },
+  {
+   "t": 18.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.42,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.42
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.42
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 10.65
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.65
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.65
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.65
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1011 chars",
+   "t_s": 18.82
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 18.82
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis to Live in 2026: Complete...",
+   "u": "https://regenteimoveis.com.br/en/guides/florianopolis-neighborhoods/best-neighborhoods-in-florianopolis-to-live-in-2026-complete-guide/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Cities to Live in Brazil for Foreigners (2026)",
+   "u": "https://welcome-to-brazil.vercel.app/en/blog/best-cities-brazil-foreigners",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Oct 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-10"
+  },
+  {
+   "t": "Cost of Living Estimator for Florianopolis, Brazil - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/city-estimator/in/Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Coliving in Florianopolis — Furnished Rooms & Shared Housing for...",
+   "u": "https://coliving.love/coliving-florianopolis/",
+   "d": ""
+  },
+  {
+   "t": "Barcelona Furnished Rentals: Apartments, Flats & Rooms Monthly",
+   "u": "https://www.spotahome.com/s/barcelona",
+   "d": "2026-10-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.65,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.3,
+  "tok": 252,
+  "s": 3.8
+ },
+ "answer_raw": "Pick **Lagoa da Conceição**; it offers the best balance of being near the water, having a vibrant social scene, and acting as a central hub for the island's various beaches [6].\n\nBecause your criteria include walkability and proximity to a beach, Lagoa is the superior choice over the northern coastal neighborhoods, which can feel more spread out and car-dependent [7].\n\nRegarding the cost for a furnished one-bedroom:\n\nThe provided data does not give a specific price for a furnished one-bedroom rental in Lagoa da Conceição, but I can provide the scale for comparison. For a single person, living expenses excluding rent are approximately **R$3,290.2 (~$660.8)** [5]. For a single person, the total cost of living (including rent) in Florianópolis typically ranges from **$900–$1,500** or **$1,200–$1,800** depending on your lifestyle [2].\n\nTo get a precise monthly rate for a furnished one-bedroom in Lagoa, you should check local rental platforms or contact property managers in that specific neighborhood.",
+ "answer": "Pick **Lagoa da Conceição**; it offers the best balance of being near the water, having a vibrant social scene, and acting as a central hub for the island's various beaches [6].\n\nBecause your criteria include walkability and proximity to a beach, Lagoa is the superior choice over the northern coastal neighborhoods, which can feel more spread out and car-dependent [7].\n\nRegarding the cost for a furnished one-bedroom:\n\nThe provided data does not give a specific price for a furnished one-bedroom rental in Lagoa da Conceição, but I can provide the scale for comparison. For a single person, living expenses excluding rent are approximately **R$3,290.2 (~$660.8)** [5]. For a single person, the total cost of living (including rent) in Florianópolis typically ranges from **$900–$1,500** or **$1,200–$1,800** depending on your lifestyle [2].\n\nTo get a precise monthly rate for a furnished one-bedroom in Lagoa, you should check local rental platforms or contact property managers in that specific neighborhood.",
+ "chars": 1011,
+ "raw_bytes": 3137,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.43,
+ "rate_gen_tok_s": 66.34,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-b",
+ "asked_at": "2026-10-25T19:10:01",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "Since Florianópolis lacks a single central hub, your choice depends on whether you prioritize a tech-driven lifestyle or a coastal vibe, but **Lagoa da Conceição** and **Ingleses Norte** are your strongest candidates for meeting all your criteria.\n\n## Top Neighborhood Options\n\n**Ingleses Norte** — This area is highly convenient for those wanting to be close to the water, with some rentals located just a two-minute walk from Ingleses Beach [3]. It offers residential amenities like proximity to malls and is a common choice for those seeking beach access [3].\n\n**Lagoa da Conceição** — This neighborhood is a strong contender for a six-month stay due to its proximity to north island beaches like Campeche and ease of access to various coastal areas [6]. It is well-positioned for those wanting a mix of local flavor and natural beauty [6].\n\n**The Gastronomic District / University Vicinity** — Areas near the UDESC campus provide a different lifestyle, often featuring modern flats with high-speed connectivity (up to 1Gbps optical internet) and proximity to city centers [3]. These areas are useful if you want to be near academic or culinary hubs [3].\n\n## Infrastructure and Logistics\n\n**Internet** — You will likely have no trouble with connectivity. Fiber optic service providing 300 to 500 Mbps is available in most neighborhoods and typically costs between R$100 and R$150 per month [1]. For high-bandwidth needs, some rentals specifically offer 1Gb optical internet [3].\n\n**The Digital Nomad Scene** — The city has become an unofficial capital for digital nomads due to its 42 beaches and thriving tech scene [2]. While internet speed is generally high across the city, the \"best\" neighborhood for remote work often comes down to the daily pace of life rather than the bandwidth [1][2].\n\n**Rental Trends** — If you are looking at long-term leases versus short-term stays, be aware that asking rents rose by 9.13% in the 12 months leading to September 2026 [5]. In some markets, like São Paulo, short-term Airbnb stays can sometimes gross less than the citywide average for a long-term lease, so compare your six-month budget against local lease averages [5]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

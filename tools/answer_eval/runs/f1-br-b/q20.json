@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":132,\"est\":false}",
+  "X-Hurry": "fa495aca6d728af4"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 19.53,
+ "elapsed_s": 27.16,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.54,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 35 passages"
+   }
+  },
+  {
+   "t": 12.54,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.54,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.54,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.54,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.53,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.16,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.0,
+    "tok": 503,
+    "s": 7.6
+   }
+  },
+  {
+   "t": 27.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2015 chars"
+   }
+  },
+  {
+   "t": 27.16,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 35 passages",
+   "t_s": 12.54
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.54
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.54
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2015 chars",
+   "t_s": 27.16
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.16
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Global Liveability Index 2026 —urban resilience trends",
+   "u": "https://www.eiu.com/n/global-themes/global-liveability-index-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "Best Cities to Live in 2026 — Rankings & Livability Scores ...",
+   "u": "https://urblytica.com/best-cities-to-live",
+   "d": "2026"
+  },
+  {
+   "t": "Top 10 Best Cities for Quality of Life in 2026 - Jagran Josh",
+   "u": "https://www.jagranjosh.com/general-knowledge/worlds-10-best-cities-for-quality-of-life-2026-list-out-why-top-indian-cities-among-the-worst-check-delhi-mumbai-and-others-rank-1820013225-1",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in... - Monocle",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026"
+  },
+  {
+   "t": "2026 Global Cities Index | Oxford Economics",
+   "u": "https://www.oxfordeconomics.com/global-cities-index/",
+   "d": "2026"
+  },
+  {
+   "t": "Thinking About Moving? These 10 U.S. Cities Rank Highest for Quality of Life",
+   "u": "https://www.yahoo.com/lifestyle/articles/thinking-moving-10-u-cities-153000658.html",
+   "d": "2026-10-04"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.54,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.0,
+  "tok": 503,
+  "s": 7.6
+ },
+ "answer_raw": "The top city for quality of life in 2026 is **Canberra**, according to the Oxford Economics 2026 Global Cities Index [3][5].\n\nWhile the overall index evaluates 1,000 cities across various economic and human capital metrics, the specific \"quality of life\" category measures factors like income equality, life expectancy, crime, and access to culture [3]. For the US, while cities rank high in economic indicators, they struggle in this category; only two US cities reached the top 30 for quality of life [2][5].\n\n## 2026 Quality of Life Rankings\n\nThe rankings differ depending on whether you are looking at \"overall\" city strength or the specific slice of \"quality of life\" metrics.\n\n**Oxford Economics 2026 Global Cities Index**\nThis index evaluates 1,000 cities using five categories: economics, human capital, environment, governance, and quality of life [2][5]. \n*   **The Top Spot**: **Canberra** is the world's best city for quality of life in 2026 [5].\n*   **The Disconnect**: A city can excel in quality of life without being a top-tier global powerhouse; for example, Canberra ranks 45th in the overall index despite being #1 for quality of life [3].\n*   **US Performance**: In the overall index, New York holds the No. 1 spot [2]. However, in the specific quality of life category, only one US city made the top 20 [2].\n\n**Urblytica Best Cities to Live**\nThis ranking uses a composite scoring model to compare cities based on individual priorities like affordability, career, and lifestyle [4].\n*   **Methodology**: It evaluates cost of living, income potential, housing, healthcare, and economic strength [4].\n\n**Monocle Quality of Life Survey**\nMonocle uses a qualitative approach, relying on trusted correspondents rather than just tax rates or GDP [6].\n*   **Methodology**: The survey assesses safety, connectivity, governance, and green space [6].\n*   **Trends**: North American cities have struggled due to high crime, inequality, and housing issues, making cities like **Perth** more attractive [6].",
+ "answer": "The top city for quality of life in 2026 is **Canberra**, according to the Oxford Economics 2026 Global Cities Index [3][5].\n\nWhile the overall index evaluates 1,000 cities across various economic and human capital metrics, the specific \"quality of life\" category measures factors like income equality, life expectancy, crime, and access to culture [3]. For the US, while cities rank high in economic indicators, they struggle in this category; only two US cities reached the top 30 for quality of life [2][5].\n\n## 2026 Quality of Life Rankings\n\nThe rankings differ depending on whether you are looking at \"overall\" city strength or the specific slice of \"quality of life\" metrics.\n\n**Oxford Economics 2026 Global Cities Index**\nThis index evaluates 1,000 cities using five categories: economics, human capital, environment, governance, and quality of life [2][5]. \n*   **The Top Spot**: **Canberra** is the world's best city for quality of life in 2026 [5].\n*   **The Disconnect**: A city can excel in quality of life without being a top-tier global powerhouse; for example, Canberra ranks 45th in the overall index despite being #1 for quality of life [3].\n*   **US Performance**: In the overall index, New York holds the No. 1 spot [2]. However, in the specific quality of life category, only one US city made the top 20 [2].\n\n**Urblytica Best Cities to Live**\nThis ranking uses a composite scoring model to compare cities based on individual priorities like affordability, career, and lifestyle [4].\n*   **Methodology**: It evaluates cost of living, income potential, housing, healthcare, and economic strength [4].\n\n**Monocle Quality of Life Survey**\nMonocle uses a qualitative approach, relying on trusted correspondents rather than just tax rates or GDP [6].\n*   **Methodology**: The survey assesses safety, connectivity, governance, and green space [6].\n*   **Trends**: North American cities have struggled due to high crime, inequality, and housing issues, making cities like **Perth** more attractive [6].",
+ "chars": 2015,
+ "raw_bytes": 4243,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.55,
+ "rate_gen_tok_s": 66.02,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-br-b",
+ "asked_at": "2026-10-25T19:48:38",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

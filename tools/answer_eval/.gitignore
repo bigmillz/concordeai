@@ -3,3 +3,5 @@ packets/
 batches/
 # a copy's stdout can be long; kept locally for post-mortems
 runs/*/devcopy.log
+# blind by-turn batches (blind_batches.py), regenerable from runs/
+blind/

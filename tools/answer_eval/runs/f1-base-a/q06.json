@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":148,\"est\":false}",
+  "X-Hurry": "e7146c057a6428a9"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 20.42,
+ "elapsed_s": 22.16,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 7.74,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.74,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.74,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 19 passages"
+   }
+  },
+  {
+   "t": 13.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.83,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.83,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.42,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.16,
+   "tag": "RATE",
+   "data": {
+    "tps": 52.5,
+    "tok": 91,
+    "s": 1.7
+   }
+  },
+  {
+   "t": 22.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "366 chars"
+   }
+  },
+  {
+   "t": 22.16,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   7.74,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.74
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.74
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 19 passages",
+   "t_s": 13.83
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.83
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.83
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "366 chars",
+   "t_s": 22.16
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 22.16
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Egg Prices Today: Average Price Of Eggs Per Dozen + Chart (2026)",
+   "u": "https://coopeduplife.com/egg-prices/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen) in U.S ...Average Price: Eg",
+   "u": "https://fred.stlouisfed.org/series/APU0000708111",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Average egg price per dozen (2026) | Basket Report",
+   "u": "https://basketreport.com/prices/eggs/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen) in U.S ...",
+   "u": "https://fred.stlouisfed.org/graph/?g=S0on",
+   "d": "2026-09"
+  },
+  {
+   "t": "Egg Prices 2026: $2.27 per Dozen (September, BLS) | Nowflation",
+   "u": "https://nowflation.com/eggs",
+   "d": "2026-08-01"
+  },
+  {
+   "t": "Egg prices have soared 60% in a year. Here's why. - CBS News",
+   "u": "https://www.cbsnews.com/news/eggs-prices-2022-chicken-bird-flu-inflation-cpi/",
+   "d": "2023-01-17"
+  },
+  {
+   "t": "Egg prices up in September? Odds & Predictions 2026",
+   "u": "https://kalshi.com/markets/kxeggs/egg-prices/kxeggs-sep26",
+   "d": "2026"
+  },
+  {
+   "t": "US egg prices increase to record high, dashing hopes of... | AP News",
+   "u": "https://apnews.com/article/egg-prices-bird-flu-cpi-b0ded420e9f7c0a707277c9c63396a76",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.83,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 52.5,
+  "tok": 91,
+  "s": 1.7
+ },
+ "answer_raw": "A dozen Grade A large eggs cost an average of **$2.27** in September 2026 [1][3][5].\n\nThis price represents a significant drop of approximately **35%** compared to a year ago [1][3][5]. \n\nThe September 2026 price was unchanged from the previous month of August [1][3]. For context, these prices remain well below the record peak of $6.23 set in March 2025 [1][3][5].",
+ "answer": "A dozen Grade A large eggs cost an average of **$2.27** in September 2026 [1][3][5].\n\nThis price represents a significant drop of approximately **35%** compared to a year ago [1][3][5]. \n\nThe September 2026 price was unchanged from the previous month of August [1][3]. For context, these prices remain well below the record peak of $6.23 set in March 2025 [1][3][5].",
+ "chars": 366,
+ "raw_bytes": 2324,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.13,
+ "rate_gen_tok_s": 52.59,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-base-a",
+ "asked_at": "2026-10-25T19:02:32",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":136,\"est\":false}",
+  "X-Hurry": "b2d1afe52623c8a4"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 20.93,
+ "elapsed_s": 29.21,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 10.5,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.5,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.5,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.86,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 22 passages"
+   }
+  },
+  {
+   "t": 16.86,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.21,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.3,
+    "tok": 548,
+    "s": 8.3
+   }
+  },
+  {
+   "t": 29.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2195 chars"
+   }
+  },
+  {
+   "t": 29.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.5,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.5
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.5
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 22 passages",
+   "t_s": 16.86
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.86
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2195 chars",
+   "t_s": 29.21
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 29.21
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "South American Airline Carry-On Rules (2026) — CarrySizer",
+   "u": "https://carrysizer.com/guides/carry-on-rules-south-america/",
+   "d": "2026-06-19"
+  },
+  {
+   "t": "Carry-on Only For 3 Weeks In South America Is It Realistic Or ...",
+   "u": "https://gradeonetools.com/more/carry-on-only-for-3-weeks-in-south-america-is-it-realistic-or-just-influencer-fantasy",
+   "d": "2026-08-10"
+  },
+  {
+   "t": "Packing Light for South America: Weight Compliance Tips – Titantrek",
+   "u": "https://titantrekstore.com/blogs/travel-guides/packing-light-for-south-america-weight-compliance-tips",
+   "d": "2025-03-25"
+  },
+  {
+   "t": "New carry-on baggage rules 2026 | gol, latam and...",
+   "u": "https://clipzag.com/watch?v=ab-7VmZbaxk",
+   "d": "2026"
+  },
+  {
+   "t": "Como está sendo voar pelo Brasil com a Azul, Gol e Latam durante...",
+   "u": "https://www.melhoresdestinos.com.br/voar-azul-gol-latam-retomada.html",
+   "d": "2020-11-12"
+  },
+  {
+   "t": "South America Itinerary: 5 Ways to Spend 2 or 3 Weeks",
+   "u": "https://latinlands.com/guides/south-america-itinerary/",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "Gol vs. Latam vs. Azul Recommendation for Heavy Carry On?",
+   "u": "https://www.tripadvisor.com/ShowTopic-g303631-i2161-k14569763-Gol_vs_Latam_vs_Azul_Recommendation_for_Heavy_Carry_On-Sao_Paulo_State_of_Sao_Paulo.html",
+   "d": ""
+  },
+  {
+   "t": "The Complete South America Packing List (Expert 2026 Guide)",
+   "u": "https://worldlyadventurer.com/south-america-packing-list/",
+   "d": "2026-01-07"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.3,
+  "tok": 548,
+  "s": 8.3
+ },
+ "answer_raw": "Three weeks in South America with a single carry-on is tight but doable if you manage weight strictly, as the limits on these airlines are often quite rigid.\n\n## Airline Limits\n\nThe weight limit for carry-on luggage is typically **10 kg / 22 lbs** [2]. While some travelers report that domestic carriers primarily check the physical size of the bag rather than the weight [7], you should expect strict enforcement of the **8–10 kg (17–22 lbs)** range for both weight and size to avoid extra fees [3].\n\n| Airline | Weight Limit | Notes |\n| :--- | :--- | :--- |\n| **LATAM** | **10 kg / 22 lbs** [2] | Often allows one carry-on plus a personal item [2]. |\n| **GOL** | **10 kg / 22 lbs** [2] | Size is frequently the primary check on domestic routes [7]. |\n| **Azul** | **10 kg / 22 lbs** [2] | Rules are consistent with the 10 kg standard [2]. |\n\n*Note: Specific dimension measurements (height/width/depth) for these airlines were not provided in the available sources; you should check the official airline websites for the exact centimeter requirements to ensure your bag fits the sizer.*\n\n## Packing Strategy\n\nFor a three-week trip across diverse climates—ranging from Patagonian winds to Amazonian humidity—your gear must be versatile and highly compressible [2]. A **38-liter backpack** is a common choice for this type of minimalist travel [2].\n\n**The Essentials**\n*   **Versatile Clothing**: Pack layers that can be worn together or separately. Focus on items that can handle different climates, such as a lightweight waterproof shell and moisture-wicking base layers.\n*   **Compression Gear**: Use packing cubes or compression-capable bags to maximize the limited volume of a carry-on [3].\n*   **Toiletries and Electronics**: Keep these limited to essentials to stay within the weight ceiling. Since you'll likely have a personal item in addition to your carry-on, use that for heavy electronics and liquids.\n\n**The \"Carry-on Only\" Reality**\nWith roughly **12–15 liters** of space dedicated to clothing and essentials, you cannot bring a full wardrobe [2]. Success depends on a \"wash and wear\" cycle—packing enough for about a week and utilizing local laundry services to refresh your gear.",
+ "answer": "Three weeks in South America with a single carry-on is tight but doable if you manage weight strictly, as the limits on these airlines are often quite rigid.\n\n## Airline Limits\n\nThe weight limit for carry-on luggage is typically **10 kg / 22 lbs** [2]. While some travelers report that domestic carriers primarily check the physical size of the bag rather than the weight [7], you should expect strict enforcement of the **8–10 kg (17–22 lbs)** range for both weight and size to avoid extra fees [3].\n\n| Airline | Weight Limit | Notes |\n| :--- | :--- | :--- |\n| **LATAM** | **10 kg / 22 lbs** [2] | Often allows one carry-on plus a personal item [2]. |\n| **GOL** | **10 kg / 22 lbs** [2] | Size is frequently the primary check on domestic routes [7]. |\n| **Azul** | **10 kg / 22 lbs** [2] | Rules are consistent with the 10 kg standard [2]. |\n\n*Note: Specific dimension measurements (height/width/depth) for these airlines were not provided in the available sources; you should check the official airline websites for the exact centimeter requirements to ensure your bag fits the sizer.*\n\n## Packing Strategy\n\nFor a three-week trip across diverse climates—ranging from Patagonian winds to Amazonian humidity—your gear must be versatile and highly compressible [2]. A **38-liter backpack** is a common choice for this type of minimalist travel [2].\n\n**The Essentials**\n*   **Versatile Clothing**: Pack layers that can be worn together or separately. Focus on items that can handle different climates, such as a lightweight waterproof shell and moisture-wicking base layers.\n*   **Compression Gear**: Use packing cubes or compression-capable bags to maximize the limited volume of a carry-on [3].\n*   **Toiletries and Electronics**: Keep these limited to essentials to stay within the weight ceiling. Since you'll likely have a personal item in addition to your carry-on, use that for heavy electronics and liquids.\n\n**The \"Carry-on Only\" Reality**\nWith roughly **12–15 liters** of space dedicated to clothing and essentials, you cannot bring a full wardrobe [2]. Success depends on a \"wash and wear\" cycle—packing enough for about a week and utilizing local laundry services to refresh your gear.",
+ "chars": 2195,
+ "raw_bytes": 4402,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.79,
+ "rate_gen_tok_s": 66.27,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "f1-ab-vendor-b",
+ "asked_at": "2026-10-25T20:38:24",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
