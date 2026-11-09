@@ -32643,7 +32643,7 @@ def _s7_apply(src):
         got[k] = ns["server_models_apply"](ctx, sid, dict(g, seen=ns["_srv_mstate"][sid]["seen"]))
     out["the gateway's refusals in words"] = (
         got["changed"] == {"ok": False, "kind": "changed", "err": "The server’s list changed. Check it again."}
-        and got["busy"]["kind"] == "busy" and "Nothing was changed" in got["busy"]["err"]
+        and got["busy"]["kind"] == "busy" and got["busy"]["err"] == "Desktop is busy changing models. Try again in a moment."
         and got["in_use"]["kind"] == "in_use" and "custom:1b is in use on Desktop" in got["in_use"]["err"]
         and got["bad"]["kind"] == "server" and "add and remove overlap" in got["bad"]["err"]
         and got["old"]["kind"] == "old")
@@ -32687,9 +32687,11 @@ process.stdout.write(JSON.stringify({on:on,off:off,h:srvSheetHtml(on),hoff:srvSh
           and o["sum"] == "1.3 GB to download · 5.1 GB freed" and o["soff"] == "1.3 GB to download"
           and o["jobs"] == ["a:1b · downloading 40%", "a:1b · couldn’t download: disk full",
                             "b:1b · removed"]
-          and o["lines"][0] == "Desk has 4 models, not all of any set."
+          # copy-2's words (a8f6348)
+          and o["lines"][0] == "Desk has 4 models: a custom pick, not a set."
           and o["lines"][1] == "Desk has Recommended. Picked on Pat's MacBook."
-          and "can’t be sized" in o["lines"][2] and o["lines"][3] == "Desk is changing its models…"
+          and o["lines"][2] == "Desk didn’t report its graphics memory. Update the server kit."
+          and o["lines"][3] == "Changing models…"
           # the page sends what the sheet showed, and the route takes it
           and "srvPost(\"models\",{id:a.sid,plan:a.k,add:sh.add,remove:sh.remove,seen:z.d.seen})" in src
           and 'elif op == "models":' in src and '"/api/servers/models"' in src
@@ -33495,7 +33497,7 @@ def _b41_confirm(src):
             "no confirmation: refused": none[0] is False,
             "a forged id: refused": forged == (False, refused),
             "not ticked: refused, and says so": unticked[0] is False
-            and "I understand this may cost money" in unticked[1] and "Nothing was sent." in unticked[1]
+            and "Select “This may cost money” first." in unticked[1] and "Nothing was sent." in unticked[1]   # copy-2 (a8f6348)
             and falsy[0] is False,
             "no profile: refused": noctx[0] is False,
             "another profile's id: refused": other == (False, refused),
@@ -33509,7 +33511,7 @@ def _b41_confirm(src):
             and [x["provider"] for x in rec["models"]] == ["Groq", "Claude"],
             "only models that are offered": "err" in unknown and "err" in empty and "err" in junk,
             "six may be planned": len(offer) >= 8 and six.get("ok") and six["calls"] == 6,
-            "seven or more may not": "err" in many and "at most 6" in many["err"]
+            "seven or more may not": "err" in many and many["err"].startswith("At most 6 cloud models a run.")
             and many.get("id") is None and ns["BENCH_CLOUD_MAX"] == 6,
             "a repeated model is one call": dup.get("ok") and dup["calls"] == 1}
         return _b41_done(P, [none, forged, unticked, other, old, reuse, [calls0, calls1, n_after, n_reuse],
@@ -33611,9 +33613,9 @@ def _b41_cloud_fail(src):
             "out of credit": out["402"][:2] == ["failed", "Failed: the account is out of credit."],
             "refused": out["400"][:2] == ["failed", "Failed: the provider refused the request (HTTP 400)."],
             "the run goes on with the next model": all(v[2] == "done" for k, v in out.items() if k.isdigit()),
-            "spent on thinking": out["length"] == "Failed: it used all 256 tokens before writing (it thinks "
-                                                  "first), so there is nothing to time.",
-            "answered with nothing": out["nothing"] == "Failed: it answered with nothing.",
+            # copy-2 (a8f6348)
+            "spent on thinking": out["length"] == "Failed: Spent all 256 tokens thinking; nothing to time.",
+            "answered with nothing": out["nothing"] == "Failed: Answered with nothing.",
             "unreachable": [x[0] for x in out["off"]] == ["failed", "failed"]
             and all(x[1] == "Failed: the provider didn’t answer." for x in out["off"]),
             "one call a model, no retry, no other place": all(v[3] == 2 for k, v in out.items() if k.isdigit()),
@@ -33827,9 +33829,9 @@ def _b41_view(src):
             and s["version"] == "0.12.9" and s["reachable"] is True,
             "models that fit are ticked": m["small:8b"]["tick"] is True and m["mid:14b"]["tick"] is True,
             "card + memory: unticked, with the CPU note": m["big:70b"]["tick"] is False
-            and m["big:70b"]["placement"] == "gpu+ram" and "CPU hard" in m["big:70b"]["why"],
-            "placement not said: unticked": m["odd:3b"]["tick"] is False and "isn’t reported" in m["odd:3b"]["why"],
-            "too big for the card: unticked": m["huge:30b"]["tick"] is False and "may not fit" in m["huge:30b"]["why"],
+            and m["big:70b"]["placement"] == "gpu+ram" and m["big:70b"]["why"] == "Spills into the server’s memory.",
+            "placement not said: unticked": m["odd:3b"]["tick"] is False and m["odd:3b"]["why"] == "Placement not reported.",
+            "too big for the card: unticked": m["huge:30b"]["tick"] is False and m["huge:30b"]["why"] == "May not fit on the card.",
             "the cloud's providers and models": set(cloud) == {"groq", "claude"} and cloud["groq"]["name"] == "Groq"
             and "openai/gpt-oss-120b" in [x["id"] for x in cloud["groq"]["models"]],
             "an estimate only where a price is held, marked *": est["openai/gpt-oss-120b"].endswith("*")
@@ -33984,12 +33986,13 @@ try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r
             "This computer", "This computer", "Pat's Desk", "Groq"],
         "cloud rows and a server's are flagged as including the network": [r[2] for r in o["rows"]] == [
             False, False, True, True] and [r[3] for r in o["rows"]] == [False, False, False, True],
-        "different hardware or versions: the warning": o["warn"].startswith("These runs were measured on different hardware"),
+        # copy-2's words (a8f6348)
+        "different hardware or versions: the warning": o["warn"] == "Different hardware or versions: this compares setups, not only models.",
         "the same setup: no warning": o["same"]["warn"] == "" and len(o["same"]["rows"]) == 4,
         "only the first run's test compares": o["mixed"]["left"] == 1 and len(o["mixed"]["rows"]) == 2
         and o["mixed"]["test"] == "b1" and o["mixedFirst"]["test"] == "b2" and len(o["mixedFirst"]["rows"]) == 1
-        and "left out: only runs of the same test compare" in o["htmlMixed"],
-        "nothing ticked": o["none"]["rows"] == [] and "Tick two or more runs" in o["htmlNone"],
+        and "1 run from another test left out." in o["htmlMixed"],
+        "nothing ticked": o["none"]["rows"] == [] and "Select two or more runs." in o["htmlNone"],
         "a model on several targets is shown side by side, each against the slowest": len(o["groups"]) == 1
         and g[0] == "GPT-OSS 20B" and g[1] == "This computer"
         and [i[0] for i in g[2]] == ["Groq", "Pat's Desk", "This computer"]
@@ -34012,16 +34015,16 @@ try{const sc=bmCompare(sparse);out.sparse={ok:true,rows:sc.rows.map(r=>[r.name,r
         and "cloud, includes the network" in o["rowCl"] and ">Groq</span>" in o["rowCl"]
         and "memory" not in o["rowCl"] and ">400.0<small>" in o["rowCl"],
         "a failed cloud row says why": "Failed: rate limited." in o["rowClF"] and "bm-v" not in o["rowClF"],
-        "a cloud row on the go": "waiting for the first token" in o["rowClNow"],
-        "an estimated cloud row": ">estimated*</span>" in o["rowEst"] and "no token count" in o["rowEst"],
+        "a cloud row on the go": "Waiting for the first token" in o["rowClNow"],
+        "an estimated cloud row": ">estimated*</span>" in o["rowEst"] and "No token count sent." in o["rowEst"],
         "this computer's row unchanged": "reads 900 tok/s \u00b7 first token 1.10 s \u00b7 load 3.0 s" in o["rowMac"],
         "the cloud: Run for 1 to 6 models only": o["cloudReady"] == [False] + [True] * 6 + [False],
         "the cloud's picks are provider and model": o["cloudPick"]["target"] == "cloud" and len(o["cloudPick"]["models"]) == 7
         and o["cloudPick"]["models"][0] == {"pid": "groq", "model": "m0"},
         "the cloud's list: unticked until ticked, an estimate marked, a count": 'data-m="m0" checked' in o["cloudHtml"]
         and "about $0.001*" in o["cloudHtml"] and "* estimate" in o["cloudHtml"]
-        and "7 of 6 models ticked" in o["cloudHtml"] and 'class="bm-s bm-f"' in o["cloudHtml"]
-        and "6 of 6 models ticked: 6 calls, about 6,000 tokens in, up to 1,536 out." in o["cloudHtml6"],
+        and "7 of 6 selected" in o["cloudHtml"] and 'class="bm-s bm-f"' in o["cloudHtml"]
+        and "6 of 6 selected: 6 calls, about 6,000 tokens in, up to 1,536 out." in o["cloudHtml6"],
         "a server's picks": o["srvPick"] == {"target": "server", "server": "s1", "models": ["small:8b"]}
         and o["srvReady"] is True and o["srvNone"] is False,
         "a server's list: the notes and the placements": "card + memory" in o["srvHtml"] and "CPU hard" in o["srvHtml"]
@@ -34386,7 +34389,7 @@ check("benchmark cloud (live): the cloud's providers are listed with no key; no 
       and _bc_c1[0] == 400 and _bc_p1[0] == 200 and _bc_p1[1].get("calls") == 2
       and _bc_p1[1].get("warning") == "This uses your API keys and may cost money with your provider. "
                                        "ConcordeAI doesn't know your plan or prices."
-      and _bc_c2[0] == 400 and "I understand" in _bc_c2[1].get("err", "") and _bc_c3[0] == 400
+      and _bc_c2[0] == 400 and "Select “This may cost money” first." in _bc_c2[1].get("err", "") and _bc_c3[0] == 400
       and _bc_none == 0 and _bc_c4[0] == 200 and _bc_run.get("state") == "done"
       and _bc_run.get("cost_warning") is True and _bc_run.get("target") == "cloud"
       and len(_bc_calls) == 2
@@ -34574,7 +34577,7 @@ def _cm_resolver(src):
     # none
     nn = _cm_ns(src, {})
     got["no keys: every mode empty, the sentence says where to add one"] = all(
-        nn["cloud_mode_plan"](m, "groq")["seats"] == [] and ("Add a key under Settings › Cloud power" in nn["cloud_mode_plan"](m, "groq")["why"])
+        nn["cloud_mode_plan"](m, "groq")["seats"] == [] and ("Add a key in Settings > Cloud" in nn["cloud_mode_plan"](m, "groq")["why"])     # copy-2 (2b0b902)
         for m in ("Fast", "Thinking", "Pro", "Model"))
     # a resting provider is skipped and shown as resting; a rejected key too
     soon = time.time() + 600
@@ -34593,7 +34596,7 @@ def _cm_resolver(src):
         _cm_names(ns["cloud_mode_plan"]("Model", p)) and ns["cloud_mode_plan"]("Model", p)["spare"] == [] for p in ("gemini", "claude"))
     got["a pick of an unavailable model is empty with its reason"] = (
         rs["cloud_mode_plan"]("Model", "claude")["seats"] == [] and "unavailable: key rejected" in rs["cloud_mode_plan"]("Model", "claude")["why"]
-        and "has no key yet" in nn["cloud_mode_plan"]("Model", "groq")["why"])
+        and nn["cloud_mode_plan"]("Model", "groq")["why"] == "Groq has no key. Add a key in Settings > Cloud.")
     # /api/tiers rows
     rows = rs["cloud_mode_tiers"]()
     got["rows: modes and one pick per provider"] = (
@@ -34667,7 +34670,7 @@ def _cm_max(src):
     n0 = _cm_ns(src, {}, **dict(base, _tier_ready=lambda n: [], server_mode_candidates=lambda ctx: []))
     r0 = n0["max_tier_row"](object())
     got["Max greyed with a reason when nothing is available"] = (
-        r0["available"] is False and "Settings › Models" in r0["why"] and r0["models"] == [] and r0["cloud"] == [] and r0["blend"] == "")
+        r0["available"] is False and "Settings > Models" in r0["why"] and r0["models"] == [] and r0["cloud"] == [] and r0["blend"] == "")
     # the blend of the other modes: cloud power on, the server's pen, the largest Gemma here (its server copy standing in)
     got["blend of a mode: the cloud ladder first when cloud power is on"] = ns["mode_blend"](object(), ["A", "B"], 2) == "blend: Claude"
     nb = _cm_ns(src, {}, **dict(base, cloud_allowed=lambda only=False: False, server_compositor=srvpen))
@@ -35144,7 +35147,7 @@ def _mc_council(src):
     got["server mode: another of its models as the pen"] = cl == [] and [c[1] for c in calls] == ["Desk · r"]
     cl, calls, out, st = go("Gemma 4 12B", run_kw={"srv_only": True}, labels=srvl,
                             over={"server_compositor": lambda ctx, d=(), c=None: {"label": "Desk · q"}})
-    got["server mode: never a pen of this computer"] = [c[1] for c in calls] == ["Desk · q"] and any("can\u2019t write" in s for s in st)
+    got["server mode: never a pen of this computer"] = [c[1] for c in calls] == ["Desk · q"] and any("is unavailable. The default compositor writes it." in s for s in st)   # copy-2 (808baeb)
     # Cloud Only's Thinking: its plan's ladder, the pen first
     plan = {"mode": "Thinking", "seats": [("Gemini", _mc_C("gemini")), ("Groq", _mc_C("groq"))],
             "comp": [_mc_C("gemini"), _mc_C("groq"), _mc_C("claude")], "spare": [], "why": "", "pid": ""}
