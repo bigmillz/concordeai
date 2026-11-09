@@ -41309,6 +41309,30 @@ check("every millen.* key the page writes to browser storage is kept by storeBoo
       _lsu == [] and _lsn >= 20 and _lsu_m == ["millen.recentsDays"]
       and "lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF)" in _MILLENAI_SRC,
       "%r" % [_lsu, _lsn, _lsu_m])
+# THE CHANNEL FOLLOWS THE BUILD (7.0 beta, per Patrick): a stored choice wins, the old checkbox means beta;
+# with nothing chosen a nightly build is on nightly, a beta or RC build on beta (so a friend who came by a beta
+# keeps getting betas), anything else on stable; Settings' menu shows the same default. Run for real out of the
+# source with each build's constants, and a mutant that puts betas back on stable
+def _chan_rule(src, nightly="", beta=0, rc=0, prefs=None):
+    ns = {"APP_NIGHTLY": nightly, "APP_BETA": beta, "APP_RC": rc, "machine_prefs": lambda: dict(prefs or {})}
+    a_ = src.index("def update_channel() -> str:")
+    exec(src[a_:src.index("\n\n\n", src.index("def _channel_default() -> str:"))], ns)
+    return ns["update_channel"]()
+def _chan_ok(src):
+    return (_chan_rule(src) == "stable" and _chan_rule(src, beta=1) == "beta" and _chan_rule(src, rc=2) == "beta"
+            and _chan_rule(src, nightly="12 abc1234") == "nightly" and _chan_rule(src, nightly="1", beta=1) == "nightly"
+            and _chan_rule(src, beta=1, prefs={"update_channel": "stable"}) == "stable"
+            and _chan_rule(src, prefs={"update_channel": "Beta"}) == "beta"
+            and _chan_rule(src, prefs={"beta_updates": True}) == "beta"
+            and _chan_rule(src, beta=1, prefs={"update_channel": "bogus"}) == "beta")
+check("the update channel follows the build when nothing is chosen (nightly, beta/RC on beta, else stable), a stored "
+      "choice wins, and Settings shows the same default; a mutant putting a beta build on stable is caught",
+      _chan_ok(_MILLENAI_SRC)
+      and not _chan_ok(_MILLENAI_SRC.replace("    if APP_BETA > 0 or APP_RC > 0:\n        return \"beta\"\n", "", 1))
+      and '(pr2.beta_updates?"beta":"%s")' % ("beta" if re.search(r"^APP_(BETA|RC) = [1-9]", _MILLENAI_SRC, re.M)
+                                               else "nightly" if re.search(r'^APP_NIGHTLY = "[^"]', _MILLENAI_SRC, re.M)
+                                               else "stable") in page
+      and "__CHANNEL_DEFAULT__" not in page, "")
 # X-MODELS NAMES WHOLE MODELS (run h): the header was cut at 300 characters, so a Pro council of six
 # server seats with long names and nine of this computer's ended in "Gemm"; now whole names, up to 2,000
 _xm_seg = _MILLENAI_SRC[_MILLENAI_SRC.index("xm_names = list(council)"):_MILLENAI_SRC.index('self.send_header("X-Models", header_text(xm))')]

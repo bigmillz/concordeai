@@ -10174,15 +10174,28 @@ def _build_from_tag(tag):
 
 
 def update_channel() -> str:
-    """stable | beta | nightly. The old beta_updates checkbox migrates
-    to beta once; a nightly build defaults to the nightly channel."""
+    """stable | beta | nightly. A stored choice always wins; the old
+    beta_updates checkbox migrates to beta once. With nothing chosen the
+    build decides (7.0 beta, per Patrick): a nightly build stays on the
+    nightly channel, a beta or release-candidate build (APP_BETA or APP_RC
+    above 0) on beta, so an install that came by a beta keeps getting
+    betas instead of falling back to stable; anything else is stable."""
     pr = machine_prefs()
     ch = str(pr.get("update_channel") or "").strip().lower()
     if ch in ("stable", "beta", "nightly"):
         return ch
     if pr.get("beta_updates"):
         return "beta"
-    return "nightly" if APP_NIGHTLY else "stable"
+    return _channel_default()
+
+
+def _channel_default() -> str:
+    """The channel a build is on when nothing was chosen (update_channel)."""
+    if APP_NIGHTLY:
+        return "nightly"
+    if APP_BETA > 0 or APP_RC > 0:
+        return "beta"
+    return "stable"
 
 
 def _channel_release():
@@ -41598,6 +41611,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              # (6b532)
                              "1" if (HAS_WEBVIEW and IS_MAC and not SHELL)
                              else "0")
+                    .replace("__CHANNEL_DEFAULT__", _channel_default())
                     .replace("__SHELL_TL__",
                              # the Mac shell seats the traffic lights on the
                              # header row; the page keeps their zone clear
@@ -64066,7 +64080,8 @@ async function openAbout(){
     try{
       const pr2=await(await api("/api/prefs")).json();
       $("#turbo").checked=!!pr2.turbo;
-      if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"stable");
+      // nothing chosen: the build's own channel (a beta build is on beta), filled in by the server
+      if($("#upchan"))$("#upchan").value=pr2.update_channel||(pr2.beta_updates?"beta":"__CHANNEL_DEFAULT__");
       $("#autochk-toggle").classList.toggle("on",pr2.auto_update_check!==false);
       $("#autoclean-toggle").classList.toggle("on",pr2.auto_cleanup!==false);   // on by default (6b306)
       try{
