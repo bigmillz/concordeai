@@ -115,6 +115,7 @@ MACHINE_STATE = frozenset((
     # swap reading, a machine fact
     "_tl_usage", "_engine_swap_seen",
     "_crypto_install", "_export_install", "_giants", "_no_limits",
+    "_pdf_install",          # 6b546: the PDF reader's install state (pypdf off a Mac), the machine's
     "EXPORT_KIND",
     # the hardware benchmark (6b331): its run, the engine call in flight,
     # the count of answers being written, the hardware line
@@ -13364,6 +13365,9 @@ MACHINE_IO = frozenset((
     "<module>",
     # 6b497: the MLX engine self-update: its record, the pip run's temp files, the unpacked wheels
     "_mlx_engine_record", "_mlx_engine_pip", "_ensure_mlx_engine",
+    # 6b546: the PDF reader: its install record, a PDF's 0600 stage file under run/ and the
+    # worker's own output file (nothing of a profile's: the text goes back to the request)
+    "_ensure_pdf_reader", "pdf_extract", "_pdf_text_worker",
     # run/ notes, locks and the instance lock
     "run_file", "drop_run_file", "sweep_run_files", "single_instance",
     "_write_instance_note", "_write_boot_note", "_drop_instance_note",
@@ -31793,14 +31797,22 @@ def pdf_extract(data: bytes) -> dict:
             p = subprocess.Popen(argv + [path, "%g" % cap, str(DOC_MAX_CHARS)],
                                  stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                  stderr=subprocess.DEVNULL)
-            killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)
-            killer.daemon = True
-            killer.start()
+            # killed past its cap by a watcher of the file's own kind (ctx_thread, the
+            # one way a thread starts here; machine work, bound to no profile)
+            done, proc = threading.Event(), p
+
+            def _kill_late():
+                if not done.wait(cap + DOC_PDF_GRACE_S):
+                    try:
+                        proc.kill()
+                    except OSError:
+                        pass
+            ctx_thread(target=_kill_late, bind=False, daemon=True).start()
             try:
                 for raw in p.stdout:
                     lines.append(raw.decode("utf-8", "replace"))
             finally:
-                killer.cancel()
+                done.set()
                 p.wait(timeout=5)
         else:
             # the pypdf worker writes them to a 0600 file of its own: a

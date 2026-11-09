@@ -40684,7 +40684,9 @@ def _ns546(src, mac=True, hooks=(), hook_args=None):
                                                      src.index("# ==== pdf reader worker (6b546): end ====")])
     ns.update({"subprocess": _sp522, "tempfile": _tf522, "IS_MAC": mac, "TEST_HOOKS": frozenset(hooks),
                "resource": lambda *p: os.path.join(os.getcwd(), *p), "app_dir": lambda: d,
-               "_hook_arg": lambda n: ha.get(n, ""), "_app546": d, "sys": sys, "__file__": wk})
+               "_hook_arg": lambda n: ha.get(n, ""), "_app546": d, "sys": sys, "__file__": wk,
+               # the file's one way to start a thread (the profiles lint), a plain one here
+               "ctx_thread": lambda target, ctx=None, bind=True, **kw: __import__("threading").Thread(target=target, **kw)})
     exec(_def522(src, "drop_run_file"), ns)
     exec(src[src.index("# ==== pdf attach (6b546): begin ===="):src.index("# ==== pdf attach (6b546): end ====")], ns)
     # pypdf is on the children's PYTHONPATH, never this process's path: found where the children will find it
@@ -41040,7 +41042,7 @@ _C546_MUT = [
     ("split not on the pages", 'DOC_PDF_MARK_RX if doc_is_pdf(d["name"]) else None)', "None)"),
     ("a PDF not a local document", 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt|pdf)$", re.I)', 'DOC_LOCAL_RX = re.compile(r"\\.(?:md|txt)$", re.I)'),
     ("PDFKit off a Mac", "    if not IS_MAC:\n        return None\n    for p in (resource(DOC_PDF_HELPER)", "    for p in (resource(DOC_PDF_HELPER)"),
-    ("a hung helper waited for", "            killer = threading.Timer(cap + DOC_PDF_GRACE_S, p.kill)", "            killer = threading.Timer(3600, p.kill)"),
+    ("a hung helper waited for", "                if not done.wait(cap + DOC_PDF_GRACE_S):", "                if not done.wait(3600):"),
     ("the copy left behind", "    finally:\n        drop_run_file(path)\n", "    finally:\n"),
     ("a PDF sliced as text", "    else if(DOC_PDF.test(f.name))addPdfFile(f);\n    else if(f.size<2_000_000)addDocFile(f);", "    else if(f.size<2_000_000)addDocFile(f);"),
     ("sent while being read", "    try{await Promise.all(pendingDocs.filter(d=>d.busy).map(d=>d.wait));}finally{sendAsking=false;}", "    sendAsking=false;"),
