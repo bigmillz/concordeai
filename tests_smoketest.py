@@ -1012,7 +1012,7 @@ check("greetings are condition-gated",
       and "GREETINGS.filter" in page
       and "a<=b?(hr>=a&&hr<=b):(hr>=a||hr<=b)" in page   # wraparound
       and "h:[0,0]" in page                              # midnight kept
-      and 'd:[5],h:[15,18]' in page)                     # Friday is real
+      and 'd:[5],h:[8,14]' in page)                      # Friday is real
 # 6b269, per Patrick ("less NYC, but still fun... use the user's
 # nickname... the user's location"): the bank is anywhere-on-earth,
 # tokened with {name}/{city} (a line needing a token the app lacks is
@@ -1394,7 +1394,7 @@ check("both studios expose a colour-coded ladder",
       and "def tier_fit" in _MILLENAI_SRC
       and "def studio_remove" in _MILLENAI_SRC
       and 'class="stnotch ' in page and "stlegend" in page
-      and "green \\u2014 runs comfortably here" in page,
+      and "Green: runs well" in page,
       str({k: [t["fit"] for t in v.get("tiers", [])] for k, v in _ss.items()}))
 check("download estimate uses a rolling window, not two polls",
       "_dl_hist = []" in _MILLENAI_SRC
@@ -1443,7 +1443,7 @@ check("image generation: intent, engine ladder, settings box, wizard, arrow pill
       and "def _dir_bytes_real" in _MILLENAI_SRC
       and 'class="genimg"' in page and "function paintStudios" in page
       and ">UPDATE<" not in page
-      and '<div id="update-flag" hidden title="Install the update"><svg' in page)
+      and '<div id="update-flag" hidden title="Update ready"><svg' in page)
 # 6b355, per Patrick: "I paste it in a map and ask the app to draw over it
 # showing good neighborhoods for an Airbnb, but it was unable to modify the
 # photo." The model says where, the page draws. Three layers here: the
@@ -1905,7 +1905,7 @@ check("visual effects switch: backdrop only, in About; cog left of pen",
       and _nv_ok(_nv_mut)[1] != []            # the mutant: a margin slipped into a still rule is caught
       and 0 < page.index('id="settings-btn"') < page.index('id="newchat"')
       and 'id="settings">' not in page
-      and "Toggle visual effects" in page)
+      and '{k:"set",t:"Visual effects",' in page)
 _auto = json.loads(req("/api/update/check", cookie=K)[2])
 check("automatic update checks: switch, daily cadence, server gate",
       'id="autochk-toggle"' in page and "auto_update_check" in page
@@ -1942,7 +1942,7 @@ check("model downloads: batch-true progress, live pane, current preset",
       and "plan_state" not in _st and "plans" not in _st and "plan_n" not in _st
       and "now" in _st and "queued_n" in _st
       and "function manageTick" in page and "function nowLine" in page
-      and 'class="cur"' in page and "already installed \\u2014 nothing to download" in page
+      and 'class="cur"' in page and '?"Already installed"' in page
       and "watch the strip in the sidebar" not in page.split("#roster\").addEventListener")[0])
 # 6b289, per Patrick: the rail's VERSION cell never ellipsizes a nightly —
 # the word "nightly" goes, the commit stays ("6.0.4 · e6fb576")
@@ -2076,7 +2076,7 @@ check("code cards + mini highlighter", "codecard" in page
 # disabled) while its fence is still open and live once it closes
 check("code-card copy button, greyed until the fence closes",
       'class="ccopy wait" disabled' in page and ".ccopy.wait" in page
-      and "ccopy" in page and "Still generating" in page)
+      and "ccopy" in page and "Still writing" in page)
 # 6b243: the burger was DEAD on phones — a 760px block set the sidebar
 # display:none while the 700px drawer block only animated transform, so
 # the ☰ toggled a class on an element that was never rendered. ONE
@@ -2094,8 +2094,8 @@ check("interactive form cards wired",
 # with two ways out; the lockout safeguard is taught to the agent itself
 check("risky tasks gated by a warning card",
       "function riskCard" in page and "riskcard" in page
-      and "challenging to undo" in page
-      and "Let\u2019s go for it" in page and "Not today" in page
+      and "This could be hard to undo." in page
+      and '<span>Go ahead</span></button>' in page and '<span>Skip</span></button></div>' in page
       and 'class="twarn"' in page)
 check("full 53-task library with the flagged set",
       page.count("{n:\"") == 53 and page.count("w:\"") == 22)
@@ -2319,7 +2319,7 @@ check("cloud video stays capped per day",
 _root = os.path.dirname(os.path.abspath(__file__))
 check("harness review fixes: one card per approval, honest verdicts, slot reserved",
       "apSeen.has(ad.jid)" in page and "expired \u2014 nothing ran" in page
-      and "no answer \\u2014 nothing ran" in _MILLENAI_SRC
+      and "No answer. Nothing ran." in _MILLENAI_SRC
       and "_started[0] = True" in _MILLENAI_SRC and "_give_back()" in _MILLENAI_SRC
       and "and not ag_remote)" in _MILLENAI_SRC
       and "_fence_output(out, 2500)" in _MILLENAI_SRC)
@@ -2349,7 +2349,7 @@ check("thinking budget and rate-limit backoff",
 check("advanced council picker present",
       '"__adv__"' in page and 'class="engdiv"' in page
       and 'id="adv-veil"' in page and 'id="adv-comp"' in page
-      and "who holds the pen" in page and "ADV_USE" in page)
+      and '<div class="adv-h">Compositor</div>' in page and "ADV_USE" in page)
 # 6b247: the four-step first-run wizard — markup, all four steps, the
 # once-only gate, and the plan/provider machinery it drives
 check("first-run wizard present, gated on wizard_done",
@@ -4314,7 +4314,7 @@ check("review fixes: chat copy, autonomy, downloads, image label, photos",
       and 'if p.startswith("https://")][:3]' in _MILLENAI_SRC
       and 'img.startswith("https://")' in _MILLENAI_SRC
       and "r'(https://[^" in _MILLENAI_SRC and "(https?://[^" not in _MILLENAI_SRC
-      and "A question that needs the web goes, as typed, to a\n      search engine"
+      and "A question that needs the web goes, as typed, to a search engine"
       in _MILLENAI_SRC)
 # (3) NO KEYLESS CLOUD. Pollinations got whole prompts (memory and name
 # included) when cloud power was on without a key, and image
@@ -4329,14 +4329,11 @@ check("Pollinations is gone and the Cloud power copy tells the truth",
       # (6b326) the switch decides chats; a saved Gemini key makes
       # pictures and video either way; the switch never removes a key
       and "only while a key is on" not in _MILLENAI_SRC
-      and ("While Use cloud power is\n      on, cloud models answer your chats; the Cloud Only tier does that\n"
-           "      for one question. Pictures and videos made with Gemini go to Google\n"
-           "      whenever a Gemini key is saved, switch on or off. The switch never\n"
-           "      removes a key.") in _MILLENAI_SRC
-      and ('title="Answers come from a cloud service instead of this computer. Your prompts '
-           'leave this computer while this is on, and whenever you pick the Cloud Only tier. '
-           'Pictures and videos use a saved Gemini key either way; keys stay saved when it is '
-           'off."') in _MILLENAI_SRC
+      and ("Optional. While on, cloud models answer and your prompts leave this Mac. "
+           "Gemini pictures and video go to Google whenever a Gemini key is saved. "
+           "Keys stay saved when off.") in _MILLENAI_SRC
+      and '<span>Cloud models</span></label>' in _MILLENAI_SRC
+      and 'id="turbo-hint"' not in _MILLENAI_SRC
       and '$("#turbo-hint").title=' not in _MILLENAI_SRC)
 # (4) AN ANSWER CAN'T RUN SCRIPT IN THE PAGE. esc() left quotes alone, so
 # ![x" onerror="...](https://...) closed the alt attribute and ran code
@@ -4691,7 +4688,7 @@ check("review fixes: effort by family, bad-key 400, model-level rest shown, re-s
 check("review fixes: refusals wipe and hand over, honest Cloud Only, synced boxes",
       'c["_stop"] = stop' in _MILLENAI_SRC
       and 'if d.get("stop_reason") == "refusal":' in _MILLENAI_SRC
-      and "Your cloud providers didn't answer this one" in _MILLENAI_SRC
+      and "No cloud provider answered. Try again in a moment." in _MILLENAI_SRC
       and "cloud_names = {lbl for lbl, _c in _bench}" in _MILLENAI_SRC
       and "cloud_text(conf, messages, timeout=70,\n" in _MILLENAI_SRC
       and "timeout_rests=False" in _MILLENAI_SRC
@@ -4700,7 +4697,7 @@ check("review fixes: refusals wipe and hand over, honest Cloud Only, synced boxe
       # limits", in both the offer and the run-time check
       and _MILLENAI_SRC.count("if model_is_giant(label) and not giants_on():\n        return False\n    if not giant_fits_here(label):") == 2
       and _MILLENAI_SRC.count("        except Exception:\n            return False") >= 2
-      and "function syncLimits" in page and "out of credit · top up the account" in page)
+      and "function syncLimits" in page and ' <i>Out of credit</i>' in page)
 # 6b308, per Patrick ("selecting the ideal model for different tasks …
 # keep it up to date as the models get cycled in and cycled out"): a
 # role per task with a version floor per line, ladders per task, one
@@ -4885,7 +4882,7 @@ check("per-task review fixes: titles per request, badge, sweeps",
       and "elif not cloud_only:\n                                # an answer of this computer's: the person's\n"
           "                                # server pins it first (6b357)" in _MILLENAI_SRC
       and "                                else:\n                                    run_model(small, _pin_ask, got2.append)" in _MILLENAI_SRC
-      and "Cloud power is off, so your cloud key can't drive" in _MILLENAI_SRC)
+      and "Cloud models are off, so your key can\\u2019t drive the agent." in _MILLENAI_SRC)
 # 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
 # sidebar and squeezed the wordmark to nothing (its full-width rule was
 # written for a two-row header); both chips now sit on their own line
@@ -4948,7 +4945,7 @@ check("giants: never in Light or Recommended; an Ollama giant is never seated fo
       and "and _is_substantive(prompt)\n                          and not slow_giant(lbl))" in _MILLENAI_SRC
       # (6b334) or a model of one of the profile's own servers
       and "if (m in MODEL_ROUTES and SUPPORTED.get(m))\n                       or server_pick(m, self.ctx)[0] is not None]" in _MILLENAI_SRC
-      and 'step("draft", "Loading the model, then writing",' in _MILLENAI_SRC,
+      and 'step("draft", "Loading %s (%d GB). Can take minutes." % (' in _MILLENAI_SRC,
       "%r" % [_rec3, _max3b])
 check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render try",
       "chat[:6]" not in _MILLENAI_SRC
@@ -5256,7 +5253,7 @@ check("smooth bar + honest time-left (the live step's hairline since 6b528)",
 # server end: an unguessable X-Hurry id, a non-admin endpoint, and
 # run_council trading the rest of the council for the fastest pen
 check("Answer now: button, endpoint, council hooks",
-      'class="wtnow"' in page and "Hurrying it along" in page
+      'class="wtnow"' in page and "Finishing early" in page
       and "/api/chat/hurry" in page
       and "X-Hurry" in _MILLENAI_SRC
       and "_hurry_jobs" in _MILLENAI_SRC
@@ -5288,7 +5285,7 @@ check("settings: descriptions + Account pane + scoped forget",
       and '"/api/forget"' in _MILLENAI_SRC
       and "FORGET ME" in page
       # one kind of account since the web version went (6b320)
-      and "local account · everything stays on this machine" in page
+      and "Local account. Everything stays on this Mac." in page
       and "chats follow you between devices" not in page
       and "Guest pass" not in page and 'id="forget-pin"' not in page
       and all('id="fs-%s"' % k in page for k in ("mem", "chats", "prefs")))
@@ -5304,7 +5301,7 @@ _want = ["p-about", "p-account", "p-persona", "p-cloud", "p-models", "p-servers"
 _want_nav = ["p-about", "p-account", "p-persona", "p-models", "p-cloud", "p-servers", "p-usage"]
 _gtip = page.split('id="giants-row"')[1].split('</label>')[0]
 check("the served page names the giants' real need",
-      "Include models for 512 GB+ systems" in page and "128 GB+" not in page
+      "Models for 512 GB+ systems" in page and "128 GB+" not in page
       and "__GIANT_" not in page and "GLM 5.3" in _gtip
       # this Mac's box never names the Windows giants (6b314)
       and "DeepSeek V3.1 671B" not in _gtip and "Qwen 3 Coder 480B" not in _gtip)
@@ -5362,7 +5359,7 @@ check("roster rows: a failed giant says why and offers retry",
       and 'm.pct+"%"' not in page, "%r" % _ro)
 check("giant installs ask twice; long downloads read in hours",
       'if(i.dataset.giant==="1"){' in page and "if(age<600)return;" in page
-      and '"download "+i.dataset.gb+" GB? click again"' in page
+      and '"download "+i.dataset.gb+" GB. Click again."' in page
       # a failed download shows its reason and a retry in the list, and
       # the list follows any download in flight (6b314)
       and '<span class="rd rerr" title="\'+esc(m.note)+\'">' in page
@@ -5370,7 +5367,7 @@ check("giant installs ask twice; long downloads read in hours",
       and 'if(miss.some(m=>m.status==="downloading"||m.status==="queued"))' in page
       and 'if(!(r.started||[]).includes(i.dataset.l)){' in page
       and 'const ROS_SKIP=new Set(["Ollama engine","Image generation","Video generation"]);' in page
-      and "retry from the list" in page
+      and "Retry from the list." in page
       and "(m.giant?'\" data-giant=\"1':'')" in page
       # (6b335) the one time-left helper, hours for long downloads; its
       # own checks are in the time-left block below
@@ -5728,10 +5725,10 @@ check("the card: %d mutations of its protections, each caught by a check above" 
       all(isinstance(v, list) for _d, v in _ofm),
       "%r" % [x for x in _ofm if not isinstance(x[1], list)])
 check("the card's primary button reads exactly \"Update model library\"",
-      '<button class="about-btn primary" id="new-get">Update model library</button>' in page
-      and 'get.textContent="Update model library";' in page
+      '<button class="about-btn primary" id="new-get">Get them</button>' in page
+      and 'get.textContent="Get them";' in page
       and "Download and remove" not in page
-      and page.count("Update model library") == 2)
+      and page.count("Get them") == 2)
 # live: the plan answers, and a click on a plan that isn't the current
 # one is refused with the current plan and starts nothing
 s, h, b = req("/api/models/offer", cookie=K)
@@ -5961,7 +5958,7 @@ check("the card's lifecycle: a failure says which and why, with a retry, once th
       and _lce[7] == "" and _lce[9] == "failed" and _lcl[9] == "Couldn\u2019t download Gone 1B (stopped)"
       # after a failure the card closes; it doesn't "run in background"
       and 'retry.hidden=false;$("#new-bg").textContent="Close";' in page
-      and '$("#new-bg").textContent="Run in background";$("#new-retry").hidden=true;' in page,
+      and '$("#new-bg").textContent="Continue in background";$("#new-retry").hidden=true;' in page,
       "%r" % _lc)
 check("the card's lifecycle: Ollama's check reads as finishing, with the rest waiting (node)",
       _lcl[10] == "Finishing: checking the files\u2026 \u00b7 1 waiting" and _lce[10] == "",
@@ -5979,7 +5976,7 @@ check("the card's lifecycle: a model ready with the bar at 0 ends the card (Patr
       and "(!s.busy&&(s.overall_pct||0)>=100)" not in page
       and 'const pr=offerProgress(started,s);' in page
       and 'id="new-retry" hidden>Retry</button>' in page
-      and '<button class="about-btn" id="new-bg" hidden>Run in background</button>' in page
+      and '<button class="about-btn" id="new-bg" hidden>Continue in background</button>' in page
       and '$("#new-bg").onclick=()=>{stopPoll();veil.hidden=true;};' in page, "%r" % _lc)
 check("About leads the rail, Account right under it",
       _nav == _want_nav and _panes == _want
@@ -5996,7 +5993,7 @@ check("About leads the rail, Account right under it",
 check("models roster + manage flow",
       'id="roster"' in page and "paintRoster" in page
       and '"/api/model/remove"' in _MILLENAI_SRC
-      and '"still downloading"' in _MILLENAI_SRC
+      and '"Still downloading"' in _MILLENAI_SRC
       and _MILLENAI_SRC.count("/api/model/remove") >= 2)
 # 6b436 (per Patrick: "hide cloud models in the local section"): the Manage
 # roster lists only what runs on this Mac; cloud stays under Cloud power and
@@ -6038,7 +6035,7 @@ check("updates: version, date, notes",
 # injected once into the system-prompt assembly every model reads
 check("your name reaches every model",
       'id="user-name"' in page
-      and "Your name (or nickname)" in page
+      and 'autocomplete="off" placeholder="Name">' in page
       and "The user's name is " in _MILLENAI_SRC)
 # 6b258, per Patrick ("this pane is glitchy"): NO checkboxes — every
 # roster row carries a text action, install on one side and remove on
@@ -6057,7 +6054,7 @@ check("manage: inventory + the three sets, the risky one warned and asked twice"
       'id="mg-count"' in page and 'id="mg-space"' in page
       and 'const SET_NAMES={light:"Light",recommended:"Recommended",everything:"Everything"};' in page
       and 'if(!c.classList.contains("risky")||setArmed(scr)===c.dataset.set){' in page
-      and "They can crash it. Click again to go ahead." in page
+      and "They can crash it. Click again to continue." in page
       and 'if(!setConfirm("grid",c))return;' in page and 'if(!setConfirm("wiz",c))return;' in page
       and 'if(!setConfirm("setup",c))return;' in page
       and "def _family_of" in _MILLENAI_SRC)
@@ -6377,7 +6374,7 @@ def _s5_page(src):
             and '<div id="plan-row"><div id="plan-limits">' in pg
             and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
             and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<script>', pg.index('<div id="setup-veil"'))]
-            and "No limits: also let Everything hold any models" in pg
+            and "No limits. Everything includes models bigger than memory" in pg
             and not re.search(r'"(Basic|Minimum|Full|Max)"', src[src.index("const SET_KEYS="):
                                                                 src.index("function renderSetup(")])
             and "Basic" not in pg[pg.index('<div id="wiz-veil"'):pg.index('<div id="setup-veil"')]
@@ -6452,13 +6449,13 @@ check("the three sets: %d mutations of their rules, each caught by the check tha
 # the wizard's studio options: two one-line rows in the autoclean row's own look, no description (Patrick)
 _wz = page[page.index('<label id="wiz-image">'):page.index('<label id="wiz-nolimits">')]
 check("wizard: image and video options are two short rows styled like the autoclean row",
-      '<span>Add image generation <i class="wsz">(9.6 GB)</i></span>' in _wz
-      and '<span>Add video generation <i class="wsz">(19.6 GB)</i></span>' in _wz
+      '<span>Image generation <i class="wsz">(9.6 GB)</i></span>' in _wz
+      and '<span>Video generation <i class="wsz">(19.6 GB)</i></span>' in _wz
       and "make pictures" not in _wz and "short video" not in _wz and "Also add" not in _wz
       and "#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;" in page
       and "#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}" in page
       and 'z.textContent="("+t.gb+" GB)"' in page
-      and "make pictures from a description, on this Mac" in page)     # the studio card's own line stays
+      and "Pictures from a description, on this Mac" in page)     # the studio card's own line stays
 # ==== 6b405 model sets: end ====
 # 6b408, per Patrick: the studio cards' Remove looked unfinished (a thin grey
 # box with the browser's own text). It and "Continue in background" are the
@@ -7753,8 +7750,8 @@ check("off a Mac the app says PC; on a Mac nothing changes",
       and '+"this PC. Start chatting the moment the first piece lands."' in _pc_page
       and "ready \u00b7 this pc" in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
-      and "Making pictures on this computer needs an Apple" in _MILLENAI_SRC
-      and "Making video on this computer needs an Apple" in _MILLENAI_SRC
+      and "Pictures on this computer need Apple" in _MILLENAI_SRC
+      and "Video on this computer needs Apple" in _MILLENAI_SRC
       and "Image generation runs on this Mac only" not in _MILLENAI_SRC
       and "return pc_words(\n" in _MILLENAI_SRC,
       "%r" % _mac_left[:5])
@@ -8576,12 +8573,12 @@ check("the page on a PC: no `ollama` commands, PC mic and SSH advice, drops atta
       and "if(!upGo.disabled)upGo.textContent=" in _pg
       and "select{color-scheme:dark}" in _pg and "select option{background:#16171b;color:#ececec}" in _pg
       and "scrollbar-color:#3a3b41 transparent;" in _pg
-      and "Settings \\u25b8 Privacy & security \\u25b8 Microphone" in _pg
-      and "voice input isn't installed on this PC" in _pg
+      and "Settings > Privacy & security > Microphone" in _pg
+      and "Dictation isn’t installed on this PC." in _pg
       and "function keyCopyCmd(u,h){" in _pg and "ssh-copy-id your key first" not in _pg
       and '$("#gpu-meter").hidden=(IS_PC&&gpu==null);' in _pg
-      and '"Install it in Settings \\u203a Models, then try again."' in _M
-      and "The model engine isn't answering yet." in _M,
+      and '"Install it in Settings > Models."' in _M
+      and "The engine isn’t answering yet." in _M,
       "")
 
 # a PC's processor by name
@@ -8752,7 +8749,7 @@ check("exports: pre-1970 and fall-back days are right; a frozen build says it ca
       "DTEND;VALUE=DATE:19690717" in _ics and "DTEND;VALUE=DATE:20261102" in _ics
       and "mktime(time.strptime(day" not in _M
       and _ex["_export_install"] == {"state": "error", "note": "not included in this build"}
-      and "this computer couldn't install the document engines" in _M,
+      and "the document engines for .%s didn’t install" in _M,
       _ics[:200])
 
 # the backdrop on Windows: Apple's root joins the usual ones for clip
@@ -12159,13 +12156,11 @@ check("review fixes: the glitch checks and rests under the lock, `off` removes u
       and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
       and "_last_cloud.get((self.ctx.name, _tcid))" in _MILLENAI_SRC
       and '$("#turbo").checked=!on;' in _MILLENAI_SRC
-      and "Cloud power is off, so these and a cloud compositor sit out." in _MILLENAI_SRC
+      and "Cloud models are off. Turn them on in Settings > Cloud." in _MILLENAI_SRC
       and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
-      and _sn_mac == ("Add a Gemini key in **Settings › Cloud power**, or add image "
-                      "generation under **Settings › Models › Manage models**.",
-                      "Add a Gemini key in **Settings › Cloud power**, or add video "
-                      "generation under **Settings › Models › Manage models**.")
-      and _sn_pc.startswith("Making pictures on this computer needs an Apple silicon Mac. Add"),
+      and _sn_mac == ("Add a Gemini key in Settings > Cloud, or add image generation in Settings > Models.",
+                      "Add a Gemini key in Settings > Cloud, or add video generation in Settings > Models.")
+      and _sn_pc.startswith("Pictures on this computer need Apple silicon. Add"),
       "%r" % [_seen26, _sn_mac, _sn_pc])
 
 # ---- nothing personal on a command line (0a 5.1)
@@ -12706,7 +12701,7 @@ _rs["_remote_save"]({"host": "h"})
 check("Forget takes the host ssh named, or the server and its jump hosts; errors come back "
       "as JSON and leave no temp file",
       _f2_ok is not False and not [f for f in os.listdir(_rdir) if f.startswith(".remote-")]
-      and '"err": "couldn\'t update "' in _MILLENAI_SRC
+      and '"err": "Couldn’t update the host list: %s"' in _MILLENAI_SRC
       and "ssh_forget_host(remote_conf(), _SSH_CHANGED[0])" in _MILLENAI_SRC,
       "%r" % [_f2_ok, locals().get("_n_named"), locals().get("_left_named"),
               locals().get("_n_hops"), locals().get("_raised"), locals().get("_tmp_left"),
@@ -17600,7 +17595,7 @@ check("wake: every packet refused by this computer says so, naming Local Network
       and "tried_n, failed_n, _first = _srv_wake_send(e)" in _MILLENAI_SRC
       and "failed_n += 1" in _MILLENAI_SRC[_MILLENAI_SRC.index("def _srv_wake_send(e):"):]
       and "_srv_wake_blocked[e[\"id\"]] = refused and not relayed" in _MILLENAI_SRC
-      and "Privacy & Security \\u203a Local Network" in _MILLENAI_SRC
+      and "Privacy & Security > Local Network" in _MILLENAI_SRC
       and "SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e[\"id\"]) else" in _MILLENAI_SRC
       and "NSLocalNetworkUsageDescription" in open("build_macos_app.sh").read())
 _bm443 = open("build_macos_app.sh", encoding="utf-8").read()
@@ -19599,8 +19594,8 @@ def _bm_pins(src):
               '        if(madeChat){chats=chats.filter(x=>x.id!==myChat);renderChats();}\n      }' in src
           and 'return runs.some(y=>y.id!==x.id&&uWhen(y.t)===w)?w+":"+u2(new Date(x.t*1000).getSeconds()):w;' in src
           and 'if(old&&on(old)!==on(shown))bits.push("This run: measured on "' in src
-          and '"Speeds are tokens a second. MLX is timed by the app; Ollama reports its own. "\n'
-              '      +"Memory is the rise in memory in use while the model loaded and wrote.");' in src
+          and '"Tokens a second. MLX timed by the app; Ollama reports its own. "\n'
+              '      +"Memory is the rise while the model loaded and wrote.");' in src
           # the second review's: the funnel held, the rewind after the hold,
           # MLX engines stopped before an Ollama row, a refused start said once
           and '            if not bench_hold():\n                self._send_json({"err": BENCH_BUSY, '
@@ -22483,7 +22478,7 @@ def _soc_adv(src):
     rows = o["rows"]
     got = {
         # grouped under each paired server's name, labelled with it, the pick ticked
-        "groups": rows.count('class="advgrp"') == 3 and rows.count("· your server</i></div>") == 3
+        "groups": rows.count('class="advgrp"') == 3 and rows.count("<i>your server</i></div>") == 3
         and "<b>Desk &lt;b&gt;</b>" in rows and "<b>Lab</b>" in rows and "<b>Quiet</b>" in rows
         and "New" not in rows and "z:1b" not in rows,
         "rows": rows.count('<input type="checkbox" data-l="') == 2
@@ -22512,9 +22507,9 @@ def _soc_adv(src):
         and o["kept2"] == ["Lab \u00b7 any:1b"],
         "ghost send": "  const advList=advOn&&adv?advSendList():[];\n  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);" in src
         and '        :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,\n          tier:advGhostOnly?"Fast":tier,' in src
-        and "so Fast answered.</div>\");" in src,
+        and ". Alpha answered.</div>\");" in src,
         # the save keeps what is not listed right now; the dialog is built from the groups
-        "wired": "    +advServerRows(sel))\n    ||'<p class=\"advp\">no local models installed yet</p>';" in src
+        "wired": "    +advServerRows(sel))\n    ||'<p class=\"advp\">No local models installed</p>';" in src
         and "  const comps=advCompList(pv,ready);" in src
         and '  const shown=[...document.querySelectorAll("#adv-local input")].map(i=>i.dataset.l);\n'
             '  const local=[...document.querySelectorAll("#adv-local input:checked")]\n'
@@ -23505,7 +23500,7 @@ def _p2c_pins(src):
         "                    # a sleeping server is woken after the headers, with a step\n" in ch
         and "                    server_refresh_modes(self.ctx, wake=False)" in ch,
         # Fast asks the cloud first (when it is on), then the server, then this Mac
-        "after the cloud ladder": ch.index('status("cloud power unavailable — running locally")')
+        "after the cloud ladder": ch.index('status("Cloud unavailable. Answering here.")')
         < ch.index("                if lbl in _seat_fb:\n                    # a mode's server seat")
         < ch.index("                _run_lbl([lbl])\n"),
         "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
@@ -23592,12 +23587,12 @@ def _p4c_rules(src):
         and "refine=not srv_only_tier(tier),\n                                          server=not cloud_only)" in ch,
         # "<name> Only" makes no picture or video (said, one line, nothing made, before the benchmark hold)
         "no pictures": "        if _srv_only and (img_subject or vid_subject):\n" in ch
-        and "            emit(AppText(\"\\u26a0\\ufe0f %s Only can\\u2019t make pictures or \"\n                         \"videos, and nothing was made.\"" in ch
+        and "            emit(AppText(\"%s Only can’t make pictures or video. Nothing was made.\"" in ch
         and ch.index("        if _srv_only and (img_subject or vid_subject):\n")
         < ch.index("        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:"),
         # and no agent: refused, the agent not resolved, nothing run
         "no agents": "        if agent_name and srv_only_tier(tier):\n" in ch
-        and "            _so_fail = (\"%s Only can\\u2019t run the %s agent, and nothing \"\n                        \"was run.\" % (_so_c0.split(SERVER_SEP, 1)[0]\n" in ch
+        and "            _so_fail = (\"%s Only can’t run the %s agent. Nothing ran.\" % (_so_c0.split(SERVER_SEP, 1)[0]\n" in ch
         and "            agent_name = \"\"\n        ag_system, ag_research, ag_remote = \"\", False, False" in ch,
         # a seat's chat is titled by the server that answered, or by none; never by this Mac
         "seat title": t(["A · x"], {"A · x": "L"}, "server", True, False, down) == "A · x"
@@ -23690,9 +23685,9 @@ def _p5c_nodes(src):
         "chip": o["chip"] == ["Fast", "Thinking \u00b7 A"] and o["chip2"] == "Fast \u00b7 Desk gpt-oss:20b",
         "bubble": "seats 4 of the 6 models on your server" in o["pro"] and "seats" not in o["th"],
         # the switch's words: the Code lane's agents read a folder, and what they read goes to the model that answers
-        "label": "<span>Use for Fast, Thinking, Pro and the Code lane</span></label>'" in src
-        and "      +'<div class=\"srv-hint\">The Workspace and Coding agents can send the contents of a '\n"
-            "      +'folder you give them to this server.</div>':\"\")" in src,
+        "label": "<span>Use for Alpha, Gamma, Sigma and Code</span></label>'" in src
+        and "      +'<div class=\"srv-hint\">Code agents may send a folder you choose to this server.</div>':\"\")"
+            "" in src,
         "tiers say the cap": "                if _cap:\n                    out[name][\"srvcap\"] = {\"seated\": _cap[0], \"of\": _cap[1]}" in src,
         "wired": "        ev.stopPropagation();hideTierPop();\n        srvRowClick(el.dataset.sv);" in src
         and "      clearTimeout(engSubTimer);if(engSubByHover&&!det.aiming())closeEngSub();});" in src,
@@ -24184,8 +24179,8 @@ def _p8c_slow(src):
         got[name] = (r is False and (downs == []) == (name == "too long")
                      and any(("took too long" in x) == (name == "too long") for x in said[-1:]))
     # where the limits are raised: a first word or a quiet stretch past the limit, and a job past its cap
-    got["limits are slow"] = ('                    raise ServerSlow("offline", "%s sent nothing for %s, so "' in src
-                              and '                raise ServerSlow("offline", "%s took more than %d minutes to make the %s, so it was "' in src)
+    got["limits are slow"] = ('                    raise ServerSlow("offline", "%s went quiet for %s. The answer stopped there." % (' in src
+                              and '                raise ServerSlow("offline", "%s took over %d minutes on the %s. It was stopped." % (' in src)
     return all(got.values()), got
 
 
@@ -27211,12 +27206,12 @@ def _dk_pins(src):
                    and "(p&&!p.hidden)" in src
                    # 6b525: the ZITO board is gone, so dictation no longer asks after it
                    and '(z&&z.classList.contains("on"))' not in src)
-    _p["tip"] = ('micBtn.title="Dictate \\u2014 speak your message. Hold "+DICT_KEY\n'
-                 '  +" to talk and let go to finish, or tap it to keep listening";' in src
+    _p["tip"] = ('micBtn.title="Dictate. Hold "+DICT_KEY\n'
+                 '  +" to talk, or tap to keep listening";' in src
                  and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
-    _p["hold_ph"] = '"listening\\u2026 release to finish"' in src
-    _p["toggle_ph"] = '"listening\\u2026 press "+DICT_KEY+" (or tap the mic) to finish"' in src
-    _p["slip_ph"] = 'input.placeholder="didn\\u2019t catch anything";return;}' in src
+    _p["hold_ph"] = '"Listening. Release to finish."' in src
+    _p["toggle_ph"] = '"Listening. Press "+DICT_KEY+" or tap the mic to finish."' in src
+    _p["slip_ph"] = 'input.placeholder="Didn\\u2019t catch that. Try again.";return;}' in src
     _p["path"] = ("const cap=micAttach();" in src
                   and 'body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in' in src
                   and 'input.placeholder=dictPrompt();\n}' in src
@@ -27770,8 +27765,8 @@ def _fs_pins(src):
     _p["warm"] = ("const MIC_WARM_S=15;" in src
                   and "return P.mic_warm===true;" in src)
     _p["toggle"] = ('id="micwarm-toggle"' in src
-                    and "<span>Keep the microphone ready for 15 seconds after dictating</span>" in src
-                    and "The next hold starts at once. macOS shows its microphone indicator while it's ready." in src)
+                    and "<span>Keep microphone ready</span>" in src
+                    and "On for 15 seconds after you dictate." in src)
     _p["close"] = ('$("#newchat").addEventListener("click",micGone);' in src
                    and 'addEventListener("pagehide",()=>micClose(true));' in src
                    and "try{micClose(true);}catch(e){}       // the warm microphone (6b345) goes first\n  location.reload();" in src
@@ -29664,7 +29659,7 @@ def _m54c_chip(src):
 def _m54c_text(src):
     out = {}
     out["markup"] = ('<div id="srv-chips"></div>\n      <!-- cloud models are on (6b354): a light blue dot and "cloud", hidden otherwise -->\n'
-                     '      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden><i></i><b>cloud</b></div>' in src)
+                     '      <div id="cloud-chip" class="srv-chip cloud" title="Cloud models on" hidden><i></i><b>cloud</b></div>' in src)
     out["css"] = (".srv-chip.cloud{--ac:#7cc4ff}" in src and "#cloud-chip[hidden]{display:none}" in src
                   and "#accel-chip,.srv-chip{" in src)
     out["hooks"] = ('  $("#chip-model").textContent=tierLabel();\n  paintCloudChip();\n}' in src
@@ -29709,7 +29704,7 @@ def _m53_run(src):
 for _n53, _o53, _d53 in _m53_run(_MILLENAI_SRC):
     check(_n53, _o53, "%r" % (_d53,))
 check("servers more: the served page holds the dialog, the link's style, the cloud chip (hidden) and no unreplaced token for them",
-      '<div id="srvall-veil" hidden>' in page and '<div id="cloud-chip" class="srv-chip cloud" title="Cloud models are on" hidden>' in page
+      '<div id="srvall-veil" hidden>' in page and '<div id="cloud-chip" class="srv-chip cloud" title="Cloud models on" hidden>' in page
       and "function srvAllOpen(){" in page and "function cloudChipOn(cs,t){" in page, "")
 
 _M53_MUT = [
@@ -30576,12 +30571,12 @@ def _l30c_text(src):
                         and "def srv_lan_touch_boot(ctx):\n    \"\"\"Once per computer" in src)
     out["thread"] = "    ctx_thread(target=run, daemon=True).start()\n" in src[src.index("def srv_lan_touch_bg("):src.index("def srv_lan_touch_boot(")]
     out["words"] = (
-        "macOS isn\\u2019t letting ConcordeAI use the local network. Open System Settings \\u203a Privacy & Security "
-        "\\u203a Local Network and turn ConcordeAI on." in src
-        and "This computer isn\\u2019t allowing local-network access (Settings \\u203a Privacy & Security \\u203a Local Network)" in src
-        and 'srvMsg(id,"Wake-up sent to "+s.name+".","ok")' in src
+        "Local network access is off. Turn on ConcordeAI in System Settings > Privacy & Security "
+        "> Local Network." in src
+        and "Local network access is off (Settings > Privacy & Security > Local Network)." in src
+        and 'srvMsg(id,"Sent to "+s.name+".","ok")' in src
         and 'srvPost("wake-test",{id:id})' in src and 'srvPost("lan-settings",{id:id})' in src
-        and 'data-a="waketest" title="Send the wake-up to this server now">Wake up server</button>' in src
+        and 'data-a="waketest">Wake server</button>' in src
         and "Test wake-up" not in src)
     return all(out.values()), out
 
@@ -31047,15 +31042,15 @@ def _l31c_text(src):
     out["kept apart"] = ("relay_token" not in src[src.index("def _srv_public("):src.index("def servers_view(")].replace(
         '"has_token": bool(e.get("relay_token"))', ""))
     out["token only in the header"] = src[src.index("def _srv_relay_post("):src.index("def server_set_relay(")].count("tok.reveal()") == 1
-    out["words"] = ('"Relay answered: wake-up sent."' in src and '"Relay refused the token."' in src
-                    and '"Relay not reachable: %s" % _srv_relay_reason(ex)' in src
-                    and 'const SRV_RELAY_HINT="Wake relay (advanced): a small service on your network that sends the wake-up '
-                        'for you when you\\u2019re away. Address and token.";' in src)
+    out["words"] = ('"The relay sent the wake-up."' in src and '"The relay refused the token."' in src
+                    and '"The relay isn’t reachable: %s" % _srv_relay_reason(ex)' in src
+                    and 'const SRV_RELAY_HINT="Wake relay. A service on your network that wakes the server '
+                        'when you\\u2019re away.";' in src)
     out["wake button tells the relay"] = (
         'const rl=d&&d.relay,rbad=rl&&!rl.ok' in src
-        and 'else if(d&&d.ok&&rbad)srvMsg(id,"Wake-up sent on this network, but the relay didn\\u2019t answer: "+rwhy+". Away from home, the relay is how the server gets woken.","warn");' in src
-        and 'else if(d&&d.ok&&rl)srvMsg(id,"Wake-up sent to "+s.name+", and the relay answered.","ok");' in src
-        and src.index("else if(d&&d.ok&&rbad)") < src.index("else if(d&&d.ok&&rl)") < src.index('else if(d&&d.ok)srvMsg(id,"Wake-up sent to "+s.name+".","ok")'))
+        and 'else if(d&&d.ok&&rbad)srvMsg(id,"Sent on this network. The relay didn\\u2019t answer: "+rwhy,"warn");' in src
+        and 'else if(d&&d.ok&&rl)srvMsg(id,"Sent to "+s.name+". The relay answered.","ok");' in src
+        and src.index("else if(d&&d.ok&&rbad)") < src.index("else if(d&&d.ok&&rl)") < src.index('else if(d&&d.ok)srvMsg(id,"Sent to "+s.name+".","ok")'))
     out["page"] = ('srvPost("wake-test",{id:id,relay_only:true})' in src and 'srvPost("relay",' in src
                    and src.count("srvRelayHtml(s)+'</div>'") == 2
                    and 'type="password" data-k="rtok"' in src
@@ -33789,14 +33784,14 @@ def _b41_pins(src):
             and 'if(!bmPlan||!$("#bmc-ok").checked)return;' in src
             and 'benchPost("/api/bench/start",{target:"cloud",confirm:id,understood:true})' in src
             and src.count('benchPost("/api/bench/start"') == 2
-            and 'id="bmc-go" class="about-btn slim" disabled>Call these models</button>' in src
-            and '<input type="checkbox" id="bmc-ok"> I understand this may cost money</label>' in src
+            and 'id="bmc-go" class="about-btn slim" disabled>Run</button>' in src
+            and '<input type="checkbox" id="bmc-ok"> This may cost money</label>' in src
             and 'role="dialog" aria-modal="true" aria-labelledby="bmc-title"' in src
             and 'for(const sel of ["#bmc-veil","#bmv-veil","#new-veil"' in src,
         "the dialog's words: the cost line comes from the server, the counts and the estimate note are there":
-            '$("#bmc-warn").textContent=j.warning;' in src and "At most \"+j.max+\" models a run." in src
-            and "ConcordeAI holds no prices for these models, so it shows no estimate." in src
-            and "* Rough estimate, not a quote." in src,
+            '$("#bmc-warn").textContent=j.warning;' in src and "At most \"+j.max+\" a run." in src
+            and "No prices held for these models, so no estimate." in src
+            and "* Estimate. Models with no price here show none." in src,
         "no cost choice is remembered": "localStorage" not in jsr and "sessionStorage" not in jsr,
         "no new ollama1 in the pane or its dialogs": "ollama1" not in jsr.lower()
         and "ollama1" not in src[src.index('<div id="bmc-veil" hidden>'):src.index('<div id="gear-veil" hidden>')].lower()
@@ -33966,7 +33961,7 @@ check("benchmark targets: the served page has the target picker, the checklist, 
       "button waiting for it) and Compare, and no ollama1",
       'id="bm-target"' in page and 'id="bm-pk"' in page and 'id="bm-cv-open"' in page
       and 'id="bmc-veil" hidden' in page and 'id="bmc-ok"' in page and 'id="bmc-go" class="about-btn slim" disabled>' in page
-      and 'id="bmv-veil" hidden' in page and 'I understand this may cost money' in page
+      and 'id="bmv-veil" hidden' in page and 'This may cost money' in page
       and "__" not in page[page.index('id="bmc-veil"'):page.index('id="gear-veil"')]
       and _bpg.index('id="bm-go"') < _bpg.index('id="bm-pk"') < _bpg.index('id="bm-prog"'),
       "")
@@ -34463,7 +34458,7 @@ def _cm_wiring(src):
                                and "if(tierOff[t]&&!isSrvMode(t))t=\"Fast\";" in src),
         "gone dark: back to plain Cloud Only, said out loud, never another model": (
             "    else if(tierOff[tier]&&!tierOff[\"Cloud Only\"]){\n      const was=tier,inf=tierInfo[was]||{};\n      setTier(\"Cloud Only\");\n      tierNote(" in src
-            and "so this is back on Cloud Only." in src and src.index("else if(tierOff[tier]&&!tierOff[\"Cloud Only\"])") < src.index("  if(tierOff[tier]&&!isSrvMode(tier))setTier(\"Fast\");\n  if(!engMenu.hidden)")),
+            and ". Back on Cloud Only." in src and src.index("else if(tierOff[tier]&&!tierOff[\"Cloud Only\"])") < src.index("  if(tierOff[tier]&&!isSrvMode(tier))setTier(\"Fast\");\n  if(!engMenu.hidden)")),
         "the menu rows follow the keys": "    paintTierAvail();     // the cloud rows' reasons and compositor lines" in src
         and "  if(!engMenu.hidden)openEngMenu();       // the rows' reasons follow the keys" in src,
         # 6b442: Cloud Only's modes are in a sub-menu of its own row
@@ -37180,7 +37175,7 @@ def _c515_pins(src):
         "the roster": "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]\n"
                       "        _unasked = labels[2:]            # said in the ledger, never asked\n"
                       "        labels = labels[:1]\n" in rc
-                      and '        took_part(_lbl, "(no answer — not asked: Thinking seats one writer and one critic)")' in rc,
+                      and '        took_part(_lbl, "(no answer: not asked. Gamma seats one writer and one critic)")' in rc,
         # (6b518) the check reads the answer with a closing recap trimmed, and records what it did
         "every way out of the stage is checked": rc.count("return _done()") >= 9
                                                   and "            report[\"verify\"] = verify_pass(\n"
@@ -37209,7 +37204,7 @@ def _c515_pins(src):
         "the page's step card knows the review and the check":
             'const STEP_ORDER=["wake","search","read","geo","council","review","draft","polish","verify","places"];' in src
             and "review:8,draft:30,polish:8,verify:6" in src and 'if(isCouncil)stepPlan.push("verify");' in src,
-        "the mode says what it does": '"desc": "a draft, a review, a fact-checked final"' in src,
+        "the mode says what it does": '"desc": "A draft, a review, a checked final"' in src,
     }
 
 
