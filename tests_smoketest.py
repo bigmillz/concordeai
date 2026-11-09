@@ -7796,8 +7796,9 @@ _mac_page = _pw["pc_words"](_page_src)
 _mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
 check("off a Mac the app says PC; on a Mac nothing changes",
       not _mac_left and _mac_page == _page_src
-      and '"Setting up on this PC. Chat opens when the first model is ready.");' in _pc_page
-      and '<div class="ros-gh">On this PC</div>' in _pc_page
+      # (6b550) settings-2's approved copy says neither Mac nor PC here: "Setting up." and "On this computer"
+      and '"Setting up. Chat opens when the first model is ready.");' in _pc_page
+      and '<div class="ros-gh">On this computer</div>' in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
       and "Pictures on this computer need Apple" in _MILLENAI_SRC
       and "Video on this computer needs Apple" in _MILLENAI_SRC

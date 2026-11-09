@@ -19740,7 +19740,16 @@ the Account avatar a line icon instead of 💻 under Horizon; the stale pointers
 
 **Gauntlet.** Re-pinned at the same strength: the Owner line, the roster's "On this computer", the studio's
 "on this computer", the suggestions note, the cloud paragraph, the swept pointers (13 pins), the notes source
-(`_release_notes` twice, its def), `_check_update_live`'s exec list. New (`# ==== settings-look (6b550)`), each
+(`_release_notes` twice, its def), `_check_update_live`'s exec list. The PC-words check follows the approved copy ("Setting up.", "On this computer"); `HTMLSelectElement`
+joins the page's host names (the controls watch a select's own setters). New (`# ==== settings-look (6b550)`), each
 with mutants: the glass and the layout kept; no Visual effects beside Effects (the fold run in node); the
 segmented controls and menus (`slKind` run in node over six real option lists); a nightly's What's new never a
 commit subject (`_check_update_live` and `whats_new` run against stand-in releases).
+
+**Checked.** ast; the page's scripts parse alone and together; no undeclared names. Every statement of the
+gauntlet run offline against the served page and the source, main and this branch side by side (the live
+copies not started): no check that passes on main fails here. The pin checker: the same three hard fails as
+main (the home import card's pins, red on main too). Playwright at 1440 and 390, Horizon and Balanced: every
+pane and the menu open, zero page errors, zero WCAG AA misses over 418 texts (322 at 390; the panel taken at its
+lightest measured pixel); Classic's Settings unchanged. Not seen in WKWebView (the checkbox tick is an `::after`
+on an `appearance:none` input, the switch knob a transform). The full gauntlet was not run.
