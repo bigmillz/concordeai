@@ -1,0 +1,13 @@
+# The install's dead man's switch (6b524): tools/install-watchdogs.sh --arm-rollback arms a transient timer
+# (ollama1-watchdogs-deadline.timer, 20 minutes) that starts this, and ollama1-bootguard starts it at a boot that
+# finds the trial unconfirmed from an earlier boot (a transient timer does not survive a reboot). It runs the
+# installed copy of the installer with --uninstall: every piece removed, the sysctl values from before put back.
+# `sudo bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --confirm` cancels it. Never enabled.
+[Unit]
+Description=ollama1: roll back the watchdogs install (its trial was not confirmed)
+ConditionPathExists=/usr/local/lib/ollama1/tools/install-watchdogs.sh
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --uninstall --rollback
+TimeoutStartSec=5min

@@ -77,6 +77,9 @@ def vector_block_lines():
     return set(m.group(1).splitlines()) if m else set()
 
 
+UUID_ANY = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+
+
 class TestRepo(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -111,6 +114,14 @@ class TestRepo(unittest.TestCase):
             for name, pat in SECRET_PATTERNS:
                 # a pip pin's published wheel hash is no secret (6b497: the app's MLX engine pins)
                 if name == "64-hex string" and re.fullmatch(r"\s*--hash=sha256:[0-9a-f]{64}( \\)?", line):
+                    continue
+                # made-up ids in test fixtures: a UUID whose last group is zero-padded (…-000000000001)
+                # is a counter, not a record (6b529's import samples and the gauntlet's checks of them)
+                if name == "UUID" and not [u for u in UUID_ANY.findall(line) if not u.lower()[-12:].startswith("00000000")]:
+                    continue
+                # the answer bench's recorded runs hold third-party search results (Bing click ids,
+                # Pinterest and AP URLs carry 32-hex names) and the run's own session folder (6b520)
+                if path.startswith("tools/answer_eval/runs/") and (name.startswith("32-hex") or name == "UUID"):
                     continue
                 if pat.search(line):
                     hits.append("%s: %s: %s" % (path, name, line.strip()[:100]))

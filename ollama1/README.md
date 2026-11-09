@@ -1713,6 +1713,9 @@ The board must reset about 60 s later (the timeout in `ollama1-watchdog status`)
 the service starts again at boot. Killing the service does not test it: it
 restarts in 2 s and pets again.
 
+After a hang it did not catch, `sudo ollama1-watchdog-doctor` (see "Self-recovery") says which of its
+known gaps it was most likely.
+
 ## Removing the old RAID mirror
 
 Since 6b400 the kit builds no RAID: a mirror of two big disks only ties up the
@@ -2526,6 +2529,177 @@ one pass and prints the timer's next run. It touches no network, firewall,
 SSH or tunnel setting and restarts nothing else. Running it again puts the
 same files back.
 
+## Self-recovery: a frozen or offline server brings itself back
+
+For a server nobody can reach in person (the owner away, someone at home who can
+only press the power button). Two failures happened on such a server: after a
+suspend the graphics driver flooded the log, filled the root disk and the box hung,
+and the hardware watchdog above did not reset it; and a box that may have been
+up all along dropped off the Wi-Fi and stayed off. Three pieces, **installed only
+by `tools/install-watchdogs.sh`** (setup.sh copies their files with the rest of the
+kit but enables none of them):
+
+| Piece | What it does |
+|---|---|
+| `ollama1-watchdog-doctor` | read-only report, for the boot after a hang: could the hardware watchdog have reset the box, and how did the last boot end |
+| `ollama1-bootguard` | panic-reboot: the kernel reboots itself after a panic, a lockup, an oops or a task stuck for 10 minutes; with a boot-loop guard |
+| `ollama1-netwatch` | every minute: a server that is up but offline reconnects, then cycles the radio, then reboots |
+
+### The watchdog doctor
+
+`sudo ollama1-watchdog-doctor` (`--json` for the same as JSON) prints the
+watchdog's driver, timeout and `nowayout`, whether the timer is armed and which
+process holds `/dev/watchdog0`, systemd's own `RuntimeWatchdogSec`, the board's
+`sp5100_tco` lines from the kernel log, the service's state, and the root
+filesystem's reserve; then the previous boot (`journalctl -b -1`): when it ran,
+how it ended (shut down on purpose, a suspend it never came out of, a shutdown
+that hung, the watchdog tripped, or abruptly), what the kernel logged (NVIDIA
+assertions and GSP resets, soft lockups, hung tasks, oopses, panics, a full
+disk, NVMe errors, Wi-Fi disconnects), the watchdog service's own lines, crash
+dumps in pstore, and its last journal lines. It ends with a verdict (LIKELY,
+possible, ruled out, unknown) for each way the hardware watchdog can fail to
+fire, read from its code:
+
+| Reason | What it means |
+|---|---|
+| `driver` | `sp5100_tco` did not load, or found the board's timer off ("Watchdog hardware is disabled"): no device, nothing armed |
+| `blacklist` | Ubuntu blacklists watchdog modules, so the boot-time `modules-load.d` entry may load nothing; only the service's own `modprobe` does |
+| `service` | the service was stopped, disabled or failing |
+| `holder` | another program (systemd's `RuntimeWatchdogSec`) holds the device, so the service could never open it |
+| `paused` | it was closed for a suspend and never reopened: the pause has **no time limit**, only the sleep hook's wake step reopens it |
+| `probe` | the probe kept passing on a useless box: it tests only the disks, and as root it still writes into the 5% reserve of a "full" disk; a driver flooding the log or a dead tunnel are invisible to it |
+| `clean_stop` | a shutdown stops the service cleanly (that disarms the timer), and the shutdown then hung |
+| `no_reset` | the timer ran out and the board did not reset: unproven until the drill in "Hardware watchdog" is done once |
+| `not_a_hang` | there was no hang: a power cut, or the box was up with no network |
+
+It changes nothing and never opens `/dev/watchdog*` (an open arms the timer).
+It exits 1 when the watchdog cannot work now (no device, the service off, the
+device held by another program).
+
+### Panic-reboot and the boot-loop guard
+
+`/etc/ollama1/panic-sysctl.conf` (sysctl syntax, yours to edit):
+
+| Setting | Why |
+|---|---|
+| `kernel.panic = 10` | a panic reboots after 10 s instead of leaving the machine frozen for ever (the kernel's default) |
+| `kernel.softlockup_panic = 1` | a CPU stuck in the kernel for 20 s (a driver spinning) panics instead of limping on |
+| `kernel.hardlockup_panic = 1` | a CPU stuck with interrupts off panics; set only when the NMI watchdog runs (`/proc/sys/kernel/nmi_watchdog` = 1) |
+| `kernel.panic_on_oops = 1` | a kernel bug (an oops, often in a driver) panics instead of leaving a half-broken kernel |
+| `kernel.hung_task_panic = 1`, `kernel.hung_task_timeout_secs = 600` | a task stuck in uninterruptible sleep for 10 minutes (not the usual 2) panics: a dead GPU leaves `nvidia-smi` and Ollama stuck like that, a dying disk too, while a slow disk never trips it |
+
+The file is **not** in `/etc/sysctl.d`: systemd applies that folder early in every
+boot, before anything can look at how the last boots went, so a driver that oopses
+at every boot would panic the machine before the guard could stop the loop.
+Only `ollama1-bootguard.service` applies it: a oneshot early in each boot (after
+the local filesystems and systemd's own sysctl step, before most services). It
+records the boot in `/var/lib/ollama1/bootguard.json`; with **3 or more boots
+within 60 minutes** it writes the values from before the install instead (saved
+in `/var/lib/ollama1/panic-before.json` by the installer; the kernel's defaults
+when that is missing), logs `bootguard: TRIPPED: ...`, and the box stays up and
+reachable. The netwatch does not reboot a tripped boot either. The next boot that
+is not part of a loop arms again by itself. A setting outside its range
+(`kernel.panic` 5 to 600, the hung-task timeout 300 to 86400) is ignored with a
+note; a line taken out of the file goes back to its value from before.
+
+- `ollama1-bootguard status`: what this boot decided, the last boots, the kernel's values now.
+- After editing the file: `sudo systemctl restart ollama1-bootguard` (a tripped boot stays tripped).
+
+**The risks, honestly.** `panic_on_oops` turns every oops into a reboot: one in
+the NVIDIA module (or the Wi-Fi driver) at every boot is a loop, which the guard
+stops after the third boot, but an oops that comes 35 minutes after each boot is
+a loop the 60-minute window never sees (the box is then up most of the time). Set
+it to 0 to keep oopses survivable. `hung_task_panic` reboots a box whose GPU died
+(good: the GPU comes back) and one whose disk is stuck for 10 minutes (a
+reboot is what the hardware watchdog would do too). `softlockup_panic` reboots on a
+CPU stuck 20 s in the kernel, which a healthy box never does but a buggy driver
+under load can.
+
+### The network watch
+
+`ollama1-netwatch.timer` runs it every minute (from 2 minutes after boot), as root:
+
+- **Probes.** The default gateway (from `/proc/net/route`; ping, else a TCP
+  connect, where a refusal counts as an answer) and 1.1.1.1 and 8.8.8.8 (a TCP
+  connect to 443, else ping). **Online** = the gateway **or** the internet
+  answers: a dead ISP with the home network up is online, a reboot would not help.
+- **Offline, one step per run, in order:**
+  - 3 min: reconnect. With NetworkManager, `nmcli connection up id <the Wi-Fi connection>`
+    (the active one, or the one it last saw active); with networkd (the kit's
+    "Wi-Fi backup"), `networkctl reconfigure <card>` and a restart of netplan's
+    `netplan-wpa-<card>.service`.
+  - 6 min: the radio off, 5 s, on (`nmcli radio wifi off/on`; networkd: the link down and up).
+  - 10 min: the card's driver lets go of it and takes it again (its PCI address written
+    to the driver's `unbind` and `bind` in sysfs, the device found from
+    `/sys/class/net/<card>/device`, only a PCI device carrying no other interface).
+    **Off** unless `/etc/ollama1/config.json` has `"netwatch_driver_reload": true`:
+    a driver that hangs while letting go can wedge the kernel, and one that fails
+    to take the card back leaves the server with no Wi-Fi until the reboot step.
+  - 20 min: a reboot, `systemctl start ollama1-reboot.service`. Never within 30 min
+    of boot; never sooner than 2 h after the last reboot it asked for, then 4 h, 8 h
+    and 12 h while reboots don't bring it back (a run of uptime proves the gap
+    even with a wrong clock); never in a boot the boot-loop guard tripped; never
+    during the install's trial; never while setup.sh, apt/dpkg or a gateway request runs.
+  - After the ladder the soft steps repeat: reconnect every 5 min, the radio every 15.
+- **The tunnel** (`ollama1-tunnel.service`) is tracked on its own: up when it is
+  active and cloudflared's `/ready` (its metrics port, 8439) says it holds a
+  connection. Down for 10 minutes with the network up: `systemctl restart
+  ollama1-tunnel.service`, then at most once every 30 minutes. A tunnel that is
+  not enabled (LAN mode) is left alone.
+- **It never changes a setting**: no netplan file, no NetworkManager profile (only
+  `connection up` of an existing one), no firewall, SSH or cloudflared file. It
+  reconnects, restarts or reboots. A run killed half-way can't leave things worse:
+  the next run first switches back on a radio it switched off (NetworkManager
+  remembers the radio across reboots) and binds a card it unbound.
+- **Pause**: `sudo touch /etc/ollama1/netwatch.off` stops every action (status only);
+  `sudo rm /etc/ollama1/netwatch.off` resumes.
+- `ollama1-netwatch status`: online or not, the probes, the card and its manager, the
+  tunnel, what is held and why, the last actions. `sudo ollama1-netwatch check`
+  probes now and changes nothing. Each action is a line in `journalctl -u
+  ollama1-netwatch` and an entry in `/var/lib/ollama1/netwatch.json` (its
+  `"status"` is what an admin panel can show; the panel doesn't yet).
+
+### Installing, checking, undoing
+
+```bash
+cd ~/concordeai/ollama1 && git pull
+sudo bash tools/install-watchdogs.sh --dry-run          # exactly what would change; changes nothing
+sudo bash tools/install-watchdogs.sh --arm-rollback     # install, with a 20-minute dead man's switch
+# then, from a NEW ssh session (that is the proof the server is still reachable):
+sudo bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --confirm
+```
+
+The installer refuses while the gateway serves a request (or setup.sh, a model
+download or an update runs: the auto sleep's own test). It copies three programs
+and three libraries (stdlib only: no library the rest of the kit uses is
+replaced), four units, the config file (an edited copy is kept), three links in
+`/usr/local/sbin` and itself to `/usr/local/lib/ollama1/tools`; saves the sysctl
+values from before; enables the boot guard and runs it (the values take effect
+at once, no reboot); enables the netwatch timer; then prints the guard's status,
+a probe and the doctor's report. It never restarts Ollama, the gateway or the
+tunnel and never reboots.
+
+**The dead man's switch.** `--arm-rollback` first starts a transient timer
+(`systemd-run --on-active=20min`, `ollama1-watchdogs-deadline.timer`) that starts
+`ollama1-watchdogs-rollback.service`, which runs the installed copy with
+`--uninstall`. `--confirm` stops it. A transient timer does not survive a
+reboot, so the boot guard also rolls back at a boot that finds the trial
+unconfirmed from an earlier boot, and the netwatch never reboots during a trial.
+
+**Undoing, one command each** (over SSH):
+
+| What | Command |
+|---|---|
+| everything (the sysctl values from before come back) | `sudo bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --uninstall` |
+| pause the network watch | `sudo touch /etc/ollama1/netwatch.off` |
+| the network watch off | `sudo systemctl disable --now ollama1-netwatch.timer` |
+| panic-reboot off | `sudo systemctl disable ollama1-bootguard && sudo ollama1-bootguard restore` |
+| one panic setting (e.g. oops) | `sudo sed -i 's/^kernel.panic_on_oops = 1/kernel.panic_on_oops = 0/' /etc/ollama1/panic-sysctl.conf && sudo systemctl restart ollama1-bootguard` |
+| the doctor | nothing to undo: it only reads |
+
+The hardware watchdog (6b399) is left as it is: the doctor reports on it, and its
+known gaps (above) are reported, not changed.
+
 ## Troubleshooting
 
 | | |
@@ -2536,6 +2710,8 @@ same files back.
 | Old mirror (a server set up before 6b400) | `cat /proc/mdstat`; to remove it: `sudo bash ollama1/tools/remove-raid.sh` (a dry run), see "Removing the old RAID mirror" |
 | Boot menu | `grep 'set timeout' /boot/grub/grub.cfg`, all 5 |
 | Watchdog | `ollama1-watchdog status`; `journalctl -u ollama1-watchdog`; off: `sudo ./setup.sh --watchdog off`; see "Hardware watchdog" |
+| After a hang (on the next boot) | `sudo ollama1-watchdog-doctor`: why the watchdog may not have reset it, and how the last boot ended; see "Self-recovery" |
+| Self-recovery | `ollama1-netwatch status`; `ollama1-bootguard status`; `journalctl -u ollama1-netwatch -u ollama1-bootguard`; all off: `sudo bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --uninstall` |
 | Fans | `ollama1-fan status`; `journalctl -u ollama1-fan`; off: `sudo ./setup.sh --fans off` |
 | Wi-Fi backup | `sudo ollama1-wifi status`; `iw dev`; off: `sudo ./setup.sh --wifi off`; see "Wi-Fi backup" |
 | SSH to the server slow or timing out while Wi-Fi backup is on | On the client, `arp -n <server-ip>` must show the wired card's MAC, not the Wi-Fi card's; on the server, `sudo ollama1-wifi status` must say `Answers ARP only for its own address: yes` (a `no` means a kit from before 6b450: run `sudo ./setup.sh`). Then clear the client's entry once: `sudo arp -d <server-ip>` |
@@ -2638,4 +2814,12 @@ Ed25519 (the server uses PyNaCl). They cover:
   the root-owned install and the one-rule sudoers text; `efibootmgr -v` read
   in its several shapes, an entry of a stopped run reused, and the optional
   renaming of the old drive's boot files (`test_migrate_efi.py`);
+- self-recovery (6b524): the network watch's escalation on a fake clock (the order, the repeats, the reboot
+  rules: 30 min after boot, 2 h apart and the backoff, a wrong clock, the boot-loop guard, the trial, busy), the
+  tunnel, the pause file and the repairs of a radio or card left half-done, against fake probes, a fake
+  NetworkManager and networkd and a fake sysfs (`test_netwatch.py`), and that no command it can run changes a
+  setting; the boot-loop guard and the panic settings against a fake `/proc/sys` (`test_bootguard.py`); the
+  doctor's reading of sample kernel logs and journal text and its verdicts, read-only (`test_wddoctor.py`);
+  `tools/install-watchdogs.sh` against a fake root: the dry run, the exact files and units, the values back on
+  `--uninstall`, the busy refusal and the dead man's switch (`test_installwatchdogs.py`);
 - that the repo holds no personal data and no utility's schedule.

@@ -17547,6 +17547,154 @@ adjusted). The doc block alone also ran 30/30 with `SMOKE_LONG_DOC` on the priva
 sees is the Greek names since 6b534 (Alpha, Gamma, Sigma, Omega). The keys are untouched; the words were updated on
 merge where they reach the page.
 
+## 6b524 — The server kit brings itself back: a watchdog doctor, panic-reboot with a boot-loop guard, and a network watch (per Patrick)
+
+- Why: the server (Ubuntu 26.04, Ryzen 5950X, RTX 5070 Ti, AMD chipset, Wi-Fi only at home, owner abroad for months,
+  only the power button within reach) hung on 2026-10-24 after an s2idle suspend (NVIDIA GSP failure,
+  `GPU_IN_FULLCHIP_RESET` and the assertion flood of 6b517 filling /), and the 6b403 hardware watchdog (the code
+  says 6b399: `ollama1-watchdog.service`, `lib/o1watchdog.py`, sp5100_tco) did not reset it. Auto sleep is off since.
+  It went dark again around 2026-10-25 (off the Wi-Fi, tunnel down): a hang, a power-off or a lost Wi-Fi with the
+  box up, unknown until someone presses the button. Everything here was built and tested offline on the Mac and is
+  **not installed**; the server was down throughout. Branch `kit-watchdogs`.
+- **The doctor** (`bin/ollama1-watchdog-doctor`, `lib/o1wddoctor.py`, read-only, stdlib): the driver, timeout,
+  nowayout and bootstatus from sysfs and the module's parameters, who holds `/dev/watchdog*` (from /proc/*/fd),
+  systemd's RuntimeWatchdogUSec, blacklist lines in the modprobe folders, the service and its status file, the
+  sp5100/TCO kernel lines of this boot and the last, the root reserve; then `journalctl -b -1`: the boot's span,
+  how it ended (clean / a suspend never exited / a shutdown that never finished / tripped / panic / abrupt), counts
+  of NVRM assertions, GSP resets, Xid, soft and hard lockups, RCU stalls, hung tasks, oopses, panics, no-space,
+  NVMe errors and Wi-Fi drops, the 6b399 service's own lines, the netwatch's, pstore dumps, the last 15 lines. It
+  never opens the device (an open arms it) and runs only journalctl and systemctl is-enabled/is-active/show.
+- **Why the 6b399 watchdog may not have fired**, from its code, each with the doctor's check:
+  1. `driver`: sp5100_tco absent or the board's timer off ("Watchdog hardware is disabled", no MMIO): no device,
+     the service sits in no-device. (sysfs, TCO lines.)
+  2. `blacklist`: Ubuntu's kernel packages blacklist watchdog modules and systemd-modules-load honours that, so
+     `/etc/modules-load.d/ollama1-watchdog.conf` may load nothing; only the unit's ExecStartPre modprobe does.
+  3. `service`: stopped, disabled, failing. (is-enabled/is-active/NRestarts, an "armed" line last boot.)
+  4. `holder`: systemd's RuntimeWatchdogSec or another daemon holds the device: EBUSY, never armed.
+  5. `paused`: **a real gap**. The sleep pause closes it with 'V' and only the hook's `post` reopens it: there is no
+     time limit on the pause, and the clock-jump check only clears the failure count. A resume that hangs, or a
+     wake whose hooks never run, leaves the timer off for good, and the 10-24 hang began with a suspend.
+     (A "closed cleanly for sleep" with no "resumed" after it; "PM: suspend entry" without an exit.)
+  6. `probe`: **the likeliest for 10-24**. The probe only proves the disks answer. It runs as root, so the token
+     write still lands in ext4's reserved 5% when everyone else sees a full disk; a GPU driver flooding the log,
+     a dead tunnel or SSH, or a kernel wedged on some CPUs, are invisible to it, and it pets on. rsyslog wrote for
+     five hours, so userspace (and the watchdog's thread) was running. (Armed, no "probe failed", heavy kernel signs.)
+  7. `clean_stop`: nowayout is off (it must be, for sleep), so every shutdown's `systemctl stop` disarms it; a
+     shutdown that then hangs on a driver is never reset. (A shutdown begun and never finished.)
+  8. `no_reset`: the timer ran out and the board didn't reset. Unproven until the README's drill; bootstatus
+     WDIOF_CARDRESET after a watchdog reset proves it.
+  9. `not_a_hang`: a power cut, or up with no network. (How the boot ended, its last line, Wi-Fi drops.)
+  The watchdog itself is **left as it is**: gap 5 matters only while auto sleep is on (it is off), and a fix
+  (a pause that expires, say 10 min after the pre-sleep stamp) should ship with turning sleep back on; gap 6 is
+  what the two layers below are for. Neither is changed here so this install replaces nothing that runs.
+- **Panic-reboot** (`config/panic-sysctl.conf` -> `/etc/ollama1/panic-sysctl.conf`, applied by
+  `bin/ollama1-bootguard` / `lib/o1bootguard.py`, stdlib): kernel.panic=10 (a panic reboots instead of hanging),
+  softlockup_panic=1 (a CPU stuck 20 s in the kernel), hardlockup_panic=1 only when /proc/sys/kernel/nmi_watchdog
+  is 1, panic_on_oops=1, hung_task_panic=1 with hung_task_timeout_secs=600 (10 min stuck in D state, not the usual
+  2, so a slow disk or a long fsync never panics it; a dead GPU leaves nvidia-smi and Ollama in D, a dying disk
+  too). Config values outside their range are ignored with a note (panic 5..600, the timeout 300..86400); a key the
+  kernel lacks is left alone; a line taken out goes back to its value from before. **Not in /etc/sysctl.d, on
+  purpose**: systemd-sysctl applies that folder before anything can look at the last boots, so a driver that oopses
+  at every boot would panic it before a guard could run, and a later `sysctl --system` would re-arm a tripped boot.
+- **The boot-loop guard** (`ollama1-bootguard.service`: oneshot, DefaultDependencies=no, After=local-fs.target
+  systemd-sysctl.service, Before=sysinit.target, WantedBy=sysinit.target, Wants= only, 30 s, exits 0): records
+  each boot (boot id, start time = now minus /proc/uptime) in /var/lib/ollama1/bootguard.json; **3 or more boots
+  within 60 minutes** -> the safe values (the ones saved before the install in panic-before.json, else the kernel's
+  defaults), `bootguard: TRIPPED: ...` in the journal, `tripped_boot` = this boot (sticky if run again), and the
+  netwatch won't reboot this boot. A boot dated ahead of now counts too (a dead clock battery errs towards staying
+  up). The next boot outside a loop arms again. Honest limit: a loop slower than 3 per hour (an oops 35 min after
+  each boot) is never seen; the box is then up most of the time.
+- **The network watch** (`bin/ollama1-netwatch`, `lib/o1netwatch.py`, stdlib; `ollama1-netwatch.service` root
+  oneshot + `.timer` OnBootSec=2min, every minute): probes the default gateway (/proc/net/route; ping, else TCP
+  53/80/443 where a refusal is an answer) and 1.1.1.1 / 8.8.8.8 (TCP 443, else ping); online = gateway or
+  internet. Offline, one step per run, in order: 3 min reconnect (NetworkManager: `nmcli -w 45 connection up id
+  <active, or last seen active, or the only saved Wi-Fi profile>`; networkd, the kit's own Wi-Fi backup:
+  `networkctl reconfigure <card>` + restart of `netplan-wpa-<card>.service`), 6 min radio off, 5 s, on (networkd:
+  `ip link` down/up), 10 min driver rebind (off by default, `"netwatch_driver_reload": true`), 20 min
+  `systemctl start --no-block ollama1-reboot.service` (else `systemctl reboot`); then reconnect every 5 min, radio
+  every 15, driver every 60. Reboot rules: 30 min of uptime; 2 h since the last one it asked for, doubling (4, 8,
+  then 12 h cap) while reboots don't bring it back and reset when online; a reboot asked for in this boot that
+  didn't happen is measured on this boot's clock; an earlier boot's on the wall clock, or proven by uptime >= the
+  gap whatever the clock says; never when the guard tripped, during the install's trial, or while setup.sh's lock,
+  dpkg/apt or a gateway request (o1idle's activity file) is busy. The bookkeeping is saved before the reboot is
+  asked, so a killed run never repeats it. Tunnel (ollama1-tunnel.service, only if enabled): active + cloudflared
+  `/ready` 200 on the metrics port from /etc/ollama1/cloudflared.yml (8439) = up; down 10 min with the network up
+  -> restart, then at most every 30 min. Repairs first in every run: a radio it switched off (NetworkManager keeps
+  WirelessEnabled across reboots, so a run killed between off and on would otherwise leave the box offline for
+  good) and a card it unbound; a NetworkManager radio found off while offline is switched on too. Never a
+  configuration change (no netplan, no NM profile edit, never `device connect` which can create one, no
+  firewall/sshd/cloudflared file); the test pins every command it can run. `/etc/ollama1/netwatch.off` pauses
+  every action (its own repairs still run). Journal lines only on changes and actions; /var/lib/ollama1/netwatch.json
+  (0640, group o1view when it exists) holds the state, the last 30 actions and a "status" block for the panel.
+- **The driver step**, honestly: the module is identified from sysfs (`/sys/class/net/<card>/device` must be a PCI
+  device carrying no other interface, a sane driver name), but rather than `modprobe -r` (which fails on iwlwifi,
+  held by iwlmvm, and would take every device of that driver) it writes the PCI address to the driver's `unbind`
+  and `bind` (drivers_probe as the fallback): the same remove and probe for that one card. Off by default because a
+  driver stuck in its remove path can wedge the kernel and one that won't bind again leaves no Wi-Fi until the
+  reboot step (which may be held for hours). The owner's call.
+- **Installer** `tools/install-watchdogs.sh` (modelled on 6b517's): `--dry-run` (every file new/changed/unchanged,
+  every systemctl and systemd-run call, the sysctl values now -> then), install, `--arm-rollback`, `--confirm`,
+  `--uninstall` (`--rollback` is the rollback unit's wording). It refuses while busy, by the auto sleep's own test
+  run from the checkout (o1idle.read_activity's in-flight requests + o1sleep.busy_reasons: setup.sh, pulls, model
+  sync and plans, updates, fan calibration, apt-daily). It copies three programs, three libraries (stdlib only,
+  nothing the rest of the kit imports is replaced), four units, the config (an edited copy is kept), three
+  /usr/local/sbin links and itself to /usr/local/lib/ollama1/tools; daemon-reload; snapshot of the six sysctl
+  values (once); enable + restart ollama1-bootguard (values live at once, no reboot); enable --now the netwatch
+  timer; then the guard's status, a probe, list-timers and the doctor. It never restarts Ollama, the gateway or
+  the tunnel and never reboots (the test pins its systemctl verbs: daemon-reload, enable, restart of the guard only,
+  stop, disable, list-timers). Uninstall: the netwatch's repairs first, the timer off, the saved values back, the
+  guard disabled, the deadline timer stopped, every file and state file removed.
+- **Dead man's switch**: `--arm-rollback` writes /var/lib/ollama1/watchdogs-trial.json (boot id, deadline) and
+  `systemd-run --unit=ollama1-watchdogs-deadline --on-active=20min ... /bin/systemctl start --no-block
+  ollama1-watchdogs-rollback.service` **before** anything takes effect (a failed arm stops the install there); that unit runs the installed copy with
+  `--uninstall --rollback`. `--confirm` (from a new SSH session, the proof of reachability) stops the timer and
+  removes the trial file. Transient timers don't survive a reboot, so the boot guard starts the rollback unit at a
+  boot that finds the trial from an earlier boot, and the netwatch never reboots during a trial.
+- **Once the server is back** (after someone presses the button):
+  `sudo ollama1-watchdog-doctor` is not installed yet, so first `cd ~/concordeai/ollama1 && git pull` (or copy the
+  branch), then `sudo python3 bin/ollama1-watchdog-doctor` from the checkout (read-only) to learn what happened;
+  `sudo bash tools/install-watchdogs.sh --dry-run`; `sudo bash tools/install-watchdogs.sh --arm-rollback`; from a
+  second SSH session `sudo bash /usr/local/lib/ollama1/tools/install-watchdogs.sh --confirm`. Verify:
+  `ollama1-bootguard status`, `sysctl kernel.panic kernel.panic_on_oops kernel.hung_task_timeout_secs`,
+  `ollama1-netwatch status`, `systemctl list-timers ollama1-netwatch.timer`, `journalctl -u ollama1-netwatch -u
+  ollama1-bootguard -b`. Undo, one command each: everything `sudo bash
+  /usr/local/lib/ollama1/tools/install-watchdogs.sh --uninstall`; pause the watch `sudo touch
+  /etc/ollama1/netwatch.off`; the watch off `sudo systemctl disable --now ollama1-netwatch.timer`; panic-reboot off
+  `sudo systemctl disable ollama1-bootguard && sudo ollama1-bootguard restore`; one setting: edit
+  /etc/ollama1/panic-sysctl.conf, `sudo systemctl restart ollama1-bootguard`.
+- **For the owner to decide before installing**: panic_on_oops (an NVIDIA or Wi-Fi oops at each boot costs three
+  reboots before the guard stops it; 0 keeps oopses survivable); softlockup_panic under the NVIDIA driver (a
+  soft lockup during a heavy model load now reboots mid-request); the driver step (off); the reboot backoff
+  (2/4/8/12 h; the spec asked for at least 2 h); whether the Wi-Fi is NetworkManager's or the kit's networkd one
+  (both handled, `ollama1-netwatch status` says which).
+- **Not verified** (nothing ran on the server): the units' sandboxes (netwatch: ProtectSystem=strict, no
+  ProtectKernelTunables since the driver step writes /sys, AF_UNIX/INET/INET6/NETLINK; the guard: PrivateNetwork,
+  writes /proc/sys), that systemd-sysctl runs before the guard on 26.04, `journalctl -g --case-sensitive` and
+  `--list-boots -o json` on its systemd (both fall back), nmcli's terse output there, cloudflared's `/ready`, and
+  whether this board's sp5100_tco resets at all (the README drill). setup.sh copies the new files with the rest of
+  the kit and enables none of them; a setup run leaves an installed set as it is.
+- Tests (`ollama1/tests`, `python3 -m unittest discover -s .`): test_netwatch.py (the ladder, repeats, every reboot
+  rule, the wrong clock, the tunnel, pause, repairs after a killed run, NM and networkd command lines, the sysfs
+  rebind and its refusals, busy, the source pinned to its allowed commands), test_bootguard.py (the 3-in-60 rule,
+  once per boot, forgetting, a clock gone back, junk state, the config's clamps, NMI, missing keys, snapshot once,
+  restore, the trial's rollback, the units, nothing in /etc/sysctl.d), test_wddoctor.py (sample TCO, service,
+  kernel and journal text; each verdict; render; gather only reads), test_installwatchdogs.py (dry run changes
+  nothing, the exact tree and calls, the values back, busy refusal, the switch and confirm, the installed copy's
+  rollback, an edited config kept, a partial kit, the verbs).
+
+- **Installed 2026-11-08 (owner's OK), and the drill done.** The server came back that evening (the power
+  button, at home). The doctor read the 10-25 end as abrupt: the journal stops at 07:23:15 mid-idle, nothing in
+  the kernel log, the 6b399 watchdog armed with no probe failed. Installed from this branch with `--arm-rollback`,
+  the owner's careful settings (`kernel.panic_on_oops = 0`, `kernel.softlockup_panic = 0`; hard lockups and
+  10-minute D-state tasks still panic, panic=10), then `--confirm` from a new SSH session. The network watch found
+  the Wi-Fi on networkd (wlo1), the tunnel up. **The drill (README, "Hardware watchdog"):** the service stopped
+  cleanly, `/dev/watchdog0` opened by a transient unit and never petted: the box went dark about 60 s later and
+  was back with a new boot 90 s after the start; `bootstatus` 32 (WDIOF_CARDRESET) on the next boot proves a
+  watchdog reset, and every service came back. So **this board's sp5100_tco does reset it**, and the 10-25 death
+  was not a freeze the watchdog could see: a power cut, a probe passing on a useless box, or a reset into a boot
+  that never finished. The BIOS's "Restore after AC power loss: Power On" and a smart plug on the server's power
+  (a remote power cycle) are what cover the rest.
+
 ## 6b525 — The ZITO easter egg is gone (per Patrick)
 
 Holding Z+I+T+O together opened the hidden "ZITO override" board, and on opening it deleted the last
@@ -18591,4 +18739,3 @@ Playwright at 390 and 1440: no page errors, no API response over 400.
   Classic keeps 6b522's own styles. 6b522's user-facing words name no mode; its NOTES entry got a line that the
   names a person sees are the Greek ones since 6b534. Pins: the bar's line (`too long for the model on ` and its
   title) re-pinned; 6b522's node-drawn chip and bar check and its copy lint hold on the merged source.
-

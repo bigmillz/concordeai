@@ -142,6 +142,8 @@ DEFAULTS = {
     "logguard_max_bytes": 2 << 30,   # a log over this keeps its last 64 MiB (256 MiB..20 GiB)
     "logguard_min_free_bytes": 8 << 30,   # under this free on /, the biggest logs are trimmed (1..64 GiB)
     "logguard_files": [],            # more logs in /var/log to guard, added to syslog, kern.log, auth.log, ufw.log
+    # the network watch (6b524, ollama1-netwatch; it reads this itself, see lib/o1netwatch.py)
+    "netwatch_driver_reload": False,  # offline 10 min: the Wi-Fi card's driver lets go of it and takes it again
     # Tests only: a local fake JWKS. Refused unless allow_insecure_certs_url.
     "certs_url": "",
     "allow_insecure_certs_url": False,
