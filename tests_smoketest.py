@@ -36867,8 +36867,10 @@ def _c97_wiring(src):
     pip with hashes and no dependency; a dev or test copy never installs."""
     main = src[src.index("    if _INSTANCE_LOCK:\n        ctx_thread(target=_ensure_crypto_deps"):]
     body = src[src.index("def _mlx_engine_pip("):src.index("def _ensure_mlx_engine(")]
-    return ("        ctx_thread(target=_ensure_mlx_engine, bind=False, daemon=True).start()\n    start_managed_engines()"
-            in main[:400]
+    return ("        ctx_thread(target=_ensure_mlx_engine, bind=False, daemon=True).start()\n"
+            "        # and the PDF reader off a Mac (6b546), the same way\n"
+            "        ctx_thread(target=_ensure_pdf_reader, bind=False, daemon=True).start()\n    start_managed_engines()"
+            in main[:600]
             and all(a in body for a in ('"--only-binary=:all:", "--require-hashes", "--no-deps"', "sys.executable"))
             and "    why = _crypto_install_blocker()\n" in src[src.index("def _mlx_engine_why_not("):]), ""
 
