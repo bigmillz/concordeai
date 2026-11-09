@@ -33648,8 +33648,10 @@ def _b41_cloud_stop(src):
                 c.hang = True
             p = W.plan((("groq", "openai/gpt-oss-120b"), ("claude", "claude-haiku-5"), ("groq", "openai/gpt-oss-20b")))
             ok0, run = ns["bench_start"](W.cloud_spec(p), W.ctx)
+            # before its headers: the call has reached the provider (run h stopped it a moment before the
+            # request left, so the stand-in had logged nothing; the row says "reading" a little ahead of it)
             seen_ = _b41_wait_for(lambda: W.rows()[0]["status"] == ("writing" if mode == "stream" else "reading")
-                                  and (mode == "headers" or W.rows()[0].get("tok", 0) >= 2))
+                                  and (W.rows()[0].get("tok", 0) >= 2 if mode == "stream" else len(c.log) >= 1))
             t0 = time.time()
             was = ns["bench_stop"]()
             fin = W.wait(5)
