@@ -18739,3 +18739,62 @@ Playwright at 390 and 1440: no page errors, no API response over 400.
   Classic keeps 6b522's own styles. 6b522's user-facing words name no mode; its NOTES entry got a line that the
   names a person sees are the Greek ones since 6b534. Pins: the bar's line (`too long for the model on ` and its
   title) re-pinned; 6b522's node-drawn chip and bar check and its copy lint hold on the merged source.
+
+## 6b538 — copy-2: the approved copy rewrite laid onto integ-1 by a re-runnable applier (per Patrick: "Apply all, I'll judge in the app")
+
+The 732-row copy pass (`scratchpad/copy/changes.json`, drafted against main 672d6f1: direct, sentence-case,
+no model names in the primary UI, no middle dots, no "I", the Greek mode names) is on the branch `copy-2`,
+off integ-1 adc4051 (first laid as `copy-1` off d1b0bd0 the same night; 6b537 went to shell-beta, so this is 6b538), as one commit per area group and one for the gauntlet's pins. Every row went in; the
+owner reviews in a window and reverts what he dislikes.
+
+**The applier**, `scratchpad/copy/apply_copy.py` (with `build_policy.py`, `policy_base.json` and `run_all.sh`
+beside it), is the point: integ-1 keeps moving tonight (Muse seating, fresh facts, file attach, the Settings
+redesign), so the copy is re-laid after each merge rather than merged as text. A row's `old`/`new` are the
+*rendered* words; the applier matches them against source literals through every escape a string can wear
+(`…`, `&rsquo;`, `\'`, a `"+n+"` splice, a concatenation break between any two characters), re-renders what
+it matched and what it wrote, and keeps an edit only when both re-renderings agree. It will not touch a
+comment, a docstring or code (a `tokenize` pass marks Python strings; a one-pass scan marks JS strings), refuses
+a placeholder that swallows code (`;`, a ternary, an unbalanced quote: the `Deleted "…"` toast did that once),
+picks among several matches by the row's origin/main line, writes a Python "this Mac" as "this computer"
+(only the page passes `pc_words()`), and keeps a ledger of what it wrote so a second run is a no-op (proved
+from pristine every time: 0 edits). `policy_base.json` holds the human decisions: 18 skips with reasons, the
+rows swept at every occurrence, the Greek-name fix-ups (the rows said Flare/Zenith/Meridian), 233
+overrides (229 of them exact source text) for strings that had moved in integ-1 or are spliced in code,
+and 89 test-pin edits.
+
+**Counts.** 579 rows applied as drafted; 244 adapted (the string had already moved in integ-1, was built in a
+ternary, or ran into code: before and after are listed in `scratchpad/copy/APPLIED.md`; 25 of these are the
+greeting pool's prune, one line each); 12 already said the new way by the design branch or covered by a wider
+rewrite; among the adapted, 40 sibling sweeps the rows' line anchors did not reach (found by re-matching every row's old text against the result: a second
+`network error`, the script's own `BM_DESC_LOCAL`, the Usage pane's `Token Usage:` set from JS, the two
+`Erase forever` resets); 18 skipped. The skips worth knowing: the `VEO_CAP:` sentinel (matched in code), the
+dictation timing line (a log), `em-srv-error` and `em-srv-council-none` (the rows would drop the only detail
+there is), three benchmark stat fragments (one piece of a dot-joined line; the owner's call on the whole line),
+and **the update channel stays "Prerelease"** (6b318, per Patrick; the gauntlet forbids `>Beta</option>`). Two
+rows were widened on purpose: the Cloud pane's intro keeps one disclosure sentence (search and place questions
+leave the Mac; the gauntlet pins it), and the benchmark's confirm keeps "At most N a run".
+
+**Pins.** 89 edits in `tests_smoketest.py`, each the same check in the new words; none dropped, none weakened.
+Restructured, not just reworded: the Friday greeting guard (the afternoon line was pruned, the morning line
+carries it), the Cloud pane's paragraph and the hint icon that is gone (`id="turbo-hint"` is now pinned
+absent), `_sn_mac`'s computed equality on `studio_needs()`, `rows.count("<i>your server</i></div>") == 3`
+after the five markers lost their dot, and `page.count("Get them") == 2`.
+
+**Checks.** Parse, both files. A windowless dev copy on 9886 in its own folder: the page served with no
+unreplaced token, both inline scripts `node --check`, `pincheck.py` at 2,155 literal pins with the one red the
+`MEMORY USED` or-branch the checker cannot read (pre-existing), Playwright's Chromium with no page error, no
+API response over 400 (the first round had one: the Cloud intro override took one line too many and ate
+`<input id="turbo">`; the null `addEventListener` and its TDZ echo were the trap in CLAUDE.md, fixed before
+commit), and screenshots of the home, the mode picker, the Code lane, every Settings pane, the four wizard
+steps, the composer with a file attached (docattach) and two engine-free error states in
+`scratchpad/copy/shots2/`. No chat was sent; the gauntlet was not run
+(the owner's runs hold 9901–9903 tonight).
+
+**Re-laid on adc4051** (fresh-1, docattach and kit-watchdogs merged) with three changes against the first lay:
+the giants' tooltip keeps the 6b315 workstation-speed warning in the short voice ("On a workstation with one
+graphics card: about 5–12 tokens a second. Fast only when it all fits in graphics memory."); the missing-search
+line keeps a next step ("Web search isn't installed. Reinstall to fix."); five sibling sweeps that had one
+second site now sweep every occurrence (docattach brought a second `network error`, `paste a key first`,
+`testing the key…`, `send failed —` and `Sharpening it`). Re-matching every row's old text against the result
+found no other docattach string a row covers; its new strings keep their words. Prerelease (6b318) and the
+Cloud pane's disclosure sentence stay as before.
