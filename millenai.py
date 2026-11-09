@@ -41146,6 +41146,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                              # (6b532)
                              "1" if (HAS_WEBVIEW and IS_MAC and not SHELL)
                              else "0")
+                    .replace("__SHELL_TL__",
+                             # the Mac shell seats the traffic lights on the
+                             # header row; the page keeps their zone clear
+                             "1" if (SHELL and IS_MAC) else "0")
                     .replace("__SKY_N__", str(len(SKY_SOURCES)))
                     .replace("__SKY_DARK__", json.dumps(SKY_DARK))
                     .replace("__SKY_NIGHT__", json.dumps(sky_is_night()))
@@ -47617,6 +47621,9 @@ if(hzLook==="horizon"){
   // (a dev copy's deliberately frozen intro says it is alive, and keeps its moment)
   setTimeout(function(){if(!window.hzFrozen&&!window.hzReady)document.documentElement.classList.remove("hz-intro","hz-markin","hz-markout");},5000);
 }
+/* THE MAC SHELL'S CORNER: the Tauri shell on a Mac runs the page under its title bar
+   with the traffic lights on the header row; html.tl keeps their zone clear */
+if("__SHELL_TL__"==="1")document.documentElement.classList.add("tl");
 /* Window-wipe boot (native Mac app only): the NSWindow starts transparent
    and the whole page is clipped to nothing, so tagging the root BEFORE the
    first paint is what stops a flash of the normal UI. Performance mode
@@ -52424,6 +52431,28 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 body.novideo #imp-veil .imp-glow,body.novideo .imp-dot.live,body.novideo .imp-bar.pulse i{animation:none}
 body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
 /* ==== bring your chats (6b529): styles end ==== */
+/* ---- THE MAC SHELL'S CORNER (per Patrick: the traffic lights crowded the sidebar toggle, "too
+   tight"). html.tl is the Tauri shell on a Mac (__SHELL_TL__): the page runs under the title bar and
+   the shell seats the lights on the header row (TL_X, TL_Y in shell/src-tauri/src/main.rs: their
+   centre line at y 36, the green button's right edge near x 75). The page keeps that zone clear: a
+   header that starts at the window's left edge reserves 96 px, so the sidebar toggle starts 16 px or
+   more right of the green button; every header row is 72 px, so the lights sit on its centre line;
+   the sidebar's top row gives the lights its left and keeps the pen at its right, and the lockup
+   stays in the header. The bare header and the sidebar's top row drag the window. */
+html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
+html.tl.hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-left:96px}
+html.tl.hz #main:not(:has(#hero)) #hz-top{height:72px}
+html.tl.hz #hz-top{pointer-events:auto}
+html.tl #brand-row .vghost{display:none}
+html.tl #brand-row #newchat{margin-left:auto}
+html.tl.hz.hz-sbopen #main:has(#hero) #hz-mark,html.tl.hz:not(.sbhide) #main:not(:has(#hero)) #hz-mark{display:inline-block}
+/* the lanes stay centred on the header whatever the corner takes: on the home the two side groups
+   share the room equally (the spacers step out), and where the header reserves the lights' 72 px
+   the right group carries the same 72 px, so the reservation moves nothing */
+html.tl.hz #main:has(#hero) #hz-brand,html.tl.hz #main:has(#hero) #hz-right{flex:1 1 0;min-width:0}
+html.tl.hz #main:has(#hero) #hz-right{justify-content:flex-end}
+html.tl.hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}
+html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-right{padding-left:72px}
 </style>
 </head>
 <body>
@@ -52432,8 +52461,8 @@ body.novideo .imp-row,body.novideo .imp-bar i{transition:none}
 
 <aside id="sidebar">
   <div id="sb-resize"></div>
-  <div id="brand-wrap">
-    <div id="brand-row">
+  <div id="brand-wrap" data-tauri-drag-region>
+    <div id="brand-row" data-tauri-drag-region>
     <span class="vghost" title="MillenAI"><svg id="vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
 <button id="newchat" title="New chat">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
@@ -52600,22 +52629,22 @@ __CODE_ROWS__
   <!-- THE HEADER (6b526): the chats button and the lockup (static since 6b542, per Patrick: the shining logo was "kind of tacky");
        the chat's title in a conversation; the lanes as text on the home; the
        machines as dies in their makers' colours; Settings -->
-  <header id="hz-top" aria-label="Window">
-    <div id="hz-brand">
+  <header id="hz-top" aria-label="Window" data-tauri-drag-region>
+    <div id="hz-brand" data-tauri-drag-region>
       <button id="hz-sb" type="button" class="hz-ib" aria-label="Show chats" aria-pressed="false">
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
       </button>
       <span id="hz-mark" class="vghost" title="MillenAI"><svg id="hz-vmark" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="hz-vmg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#hz-vmg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b></span>
       <span id="hz-title"></span>
     </div>
-    <span class="hz-sp"></span>
+    <span class="hz-sp" data-tauri-drag-region></span>
     <nav id="hz-lanes" role="tablist" aria-label="Lane">
       <button type="button" role="tab" data-m="ai" aria-selected="true">Chat</button>
       <button type="button" role="tab" data-m="code" aria-selected="false" tabindex="-1">Code</button>
       <button type="button" role="tab" data-m="funnel" aria-selected="false" tabindex="-1">Funnels</button>
     </nav>
-    <span class="hz-sp"></span>
-    <div id="hz-right">
+    <span class="hz-sp" data-tauri-drag-region></span>
+    <div id="hz-right" data-tauri-drag-region>
       <div id="hz-effort-slot"></div>
       <div id="hz-machines" role="list" aria-label="Your machines"></div>
       <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings">

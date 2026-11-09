@@ -4932,7 +4932,7 @@ check("per-task review fixes: titles per request, badge, sweeps",
 # 6b308, per Patrick: the MODELS AVAILABLE chip ran 50 px past the
 # sidebar and squeezed the wordmark to nothing (its full-width rule was
 # written for a two-row header); both chips now sit on their own line
-_brow = page[page.index('<div id="brand-row">'):page.index('<div id="models-flag"')]
+_brow = page[page.index('<div id="brand-row" data-tauri-drag-region>'):page.index('<div id="models-flag"')]
 check("header chips never overrun the sidebar or hide the wordmark",
       "flex:1 0 100%" not in page
       and _brow.count("<div") == _brow.count("</div>")
@@ -40782,14 +40782,16 @@ check("a copy outside shell mode and without the boot-code hook writes no run/bo
 _rs_main = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
 _rs_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
 _rs_shim = _rs_main[_rs_main.index("const BRIDGE_SHIM"):_rs_main.index('})();"#;')]
-check("the Tauri shell hands the token over through one command that checks scheme, host and the sidecar's port; starts on about:blank in the night colour; grants one permission; the shim holds no secret",
+check("the Tauri shell hands the token over through one command that checks scheme, host and the sidecar's port; starts on about:blank in the night colour; grants its one command and the title bar's two (drag, zoom); the shim holds no secret",
       _rs_main.count("#[tauri::command]") == 1
       and 'url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == Some(*port)' in _rs_main
       and 'WebviewUrl::External("about:blank"' in _rs_main
       and ".background_color(NIGHT)" in _rs_main and "Color(0x03, 0x04, 0x0a, 0xff)" in _rs_main
       and ".initialization_script(BRIDGE_SHIM)" in _rs_main
       and "initialization_script_for_all_frames" not in _rs_main
-      and _rs_cap.get("permissions") == ["allow-api-token"] and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
+      and _rs_cap.get("permissions") == ["allow-api-token", "core:window:allow-start-dragging",
+                                         "core:window:allow-internal-toggle-maximize"]
+      and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
       and "token" not in _rs_shim.replace("api_token", "")
       and '.env("MILLENAI_SHELL", "tauri")' in _rs_main
       and "libc::SIGTERM" in _rs_main and "RunEvent::ExitRequested { .. } | RunEvent::Exit => stop_sidecar(app)" in _rs_main,
@@ -40811,6 +40813,49 @@ check("every millen.* key the page writes to browser storage is kept by storeBoo
       _lsu == [] and _lsn >= 20 and _lsu_m == ["millen.recentsDays"]
       and "lsKeys().forEach(k=>{if(k!==null&&!KEEP_LS.includes(k)&&!(k in PREF_OF)" in _MILLENAI_SRC,
       "%r" % [_lsu, _lsn, _lsu_m])
+# THE MAC SHELL'S CORNER (per Patrick: the traffic lights crowded the header's sidebar
+# toggle, "too tight"). The shell runs the page under a transparent title bar (Overlay) and
+# seats the lights on the 72 px header row (TL_X, TL_Y); the page, told by __SHELL_TL__,
+# reserves their zone. The geometry is the one measured in the debug shell on macOS 27
+# (2x captures, buttons 14 pt wide on a 23 pt pitch, their centre line at TL_Y - 2): the
+# green button's right edge at TL_X + 60, the toggle at the reserved padding. The check
+# reads the numbers from the source and the CSS, so a smaller reservation, lights moved
+# right or off the row, or a header row of another height fails it.
+def _corner_geo(rs, css):
+    tx = float(re.search(r"const TL_X: f64 = ([\d.]+);", rs).group(1))
+    ty = float(re.search(r"const TL_Y: f64 = ([\d.]+);", rs).group(1))
+    pad = int(re.search(r"html\.tl\.hz\.sbhide body:not\(:has\(#main #hero\)\) #hz-top\{padding-left:(\d+)px\}", css).group(1))
+    row = int(re.search(r"html\.tl\.hz #main:not\(:has\(#hero\)\) #hz-top\{height:(\d+)px\}", css).group(1))
+    rpad = int(re.search(r"#hz-right\{padding-left:(\d+)px\}", css).group(1))
+    return {"gap": pad - (tx + 2 * 23 + 14), "centre": ty - 2, "row": row, "pad": pad, "rpad": rpad, "tx": tx}
+_cn_css = page[page.index("/* ---- THE MAC SHELL'S CORNER"):page.index("</style>", page.index("/* ---- THE MAC SHELL'S CORNER"))]
+_cn = _corner_geo(_rs_main, _cn_css)
+check("the Mac shell's corner: the lights sit centred on the 72 px header row, the toggle starts 16 px or more right of the green button, the reservation keeps the 8 px grid and the lanes centred; the page asks for it only under the shell on a Mac, and the bare header drags",
+      ".title_bar_style(tauri::TitleBarStyle::Overlay)" in _rs_main
+      and ".traffic_light_position(tauri::LogicalPosition::new(TL_X, TL_Y))" in _rs_main
+      and "TitleBarStyle::Transparent" not in _rs_main
+      and _cn["gap"] >= 16 and _cn["centre"] == _cn["row"] / 2 and _cn["row"] == 72
+      and _cn["pad"] % 8 == 0 and _cn["tx"] % 8 == 0
+      and _cn["rpad"] == _cn["pad"] - 24          # the right group carries what the left reserves
+      and "html.tl.hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top," in _cn_css
+      and "html.tl.hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}" in _cn_css
+      and "html.tl #brand-row .vghost{display:none}" in _cn_css
+      and 'if("0"==="1")document.documentElement.classList.add("tl");' in page
+      and '"1" if (SHELL and IS_MAC) else "0")' in _MILLENAI_SRC
+      and '<header id="hz-top" aria-label="Window" data-tauri-drag-region>' in page
+      and '<div id="brand-row" data-tauri-drag-region>' in page,
+      "%r" % _cn)
+# mutants: a reservation 8 px short, lights 8 px lower, a 56 px header row each fail
+_cn_m = [_corner_geo(_rs_main, _cn_css.replace("#hz-top{padding-left:96px}", "#hz-top{padding-left:88px}")),
+         _corner_geo(_rs_main.replace("const TL_Y: f64 = 38.0;", "const TL_Y: f64 = 46.0;"), _cn_css),
+         _corner_geo(_rs_main, _cn_css.replace("#hz-top{height:72px}", "#hz-top{height:56px}"))]
+check("the Mac shell's corner, mutants: a short reservation, lights off the row's centre and a 56 px row are each caught",
+      _cn_m[0]["gap"] < 16 and _cn_m[1]["centre"] != _cn_m[1]["row"] / 2
+      and _cn_m[2]["centre"] != _cn_m[2]["row"] / 2, "%r" % _cn_m)
+# the measuring hook exists in a debug build only
+check("the shell's probe hook (CONCORDE_SHELL_PROBE) is compiled into debug builds only",
+      _rs_main.count("#[cfg(debug_assertions)]\nfn probe_hook") == 1
+      and "#[cfg(debug_assertions)]\n            probe_hook(" in _rs_main, "")
 # ==== native shell (6b532): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks

@@ -23,6 +23,17 @@ use url::Url;
 /// the page paints, so there is no white flash.
 const NIGHT: tauri::window::Color = tauri::window::Color(0x03, 0x04, 0x0a, 0xff);
 
+/// The traffic lights' inset on a Mac (the close button's left edge and
+/// top, in points; per Patrick: they crowded the sidebar toggle, "too
+/// tight"). They sit on the page's 72 px header row, their centre line at
+/// y 36, the green button's right edge near x 75; the page (html.tl, set
+/// when millenai.py runs under this shell on a Mac) reserves 96 px at a
+/// header's left, so the toggle starts 16 px or more right of them.
+#[cfg(target_os = "macos")]
+const TL_X: f64 = 16.0;
+#[cfg(target_os = "macos")]
+const TL_Y: f64 = 38.0;
+
 /// How long to give the server to write its note before giving up.
 const SERVER_START_TIMEOUT: Duration = Duration::from_secs(180);
 
@@ -581,17 +592,48 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
         });
     #[cfg(target_os = "macos")]
     {
-        // the dark bar IS the page (6b257's recipe): the strip stays, its
-        // title hidden and its background transparent, so the window's
-        // own night colour shows through
+        // the page IS the bar: the content runs under a transparent title
+        // bar (Overlay), the title hidden, the traffic lights seated on the
+        // header row (TL_X, TL_Y). The page keeps their zone clear and its
+        // bare header drags the window (data-tauri-drag-region, granted
+        // start-dragging in capabilities/main.json).
         b = b
-            .title_bar_style(tauri::TitleBarStyle::Transparent)
-            .hidden_title(true);
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+            .traffic_light_position(tauri::LogicalPosition::new(TL_X, TL_Y));
     }
     let _ = &mut b;
     let _w = b.build()?;
     let _ = nav_app;
     Ok(())
+}
+
+/// A debug build's measuring hook (compiled out of a release): with
+/// CONCORDE_SHELL_PROBE=<dir>, each `cmd-<n>.js` dropped there is evaluated
+/// in the window's page (the real WKWebView) and its value, as JSON, lands
+/// in `out-<n>.json`. Scripts outside the app measure the window's corner
+/// and drive the sidebar this way; nothing here exists in a shipped app.
+#[cfg(debug_assertions)]
+fn probe_hook(app: AppHandle) {
+    let Some(dir) = std::env::var_os("CONCORDE_SHELL_PROBE").map(PathBuf::from) else { return };
+    std::thread::spawn(move || {
+        let mut n: u64 = 1;
+        loop {
+            let cmd = dir.join(format!("cmd-{}.js", n));
+            if let Ok(js) = std::fs::read_to_string(&cmd) {
+                let _ = std::fs::remove_file(&cmd);
+                let out = dir.join(format!("out-{}.json", n));
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.eval_with_callback(js, move |r| {
+                        let _ = std::fs::write(&out, r);
+                    });
+                }
+                n += 1;
+            } else {
+                std::thread::sleep(Duration::from_millis(40));
+            }
+        }
+    });
 }
 
 fn main() {
@@ -637,6 +679,8 @@ fn main() {
                     });
                 }
             }
+            #[cfg(debug_assertions)]
+            probe_hook(app.handle().clone());
             Ok(())
         })
         .build(ctx)
