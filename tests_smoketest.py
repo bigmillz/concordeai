@@ -22563,7 +22563,7 @@ def _soc_adv(src):
         and o["kept2"] == ["Lab \u00b7 any:1b"],
         "ghost send": "  const advList=advOn&&adv?advSendList():[];\n  const advGhostOnly=!!(advOn&&adv&&!advList.length&&(adv.local||[]).length);" in src
         and '        :{model:advGhostOnly?"":model,models:advGhostOnly?[]:council,\n          tier:advGhostOnly?"Fast":tier,' in src
-        and ". Alpha answered.</div>\");" in src,
+        and ". Fast answered.</div>\");" in src,
         # the save keeps what is not listed right now; the dialog is built from the groups
         "wired": "    +advServerRows(sel))\n    ||'<p class=\"advp\">No local models installed</p>';" in src
         and "  const comps=advCompList(pv,ready);" in src
@@ -23741,7 +23741,7 @@ def _p5c_nodes(src):
         "chip": o["chip"] == ["Fast", "Thinking \u00b7 A"] and o["chip2"] == "Fast \u00b7 Desk gpt-oss:20b",
         "bubble": "4 of 6 server models fit the time a blend has" in o["pro"] and "server models fit" not in o["th"],
         # the switch's words: the Code lane's agents read a folder, and what they read goes to the model that answers
-        "label": "<span>Use for Alpha, Gamma, Sigma and Code</span></label>'" in src
+        "label": "<span>Use for Fast, Thinking, Pro and Code</span></label>'" in src
         and "      +'<div class=\"srv-hint\">Code agents may send a folder you choose to this server.</div>':\"\")"
             "" in src,
         "tiers say the cap": "                if _cap:\n                    out[name][\"srvcap\"] = {\"seated\": _cap[0], \"of\": _cap[1]}" in src,
@@ -37508,7 +37508,7 @@ def _c515_pins(src):
         "the roster": "    if craft and not max_mode and len(labels) >= 2:\n        critic_lbl = labels[1]\n"
                       "        _unasked = labels[2:]            # said in the ledger, never asked\n"
                       "        labels = labels[:1]\n" in rc
-                      and '        took_part(_lbl, "(no answer: not asked. Gamma seats one writer and one critic)")' in rc,
+                      and '        took_part(_lbl, "(no answer: not asked. Thinking seats one writer and one critic)")' in rc,
         # (6b518) the check reads the answer with a closing recap trimmed, and records what it did
         "every way out of the stage is checked": rc.count("return _done()") >= 9
                                                   and "            report[\"verify\"] = verify_pass(\n"
@@ -38395,7 +38395,7 @@ check("horizon: the served page carries the night canvas, the header, the mode p
       'id="hz-sky"' in page and '<canvas id="hz-gl"></canvas>' in page and 'id="hz-top"' in page and 'id="hz-effort"' in page
       and '<div id="hz-menu" role="menu" aria-label="Mode"></div>' in page and 'id="look-sel"' in page and 'id="fx-level"' in page and 'id="hz-machines"' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "/* MODE NAMES (6b526) */" in page
-      and 'const MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};' in page
+      and 'const MODE_NAMES={"Vera Rubin":"Deep"};' in page
       and "const modeName=t=>MODE_NAMES[t]||t;" in page
       and "const HZ_PLACE=" in page and "const HZ_CLIPS=[" in page and "var hzSeen=" in page
       and not any(tk in page for tk in ("__HZ_PLACE__", "__HZ_DEBUG__", "__HZ_FONTS__", "__SKY_ORBIT__", "__HZ_SEEN__", "__SKY_HZ__")), "")
@@ -38437,7 +38437,7 @@ def _hz_intro_gated(head, css, js):
             and 'localStorage.getItem("millen.video")==="0"' in head
             and "@media (prefers-reduced-motion:reduce){" in css
             and ".hz #hz-sky *,.hz #hz-cglow,.hz .hz-sl-halo,.hz .hz-rig .die,.hz #hz-intro-mark,.hz #hz-intro-mark line,.hz #hero .greet .bloom,.hz #hero .greet .sheen,.hz .hz-ldie,.hz .chat-item.hz-live .ct,.hz .chat-item.hz-landed{animation:none!important}" in css
-            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo .hz-elevel.shim,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
+            and ".hz .novideo #hz-sky *,.hz .novideo #hz-cglow,.hz .novideo .hz-sl-halo,.hz .novideo .hz-rig .die,.hz .novideo #hero .greet .bloom,.hz .novideo #hero .greet .sheen,.hz .novideo .hz-ldie,.hz .novideo .chat-item.hz-live .ct{animation:none!important}" in css
             and "if(!hzMotionOK()||hzS.reduced)return;" in js)
 
 
@@ -38538,8 +38538,8 @@ check("horizon: the real-sky math lands (GMST at J2000, Polaris at the latitude,
 _hz_alias = {}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("MODE_ALIASES = {"):_MILLENAI_SRC.index("_HZ_PLACE_CACHE = profile_cache(")], _hz_alias)
 _hz_post = _MILLENAI_SRC[_MILLENAI_SRC.index('        if tier == "Power":'):_MILLENAI_SRC.index("_cl_mode, _cl_pid = cloud_tier_parse(tier)")]
-check("horizon: Alpha, Gamma, Sigma and Omega (and 6b526's Flare, Zenith, Meridian, Odyssey) are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
-      _hz_alias["MODE_ALIASES"] == {"Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro", "Omega": "Vera Rubin",
+check("horizon: Deep (6b544) and the old display names (6b534's Alpha, Gamma, Sigma, Omega; 6b526's Flare, Zenith, Meridian, Odyssey) are understood by /api/chat beside Smart/Best/Power, shown by the chip and the menu, and the home itself names no model",
+      _hz_alias["MODE_ALIASES"] == {"Deep": "Vera Rubin", "Alpha": "Fast", "Gamma": "Thinking", "Sigma": "Pro", "Omega": "Vera Rubin",
                                     "Flare": "Fast", "Zenith": "Thinking", "Meridian": "Pro", "Odyssey": "Vera Rubin"}
       and "tier = MODE_ALIASES[tier]" in _hz_post and "MODE_ALIASES[tier] in TIERS" in _hz_post
       and 'function tierLabel(){return (typeof hzModeWords==="function"?hzModeWords(tierShown(tier)):tierShown(tier))||model;}' in _MILLENAI_SRC
@@ -38556,7 +38556,7 @@ check("horizon: the night is one GPU canvas over the app's own aerial (same-orig
       and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
       and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:0;" in _hz_js   # (6b542 on beta-1) no gap below Full any more
       and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
-      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62][Math.max(0,Math.min(3,m))]+e*.035+(e===4?.12:0);S.setNeon();};" in _hz_js
+      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.5,.62,.68][Math.max(0,Math.min(4,m))]+e*.035+(e===4?.12:0);S.setNeon();};" in _hz_js
       and "S.setBusy=function(on){S.boostTo=on?1.7:1;S.busy=on;S.setNeon();};" in _hz_js
       and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
       and ".hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}" in _hz_css
@@ -38649,19 +38649,19 @@ check("horizon: Effort (Low, Medium, High, Max, Ultra) is sent with each questio
       and 'user_prefs(user_base).get("polish", True)\n' not in _MILLENAI_SRC
       and '_eff = getattr(globals().get("_srv_think"), "effort", None)\n    if _eff and not max_mode:\n        reflect, peer = effort_reflect(reflect, _eff), effort_peer(peer, _eff)\n' in _MILLENAI_SRC
       and 'if(globalThis.hzReady&&document.documentElement.classList.contains("hz"))annExtra.effort=hzEffortWire();' in _MILLENAI_SRC
-      and 'const HZ_EFFORT=["Low","Medium","High","Max","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
+      and 'const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in _hz_js
       and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in _hz_js
       and 'inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);' in _hz_js
-      and 'en.classList.toggle("shim",i>=3);en.classList.toggle("soft",i===3);' in _hz_js
+      and 'en.classList.toggle("spectral",i===4);' in _hz_js
       and 'root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);' in _hz_js
-      and ".hz.hz-ultra #composer::before{opacity:.9}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
+      and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in _hz_css and ".hz .hz-sl{position:relative;width:170px;" in _hz_css
       and "hz-ody" not in page and '"millen.fxlevel","millen.effort"]' in page, "")
 
 # THE MODE PICKER (OVERRIDE 3): the name only; a glass menu of the four modes, what each is for,
 # its machines' dies, its real models sliding out on hover, Escape and arrows; no hint in the composer
 check("horizon: the mode picker shows the name only and opens a menu of the modes (what each is for, its machines, its real models on hover, the current one marked); no description or time hint in the composer",
       'const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",' in _MILLENAI_SRC
-      and '"Pro":"Every model weighs in","Vera Rubin":"Keeps going until you stop it",' in _MILLENAI_SRC
+      and '"Pro":"Every model on your machines","Max":"Every model, every machine",\n  "Vera Rubin":"Keeps going until you stop it"};' in _MILLENAI_SRC
       and 'o.setAttribute("role","menuitemradio")' in _hz_js and 'o.setAttribute("aria-checked",String(m===t));' in _hz_js
       and 'class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"' in _hz_js
       and 'if(e.key==="Escape"&&menu.classList.contains("open")){e.stopPropagation();hzMenuClose(true);}' in _hz_js
@@ -39302,11 +39302,11 @@ check("the spine's pure pieces: figures, totals, the final call, a row per step 
       and _so.get("liveWhat") == ["Searched the web", "First draft", "Second draft, writing", "Final answer, writing"]
       and _so.get("liveProg") is True and _so.get("liveRate") is True
       and _so.get("think") == ["checking 12 claims", "writing a first draft", "drafting, 2 of 3", "thinking", "reading 4 pages"]
-      and _so.get("sign") == '<i class="dot" aria-hidden="true"></i><b>Concorde Gamma</b><span class="st">writing</span>'
+      and _so.get("sign") == '<i class="dot" aria-hidden="true"></i><b>Concorde Thinking</b><span class="st">writing</span>'
       and _so.get("signPlain") == '<i class="dot" aria-hidden="true"></i><b>Concorde</b><span class="st"></span>'
-      and _so.get("signOd") == '<i class="dot" aria-hidden="true"></i><b class="shim">Concorde Omega</b><span class="st">writing</span>'
-      and _so.get("signMer") == '<i class="dot" aria-hidden="true"></i><b class="shim soft">Concorde Sigma</b><span class="st"></span>'
-      and _so.get("signModeOnly") == '<i class="dot" aria-hidden="true"></i><b>Concorde Omega</b><span class="st">writing</span>'   # the mode alone never shimmers (OVERRIDE 4)
+      and _so.get("signOd") == '<i class="dot" aria-hidden="true"></i><b class="shim">Concorde Deep</b><span class="st">writing</span>'
+      and _so.get("signMer") == '<i class="dot" aria-hidden="true"></i><b class="shim soft">Concorde Pro</b><span class="st"></span>'
+      and _so.get("signModeOnly") == '<i class="dot" aria-hidden="true"></i><b>Concorde Deep</b><span class="st">writing</span>'   # the mode alone never shimmers (OVERRIDE 4)
       and _so.get("tok") == [{"n": 120, "est": False}, {"n": 30, "est": True}]
       and _so.get("day") == ["Today", "Yesterday", "This week", "Earlier"]
       and _so.get("mark") == "Best <mark>GPU</mark> for home", "%r" % (_so,))
@@ -39335,9 +39335,9 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and ".msg.ai.live .who b.shim{animation:hzShim 3.2s linear infinite}" in page
       and ".msg.ai.live .who b.shim.soft{animation-duration:5s}" in page
       and "@keyframes hzShim{to{background-position:300% 0}}" in page
-      and "  .hz .msg,.hz .chat-item,.hz #undobar,.hz .msg.ai.live .who .dot,.hz .behind .spine li.live .node,.hz .msg.ai.live .who b.shim,\n  .hz .msg.ai.live .liveline .die,.hz .msg.ai.live .liveline em,.hz #composer.finish::before{animation:none!important}" in page   # scoped under html.hz (integration)
+      and "  .hz .msg,.hz .chat-item,.hz #undobar,.hz .msg.ai.live .who .dot,.hz .behind .spine li.live .node,.hz .msg.ai.live .who b.shim,\n  .hz .msg.ai.live .liveline .die,.hz .msg.ai.live .liveline em{animation:none!important}" in page   # scoped under html.hz (integration)
       and "caretIn(" not in page and ".caret{" not in page   # the caret stays retired (6b257, per Patrick; integration)
-      and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Fast":"Alpha","Thinking":"Gamma","Pro":"Sigma","Vera Rubin":"Omega"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
+      and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Vera Rubin":"Deep"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "--hz-ink-read:#e6e9f4;" in page
       and ".msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;" in page
       and ".msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;" in page
@@ -39393,19 +39393,19 @@ check("the live line says what the frames say: searching, reading N sources, <mo
       and _lv.get("verify", {}).get("text") == "Checking the answer" and _lv.get("verify", {}).get("who") == ["Sam’s box · gpt-oss:20b"]
       and _lv.get("done") == "Done in 8.6 s" and _lv.get("idle") == "Thinking"
       and _lv.get("kinds") == ["local", "server", "cloud"] and _lv.get("names") == ["this Mac", "Sam’s box", "the cloud"], "%r" % (_lv,))
-check("the asking flow hangs off real frames: a comet per real DRAFT, the white ripple on the RUN compositor frame, the live line painted from the stream loop and a 200 ms clock, the glow on the live body's container, the light round the composer at the end",
-      'if(!/^\\(no answer/.test(d.t||"")&&!/\\((review|rewrite)\\)$/.test(d.m||""))cometFor(d.m,aiDiv);}' in page
-      and 'if(!stepComp&&drafts.filter(x=>!/^\\(no answer/.test(x.t||"")).length>=2)rippleAt(aiDiv,"#ffffff");' in page
+check("the asking flow hangs off real frames: the live line painted from the stream loop and a 200 ms clock, the answer-done event at the end; the comets, the ripple, the glow and the light round the composer are gone (the writing star, 6b544)",
+      "cometFor(" not in page and "rippleAt(" not in page
+      and "if(!drafts.some(x=>x.m===d.m))drafts.push(d);" in page
       and "liveLinePaint(aiDiv);              // the live line follows the frames (6b528)" in page
       and "const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);" in page
       and "liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});" in page
       and "if(full&&!wasAborted)answerLanded();" in page and 'document.dispatchEvent(new Event("hz-answer-done"))' in page
-      and '<canvas id="comets" aria-hidden="true"></canvas>' in page and "function cometsDraw(){" in page
-      and ".msg.ai.live .body{color:#fff;text-shadow:0 0 10px rgba(159,192,255,.38)" in page
-      and ".msg.ai .body{transition:color .9s ease,text-shadow .9s ease}" in page
-      and ".hz #composer.finish::before{opacity:1;animation:hzRing 1.5s cubic-bezier(.45,0,.25,1) 1}" in page and "@keyframes hzRing{to{--hz-ang:360deg}}" in page
+      and 'id="comets"' not in page and "function cometsDraw(){" not in page
+      and ".msg.ai.live .body{color:#fff;text-shadow" not in page
+      and ".msg.ai .body{transition:color .9s ease,text-shadow .9s ease}" not in page
+      and "#composer.finish" not in page and "@keyframes hzRing{to{--hz-ang:360deg}}" in page
       and ".msg.ai.live .liveline em{background:none;color:var(--hz-ink-2)}" in page
-      and "function cometsDraw(){" in _jsfn(page, "function cometsDraw(){") and "setTimeout(" not in _jsfn(page, "function livePhrase(steps,running,status,drafts,comp,done){"))
+      and "setTimeout(" not in _jsfn(page, "function livePhrase(steps,running,status,drafts,comp,done){"))
 # a fenced block with a blank line in it is ONE card (6b528): the paragraph splitter used to cut it in two
 # and wrap each half in <p>, and the inline rules dressed backticks and asterisks inside it
 def _fence528(src):
@@ -41748,25 +41748,22 @@ def _c542_gated(js, css, pg):
     return ('function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
             and 'if(hzFxLevel()==="calm")return;      // Calm shows the words plainly' in js
             and "if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}\n    if(from&&from.home)hzArc(from,hzS.liveChat);}\n  else hzStrike();" in js
-            and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the comets are Full' in pg
-            and 'if(typeof hzFxFull!=="function"||!hzFxFull())return;   // the ripple is Full' in pg
-            and 'if(typeof hzFxFull!=="function"||!hzFxFull()){if(typeof hzLandSweep==="function")hzLandSweep();return;}' in pg
+            and "cometFor(" not in pg and "rippleAt(" not in pg and "hzLandSweep" not in pg      # the asking flow is the writing star's (6b544)
             and 'if(!w||!hzMotionOK()||hzCalm()||document.documentElement.classList.contains("hz-intro"))return;' in js
             # present still, for Full: the trace, the streak, the sweep, the comets, the ring, the bloom, the sheen, the dies
             and "async function hzTraceIn(el,opts){" in js and "function hzStreak(row,b){" in js and "function hzSweep(b){" in js
-            and "function cometsDraw(){" in pg and ".hz.hz-ultra #composer::before{opacity:.9}" in css
+            and "function cometsDraw(){" not in pg and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in css
             and ".hz #hero .greet.shown .bloom{opacity:.75;animation:hzBreatheB 8s ease-in-out 1.4s infinite,hzShim 16s linear infinite}" in css
             and ".hz #hero .greet.shown .sheen{opacity:1;animation:hzSheen 9s var(--hz-ease-out) 3s infinite}" in css
             and ".hz .hz-rig.working .die{animation:hzDie 1.2s ease-in-out infinite}" in css
             # and gated in Calm
             and ".hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}" in css
             and ".hz:not(.hz-full) #hero .greet .bloom,.hz:not(.hz-full) #hero .greet .sheen{display:none}" in css
-            and ".hz:not(.hz-full) #composer::before,.hz:not(.hz-full) #composer.finish::before{animation:none;opacity:0!important}" in css
+            and ".hz:not(.hz-full) #composer::before{animation:none;opacity:0!important}" in css
             and ".hz:not(.hz-full) #hz-cglow{display:none}" in css
-            and ".hz:not(.hz-full) .hz-elevel.shim,.hz:not(.hz-full) .hz-elevel.shim.soft{background:none;color:var(--hz-ink-2);animation:none}" in css
+            and ".hz-elevel.shim" not in css      # the label's shimmer is gone at every level (6b544: Ultra's flow is the one loop on text)
             and ".hz:not(.hz-full) .liveline .die,.hz:not(.hz-full) .liveline .lstats{display:none}" in css
             and ".hz:not(.hz-full) .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2);animation:none}" in css
-            and ".hz:not(.hz-full) .msg.ai.live .body,.hz:not(.hz-full) .msg.ai.live .body>*:last-child{color:var(--hz-ink-read);text-shadow:none}" in css
             and ".hz:not(.hz-full) .msg.ai .who b.shim,.hz:not(.hz-full) .msg.ai .who b.shim.soft{background:none;color:#e2e7f5;animation:none}" in css
             and ".hz:not(.hz-full) .msg.ai.live .who .st{display:none}" in css
             and ".hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}" in css
@@ -41782,7 +41779,7 @@ def _c542_gated(js, css, pg):
             and "const hzq=isHz();   // no token counts beside Horizon's chats" in pg
             and 'const tk=hzq?{n:0,est:false}:chatTokens(c);if(tk.est&&tk.n)anyEst=true;' in pg
             and "const hzq=typeof isHz===\"function\"&&isHz();\n  return groups.map(g=>'<div class=\"cday\"><span>'+g.l+'</span>'\n    +(g.n&&!hzq?" in pg)
-check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, comets, ripple, rings, arc, glide, bloom, sheen, ring, glow, shimmer, dies, pulse); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
+check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, rings, arc, glide, bloom, sheen, dies, pulse; the comets, ripple, glow and landing ring went with the writing star, 6b544); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
       _c542_gated(_hz_js, _hz_css, page)
       and not _c542_gated(_hz_js.replace('return hzMotionOK()&&hzFxLevel()==="full";', "return hzMotionOK();"), _hz_css, page)
       and not _c542_gated(_hz_js, _hz_css.replace(".hz:not(.hz-full) #hz-cglow{display:none}", ""), page)
@@ -41845,7 +41842,7 @@ def _c542_sting(css, js, ember):
             and ".hz #send svg{stroke-width:1.5}" in css
             and ".hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}" in css
             and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
-            and css.count("var(--hz-ember)") == 6 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops
+            and css.count("var(--hz-ember)") == 7 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the seventh use: the beam's keyboard pill, 6b544)
             and ':root{--hz-r-composer:14px;--hz-ember:' in css
             and ".hz .hz-sl-thumb{width:10px;height:10px;margin-left:-5px;border-radius:1px;box-sizing:border-box;background:#0a0d18;border:1px solid #fff;box-shadow:none;" in css
             and "transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}" in css
@@ -41903,7 +41900,7 @@ check("6b542 one greeting: Calm writes ONE text node (shown at once); Full's thr
 # BALANCED (the default): the living touches, each soft, from a real input or the hour, settling;
 # nothing loops but the slow sky (the status dot breathes only while an answer works)
 def _c542_bal(js, css):
-    bal = css[css.index("/* ---- BALANCED (6b542"):]
+    bal = css[css.index("/* ---- BALANCED (6b542"):css.index("/* ---- ULTRA (6b544")]   # Ultra's flow is the owner's one loop on text (6b544), checked in its own section
     return ('if(hzFxBal()){\n    root.classList.add("hz-balopen");' in js
             and 'hzTraceIn(word,{margin:40,speed:900,spread:.45}).then(()=>{if(!hzS.intro)return;word.classList.add("shown");});' in js   # traced, about 2.5 s, no hz-litmark: no streak, no glint
             and 'at(3300,()=>root.classList.add("hz-markout"));' in js and 'at(4700,()=>hzIntroEnd(false));' in js
@@ -41917,16 +41914,15 @@ def _c542_bal(js, css):
             and ".hz.hz-bal .hz-sl-halo{display:block;animation:none;opacity:calc(.3 + var(--hz-eff-u) * .6);" in css
             and "transform:translateX(var(--hz-eff-px,0px)) scale(calc(.7 + var(--hz-eff-u) * .7));transition:transform 120ms ease,opacity 120ms ease}" in css
             and 'if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}' in js and "function hzChipSweep(b){" in js
-            and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);\n}\n// BALANCED (6b542): when the answer lands' in js
+            and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);\n}\n// one soft sweep along the composer' in js
             and ".hz .hz-usweep[hidden],.hz .novideo .hz-usweep{display:none}" in css
-            and "function hzLandSweep(){\n  const c=$(\"#composer\");if(!c||!hzFxBal()||!hzMotionOK()||!c.animate)return;" in js
-            and 'hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},700);' in js
+            and "hzLandSweep" not in js and "function hzLandSweep(){" not in js      # the landing is the star's (6b544)
             and ".hz.hz-bal .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite;opacity:1}" in css      # only while .live
             and ".hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}" in css
             and ".hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}" in css
             and "@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}" in css
             and bal.count("infinite") == 1 and ".live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite" in bal)   # the one loop: the dot, while working
-check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the landing's one pass, the breathing dot only while working, the lifting hover; nothing else loops; the mutants are caught",
+check("6b542 Balanced (the default): the traced opening without streak or glint, the greeting's glow that settles in 1.5 s (one node), the composer's top light warming on focus, the still effort pool growing with effort, the chip's 300 ms sweep, the breathing dot only while working, the lifting hover; nothing else loops (the landing's pass went with the writing star, 6b544); the mutants are caught",
       _c542_bal(_hz_js, _hz_css)
       and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .hz-sl-halo{display:block;animation:none;", ".hz.hz-bal .hz-sl-halo{display:block;animation:hzBreathe 8s ease-in-out infinite;"))
       and not _c542_bal(_hz_js.replace("if(!full){if(calm&&hzFxBal())hzChipSweep(b);return;}", "if(!full)return;"), _hz_css)
@@ -41934,6 +41930,106 @@ check("6b542 Balanced (the default): the traced opening without streak or glint,
 check("6b542 the Horizon rules added stay scoped under .hz and name no outside URL",
       _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
 # ==== calm by default, balanced, balance and sting (6b542): end ====
+
+# ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): begin ====
+# Patrick (2026-11-09): the Greek names go ("Fast · Thinking · Pro · Max · Deep"; effort "Low · Medium ·
+# High · Extra · Ultra"); "that's where I want to use VFX to have it pull something off" (Ultra); "make the
+# Ultra switch rival ... whatever Claude has" (the living ULTRA); "clean up how it writes and delivers the
+# final result ... I like the star effect, but rethink it" (the writing star). The friend page's values.
+print("== plain names, Ultra, the focus hairline, the writing star (6b544) ==")
+_GREEK544 = re.compile(r"\b(Alpha|Gamma|Sigma|Omega|Flare|Zenith|Meridian|Odyssey)\b")
+_tiers544 = re.findall(r'^    "([^"]+)": \{', _MILLENAI_SRC[_MILLENAI_SRC.index("TIERS = {"):_MILLENAI_SRC.index("# ------------------------------------------------------------- agents")], re.M)
+def _names544(pg, src, js, al):
+    return (not _GREEK544.search(pg)                                        # no Greek display name anywhere in the page
+            and 'const MODE_NAMES={"Vera Rubin":"Deep"};' in pg and "const modeName=t=>MODE_NAMES[t]||t;" in pg
+            and 'function hzModes(){return ["Fast","Thinking","Pro","Max","Vera Rubin"].filter(n=>TIER_META[n]);}' in js
+            and 'const HZ_MODE_DESC={"Fast":"Fast answers","Thinking":"Thinks it through",\n  "Pro":"Every model on your machines","Max":"Every model, every machine",\n  "Vera Rubin":"Keeps going until you stop it"};' in pg
+            and 'const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in js
+            and 'const hzModeWords=s=>String(s||"").replace(/^(Fast|Thinking|Pro|Max|Vera Rubin)(?=$| \\u00b7 )/,m=>modeName(m));' in pg   # the page carries the escape itself
+            and al.get("Deep") == "Vera Rubin"
+            and all(al.get(k) in _tiers544 for k in ("Deep", "Alpha", "Gamma", "Sigma", "Omega", "Flare", "Zenith", "Meridian", "Odyssey"))
+            and "tier = MODE_ALIASES[tier]" in src
+            and "Switch to Fast, Thinking or Pro to answer here." in src and "or switch to Fast, Thinking or Pro." in src
+            and "Thinking seats one writer and one critic" in src
+            and "<span>Use for Fast, Thinking, Pro and Code</span>" in pg and "Now on Thinking, cloud only." in pg
+            and '"Fast, cloud only: "' in pg and '". Fast answered.</div>"' in pg)
+check("6b544 plain names: Fast, Thinking, Pro, Max, Deep in the picker (Max out of More modes), Extra for the fourth effort, no Greek display name in the page, Deep and every old name an alias that resolves to a tier; the mutants are caught",
+      _names544(page, _MILLENAI_SRC, _hz_js, _hz_alias["MODE_ALIASES"])
+      and not _names544(page.replace('"Vera Rubin":"Deep"', '"Vera Rubin":"Omega"'), _MILLENAI_SRC, _hz_js, _hz_alias["MODE_ALIASES"])      # a Greek name back
+      and not _names544(page, _MILLENAI_SRC, _hz_js, {k: v for k, v in _hz_alias["MODE_ALIASES"].items() if k != "Deep"})                   # Deep not an alias
+      and not _names544(page, _MILLENAI_SRC, _hz_js.replace('"Pro","Max","Vera Rubin"]', '"Pro","Vera Rubin"]'), _hz_alias["MODE_ALIASES"])   # Max out of the picker
+      and not _names544(page, _MILLENAI_SRC, _hz_js.replace('"High","Extra","Ultra"]', '"High","Max","Ultra"]'), _hz_alias["MODE_ALIASES"]), "")
+# THE ULTRA MOMENT and THE LIVING ULTRA: once per arrival, the ignition (the diamond, the spark, the rim's
+# 600 ms reveal from 160 ms, the aurora's breath, the lit label); at Ultra the label flows (3.5 s) and the
+# diamond glows, the rim still; leaving drains in 300 ms; Calm and reduced motion still
+def _ultra_css544(css): return css[css.index("/* ---- ULTRA (6b544"):css.index("/* ---- the focus hairline on the beam (6b544)")]
+def _ultra544(css, js):
+    u = _ultra_css544(css)
+    return (".hz.hz-ultra #composer::after,.hz.hz-ultra-out #composer::after{display:block}" in u
+            and ".hz.hz-ignite #composer::after{animation:hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both}" in u
+            and "@keyframes hzUltraRun{0%{--hz-rev:0deg;--hz-head:1}90%{--hz-head:1}100%{--hz-rev:360deg;--hz-head:0}}" in u
+            and ".hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}" in u
+            and "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);" in u and "padding:1.5px" in u and "opacity:.9;" in u
+            and ".hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}" in u
+            and "18%{box-shadow:0 0 6px 2px #fff,0 0 22px 8px rgba(185,168,255,.75),0 0 44px 16px rgba(242,166,180,.45)}" in u
+            and ".hz .hz-elevel.spectral{background:linear-gradient(90deg,#cfe0ff,#b9a8ff,#f2a6b4,#e8415a,#f1dcb2,#cfe0ff);background-size:300% 100%;" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow 3.5s linear infinite}" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-thumb{animation:hzDiamondFlow 3.5s linear infinite}" in u
+            and "@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 12px rgba(255,255,255,.95),0 0 28px rgba(185,168,255,.7)}" in u
+            and ".hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}" in u
+            and u.count("infinite") == 4                      # the flow on the label and the diamond (plain and igniting): nothing else loops, the rim never
+            and ".hz.hz-calm.hz-ultra #composer::after{animation:hzRimIn .3s cubic-bezier(.16,1,.3,1) both}" in u
+            and ".hz #composer::after,.hz .hz-sl-thumb,.hz .hz-elevel.spectral,.hz.hz-ignite #hz-aurw{animation:none!important}" in u
+            and ".hz-elevel.shim" not in css
+            and 'en.classList.toggle("spectral",i===4);' in js
+            and "if(i===4&&was!=null&&was!==4)hzIgnite();else if(was===4&&i!==4)hzUltraOut();" in js
+            and 'function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}' in js
+            and 'hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);' in js
+            and 'hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ultra-out"),300);' in js
+            and 'cb.style.setProperty("--hz-a0",((Math.atan2(dx,-dy)*180/Math.PI+360)%360).toFixed(1)+"deg");' in js
+            # the focus hairline: keyboard only (:focus-visible on the range), a pill that hugs the beam; never from a click
+            and '.hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:3px;right:3px;top:13px;height:15px;border-radius:999px;pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}' in css
+            and ".hz-sl:focus-within" not in css)
+check("6b544 the Ultra moment: the ignition once per arrival (the diamond's bloom, the 160 ms spark, the rim's 600 ms reveal from 160 ms, the aurora's breath, the lit label), the still 1.5 px spectral rim, the living ULTRA (a 3.5 s flow on the label and the diamond, the one loop on text, off in Calm and reduced motion), the 300 ms drain, the keyboard-only ember pill on the beam; the mutants are caught",
+      _ultra544(_hz_css, _hz_js)
+      and not _ultra544(_hz_css.replace("hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both", "hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s infinite"), _hz_js)      # a looping rim
+      and not _ultra544(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) .hz-elevel.spectral{animation:hzFlow", ".hz.hz-ultra .hz-elevel.spectral{animation:hzFlow"), _hz_js)       # Calm flowing
+      and not _ultra544(_hz_css + ".hz .hz-sl:focus-within{box-shadow:0 0 0 1px var(--hz-ember)}", _hz_js)                                                              # the ring from a click
+      and not _ultra544(_hz_css, _hz_js.replace("if(i===4&&was!=null&&was!==4)hzIgnite();", "if(i===4)hzIgnite();")), "")                                               # igniting on every paint
+# THE WRITING STAR: one idea for the answer's delivery; the aim reads layout once per paint and the frame
+# loop never; the landing retires the star; the comets, the glow and the composer's landing light are gone
+def _star544(pg):
+    fr = _jsfn(pg, "function hzStarFrame(t){"); land = _jsfn(pg, "function hzStarLand(div){"); aim = _jsfn(pg, "function hzStarAim(body){")
+    return ("const hzStar={el:null,div:null,x:NaN,y:NaN,tx:NaN,ty:NaN,raf:0,on:false,marks:[],reads:0,at:0};" in pg
+            and 'if(globalThis.hzReady&&typeof hzStarStart==="function")hzStarStart(aiDiv);' in pg
+            and 'if(globalThis.hzReady&&typeof hzStarPaint==="function")hzStarPaint(body);' in pg
+            and 'if(globalThis.hzReady&&typeof hzStarSweep==="function")hzStarSweep(body);' in pg
+            and 'if(full&&!wasAborted)answerLanded();\n  if(globalThis.hzReady&&typeof hzStarLand==="function")hzStarLand(aiDiv);' in pg
+            and "getBoundingClientRect" not in fr and "getComputedStyle" not in fr and "offset" not in fr       # the frame reads no layout
+            and 's.el.style.transform="translate("+s.x.toFixed(2)+"px,"+s.y.toFixed(2)+"px)"' in fr
+            and aim.count("getBoundingClientRect") == 2 and "s.reads++" in aim                                   # one aim: the range and the message, at the paint
+            and "s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}" in land and "el.remove()" in land and 'div.classList.add("landed")' in land
+            and '{duration:400,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"}' in land
+            and '{duration:350,easing:"cubic-bezier(.3,0,.2,1)"}' in _jsfn(pg, "function hzStarSweep(body){")
+            and "m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();" in pg
+            and 'function hzStarOK(){return isHz()&&typeof hzMotionOK==="function"&&hzMotionOK()&&typeof hzFxLevel==="function"&&hzFxLevel()!=="calm";}' in pg
+            and ".hz .hz-star{display:none;position:absolute;left:0;top:0;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;" in pg
+            and "s.tx=rr.right-mr.left+6;" in aim                                                                 # 5 px after the word (the 4 px star's edge at +4)
+            and ".hz .hz-new{position:relative;animation:hzNew .16s cubic-bezier(.3,0,.2,1) both}" in pg
+            and "@keyframes hzNew{from{opacity:0;top:2px}to{opacity:1;top:0}}" in pg
+            and ".hz.hz-calm .hz-new{animation-name:hzNewCalm}" in pg and ".hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}" in pg
+            and ".hz .msg.ai.landed>.ans-foot .hz-details{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}" in pg
+            and ".hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}" in pg
+            and "@media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}" in pg
+            and "cometFor(" not in pg and "rippleAt(" not in pg and 'id="comets"' not in pg and "function cometsDraw(){" not in pg
+            and ".msg.ai.live .body{color:#fff;text-shadow" not in pg and "#composer.finish" not in pg and "hzLandSweep" not in pg
+            and 'function answerLanded(){\n  try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}\n}' in pg)
+check("6b544 the writing star: one star at the end of the newest text (aimed once per paint from a Range, moved by transform alone), the 160 ms reveal with a 2 px rise, the 350 ms pass at the polish swap, the 400 ms lift to the byline's dot that retires it, Details and the actions 120 ms apart; Calm the fade alone, reduced motion none; no comets, no glow, no light round the composer; the mutants are caught",
+      _star544(page)
+      and not _star544(page + 'if(!/^\\(no answer/.test(d.t||""))cometFor(d.m,aiDiv);')                                                                                     # a comet left in
+      and not _star544(page.replace("s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}", "s.on=false;"))                                                            # the star never retiring
+      and not _star544(page.replace("const dt=s.at?Math.min(64,t-s.at):16;s.at=t;", "const dt=s.at?Math.min(64,t-s.at):16;s.at=t;s.ty=s.el.getBoundingClientRect().top;")), "")    # a layout read per frame
+# ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
