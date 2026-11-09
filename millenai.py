@@ -45570,14 +45570,26 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and not slow_giant(lbl))
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
-                    # TWO PASS: draft in silence, then stream the rewrite.
-                    # The reader waits a little longer and gets a visibly
-                    # better answer instead of a first-take one.
-                    status(f"{lbl} is thinking")
+                    # TWO PASS, BOTH ON SCREEN (6b539, per Patrick: "faster
+                    # feels smarter"). The draft used to be written in
+                    # silence, so the first visible word waited for the
+                    # whole first pass (9-21 s warm on Gemma 4 26B, measured
+                    # in 6b531). The draft now streams as it is written, the
+                    # first word lands in a second or two, and the polished
+                    # answer replaces it: a RESET, which the page turns into a
+                    # soft crossfade that keeps the draft on screen until the
+                    # polish has words. The byline says which pass is on. If
+                    # the polish fails, the draft stays as the answer. The
+                    # saved chat keeps what follows the last RESET (turn_text).
+                    status(f"{lbl} is writing a first draft")
                     parts = []
                     draft = ""
+
+                    def _draft_live(chunk, _p=parts):
+                        _p.append(chunk)
+                        memit(chunk)
                     try:
-                        run_model(lbl, full_messages, parts.append)
+                        run_model(lbl, full_messages, _draft_live)
                         draft = strip_think("".join(parts))
                     except Exception:
                         draft = ""
@@ -45585,7 +45597,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         step("draft", "Drafted the answer", "done",
                              "%d chars" % len(draft))
                         step("polish", "Polishing", "run", "")
-                        status(f"{lbl} is polishing the answer")
+                        status(f"{lbl} is polishing")
+                        emit(Ctl(NUL + "RESET" + NUL))     # the polish takes the draft's place
                         # for a searched OR doc-carrying answer the
                         # "question" is the full grounded message — a
                         # reviser that can't see the data can't tell a
@@ -45596,16 +45609,28 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         # wrong evidence — seen in the gauntlet).
                         src_q = (ground_clip(full_messages[-1]["content"], 10000)
                                  if (query or docs) else prompt)
-                        _stream_guarded(
-                            lbl,
-                            [brief_system(full_messages[0]),     # the brief (6b515)
-                             {"role": "user",
-                              "content": REVISE_INSTRUCTION
-                              + "QUESTION: " + src_q
-                              + "\n\nFIRST DRAFT:\n" + draft[:6000]}],
-                            memit, status, draft,
-                            "showing the first draft")
+                        try:
+                            _stream_guarded(
+                                lbl,
+                                [brief_system(full_messages[0]),     # the brief (6b515)
+                                 {"role": "user",
+                                  "content": REVISE_INSTRUCTION
+                                  + "QUESTION: " + src_q
+                                  + "\n\nFIRST DRAFT:\n" + draft[:6000]}],
+                                memit, status, draft,
+                                "showing the first draft")
+                        except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                            raise
+                        except Exception:
+                            # the polish failed or timed out: the draft is
+                            # the answer (6b539), shown whole again
+                            status(f"{lbl} kept the first draft")
+                            emit(Ctl(NUL + "RESET" + NUL))
+                            memit(draft)
                     else:
+                        # a draft that wandered was on screen: it goes (6b539)
+                        if parts:
+                            emit(Ctl(NUL + "RESET" + NUL))
                         _stream_guarded(lbl, full_messages, memit, status,
                                         None,
                                         "kept the part before it wandered")
@@ -45737,7 +45762,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         # it said 7,421 chars for a 3,095-char answer)
                         step("draft", "Answer written", "done",
                              "%d chars" % (shown_n[0] or sent[0]))
-                        step("polish", "Sharpened", "done", "")
+                        step("polish", "Polished", "done", "")
                     # OSM already named the venues and knows where they are,
                     # so the local extraction pass is pure cost — pin them
                     # straight from the structured rows, mentioning only the
@@ -49104,6 +49129,12 @@ body.gen #chip-model{color:var(--accent)}
 @keyframes suggIn{from{opacity:0;transform:translateY(4px)}
   to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.sugg{animation:none}}
+/* the polish takes the draft's place with a soft crossfade (6b539) */
+.body.swapwait{opacity:.72;transition:opacity .25s ease}
+.body.swapout{opacity:0;transition:opacity .16s ease}
+.body.swapin{animation:swapIn .28s ease}
+@keyframes swapIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.body.swapwait,.body.swapout{opacity:1;transition:none}.body.swapin{animation:none}}
 
 #model-chip{
   font-family:var(--mono);font-size:10px;color:var(--faint);
@@ -56618,6 +56649,7 @@ async function send(){
     // text flows like typing instead of teleporting. The caret is
     // gone — the pinwheel rides the text's tail instead.
     let dripShown=0,dripOn=false,dripOff=false,streamEnded=false,dripCut=-1;   // dripOff: the answer has landed (integration)
+    let swapHold=false,swapAt=0;   // a RESET over shown prose: the old text holds until the new has words (6b539)
     const paintStream=txt=>{
       if(dripOff)return;             // a landed answer is never repainted from the drip (integration)
       // the tree owns the narration; the bare status line is only for
@@ -56638,6 +56670,24 @@ async function send(){
     };
     const dripTick=()=>{
       if(dripOff)return;
+      // THE DRAFT HOLDS THE SCREEN (6b539, per Patrick): the polish's RESET
+      // used to empty the answer and start it again from nothing. The shown
+      // prose now stays, dimmed, until the replacement has a few lines (or
+      // the stream ends, or 4 s pass), then a short crossfade swaps them;
+      // the box keeps its height so the page never jumps. No motion when
+      // effects are off or the system asks for reduced motion.
+      if(swapHold){
+        if(full.length<160&&!streamEnded&&performance.now()-swapAt<4000){setTimeout(dripTick,80);return;}
+        swapHold=false;
+        const fx=!(typeof noVideo!=="undefined"&&noVideo)
+          &&!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);
+        body.classList.remove("swapwait");
+        if(fx){body.classList.add("swapout");
+          setTimeout(()=>{body.classList.remove("swapout");body.classList.add("swapin");
+            setTimeout(()=>body.classList.remove("swapin"),300);
+            dripTick();},170);
+          return;}
+      }
       if(dripShown>=full.length){dripOn=false;
         if(streamEnded)paintStream(full);
         return;}
@@ -56745,7 +56795,12 @@ async function send(){
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
       // cut>=0 on every chunk zeroed the reveal every few hundred ms
-      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;}
+      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;
+        // the old prose holds, at its height, until the new has words (6b539)
+        if(body.textContent.trim()&&!swapHold){swapHold=true;swapAt=performance.now();
+          const h=body.getBoundingClientRect().height;if(h>0)body.style.minHeight=h+"px";
+          body.classList.add("swapwait");}
+      }
       if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
       if(steps.length)paintSteps();
@@ -56763,6 +56818,8 @@ async function send(){
     // let the reveal catch up (capped — a hidden window throttles rAF)
     for(let w=0;w<60&&dripShown<full.length;w++)
       await new Promise(r=>setTimeout(r,30));
+    // the swap's height pin and classes go with the stream (6b539)
+    body.style.minHeight="";body.classList.remove("swapwait","swapout","swapin");
   }catch(err){
     if(err.name==="AbortError")wasAborted=true;
     else{
