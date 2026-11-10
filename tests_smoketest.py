@@ -43309,6 +43309,202 @@ check("6b551 a nightly's What's new never lists commit subjects: the last releas
       and '+(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")' in page,
       "%r" % [_sl_n1.get("notes"), _sl_n2.get("notes"), _sl_w1.get("notes"), _sl_w2.get("notes")])
 # ==== settings-look (6b551): end ====
+# ==== beta-3 the chrome (6b554): begin ====
+# Patrick: the preview's look in the app (beta/DESIGN.md). Horizon only. The composer flat and low (99 px at rest on
+# the home, 95 on a phone, centred at the golden point); flat keys (no gradient, sheen, glint, glow, pulse or lift at
+# any level, Ultra included); the keyboard's ember ring only after the keyboard; Chat, Code and Funnels once, as the
+# header's sliding glass segmented control (the sidebar's tabs gone under Horizon, Classic keeps them); the ink (one
+# word to a box held at its rest width, the weight settling, the wet-ink light); no circles or rings in the chrome;
+# the tokens at DESIGN.md's values.
+print("== beta-3 the chrome (6b554) ==")
+_ch554_block = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== BETA 3 CHROME (6b554"):_MILLENAI_SRC.index("/* ==== beta 3 chrome end ==== */")]
+def _ch554_rules(css):
+    """(selector, body) of every rule, comments gone, @media wrappers opened"""
+    nc = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    nc = re.sub(r"@media[^{]*\{", "", nc)
+    return [(m.group(1).strip(), m.group(2)) for m in re.finditer(r"([^{}@]+)\{([^{}]*)\}", nc)]
+def _ch554_lanes(css, js, pg):
+    """one lane control under Horizon: the header's; #mode-tabs hidden under .hz only (Classic keeps it); the lit box
+    slides by the nav's data-m in 200 ms on --out; Funnels' star twinkles on hover only and never turns"""
+    try:
+        paint = _jsfn(js, "function hzLanePaint(){")
+    except ValueError:
+        return False
+    shows_tabs = [s for s, b in _ch554_rules(css) + _ch554_rules(pg) if ".hz" in s and "mode-tabs" in s and re.search(r"display:(?!none)", b)]
+    fstar = re.search(r"@keyframes hzFstar\{[^@]*?\}\}", css)
+    return (pg.count('role="tablist" aria-label="Lane"') == 1                                  # one lane control in the page
+            and '<nav id="hz-lanes" role="tablist" aria-label="Lane" data-m="ai"><i class="hz-seg-hi" aria-hidden="true"></i>' in pg
+            and ">Funnels</button>" in pg and 'class="hz-fstar" width="9" height="9"' in pg
+            and ".hz #mode-tabs{display:none}" in pg and not shows_tabs                          # never shown again under Horizon (the rule sits with the sidebar's)
+            and "#mode-tabs{display:flex;gap:0;margin:5px 0 6px;position:relative;" in pg         # Classic keeps its tabs
+            and 'const nav=$("#hz-lanes");if(nav&&nav.dataset.m!==uiMode)nav.dataset.m=uiMode;' in paint
+            and 'e.key==="Home"?0:e.key==="End"?tabs.length-1:-1;' in js
+            and ".hz #hz-lanes{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:32px;box-sizing:border-box;padding:0;margin:0;border-radius:6px;" in css
+            and ".hz #hz-lanes button{position:relative;z-index:1;min-width:88px;height:30px;padding:0 14px;margin:0;border:0;background:none;border-radius:4.5px;" in css
+            and ".hz #hz-lanes button{min-width:76px;padding:0 10px}" in css                     # a phone
+            and "transform:translateX(calc(var(--hz-i) * 100%));" in css
+            and "transition:transform .2s var(--hz-ease-out),box-shadow .2s var(--hz-ease-out)}" in css   # the slide: 200 ms on --out
+            and ".hz #hz-lanes[data-m=code] .hz-seg-hi{--hz-i:1}" in css and ".hz #hz-lanes[data-m=funnel] .hz-seg-hi{--hz-i:2;" in css
+            and ".hz:not(.hz-calm) #hz-lanes button:hover .hz-fstar{animation:hzFstar 1.4s ease-in-out}" in css
+            and fstar is not None and "rotate" not in fstar.group(0) and "infinite" not in fstar.group(0)
+            and not [s for s, b in _ch554_rules(css) if "hz-fstar" in s and "animation:hzFstar" in b and ":hover" not in s])
+_CH554_KEYS = ("#send", "#attach", "#mic", "#voicebtn")
+def _ch554_flat(css):
+    """the composer's keys at every level, Ultra included: no gradient, sheen, filter, text-shadow, animation (but none)
+    or lift; every box-shadow a hairline or a ring with no blur (an offset 0, a blur 0)"""
+    seen = 0
+    for sel, body in _ch554_rules(css):
+        for x in (x_.strip() for x_ in sel.split(",")):
+            if "codecard" in x or not (any(k in x for k in _CH554_KEYS) or re.search(r"\.cbtn(?![-\w])", x)):
+                continue
+            seen += 1
+            if re.search(r"gradient\(|(?<![-\w])filter:|text-shadow:|sheen|glint", body):
+                return False
+            for a_ in re.findall(r"animation(?:-name)?:([^;}]*)", body):
+                if a_.strip() not in ("none", "none!important"):
+                    return False
+            if re.search(r"translateY\(-", body) and not x.endswith(" svg"):     # a lift (the arrow's own -.5 px optical nudge is not one)
+                return False
+            for m in re.finditer(r"box-shadow:([^;}]*)", body):
+                for sh_ in re.split(r",(?![^()]*\))", m.group(1)):
+                    sh_ = sh_.strip()
+                    if sh_ in ("none", "inherit"):
+                        continue
+                    n_ = re.findall(r"-?\d*\.?\d+(?:px)?", re.sub(r"rgba?\([^)]*\)|var\([^)]*\)|#[0-9a-fA-F]+|inset", "", sh_))
+                    if len(n_) < 3 or any(float(v.replace("px", "")) != 0 for v in n_[:3]):
+                        return False
+    return seen >= 12
+def _ch554_round(block):
+    """no circles, rings or radial glows in the chrome's new css"""
+    nc = re.sub(r"/\*.*?\*/", "", block, flags=re.S)
+    return ("50%" not in re.sub(r"(left|top):50%|translate[XY]?\([^)]*\)", "", nc) and "radial-gradient" not in nc and "circle" not in nc
+            and "999px" not in nc and not re.search(r"@keyframes \w*[Rr]ing", nc))
+def _ch554_height(css):
+    """the composer at rest, from its css: border + padding + one 26 px line + the gap + the row's keys = 99 on the home,
+    95 on a phone"""
+    g_ = lambda rx: re.search(rx, css)
+    home = g_(r"\.hz #composer\{border-radius:var\(--hz-r-panel\);padding:(\d+)px (\d+)px (\d+)px (\d+)px;gap:(\d+)px;background:var\(--hz-glass-grad\);border:1px solid")
+    inp = g_(r"\.hz #input\{font:17px/(\d+)px var\(--hz-font-ui\);color:var\(--hz-ink\);padding:0 2px;min-height:(\d+)px;max-height:(\d+)px;overflow-y:auto\}")
+    key = g_(r"\.hz \.cbtn\{width:(\d+)px;height:(\d+)px;border-radius:8px;")
+    send = g_(r"\.hz #send\{width:(\d+)px;height:(\d+)px;border-radius:8px;")
+    pick = g_(r"\.hz \.hz-pick\{height:(\d+)px;border-radius:8px;")
+    phone = g_(r"@media \(max-width:600px\)\{\n  \.hz #composer\{padding:(\d+)px (\d+)px (\d+)px (\d+)px\}\n  \.hz #crow \.cbtn,\.hz #crow #model-chip\{width:(\d+)px;height:(\d+)px\}\n  \.hz #crow \.hz-pick\{height:(\d+)px\}")
+    if not all((home, inp, key, send, pick, phone)):
+        return None
+    t, r_, b, l = (int(x) for x in home.groups()[:4])
+    row = max(int(key.group(2)), int(send.group(2)), int(pick.group(1)))
+    at_rest = 2 + t + int(inp.group(2)) + int(home.group(5)) + row + b
+    pt, pr, pb, pl = (int(x) for x in phone.groups()[:4])
+    prow = max(int(phone.group(6)), int(phone.group(7)))
+    on_phone = 2 + pt + int(inp.group(2)) + int(home.group(5)) + prow + pb
+    return {"home": at_rest, "phone": on_phone, "pad": (t, r_, b, l), "ppad": (pt, pr, pb, pl), "line": int(inp.group(1)), "max": int(inp.group(3))}
+def _ch554_kb_run(js):
+    kb = _jsfn(js, "function hzKbWire(){")
+    src = kb + r"""
+const L={};function addEventListener(t,f,cap){(L[t]=L[t]||[]).push([f,cap]);}
+const cls=new Set();const document={documentElement:{classList:{add:c=>cls.add(c),remove:c=>cls.delete(c),contains:c=>cls.has(c)}}};
+hzKbWire();const fire=(t,e)=>(L[t]||[]).forEach(([f])=>f(e||{}));const out={};
+fire("pointerdown");fire("keydown",{key:"a"});out.letter=cls.has("hz-kb");fire("keydown",{key:"Enter"});out.enter=cls.has("hz-kb");
+for(const k of ["Tab","ArrowRight","Home","End","PageDown"]){cls.clear();fire("keydown",{key:k});out[k]=cls.has("hz-kb");}
+fire("pointerdown");out.cleared=!cls.has("hz-kb");out.capture=(L.keydown||[]).every(x=>x[1]===true)&&(L.pointerdown||[]).every(x=>x[1]===true);
+process.stdout.write(JSON.stringify(out));
+"""
+    try:
+        return _node_json(src, "kb554.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _ch554_kb(css, js):
+    r = _ch554_kb_run(js)
+    return (r.get("letter") is False and r.get("enter") is False and all(r.get(k) is True for k in ("Tab", "ArrowRight", "Home", "End", "PageDown"))
+            and r.get("cleared") is True and r.get("capture") is True
+            and "  hzKbWire();\n" in js
+            and ".hz:not(.hz-kb) #crow .cbtn:focus-visible,.hz:not(.hz-kb) #crow .hz-pick:focus-visible,.hz:not(.hz-kb) #crow #model-chip:focus-visible,\n.hz:not(.hz-kb) #hz-lanes button:focus-visible,.hz:not(.hz-kb) #sidebar .chat-item:focus-visible,.hz:not(.hz-kb) #sidebar #newchat:focus-visible{outline:0;box-shadow:none}" in css
+            and ".hz:not(.hz-kb) .hz-sl:has(input:focus-visible)::after{box-shadow:none}" in css
+            and ".hz.hz-kb #composer.hastext #send:not(:disabled):not(.stop):focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 3px var(--hz-ember)}" in css
+            and ".hz.hz-kb #hz-lanes button:focus-visible,.hz.hz-kb #sidebar .chat-item:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}" in css)
+def _ch554_ink(css, pg):
+    """the ink: one word to a box, its width read at the rest weight BEFORE the weight moves (one read per paint), the
+    weight 320 > 400 (bold and headings 450 > 600) in 280 ms, the wet-ink light fading in 300 ms; text-wrap: wrap and no
+    kerning while streaming; Calm a plain fade; reduced motion none"""
+    try:
+        wrap = _jsfn(pg, "function hzStarWrap(nodes,segs){")   # the conversation's js, in the page
+    except ValueError:
+        return False
+    i_read, i_go = wrap.find("getBoundingClientRect"), wrap.find('classList.add("go")')
+    return (0 < i_read < i_go and wrap.count("getBoundingClientRect") == 1
+            and 'x.style.width=wd[i]+"px";' in wrap and "toFixed" not in wrap                   # the exact width: a rounded one nudges what follows
+            and "if(ws>=A&&ws<B)" in wrap and "if(calm||!ink.length)return;" in wrap
+            and ".hz .hz-ink{display:inline-block;--hz-w0:320;--hz-w1:400}" in css
+            and ".hz .msg.ai .body strong .hz-ink,.hz .msg.ai .body b .hz-ink,.hz .msg.ai .body h1 .hz-ink,.hz .msg.ai .body h2 .hz-ink,.hz .msg.ai .body h3 .hz-ink{--hz-w0:450;--hz-w1:600}" in css
+            and ".hz .msg.ai.live .body{text-wrap:wrap;font-kerning:none}" in css
+            and "@keyframes hzInkIn{0%{opacity:0;transform:translateY(1px);filter:blur(2px) drop-shadow(0 0 6px rgba(255,255,255,.6))}" in css
+            and "100%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}" in css
+            and ".hz .msg.ai .body.swapout{opacity:.12;filter:blur(1.5px);transition:opacity .22s ease,filter .22s ease}" in css
+            and ".hz .msg.ai .body.swapin{animation:hzInkShimmer .62s var(--hz-ease-out) both}" in css
+            and ".hz.hz-calm .msg.ai .body.swapin{animation:hzInkFade .4s ease both}" in css
+            and "@media (prefers-reduced-motion:reduce){.hz .hz-ink{animation:none!important}" in css
+            and "family=Space+Grotesk:wght@300..700&" in _MILLENAI_SRC                            # the variable face, 300 to 700
+            and "hzi?640:300);\n            dripTick();},hzi?220:170);" in _MILLENAI_SRC)       # Classic's swap keeps its 170 / 300
+def _ch554_tokens(css):
+    return all(t in css for t in (
+        "--hz-night:#030305; --hz-deep:#0a0a0c;", "--hz-ink:#f4f5fa;", "--hz-ink-2:#c6cde0;", "--hz-ink-3:#9aa6c6;", "--hz-ink-read:#e8ebf5;",
+        "--hz-hair:rgba(241,230,206,.09); --hz-hair-2:rgba(241,230,206,.15);", "--hz-line:rgba(243,235,216,.32); --hz-spec:rgba(255,250,240,.12);",
+        "--hz-blur:blur(30px) saturate(108%);", "--hz-glass-grad:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));",
+        "--hz-glass-dense:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03)),rgba(8,8,10,.78);",
+        "--hz-shadow:0 1px 2px rgba(0,0,0,.18),0 12px 32px -8px rgba(0,0,0,.34),0 40px 96px -32px rgba(0,0,0,.55);",
+        "--hz-ease-spring:cubic-bezier(.16,1,.3,1);", "--hz-t-fast:120ms; --hz-t-mid:200ms; --hz-t-slow:320ms;", "--hz-r-panel:14px; --hz-r-ctl:8px; --hz-r-chip:6px; --hz-r-tag:4px;"))
+_ch554_h = _ch554_height(_hz_css)
+check("6b554 the composer, flat and low: 99 px at rest on the home and 95 on a phone (its css: 13 / 14 / 12 / 16, one 26 px line, a 10 px gap, the 36 px row; 13 / 12 / 12 / 14 and a 32 px row on a phone), typed text growing it to 156 px, the glass the one material (blur 30, saturate 108, the top highlight, the inner shadow at the foot), its focus a silver line; the mutants are caught",
+      _ch554_h is not None and _ch554_h["home"] == 99 and _ch554_h["phone"] == 95 and _ch554_h["pad"] == (13, 14, 12, 16) and _ch554_h["ppad"] == (13, 12, 12, 14)
+      and _ch554_h["line"] == 26 and _ch554_h["max"] == 156
+      and "box-shadow:inset 0 1px 0 var(--hz-spec),var(--hz-glass-inner),var(--hz-shadow);" in _hz_css
+      and "--hz-glass-inner:inset 0 -1px 0 rgba(0,0,0,.28),inset 0 -12px 18px -14px rgba(0,0,0,.45);" in _hz_css
+      and "const HZ_PHI=0.618,HZ_HEAD=72;" in _hz_js and 'new ResizeObserver(()=>{if(root.classList.contains("hz"))hzGlowFit();}).observe($("#composer"));' in _hz_js   # re-seated at the golden point as it grows
+      and (_ch554_height(_hz_css.replace("padding:13px 14px 12px 16px;gap:10px;", "padding:18px 14px 12px 16px;gap:10px;")) or {}).get("home") != 99   # taller again
+      and (_ch554_height(_hz_css.replace("padding:0 2px;min-height:26px;max-height:156px;", "padding:0 2px;min-height:52px;max-height:156px;")) or {}).get("home") != 99   # two lines at rest
+      and (_ch554_height(_hz_css.replace(".hz #crow .cbtn,.hz #crow #model-chip{width:32px;height:32px}", ".hz #crow .cbtn,.hz #crow #model-chip{width:40px;height:40px}")) or {}).get("phone") != 95,
+      "%r" % (_ch554_h,))
+check("6b554 no shine on the composer's keys: send, attach and mic flat at every level, Ultra included (no gradient, sheen, filter, glow, pulse or lift; hairlines and blur-free rings only); the send key ember only with text, the night's arrow on it, a flat lighter ember on hover, a 1 px press; the mic's listening state a plain fill; the mutants are caught",
+      _ch554_flat(_hz_css)
+      and ".hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ed5169;color:var(--hz-night)}" in _hz_css
+      and ".hz #crow .cbtn:active,.hz #crow .hz-pick:active,.hz #crow #model-chip:active,.hz #hz-lanes button:active{transform:translateY(1px) scale(.985);transition-duration:80ms}" in _hz_css
+      and ".hz #mic.rec{animation:none;color:var(--hz-ink);background:rgba(255,255,255,.12);border-color:var(--hz-line)}" in _hz_css
+      and not _ch554_flat(_hz_css + ".hz.hz-ultra #send{background:linear-gradient(90deg,#8fb7ff,#a58bff)}")                       # a gradient at Ultra
+      and not _ch554_flat(_hz_css + ".hz.hz-full #composer.hastext #send:not(:disabled):not(.stop){box-shadow:0 0 18px rgba(232,65,90,.5)}")   # an ember glow
+      and not _ch554_flat(_hz_css.replace(".hz #mic.rec{animation:none;", ".hz #mic.rec{animation:hzBreathe 2s ease-in-out infinite;"))   # the mic's pulse back
+      and not _ch554_flat(_hz_css + ".hz.hz-bal #attach:hover{transform:translateY(-1px)}")                                          # a lift
+      and not _ch554_flat(_hz_css + ".hz.hz-ultra .cbtn::after{content:\"\";filter:blur(2px)}"), "")                                  # a sheen by filter
+check("6b554 the lanes, once: Chat, Code and Funnels as the header's glass segmented control (one tablist in the page; the sidebar's #mode-tabs hidden under .hz only, Classic keeps them), 88 px segments (76 on a phone), 32 tall, radius 6 and 4.5; the lit box slides to the chosen lane in 200 ms on --out; arrows, Home and End; Funnels' star twinkles on hover only, never turning; the mutants are caught",
+      _ch554_lanes(_hz_css, _hz_js, page)
+      and not _ch554_lanes(_hz_css + ".hz #mode-tabs{display:flex}", _hz_js, page)                                                    # the duplicate back
+      and not _ch554_lanes(_hz_css, _hz_js, page.replace('<div id="mode-tabs">', '<div id="mode-tabs" role="tablist" aria-label="Lane">'))   # a second lane tablist
+      and not _ch554_lanes(_hz_css.replace("transition:transform .2s var(--hz-ease-out),box-shadow .2s var(--hz-ease-out)}", "transition:none}"), _hz_js, page)   # the slide gone
+      and not _ch554_lanes(_hz_css.replace("40%{transform:scale(1.35);opacity:1}", "40%{transform:scale(1.35) rotate(45deg);opacity:1}"), _hz_js, page)   # the star turning
+      and not _ch554_lanes(_hz_css + ".hz #hz-lanes .hz-fstar{animation:hzFstar 1.4s ease-in-out infinite}", _hz_js, page)            # twinkling at rest
+      and not _ch554_lanes(_hz_css, _hz_js.replace("if(nav&&nav.dataset.m!==uiMode)nav.dataset.m=uiMode;", ""), page), "")          # the box never moves
+check("6b554 the keyboard's ring, keyboard only: html.hz-kb after Tab, an arrow, Home, End or a Page key (never a letter or Enter), cleared by any pointer press, both caught first; no ring on a clicked key, lane, row or the slider; the ember ring stood off the filled send key and inside a lane and a row; the mutants are caught",
+      _ch554_kb(_hz_css, _hz_js)
+      and not _ch554_kb(_hz_css, _hz_js.replace('addEventListener("pointerdown",()=>root.classList.remove("hz-kb"),true);', ""))       # a click leaves it
+      and not _ch554_kb(_hz_css, _hz_js.replace("/^(Tab|Arrow|Home$|End$|Page)/", "/^(Tab|Arrow|Home$|End$|Page|Enter)/"))          # Enter turns it on
+      and not _ch554_kb(_hz_css.replace(".hz:not(.hz-kb) .hz-sl:has(input:focus-visible)::after{box-shadow:none}", ""), _hz_js), "")   # the slider's ring after a click
+check("6b554 the ink: one word to a box at its rest weight's width (read once per paint, before the weight moves; exact, never rounded), the weight 320 > 400 and 450 > 600 in 280 ms, the wet-ink light gone in 300 ms, text-wrap: wrap and no kerning while it streams, the calm dissolve (.12 and 1.5 px in 220 ms, a 620 ms shimmer; Calm a 400 ms fade), Space Grotesk the variable 300-700; the mutants are caught",
+      _ch554_ink(_hz_css, page)
+      and not _ch554_ink(_hz_css, page.replace('  const wd=ink.map(x=>x.getBoundingClientRect().width);', '  ink.forEach(x=>x.classList.add("go"));const wd=ink.map(x=>x.getBoundingClientRect().width);'))   # measured mid-weight
+      and not _ch554_ink(_hz_css, page.replace('x.style.width=wd[i]+"px";', 'x.style.width=wd[i].toFixed(1)+"px";'))            # a rounded width
+      and not _ch554_ink(_hz_css.replace(".hz .msg.ai.live .body{text-wrap:wrap;", ".hz .msg.ai.live .body{text-wrap:pretty;"), page)   # pretty re-breaks earlier lines
+      and not _ch554_ink(_hz_css, page.replace("if(ws>=A&&ws<B)", "if(ws+w[0].length>A&&ws<B)")), "")                             # a shown word starting over
+check("6b554 no circles or rings in the chrome's css (no 50 % radius, no radial glow, no pill rings, no ring keyframes), and its rules stay under .hz; the mutants are caught",
+      _ch554_round(_ch554_block) and _hz_scoped(_ch554_block)
+      and not _ch554_round(_ch554_block + ".hz #hz-lanes .hz-seg-hi{border-radius:50%}")
+      and not _ch554_round(_ch554_block + ".hz #send::after{background:radial-gradient(circle,rgba(232,65,90,.4),transparent 70%)}")
+      and not _ch554_round(_ch554_block + "@keyframes hzSendRing{to{opacity:0}}")
+      and not _hz_scoped(_ch554_block + "\n#composer{padding:13px}"), "")
+check("6b554 the Horizon tokens at beta/DESIGN.md's values: the ground #030305, the inks, champagne hairlines, the frosted glass and its dense kin, two soft shadows, one easing family with no bounce, 120 / 200 / 320 ms, radii 14 / 8 / 6 / 4; the greeting tracked -0.03em (-0.02em on a phone) at the display size; the mutant is caught",
+      _ch554_tokens(_hz_css)
+      and ".hz #hero .greet{font-family:var(--hz-font-display);font-weight:500;font-size:clamp(44px,6.2vw,96px);line-height:1;letter-spacing:-.03em;" in _hz_css
+      and "@media (max-width:600px){.hz #hero .greet{font-size:clamp(40px,11.5vw,56px);letter-spacing:-.02em}}" in _hz_css
+      and not _ch554_tokens(_hz_css.replace("--hz-night:#030305;", "--hz-night:#04050a;")), "")
+# ==== beta-3 the chrome (6b554): end ====
 
 # ==== the effort slider, slim and fluid (6b552): begin ====
 # Patrick (2026-11-09 evening): "Remember how we had it? It looked beautiful when it was very slim and very fluid, not
