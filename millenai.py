@@ -51488,6 +51488,7 @@ body.gen #chip-model{color:var(--accent)}
    width again, it goes INSIDE this block, not into a second one. */
 #mburger{display:none}
 @media (max-width:760px){
+  html.hz #sidebar{background:var(--hz-glass-grad),rgba(6,6,8,.9)}   /* Horizon's drawer: a denser near-black over the page (6b555) */
   #sidebar{
     position:fixed;left:0;top:0;bottom:0;z-index:60;
     width:300px!important;min-width:300px!important;
@@ -53139,7 +53140,6 @@ html:not(.hz) .sl-sel{display:none}
 @media (prefers-reduced-motion:reduce){.hz .hz-ink{animation:none!important}
   .hz .msg.ai .body.swapout,.hz .msg.ai .body.swapwait{opacity:1;filter:none;transition:none}.hz .msg.ai .body.swapin{animation:none}}
 /* ---- the sidebar: the glass over the night (a denser near-black where it is a drawer over the page) */
-@media (max-width:760px){.hz #sidebar{background:var(--hz-glass-grad),rgba(6,6,8,.9)}}
 /* ---- a phone: the composer's 95 px (13 / 12 / 14 / 12 and a 32 px row); the lanes just under the header */
 @media (max-width:600px){
   .hz #composer{padding:13px 12px 12px 14px}
@@ -58322,7 +58322,7 @@ async function send(){
   if(uiMode==="funnel"&&text&&!pendingImages.length&&!pendingDocs.length){
     if(fnState&&fnState.chat===curChat){
       if(!fnAnswer)return;          // stage still building — keep the text
-      input.value="";input.style.height="auto";
+      input.value="";input.style.height="auto";if(hzReady&&hzS&&hzS.hasText)hzS.hasText();   /* the send key back to glass once the box is empty (6b555) */
       addMsg("user",text);
       // one line, whatever was typed: the server reads picks back out
       // of "q → label" assistant turns, and $-anchored regex can't
@@ -58331,7 +58331,7 @@ async function send(){
       return;
     }
     if(!messages.length){
-      input.value="";input.style.height="auto";
+      input.value="";input.style.height="auto";if(hzReady&&hzS&&hzS.hasText)hzS.hasText();   /* the send key back to glass once the box is empty (6b555) */
       startFunnel(text);
       return;
     }
@@ -58351,7 +58351,7 @@ async function send(){
   // in a terminal, a command it doesn't have.
   const eng=(!tier&&!advOn)?engineState[model]:null;
   if(eng&&!eng.up){
-    input.value="";input.style.height="auto";
+    input.value="";input.style.height="auto";if(hzReady&&hzS&&hzS.hasText)hzS.hasText();   /* the send key back to glass once the box is empty (6b555) */
     addMsg("user",text);
     const help="**"+model+"** isn't running ("+eng.note+"). "+
       (IS_PC?"Pick a mode, or install it in Settings > Models.":
@@ -58363,7 +58363,7 @@ async function send(){
 
   api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({stop:true})});
-  input.value="";input.style.height="auto";
+  input.value="";input.style.height="auto";if(hzReady&&hzS&&hzS.hasText)hzS.hasText();   /* the send key back to glass once the box is empty (6b555) */
   const sentImages=pendingImages.slice();
   const sentDocs=pendingDocs.slice();
   pendingImages=[];pendingDocs=[];paintChips();
