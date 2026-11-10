@@ -58374,6 +58374,11 @@ async function send(){
       +'color:var(--faint);margin-bottom:6px">Your picked models are gone from '
       +esc(gs?gs.name:"your server")+". Fast answered.</div>");
   }
+  // dripOff: the answer has landed (integration). Declared OUTSIDE the try
+  // (6b554): the landing after the try/catch sets it, and in this
+  // strict-mode script a let inside the try made that a ReferenceError that
+  // ended every streamed answer with "Couldn't send. dripOff is not defined".
+  let dripOff=false;
   try{
     // a Try again or Edit & resend rewinds the saved chat: the server
     // does it with the question, once no benchmark can refuse it (6b331)
@@ -58447,7 +58452,7 @@ async function send(){
     // animator reveals it at a rate that eases toward the backlog, so
     // text flows like typing instead of teleporting. The caret is
     // gone — the pinwheel rides the text's tail instead.
-    let dripShown=0,dripOn=false,dripOff=false,streamEnded=false,dripCut=-1;   // dripOff: the answer has landed (integration)
+    let dripShown=0,dripOn=false,streamEnded=false,dripCut=-1;
     let swapHold=false,swapAt=0;   // a RESET over shown prose: the old text holds until the new has words (6b539)
     const paintStream=txt=>{
       if(dripOff)return;             // a landed answer is never repainted from the drip (integration)

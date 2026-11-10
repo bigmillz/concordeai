@@ -20230,3 +20230,15 @@ over the wire; the race did not reproduce on a quiet machine before the fix eith
 computer's own Pro seats follow its free memory (`model_fits_memory`), which other work on the machine moved between
 the check's `/api/tiers` snapshot and the Pro run minutes later (Qwen 3.6 35B MoE admitted at the run, not at the
 snapshot). The check now takes the snapshot just before the Pro run and still holds the line-up to it exactly.
+
+## 6b554 — every answer ended with "Couldn't send. dripOff is not defined" (hotfix, found by a helper)
+
+Since 0402079 (integ-1's second fix round, so 7.0 beta 1 and beta 2) send() declared `dripOff` with a `let` INSIDE its
+`try{`, while the landing after the try/catch sets `dripOff=true`. The page script is "use strict", so that line threw a
+ReferenceError after every streamed answer: the caller's catch put "Couldn't send. dripOff is not defined" in the
+composer's placeholder and the rest of the landing (the final prose, places, the byline) never ran. Seen in headless
+Chromium with a stand-in streamed /api/chat. Fix: `let dripOff=false;` at send's own level, just before the try, and out
+of the inner `let`. The gauntlet never drove a whole send through the page, which is why 1496/1496 let it through.
+Check: "send: no name declared inside its try is assigned after it" collects every `let`/`const` declared on a 4-space
+line inside send's try and fails if one is assigned on a 2-space line after it closes; its mutant (the old placement)
+is caught. Follow-up worth doing: a gauntlet check that drives a full streamed answer through the real page.

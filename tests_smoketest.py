@@ -5286,6 +5286,33 @@ check("the marginalia lives outside the prose and survives streaming (6b528; rep
       and ".hz #main:not(:has(#hero)) #chat-scroll.scrolled{-webkit-mask-image:" in page and 'scroller.classList.toggle("scrolled",on)' in page   # the header fade only once scrolled (integration)
       and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
       and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
+# 6b554, a hotfix: every streamed answer ended with "Couldn't send.
+# dripOff is not defined" from beta 1 on. The page is "use strict"; dripOff was
+# a let INSIDE send's try{ while the landing after the try/catch assigns it, a
+# ReferenceError. It must be declared at the function's own level, before the
+# try, and nowhere inside it. The scope rule is run, not just pinned: every
+# `let`/`const` name declared on a 4-space line inside send's try is collected
+# and none of them may be assigned on a 2-space line after the try closes.
+def _send_scope_ok(pg):
+    i=pg.find("  let dripOff=false;\n")
+    t=pg.find("\n  try{\n",i)
+    if i<0 or t<0 or t-i>600: return False, "dripOff not declared just before send's try"
+    c=pg.find("\n  }catch(err){",t)
+    e=pg.find("\n  }\n",c+5)
+    after=pg[e:pg.find("\n}\n",e)]
+    inner=[]
+    for ln in pg[t:c].split("\n"):
+        m=re.match(r"^    (?:let|const) (.+?);",ln)
+        if m:
+            for part in m.group(1).split(","):
+                nm=part.split("=")[0].strip()
+                if re.match(r"^[A-Za-z_$][\w$]*$",nm): inner.append(nm)
+    bad=[n for n in inner if re.search(r"(?m)^  (?:"+re.escape(n)+r")\s*=[^=]",after)]
+    return (not bad), bad
+_ok,_why=_send_scope_ok(page)
+_mut=page.replace("  let dripOff=false;\n","",1).replace("let dripShown=0,dripOn=false,","let dripShown=0,dripOn=false,dripOff=false,",1)
+check("send: no name declared inside its try is assigned after it (dripOff, 6b554); the mutant is caught",
+      _ok and not _send_scope_ok(_mut)[0], _why)
 # 6b257: the bar the user SEES is a tween chasing the honest math —
 # the in-place fast path moves .wtbar i without an innerHTML rewrite
 # (a rewrite recreates the <i> and kills the width transition), and
