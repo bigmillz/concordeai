@@ -100,3 +100,12 @@ every sample, at no cost to correctness that the bench can see and slightly fast
 quality release: overall +0.17 (se 0.24) is under one standard error, and the low scores (q01–q03, q07, q19,
 2–3 of 10) are search and model knowledge, which no rule here touches. The server path (where most of the owner's
 answers go) was not measured: the server was off when the A/B started.
+
+## After the bench: the server path
+
+The scorecard's first server runs found what this bench (local) could not: the owner's gemma4:12b reasons
+hidden by default, comes in 25–35 s, and can run out of its 8,192 context, leaving answers cut or empty (on main
+too: 3 of 20 empty in one scorecard run). quality-4 now treats an empty server answer as a failure before the
+first word, so this Mac's copy answers. Turning the reasoning off (`think: false`) made it three times quicker
+but the local judge graded it 8.2 → 5.9 on the same 12 questions, so that is a dev copy's pilot
+(`MILLENAI_Q4_NOTHINK=1`) and the owner's call. NOTES 6b560 and `SCORECARD.md` have the numbers.
