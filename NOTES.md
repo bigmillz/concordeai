@@ -19733,3 +19733,25 @@ transition is 0 s and its `left` moves continuously (29 → 212 px); a click at 
 then → steps; no page errors. A drag clip, Low to Ultra. **Not verified in WKWebView** (the shipped app):
 `:has()`, `-webkit-background-clip:text` over two backgrounds, `var()` inside `@keyframes` and the styled
 `::-webkit-slider-thumb` are all WebKit features, but nothing here ran in WebKit.
+
+**Second pass, the same night (per Patrick: "too much rainbow; think more what GPT, Astra and Claude do").**
+Low to Extra are silver-white now: the fill is a vertical sheen (white .92 at the top to .62 at the foot) with
+a faint white bloom; the levels differ only in the fill's length and a slight brightening (`--hz-lift` .84 →
+.96, the bloom .12 → .22). The knob keeps its near-white face and gains a .5 px dark edge so it reads on the
+white fill; the halo is white; a passed notch is a faint dark mark on the fill (white would vanish there).
+Colour comes only at Ultra, one cool pair: ice `#8fb7ff` → soft violet `#a58bff` and back, flowing slowly
+(one 2 × width period per 8 s, was 4) under a white top sheen; the halo takes the same pair. The star knob
+and the track's stars are white with a hint of ice (the star's gradient ends at `#d6e4ff`, not violet; its
+glow is white and ice, no blue or violet). "Ultra" is silver (`#d3d9e6`: 9.6:1 on the composer's glass, 14.5:1
+on the night) with a white highlight passing over it every 3 s, no gradient letters, no violet glow. The
+6b544 rim is a 1 px ice-white line (`#dce8ff → #fff → #c4d8ff`; was 1.5 px of ice, violet, rose and ember).
+Elsewhere in the effort code: the byline's Ultra shimmer (Full) is the same cool pair (was the full rainbow),
+Extra's in silver; Extra's rotating ring in Full is silver light (was blue, pink and gold). Ember stays only
+at decisions (the send strike, the focus ring, errors). The greeting's Full-only bloom still carries its
+rainbow: it is not effort code, so it was left for Patrick.
+Gauntlet: the 6b544 pins follow (the rim, the label, the 8 s flow); 6b549 gains `_sl549_calm_colour`: the
+slider's base css may hold no colour at all (chroma under .2), and the Ultra css, the byline's shimmer and
+Extra's ring may hold no rose, pink, red, orange or gold (a coloured hue from 285° round to 60°) and no
+gradient wider than one cool pair (coloured stops within 60°). Six mutants: a rose stop in Ultra's fill, the
+byline's old rainbow, a blue-to-rose fill below Ultra, a rose halo, the old ember rim, a cyan-to-green third
+hue. The five slider sections pass (37 checks) against a dev copy.

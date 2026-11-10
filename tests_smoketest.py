@@ -42672,14 +42672,14 @@ def _ultra544(css, js):
             and ".hz.hz-ignite #composer::after{animation:hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both}" in u
             and "@keyframes hzUltraRun{0%{--hz-rev:0deg;--hz-head:1}90%{--hz-head:1}100%{--hz-rev:360deg;--hz-head:0}}" in u
             and ".hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}" in u
-            and "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);" in u and "padding:1.5px" in u and "opacity:.9;" in u
+            and "conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);" in u and "border-radius:var(--hz-r-composer);padding:1px;" in u and "opacity:.9;" in u   # ice-white, 1 px (6b549)
             and ".hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}" in u
             and ".hz.hz-ignite:not(.hz-calm) .hz-sl-star{animation:hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both}" in u
-            and "linear-gradient(90deg,#9cc0ff,#c4b0ff 55%,#f7a3c3);\n  -webkit-background-clip:text;background-clip:text;color:transparent;" in u   # the clip after the shorthand, or the label is a box
-            and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) infinite}" in u
+            and "linear-gradient(#d3d9e6,#d3d9e6);\n  -webkit-background-clip:text;background-clip:text;color:transparent}" in u   # silver letters; the clip after the shorthand, or the label is a box
+            and ".hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 3s cubic-bezier(.45,0,.25,1) infinite}" in u
             and ".hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;transform:none}" in u and ".hz.hz-ultra:not(.hz-calm) .hz-sl-core{opacity:0;transform:scale(.55) rotate(45deg)}" in u
             and ".hz.hz-ultra:not(.hz-calm) .hz-sl-tst{animation:hzTDrift var(--du) linear var(--dl) infinite}" in u
-            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 4s linear infinite}" in u
+            and ".hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 8s linear infinite}" in u
             and "@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}" in u
             and "hzDiamondFlow" not in css and ".hz-elevel.spectral" not in css
             # no big circles or ovals (per Patrick): no glow in the moment reaches past 12 px (blur + spread)
@@ -42772,17 +42772,53 @@ def _sl549_dots_rest(css):
         if shows and not all((":hover" in x or ".dragging" in x or "focus-visible" in x) for x in sels if "hz-sl-dot" in x):
             return False
     return True
+def _sl549_colours(text):
+    """every colour written in text, as (r, g, b) 0-1: #rgb, #rrggbb, rgb()/rgba()"""
+    out = []
+    for h in re.findall(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b", text):
+        h = h if len(h) == 6 else "".join(c * 2 for c in h)
+        out.append(tuple(int(h[i:i + 2], 16) / 255 for i in (0, 2, 4)))
+    for r_, g_, b_ in re.findall(r"rgba?\((\d+),\s*(\d+),\s*(\d+)", text):
+        out.append((int(r_) / 255, int(g_) / 255, int(b_) / 255))
+    return out
+def _sl549_hue(c):
+    import colorsys
+    h_, l_, s_ = colorsys.rgb_to_hls(*c)
+    return h_ * 360, max(c) - min(c)          # the hue and the chroma (how coloured, whatever the lightness)
+def _sl549_calm_colour(css, pg):
+    """per Patrick ("too much rainbow; think more what GPT, Astra and Claude do"): the slider below Ultra has no colour
+    at all (every colour's chroma under .2: white, silver, the knob's near-white, the dark shadows); the Ultra css, the
+    byline's effort shimmer and Extra's ring in Full hold no rose, pink, red, orange or gold (a coloured hue from 285 deg
+    round through 0 to 60), and none of their gradients spans more than one cool pair (coloured stops within 60 deg)"""
+    base = css[css.index("/* ---- THE EFFORT SLIDER (6b549"):css.index("/* the picker: the mode's name only")]
+    ultra = css[css.index("/* ---- ULTRA (6b544"):css.index("/* ---- the focus ring on the slider (6b544")]
+    shim = "\n".join(l_ for l_ in pg.split("\n") if ".who b.shim" in l_ and "{background" in l_)   # in the page's own css, before Horizon's
+    ring = css[css.index("/* a light runs round the composer at Extra"):css.index("/* a model a mode runs")]
+    if any(_sl549_hue(c)[1] >= .2 for c in _sl549_colours(re.sub(r"/\*.*?\*/", "", base, flags=re.S))):
+        return False
+    for part in (ultra, shim, ring):
+        part = re.sub(r"/\*.*?\*/", "", part, flags=re.S)
+        hues = [_sl549_hue(c) for c in _sl549_colours(part)]
+        if any(ch >= .2 and (h >= 285 or h <= 60) for h, ch in hues):
+            return False
+        for g_ in re.finditer(r"(?:linear|conic|radial)-gradient\(([^;{}]*)", part):
+            hs = [h for h, ch in (_sl549_hue(c) for c in _sl549_colours(g_.group(1))) if ch >= .2]
+            if hs and max(hs) - min(hs) > 60:
+                return False
+    return True
 def _sl549(css, js, pg):
     paint, wire = _jsfn(js, "function hzEffortPaint(){"), _jsfn(js, "function hzControlsWire(host){")
     return (_sl549_dots_rest(css)
             and ".hz .hz-sl:hover .hz-sl-dot,.hz .hz-sl.dragging .hz-sl-dot,.hz .hz-sl:has(input:focus-visible) .hz-sl-dot{opacity:1}" in css
-            and "background:rgba(255,255,255,.18);opacity:0;transition:opacity .2s var(--hz-ease-out)}" in css and ".hz .hz-sl-dot.passed{background:rgba(255,255,255,.5)}" in css
+            and "background:rgba(255,255,255,.18);opacity:0;transition:opacity .2s var(--hz-ease-out)}" in css and ".hz .hz-sl-dot.passed{background:rgba(10,14,30,.28)}" in css
             # the pill: slim, rounded, luminous, a bloom growing with the effort; slimmer in a conversation
             and ".hz .hz-sl{position:relative;width:var(--hz-sw);height:36px;flex:none;--hz-sw:220px;--hz-ph:16px;--hz-ob:14px;--hz-sr:4.5px;--hz-kr:4px;" in css
             and ".hz #hz-effort.compact .hz-sl{--hz-sw:200px;--hz-ph:12px;--hz-ob:11px;--hz-sr:4px;--hz-kr:3.5px}" in css
-            and "background:linear-gradient(90deg,#4f8cff,#9b72ff 55%,#f07aa6) 0 0/var(--hz-sw) 100% no-repeat}" in css
+            and "background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62))}" in css      # a silver-white sheen (per Patrick: "too much rainbow")
+            and _sl549_calm_colour(css, pg) and "#a9c6ff,#b9a6ff" in pg
             and ".hz .hz-sl-bloom{filter:blur(8px);opacity:var(--hz-bloom);" in css
-            and [re.search(r'\.hz \.hz-sl\[data-lv="%d"\]\{--hz-halo:#[0-9a-f]{6};--hz-bloom:([.\d]+)\}' % k, css).group(1) for k in (1, 2, 3, 4)] == [".4", ".5", ".62", ".78"]
+            and [re.search(r'\.hz \.hz-sl\[data-lv="%d"\]\{--hz-bloom:([.\d]+);--hz-lift:([.\d]+)\}' % k, css).groups() for k in (1, 2, 3, 4)] == [(".15", ".88"), (".18", ".92"), (".22", ".96"), (".34", "1")]   # Low to Extra: only a slight brightening
+            and ".hz .hz-sl-fill{opacity:var(--hz-lift);" in css
             and "background:radial-gradient(110% 90% at 50% 25%,#fff 0%,#f4f7ff 45%,#dde5fa 100%);box-shadow:var(--hz-ks);" in css
             # fluid: the snap is 140 ms on the friend page's curve, no bounce; held, no transition at all
             and "--hz-snap:140ms cubic-bezier(.22,1,.36,1);" in css and "transition:left var(--hz-snap)}" in css and "transition:width var(--hz-snap);" in css
@@ -42813,7 +42849,7 @@ def _sl549(css, js, pg):
             and 'const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;' in js
             and '<input type="range" min="0" max="\'+HZ_EMAX+\'" step="1" value="1">' in js
             and 'annExtra.effort=hzEffortWire();' in pg)
-check("6b549 the effort slider, slim and fluid: the friend page's luminous pill (220 x 16, 200 x 12 in a conversation), no dots at rest (faint notches only on hover, drag or keyboard focus), the knob and fill following the pointer while held and snapping in 140 ms, the level in normal case, the living star at Ultra, the wire unchanged; the mutants are caught",
+check("6b549 the effort slider, slim and fluid: a slim silver-white pill (220 x 16, 200 x 12 in a conversation), colour only at Ultra (one cool pair, ice to soft violet; no rose, pink or red anywhere in the effort or Ultra), no dots at rest (faint notches only on hover, drag or keyboard focus), the knob and fill following the pointer while held and snapping in 140 ms, the level in normal case, the living star at Ultra, the wire unchanged; the mutants are caught",
       _sl549(_hz_css, _hz_js, page)
       and not _sl549(_hz_css.replace("background:rgba(255,255,255,.18);opacity:0;", "background:rgba(255,255,255,.18);opacity:.35;"), _hz_js, page)            # dots at rest
       and not _sl549(_hz_css + ".hz .hz-sl-dot.passed{opacity:1}", _hz_js, page)                                                                          # passed dots lit at rest
@@ -42822,7 +42858,14 @@ check("6b549 the effort slider, slim and fluid: the friend page's luminous pill 
       and not _sl549(_hz_css.replace("--hz-snap:140ms cubic-bezier(.22,1,.36,1);", "--hz-snap:260ms var(--hz-ease-spring);"), _hz_js, page)            # a slow, bouncing snap
       and not _sl549(_hz_css + ".hz .hz-elevel{text-transform:uppercase;letter-spacing:.14em}", _hz_js, page)                                          # spaced caps back
       and not _sl549(_hz_css, _hz_js.replace("u=hzS.effDrag!=null?hzS.effDrag:i/HZ_EMAX;", "u=i/HZ_EMAX;"), page)                                      # stepping, not following
-      and not _sl549(_hz_css, _hz_js.replace("if(on&&hzS.kT)return;", ""), page), "")                                                                  # the star's clock restarted on every paint
+      and not _sl549(_hz_css, _hz_js.replace("if(on&&hzS.kT)return;", ""), page)                                                                     # the star's clock restarted on every paint
+      # the rainbow back (per Patrick: "too much rainbow"): a rose stop in Ultra's fill, the byline's old rainbow, a blue-to-rose fill below Ultra, a rose halo, an ember rim
+      and not _sl549(_hz_css.replace("linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff)", "linear-gradient(90deg,#8fb7ff,#a58bff 50%,#f07aa6)"), _hz_js, page)
+      and not _sl549(_hz_css, _hz_js, page.replace("linear-gradient(90deg,#a9c6ff,#b9a6ff,#a9c6ff)", "linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff)"))
+      and not _sl549(_hz_css.replace("background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62))}", "background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62)),linear-gradient(90deg,#4f8cff,#9b72ff 55%,#f07aa6)}"), _hz_js, page)
+      and not _sl549(_hz_css.replace(".hz.hz-ultra .hz-sl-halo{background:linear-gradient(135deg,#8fb7ff,#a58bff)}", ".hz.hz-ultra .hz-sl-halo{background:#f2a6b4}"), _hz_js, page)
+      and not _sl549(_hz_css.replace("conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);", "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);"), _hz_js, page)
+      and not _sl549(_hz_css.replace("linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff)", "linear-gradient(90deg,#4fd1ff,#a58bff 50%,#7dff9b)"), _hz_js, page), "")   # a third hue (cyan to green): no more than one cool pair
 check("6b549 the slider's rules stay scoped under .hz and name no outside URL",
       _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
 # ==== the effort slider, slim and fluid (6b549): end ====
