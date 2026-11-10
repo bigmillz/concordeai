@@ -19673,10 +19673,10 @@ mutant), the corner's full-screen rule, the home pill's absence, the menu's Impo
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
 
-## 6b549 — slider-port: the effort slider slim and fluid again, the friend page's pill in place of the balance beam (7.0 beta, per Patrick)
+## 6b552 — slider-port: the effort slider slim and fluid again, the friend page's pill in place of the balance beam (7.0 beta, per Patrick)
 
-*Numbering: the next free after main's 6b547; shell-polish and signing share 6b548, and dict-hold and
-settings-look are in flight, so this may be renumbered at the merge.*
+*Renumbered 6b549 -> 6b552 at the beta-2 merge (shell-polish 6b548, signing 6b549, dict-hold 6b550,
+settings-look 6b551).*
 
 **The ask** (per Patrick, seeing the app: "Remember how we had it? It looked beautiful when it was very slim
 and very fluid, not just a bunch of dots"). The app still showed 6b542's balance beam: a hairline, five tick
@@ -19717,12 +19717,12 @@ sent as low/medium/high/max/ultra in the question's `effort`.
 **Gauntlet.** The 6b542 Sting check now asserts the beam is gone (its diamond mutant re-adds it); Balanced
 asserts the pool is gone; the 6b544 Ultra check pins the star knob, the drifting stars, the flowing fill and
 the gliding label, its loop count re-reasoned (still four), with new mutants (Calm gliding, Calm's knob a
-star, a pulsing star, a wide halo). New "6b549 the effort slider, slim and fluid", eight mutants: dots at
+star, a pulsing star, a wide halo). New "6b552 the effort slider, slim and fluid", eight mutants: dots at
 rest (the base opacity), passed dots lit at rest, the notches shown always by the back door, a lagging
 drag, a slow bouncing snap, spaced caps back, stepping instead of following, the star's clock restarted on
 every paint. "No dots at rest" is a CSS parse: the base notch rule says `opacity:0`, and any rule that could
 show a notch applies only under `:hover`, `.dragging` or `:focus-visible`. Run against a dev copy: the
-HORIZON, 6b540, 6b542, 6b544 and 6b549 sections (37 checks) all pass; `pincheck.py` shows only three
+HORIZON, 6b540, 6b542, 6b544 and 6b552 sections (37 checks) all pass; `pincheck.py` shows only three
 pre-existing false hits in the import section's negative helper. The full gauntlet was not run.
 
 **Verified** in a windowless dev copy (headless Chromium, `--use-mock-keychain`, nice 15): stills of the home
@@ -19749,7 +19749,7 @@ Elsewhere in the effort code: the byline's Ultra shimmer (Full) is the same cool
 Extra's in silver; Extra's rotating ring in Full is silver light (was blue, pink and gold). Ember stays only
 at decisions (the send strike, the focus ring, errors). The greeting's Full-only bloom still carries its
 rainbow: it is not effort code, so it was left for Patrick.
-Gauntlet: the 6b544 pins follow (the rim, the label, the 8 s flow); 6b549 gains `_sl549_calm_colour`: the
+Gauntlet: the 6b544 pins follow (the rim, the label, the 8 s flow); 6b552 gains `_sl549_calm_colour`: the
 slider's base css may hold no colour at all (chroma under .2), and the Ultra css, the byline's shimmer and
 Extra's ring may hold no rose, pink, red, orange or gold (a coloured hue from 285° round to 60°) and no
 gradient wider than one cool pair (coloured stops within 60°). Six mutants: a rose stop in Ultra's fill, the

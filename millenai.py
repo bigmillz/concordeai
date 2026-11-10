@@ -51569,7 +51569,7 @@ body.gen #chip-model{color:var(--accent)}
 .hz .msg.ai .who b{font-weight:500;color:#e2e7f5}
 .hz .msg.ai .who .st{font-size:13px;font-weight:400;color:var(--hz-ink-3)}
 /* the deepest efforts shimmer (per Patrick): Ultra in its one cool pair while it writes (ice > soft violet, no
-   rainbow since 6b549), Extra in silver; both settle to the gradient, still, when the answer lands */
+   rainbow since 6b552), Extra in silver; both settle to the gradient, still, when the answer lands */
 .hz .msg.ai .who b.shim{background:linear-gradient(90deg,#a9c6ff,#b9a6ff,#a9c6ff);background-size:300% 100%;
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .hz .msg.ai .who b.shim.soft{background-image:linear-gradient(90deg,#cfd6e4,#ffffff,#cfd6e4)}
@@ -52156,7 +52156,7 @@ __HZ_FONTS__
 .hz #hero .greet{font-family:var(--hz-font-display);font-weight:600;font-size:clamp(60px,9vw,124px);line-height:.98;letter-spacing:-.055em;color:#f8faff;margin:0;
   text-wrap:balance;position:relative;display:inline-block;
   text-shadow:0 0 1px rgba(255,250,242,.6),0 0 12px rgba(255,244,228,.42),0 0 24px rgba(255,240,220,.26)}
-/* THE GREETING'S AFTERGLOW in Full (6b549, per Patrick: silver and one hue, "too much rainbow"): warm white, still,
+/* THE GREETING'S AFTERGLOW in Full (6b552, per Patrick: silver and one hue, "too much rainbow"): warm white, still,
    two zero-offset layers from the one string: a close glow hugging the letters (the text-shadow above, 12-24 px) and
    a slightly stronger wide bloom (the blurred .bloom copy, 30 px, behind); no rainbow, rose or gold, no loop, no
    sweep, and nothing offset, so it never reads as a second word */
@@ -52168,7 +52168,7 @@ __HZ_FONTS__
 .hz #hero .greet .sheen{position:absolute;inset:0;pointer-events:none;color:transparent;text-shadow:none;opacity:0;
   background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.95) 48%,rgba(190,212,255,.9) 52%,transparent 65%);background-size:250% 100%;background-position:120% 0;
   -webkit-background-clip:text;background-clip:text}
-.hz #hero .greet.shown .sheen{opacity:0}   /* no sweep over the words: the afterglow is still (6b549) */
+.hz #hero .greet.shown .sheen{opacity:0}   /* no sweep over the words: the afterglow is still (6b552) */
 .hz-status{display:none}
 .hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
@@ -52213,7 +52213,7 @@ __HZ_FONTS__
   background:currentColor;-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat;
           mask:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h4M12 17h8M4 12h16"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>') center/18px no-repeat}
 .hz .gen #chip-model{color:inherit}
-/* ---- THE EFFORT SLIDER (6b549, per Patrick: "Remember how we had it? It looked beautiful when it was very
+/* ---- THE EFFORT SLIDER (6b552, per Patrick: "Remember how we had it? It looked beautiful when it was very
    slim and very fluid, not just a bunch of dots"): the friend page's slider (beta/DESIGN.md, The effort slider),
    ported over 6b542's balance beam. A slim pill, 220 x 16 on the home (radius 4.5) and 200 x 12 in a conversation
    (radius 4), 88 x 16 under 600 px: a faint frosted channel and a fill of silver-white light from the left round
@@ -52313,7 +52313,7 @@ __HZ_FONTS__
 @property --hz-head{syntax:'<number>';initial-value:0;inherits:false}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
-  background:conic-gradient(from var(--hz-ang),rgba(220,232,255,0) 0deg,rgba(220,232,255,.8) 40deg,#fff 90deg,rgba(220,232,255,.8) 140deg,rgba(220,232,255,0) 200deg,rgba(220,232,255,0) 360deg);   /* silver light, no rainbow (6b549) */
+  background:conic-gradient(from var(--hz-ang),rgba(220,232,255,0) 0deg,rgba(220,232,255,.8) 40deg,#fff 90deg,rgba(220,232,255,.8) 140deg,rgba(220,232,255,0) 200deg,rgba(220,232,255,0) 360deg);   /* silver light, no rainbow (6b552) */
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
           mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);
   animation:hzRing 4s linear infinite}
@@ -52487,7 +52487,7 @@ __HZ_FONTS__
    perfect, but also being a Scorpio where I can sting ... very sharp and fancy"): one centred
    axis with the composer at the golden-ratio point (hzBalance), an 8 px grid, four type sizes,
    silver hairlines in place of glows, tight radii (composer 14, keys 8), a balance-beam slider
-   with a diamond thumb (gone in 6b549: the slim luminous pill), and ONE accent, ember, that appears only at a moment of decision: the
+   with a diamond thumb (gone in 6b552: the slim luminous pill), and ONE accent, ember, that appears only at a moment of decision: the
    send strike, the focus hairline, an error's left rule. It never loops and it never glows. */
 :root{--hz-r-composer:14px;--hz-ember:#e8415a;--hz-hair-3:rgba(255,255,255,.22)}
 /* ---- the sky in Calm: the stars, the moonlight and the hour's gradient as a still (hzSky's
@@ -52571,7 +52571,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .hz-pick{height:40px;border-radius:8px;gap:8px;padding:0 10px 0 12px}
 .hz #hz-effort.compact .hz-pick{height:32px;padding:0 8px 0 10px}
 /* ---- the slider: 6b542's balance beam (a hairline, five ticks, a diamond, the level in spaced mono caps) gave way in
-   6b549 to the friend page's slim luminous pill, per Patrick ("not just a bunch of dots"); see THE EFFORT SLIDER */
+   6b552 to the friend page's slim luminous pill, per Patrick ("not just a bunch of dots"); see THE EFFORT SLIDER */
 /* ---- the send key: a crisp square with a 1.5 px arrow; silver outline until there are words,
    ember while there are (#composer.hastext); the stop key is silver */
 .hz #send{width:40px;height:40px;border-radius:8px;background:transparent;color:var(--hz-ink-2);box-shadow:inset 0 0 0 1px var(--hz-hair-3);
@@ -52633,13 +52633,13 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
    look stays restrained; this is the one place the effects perform. Values and timings are the friend
    page's (scratchpad/preview-site/beta, DESIGN.md "The Ultra moment").
-   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the knob clicks into place as a star (6b549: it unfolds
+   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the knob clicks into place as a star (6b552: it unfolds
    from .45 and overshoots to 1.12 in 320 ms); a 22 px spark runs from the knob back along the track to its
    start (160 ms); from there a line of light runs all the way round the composer's border (a conic reveal
    from that point's angle, --hz-a0, 600 ms from 160 ms, a white head at its edge) and settles into a still
-   1 px rim of ice-white light (6b549, per Patrick: "too much rainbow": no violet, rose or ember in it), at .9; the aurora takes one breath (+.45 at 200 ms,
+   1 px rim of ice-white light (6b552, per Patrick: "too much rainbow": no violet, rose or ember in it), at .9; the aurora takes one breath (+.45 at 200 ms,
    settled within 2 s); "Ultra" is lit (a white glow that settles over 900 ms).
-   AT ULTRA (html.hz-ultra), the friend page's slider (6b549, per Patrick: keep its Ultra): the knob is a LIVING
+   AT ULTRA (html.hz-ultra), the friend page's slider (6b552, per Patrick: keep its Ultra): the knob is a LIVING
    STAR (crisp vector, white with a hint of ice) stepping through four, six, eight and six points, one form every
    140 ms (hzKnobStar), ANCHORED to the track (per Patrick: "be careful with the star that doesn't stick"): 1.25 x the
    track's height, centred where the knob stands inside the fill's end, its points at most 2-3 px past the track's
@@ -52738,7 +52738,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   .hz .hz-sl-spark,.hz .hz-sl-star,.hz #hz-ufield{display:none!important}
   .hz.hz-ultra .hz-sl-core{opacity:1;transform:none}
 }
-/* ---- the focus ring on the slider (6b544; round the pill since 6b549): keyboard-only (:focus-visible on the range,
+/* ---- the focus ring on the slider (6b544; round the pill since 6b552): keyboard-only (:focus-visible on the range,
    never a click), a 1 px ember ring 2 px off the track with the knob inside, following its radius; never a box */
 .hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:-2px;right:-2px;top:calc(50% - var(--hz-ph) / 2 - 2px);height:calc(var(--hz-ph) + 4px);border-radius:calc(var(--hz-sr) + 2px);pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}
 /* ---- THE WRITING STAR (6b544, per Patrick: "clean up how it writes and delivers the final result of a
@@ -65750,7 +65750,7 @@ function hzSkyBoot(){
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
-    // the palette is blue-violet only (6b549, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
+    // the palette is blue-violet only (6b552, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
     // violet-blue, each as bright as the pink, gold and mint it replaced, so the light keeps its strength and motion
     +"vec3 pal(float t){vec3 a=vec3(.62,.74,1.),b=vec3(.76,.66,1.),c=vec3(.82,.88,1.),d=vec3(.68,.68,1.);t=fract(t)*4.;"
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
@@ -66001,7 +66001,7 @@ function hzDrawAuroras(){
   const r=hzS.rnd,k=0.9+r()*0.25,gain=0.85+r()*0.3,fr=0.8+r()*0.4,ph=r()*6.283,ph2=r()*6.283;
   const w1=$("#hz-aur1 canvas"),w2=$("#hz-aur2 canvas"),f1=$("#hz-aur1f");
   if(w1)hzDrawAuroraLayer(w1,{w:1800,h:640,rgb:"168,198,255",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
-  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"186,176,255",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});   // the fringe soft violet, not mint (6b549)
+  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"186,176,255",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});   // the fringe soft violet, not mint (6b552)
   if(w2)hzDrawAuroraLayer(w2,{w:1800,h:600,rgb:"186,208,255",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
 }
 // the wash flowers on arriving home (the intro has its own moment)
@@ -66018,7 +66018,7 @@ function hzDrawWash(){
   const bloom=(cx,cy,rx,ry,col,a)=>{x.save();x.translate(cx*W,cy*H);x.scale(rx*W,ry*H);
     const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,"rgba("+col+","+a+")");g.addColorStop(.72,"rgba("+col+",0)");g.addColorStop(1,"rgba("+col+",0)");
     x.fillStyle=g;x.beginPath();x.arc(0,0,1,0,7);x.fill();x.restore();};
-  // blue-violet only (6b549): the rose, amber and teal blooms became violet, ice and blue at the same strength
+  // blue-violet only (6b552): the rose, amber and teal blooms became violet, ice and blue at the same strength
   bloom(.24,.40,.42,.36,"98,96,255",.6);bloom(.72,.30,.38,.32,"150,118,255",.4);
   bloom(.50,.64,.40,.30,"150,186,255",.44);bloom(.88,.58,.34,.30,"86,140,255",.34);
 }
@@ -66069,7 +66069,7 @@ async function hzTraceIn(el,opts){
   if(!gl)return;
   const IFS="precision highp float;varying vec2 uv;uniform sampler2D map;uniform float t,TE;"
     +"float tf(vec4 s){return (s.r*65280.+s.g*255.)/65535.*TE;}"
-    // the palette is blue-violet only (6b549, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
+    // the palette is blue-violet only (6b552, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
     // violet-blue, each as bright as the pink, gold and mint it replaced, so the light keeps its strength and motion
     +"vec3 pal(float t){vec3 a=vec3(.62,.74,1.),b=vec3(.76,.66,1.),c=vec3(.82,.88,1.),d=vec3(.68,.68,1.);t=fract(t)*4.;"
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
@@ -66266,7 +66266,7 @@ function hzModesPaint(){
   if(!host.querySelector(".hz-pick")){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
-      // the slim pill (6b549): the channel, the bloom, the silver fill, the notches (shown only on hover, drag and
+      // the slim pill (6b552): the channel, the bloom, the silver fill, the notches (shown only on hover, drag and
       // keyboard focus), the spark, and the knob: its halo, the rounded square, Ultra's star (no stars in the track:
       // they live above the box, hzUField)
       +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i>'
@@ -66286,14 +66286,14 @@ function hzModesPaint(){
 }
 function hzEffortPaint(){
   const host=$("#hz-effort"),sl=host&&host.querySelector(".hz-sl");if(!sl)return;
-  // where the knob stands (6b549): the level, or while it is pressed or dragged the pointer's own place (hzS.effDrag,
+  // where the knob stands (6b552): the level, or while it is pressed or dragged the pointer's own place (hzS.effDrag,
   // 0 to 1) so it glides with the hand; the css draws everything from --hz-eff-u and data-lv, no layout is read here
   const inp=sl.querySelector("input"),i=hzEffort(),u=hzS.effDrag!=null?hzS.effDrag:i/HZ_EMAX;
   sl.style.setProperty("--hz-eff-u",u.toFixed(4));sl.dataset.lv=String(i);
   sl.querySelectorAll(".hz-sl-dot").forEach((d,k)=>d.classList.toggle("passed",k<=i));
   if(+inp.value!==i)inp.value=String(i);
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
-  // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b549)
+  // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b552)
   const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);
   hzKnobStar(i===4);hzUField(i===4);
   const root=document.documentElement,was=hzS.effI;hzS.effI=i;
@@ -66308,12 +66308,12 @@ function hzEffortPaint(){
 // (--hz-a0: the beam's start, seen from the composer's centre). Calm, reduced motion, a hidden or
 // long-unfocused window: no ignition, the still rim and label alone (Calm's rim fades, in the css).
 function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
-// THE LIVING STAR (6b549, the friend page's): at Ultra the knob is a crisp star that steps through four, six, eight
+// THE LIVING STAR (6b552, the friend page's): at Ultra the knob is a crisp star that steps through four, six, eight
 // and six points, one form every 140 ms, like Claude Code's thinking glyph; it rests while the window is hidden, in
 // Calm and under reduced motion (the css shows the plain knob there). The forms are made on first use, never at load.
 function hzStarPath(n,R){const r=R*(n===4?.34:n===6?.44:.5);let d="";for(let k=0;k<n*2;k++){const a=-Math.PI/2+k*Math.PI/n,rr=k%2?r:R;d+=(k?"L":"M")+(Math.cos(a)*rr).toFixed(2)+" "+(Math.sin(a)*rr).toFixed(2);}return d+"Z";}
 function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,10)));}   // tips at the viewBox's edge: the star is exactly its box, 1.25 x the track
-// THE STARS ABOVE THE BOX (6b549, per Patrick: "more stars above the box versus in the box"). hzUFieldPlan is
+// THE STARS ABOVE THE BOX (6b552, per Patrick: "more stars above the box versus in the box"). hzUFieldPlan is
 // pure: from the greeting's and the composer's rects it places n stars in the open sky between them (home), or in a
 // strip above the composer (a conversation), each kept clear of both boxes by its own size plus 6 px. hzUField builds
 // the field inside the sky once per place (home or not, the window's size, the level) and fades it in or out.
@@ -66372,7 +66372,7 @@ function hzUltraOut(){
 function hzControlsWire(host){
   const sl=host.querySelector(".hz-sl"),inp=sl.querySelector("input"),pick=host.querySelector(".hz-pick");
   inp.addEventListener("input",()=>hzEffortSet(inp.value));
-  // fluid (6b549): held, the knob and the fill follow the pointer continuously, (x - left - track/2) / (width - track)
+  // fluid (6b552): held, the knob and the fill follow the pointer continuously, (x - left - track/2) / (width - track)
   // clamped 0 to 1; the native input still sets the level (the nearest stop: its thumb is as wide as the pill is
   // tall, so its steps fall under the drawn ones); let go and it snaps to the stop in 140 ms
   const at=x=>{const r=sl.getBoundingClientRect(),ph=parseFloat(getComputedStyle(sl).getPropertyValue("--hz-ph"))||16;
