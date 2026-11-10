@@ -20460,4 +20460,10 @@ gated, and the judge's reply parsed and clamped. Re-pinned at the same strength:
 server-alone call (the post-pass lines between), the 6b520 dating rule (the vendor's own site joins it) and its
 shipped-knob check (now read inside `fresh_ablate`, where `quality_ablate`'s same lines had hidden its mutant), the
 6b523 handler slice and mutant anchors, the estimate checks turned into "it is gone", the 6b516 slice's namespace
-(the shape knob), and 6b537's known-env pin (UPDATE_API is no longer the list's last). GAUNTLET_RESULT
+(the shape knob), and 6b537's known-env pin (UPDATE_API is no longer the list's last). The full gauntlet ran green, **1537/1537**
+(2026-11-10, 10:53–12:22), with one change made outside the repo: another helper's orphaned dev copy (pid 89757,
+from worktree agent-aa067e096e1ca3de4) held 9903 for over three hours, so the run was a copy of
+tests_smoketest.py with 9903 shifted to 9913, from the repo root, nothing else changed. The run before it,
+1530/1537, found the seven reds fixed here: `srv_nothink` outside the servers section (three server slices raised
+NameError), the 6b339 second-pass mutant's anchor, and the 6b516 clip of a grounded turn whose rules the shape had
+grown past half the cap (`ground_clip` now keeps them whole up to three quarters).
