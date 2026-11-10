@@ -20124,3 +20124,67 @@ Gauntlet: `_sl549_aurora` reads every colour the aurora and the wash are drawn i
 the three curtains, the four wash blooms): a blue-to-violet hue (200–285°) or near-white, nothing else; five
 mutants (the neon's rose back, the mint fringe back, the canvas fringe's mint back, the wash's rose back, the
 trace's rose back on its own). The five slider sections pass (37).
+
+## 6b553 — beta-2: five branches in, renumbered; the Ultra knob a knob again, the Ultra arrival, the living Ultra (7.0 beta 2, per Patrick)
+
+**The merge.** On main at 93f34e1 (7.0 beta 1, v278), in this order: shell-polish (6b548), signing (6b549, was
+6b548), dict-hold (6b550, was 6b549), settings-look (6b551, was 6b550), slider-port (6b552, was 6b549). Each
+renumbered branch was rewritten on a throwaway branch first (`rn-*`: the number in NOTES, the code comments and the
+gauntlet's labels, one commit each), then merged, so no line cites a number it does not own. The only conflicts
+were NOTES (every branch appended at the end: kept all, in order) and the gauntlet's tail (settings-look and
+slider-port both added a block before the scorecard: kept both; no name collides). The page css and js merged
+clean.
+
+**The star knob is gone** (per Patrick: "that little star, that tiny one, when you hit ultra, I don't like that…
+one star that sits there spinning just looks tacky"). At Ultra the knob is the near-white rounded square of every
+level; only its halo takes a soft ice tint (`#a9c6ff`), held within 6 px (scale .8, blur 4 px). Removed, not
+hidden: the svg in the slider's markup, `hzStarPath`, `hzKForms`, `hzKnobStar` and its 140 ms timer, the
+`.hz-sl-star` rules, `hzKnobClick`, the core's fold at Ultra and its reduced-motion and effects-off undo. Kept as
+they were: the ice → violet flow, the silver sweep on "Ultra", the stars above the box. Gauntlet:
+`_knob_plain553` (the thumb holds only the halo and the square, no svg or path in the slider's markup, no script
+reaching into the knob, no rule under Ultra or its arrival touching the knob, no rule anywhere animating,
+clipping, masking or turning it, the star's names gone, the halo an ice hue within 6 px) in the 6b544 and 6b552
+checks; `_sl549_star_bounds` and its five mutants went with the star. Seven new mutants: the svg star back,
+the knob folded away, a star clip, a spinning knob at `data-lv="4"`, a script morphing the knob's radius, a wide
+halo, a violet halo; and in 6b544 the knob's click back and a pulsing halo.
+
+**The Ultra arrival** (per Patrick: "a little more smash effect when somebody slides to Ultra. Think like Astra or
+Ultra Code in Claude"). Once per arrival from a lower level, about 700 ms, then the calm Ultra: the light rush
+(the spark, now 36 px and 180 ms, from the knob back along the fill); the edge (`.hz-uedge`, 80–500 ms: the
+composer's top edge ignites at the knob's x, `--hz-kx`, and races both ways as an ice-white line with a 12 px
+bloom, then the rim fades in from 300 ms; the 6b544 conic run is gone, it repainted every frame); the burst
+(`hzUBurst`, 100–700 ms: the field's stars launch from the composer's top edge, a little toward the knob, each on
+its own ease-out of 380–600 ms, by `translate` and `scale` so the twinkle's `transform` and opacity are left
+alone; three, one in Balanced, go further and fade); the kick in Full only (`scale` 1 → 1.012 → 1 in 220 ms; the
+individual property, so the send glide's inline transform is untouched); the label's one fast sweep (420 ms)
+before the slow one. Balanced: the rush, the edge at half, half the stars, no kick. Calm, reduced motion, effects
+off: none. `hzUltraGate`: never again within 1.5 s of the last, and once per drag (reset on release). **No haptic:**
+neither the shell (`main.rs`) nor the page has a haptic bridge, so none was fired and none built.
+
+**The living Ultra** (per Patrick: "Give Ultra a little more effect"), the steady state. Full: the rim's pass
+(`.hz-urim`, every 8 s from 3 s, a soft ice-white comet runs the top edge left to right in about 900 ms, clipped
+to the straight edge); the field drifts up 6 px over 20 s and back (`translate` on the field); each star its own
+twinkle (its low, high and middle opacity and its pace, set at render; the keyframes take a second, softer peak);
+a shooting star (`hzUShoot`, the friend page's streak: 1.1 px, the tail fading over its last 42 %, 120–260 px at
+18–32° in 500 ms by WAAPI transform and opacity) in the band above the composer every 12–18 s (first at 4 s),
+never over the greeting or the composer; the charged glow (`.hz-uglow`, a 40 px strip of ice above the composer's
+top edge, masked soft at both ends, opacity .06 ↔ .08 over 10 s); the fill's glint every 5 s (`::before`, the fill
+isolated so it never paints over the knob). Balanced: half (drift 3 px, glow .03–.04, glint .5), no comet,
+shooting stars every 25–35 s (first at 9 s). Calm, reduced motion, effects off: none. All of it pauses with the
+page (`hz-pause`: hidden, or a minute unfocused, the app's stillness rule), and the shooter draws nothing while
+paused. Gauntlet: "6b553 the Ultra arrival" (the gate run in node over a sequence; Calm stopping before the gate;
+the edge, the burst, the kick, the label; ice, violet and white only; no circles, rings or ovals; keyframes
+animate transform, translate, scale and opacity only; 15 mutants) and "6b553 the living Ultra" (Full's comet,
+the drift, the glow, the glint, the twinkle's variety, the shooter's pace and the friend page's streak; every
+animated rule Full's or Ultra-not-Calm's; every animation named in the pause rule; the shooter checking the pause
+before it draws; 12 mutants). The 6b544 loop count is 13 now (re-reasoned in the check).
+
+**Verified** against a windowless dev copy in headless Chromium (`--use-mock-keychain`, nice 10): the slider,
+Ultra, arrival and living sections pass (43 checks); stills and clips of High → Ultra in Full and Balanced and a
+6 s rest in Full; at 260 ms in Full the kick, the edge, the burst (26 stars, 3 far) are running, in Balanced the
+dim edge, 13 stars and 1 far, no kick; at rest the comet (Full) and the glow run; Calm shows none of it; three
+arrivals inside 1.5 s ignite once and a later one ignites again; a forced shooting star lands in the band clear of
+both boxes; the composer's top edge is still the composer to `elementFromPoint`. **Frame time not measurable
+here:** headless Chromium draws the sky in software GL, about 100 ms a frame with a long task every frame at High
+before any of this, and the arrival and the rest are no worse; the new motion is transform and opacity only, but
+the 6b552 fill flow and the label sweep (background-position) were already main-thread paints.

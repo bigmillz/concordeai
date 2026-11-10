@@ -52320,7 +52320,6 @@ __HZ_FONTS__
 /* a light runs round the composer at Extra, softly, in Full (OVERRIDE 4); Ultra has its own moment
    (the ULTRA block at the end of the Horizon css, 6b544) and the label never loops */
 @property --hz-ang{syntax:'<angle>';initial-value:0deg;inherits:false}
-@property --hz-head{syntax:'<number>';initial-value:0;inherits:false}
 .hz #composer::before{content:"";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;pointer-events:none;opacity:0;
   transition:opacity .8s var(--hz-ease-in-out);
   background:conic-gradient(from var(--hz-ang),rgba(220,232,255,0) 0deg,rgba(220,232,255,.8) 40deg,#fff 90deg,rgba(220,232,255,.8) 140deg,rgba(220,232,255,0) 200deg,rgba(220,232,255,0) 360deg);   /* silver light, no rainbow (6b552) */
@@ -52643,51 +52642,39 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
    look stays restrained; this is the one place the effects perform. Values and timings are the friend
    page's (scratchpad/preview-site/beta, DESIGN.md "The Ultra moment").
-   ARRIVING (html.hz-ignite, about 900 ms, once per arrival): the knob clicks into place as a star (6b552: it unfolds
-   from .45 and overshoots to 1.12 in 320 ms); a 22 px spark runs from the knob back along the track to its
-   start (160 ms); from there a line of light runs all the way round the composer's border (a conic reveal
-   from that point's angle, --hz-a0, 600 ms from 160 ms, a white head at its edge) and settles into a still
-   1 px rim of ice-white light (6b552, per Patrick: "too much rainbow": no violet, rose or ember in it), at .9; the aurora takes one breath (+.45 at 200 ms,
+   ARRIVING (html.hz-ignite, about 700 ms, once per arrival; THE ARRIVAL below, 6b553): a light rushes from the knob
+   back along the fill to its start (180 ms); the composer's top edge ignites from the knob and races both ways; the
+   rim fades in and settles into a still 1 px rim of ice-white light (6b552, per Patrick: "too much rainbow": no violet, rose or ember in it), at .9; the aurora takes one breath (+.45 at 200 ms,
    settled within 2 s); "Ultra" is lit (a white glow that settles over 900 ms).
-   AT ULTRA (html.hz-ultra), the friend page's slider (6b552, per Patrick: keep its Ultra): the knob is a LIVING
-   STAR (crisp vector, white with a hint of ice) stepping through four, six, eight and six points, one form every
-   140 ms (hzKnobStar), ANCHORED to the track (per Patrick: "be careful with the star that doesn't stick"): 1.25 x the
-   track's height, centred where the knob stands inside the fill's end, its points at most 2-3 px past the track's
-   edges, its glow and halo within 6 px; THE STARS ABOVE THE BOX (per Patrick: "more stars above the box versus in the
+   AT ULTRA (html.hz-ultra), the friend page's slider (6b552, per Patrick: keep its Ultra): THE KNOB STAYS THE KNOB
+   (6b553, per Patrick: "one star that sits there spinning just looks tacky"): the same near-white rounded square as
+   every other level, no star, no morph, no spin, its halo a soft ice tint held within 6 px; THE STARS ABOVE THE BOX (per Patrick: "more stars above the box versus in the
    box"): no stars in the track; a gentle field of small white-ice stars in the sky between the greeting and the
    composer (26 in Full, 13 in Balanced; in a conversation a subtler strip above the composer, 12 and 6), fading in
    over 600 ms, twinkling slowly, one in eight rarely drifting up; behind everything (inside the sky), never over the
    greeting or the composer (hzUFieldPlan); the fill turns to Ultra's one cool pair, ice #8fb7ff > soft violet #a58bff,
    flowing slowly (one 2 x width period per 8 s), the halo with it; the label "Ultra" is silver with a highlight
    passing over it once every 3 s (the one loop on text; no gradient letters). Nothing rose, pink or red anywhere in
-   the effort or Ultra; ember stays at decisions (the send strike, the focus ring, errors). The rim stays still. LEAVING (html.hz-ultra-out) folds the star back into the
-   rounded square in 200 ms and drains the rim back the way it came in 300 ms. Calm and reduced motion: plain (the
-   rounded-square knob, no drift, no flow, the label plain silver) and the still rim (a 300 ms fade in Calm). Arrivals ease on cubic-bezier(.16,1,.3,1), the drain on
+   the effort or Ultra; ember stays at decisions (the send strike, the focus ring, errors). The rim stays still. LEAVING (html.hz-ultra-out) drains the rim back the way it
+   came in 300 ms. Calm and reduced motion: plain (no
+   field, no flow, the label plain silver) and the still rim (a 300 ms fade in Calm). Arrivals ease on cubic-bezier(.16,1,.3,1), the drain on
    cubic-bezier(.65,0,.35,1), the run on cubic-bezier(.45,0,.2,1). Full's rotating ring (::before) is off at Ultra. */
 @property --hz-rev{syntax:'<angle>';initial-value:360deg;inherits:false}
 .hz #composer{--hz-a0:230deg}
 .hz #composer::after{content:"";display:none;position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1px;pointer-events:none;z-index:1;
-  --hz-rev:360deg;--hz-head:0;opacity:.9;
-  background:conic-gradient(from calc(var(--hz-a0) + var(--hz-rev) - 16deg),rgba(255,255,255,0),rgba(255,255,255,var(--hz-head)) 16deg,rgba(255,255,255,0) 17deg),
-    conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);
+  --hz-rev:360deg;opacity:.9;
+  background:conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);
   -webkit-mask:conic-gradient(from var(--hz-a0),#000 var(--hz-rev),transparent var(--hz-rev)),linear-gradient(#000 0 0) content-box;-webkit-mask-composite:source-out;
           mask:conic-gradient(from var(--hz-a0),#000 var(--hz-rev),transparent var(--hz-rev)),linear-gradient(#000 0 0) content-box;mask-composite:subtract}
 .hz #main:not(:has(#hero)) #composer::after{border-radius:14px}
 .hz.hz-ultra #composer::after,.hz.hz-ultra-out #composer::after{display:block}
 .hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}
-.hz.hz-ignite #composer::after{animation:hzUltraRun .6s cubic-bezier(.45,0,.2,1) .16s both}
-@keyframes hzUltraRun{0%{--hz-rev:0deg;--hz-head:1}90%{--hz-head:1}100%{--hz-rev:360deg;--hz-head:0}}
+.hz.hz-ignite #composer::after{animation:hzRimIn .2s cubic-bezier(.16,1,.3,1) .3s both}
 .hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}
 @keyframes hzUltraDrain{from{--hz-rev:360deg}to{--hz-rev:0deg}}
-/* the knob becomes the star (Balanced and Full); the rounded square folds away */
-.hz .hz-sl-star{position:absolute;left:50%;top:50%;width:calc(var(--hz-ph) * 1.25);height:calc(var(--hz-ph) * 1.25);margin:calc(var(--hz-ph) * -.625) 0 0 calc(var(--hz-ph) * -.625);overflow:visible;pointer-events:none;opacity:0;transform:scale(.45) rotate(-35deg);
-  filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95)) drop-shadow(0 0 4px rgba(200,220,255,.6));transition:opacity .2s var(--hz-ease-out),transform .2s var(--hz-ease-out)}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;transform:none}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-core{opacity:0;transform:scale(.55) rotate(45deg)}
-.hz.hz-ultra .hz-sl-halo{background:linear-gradient(135deg,#8fb7ff,#a58bff)}
-.hz.hz-ignite:not(.hz-calm) .hz-sl-star{animation:hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both}
-@keyframes hzKnobClick{0%{opacity:0;transform:scale(.45) rotate(-35deg)}60%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none}}
-/* at Ultra the halo stays tight, whatever the hand does: within 6 px of the knob */
+/* the knob at Ultra is the knob of every level (6b553, per Patrick): no star, no morph, no spin; only its halo
+   takes a soft ice tint, and stays tight, whatever the hand does: within 6 px of the knob */
+.hz.hz-ultra .hz-sl-halo{background:#a9c6ff}
 .hz.hz-ultra .hz-sl-halo,.hz.hz-ultra .hz-sl:hover .hz-sl-halo,.hz.hz-ultra .hz-sl.dragging .hz-sl-halo{transform:scale(.8);filter:blur(4px)}
 /* THE STARS ABOVE THE BOX: a field in the sky between the greeting and the composer (a strip above it in a
    conversation), inside #hz-sky so it sits behind everything; placed by hzUFieldPlan, never over the greeting or the
@@ -52700,7 +52687,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   background:radial-gradient(circle,#fff 0 18%,rgba(255,255,255,0) 30%),linear-gradient(90deg,transparent,rgba(236,243,255,.9),transparent) center/100% 1px no-repeat,linear-gradient(0deg,transparent,rgba(236,243,255,.9),transparent) center/1px 100% no-repeat;
   animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite}
 .hz #hz-ufield i.up{animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite,hzURise 14s ease-in-out var(--dl) infinite}
-@keyframes hzUTwinkle{0%,100%{opacity:.28}50%{opacity:.9}}
+@keyframes hzUTwinkle{0%,100%{opacity:var(--lo,.28)}42%{opacity:var(--hi,.9)}56%{opacity:var(--mid,.6)}68%{opacity:var(--hi,.9)}}
 @keyframes hzURise{0%,70%{transform:none}85%{transform:translateY(-14px)}86%,100%{transform:translateY(-14px) scale(0)}}
 .hz.hz-calm #hz-ufield,.hz .novideo #hz-ufield{display:none}
 .hz.hz-pause #hz-ufield i{animation-play-state:paused}
@@ -52712,10 +52699,11 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-ultra .hz-sl-fill::after,.hz.hz-ultra .hz-sl-bloom::after{opacity:1;transition:opacity .3s var(--hz-ease-out)}
 .hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 8s linear infinite}
 @keyframes hzFillFlow{from{background-position:0 0,0 0}to{background-position:0 0,calc(var(--hz-sw) * -2) 0}}
-/* the spark: 22 px, from the knob back to the track's start in 160 ms; leaving, back out to the knob */
-.hz .hz-sl-spark{display:none;position:absolute;z-index:2;top:calc(50% - 1.5px);left:calc(var(--hz-ph) / 2);width:22px;height:3px;margin-left:-11px;border-radius:2px;pointer-events:none;opacity:0;
-  background:linear-gradient(90deg,rgba(255,255,255,0),#fff);box-shadow:0 0 8px rgba(207,224,255,.9)}
-.hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .16s cubic-bezier(.45,0,.2,1) both}
+/* the light rush (6b553): a 36 px streak of white from the knob back along the fill to its start in 180 ms, as if the
+   bar charged; leaving, back out to the knob */
+.hz .hz-sl-spark{display:none;position:absolute;z-index:2;top:calc(50% - 2px);left:calc(var(--hz-ph) / 2);width:36px;height:4px;margin-left:-18px;border-radius:2px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,rgba(255,255,255,0),#fff 70%,#fff);box-shadow:0 0 8px rgba(207,224,255,.9)}
+.hz.hz-ignite .hz-sl-spark{display:block;animation:hzSpark .18s cubic-bezier(.3,0,.2,1) both}
 .hz.hz-ultra-out .hz-sl-spark{display:block;animation:hzSpark .3s cubic-bezier(.65,0,.35,1) reverse both}
 @keyframes hzSpark{0%{transform:translateX(var(--hz-eff-px,0px));opacity:1}85%{transform:translateX(0);opacity:1}100%{transform:translateX(0);opacity:0}}
 /* the label: "Ultra" in silver (#d3d9e6, AA on the glass and the night) with a white highlight passing over it once
@@ -52724,7 +52712,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   background:linear-gradient(100deg,rgba(255,255,255,0) 40%,#fff 50%,rgba(255,255,255,0) 60%) 150% 0/250% 100% no-repeat,linear-gradient(#d3d9e6,#d3d9e6);
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 3s cubic-bezier(.45,0,.25,1) infinite}
-.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.lum{animation:hzLumSweep 3s cubic-bezier(.45,0,.25,1) .6s infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
+.hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.lum{animation:hzLumSweep .42s cubic-bezier(.3,0,.2,1) .06s both,hzLumSweep 3s cubic-bezier(.45,0,.25,1) 1.2s infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzLumSweep{0%{background-position:150% 0,0 0}45%,100%{background-position:-50% 0,0 0}}
 @keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}
   100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
@@ -52739,15 +52727,86 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-calm.hz-ultra-out #composer::after{animation:hzRimOut .3s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzRimIn{from{opacity:0}to{opacity:.9}}
 @keyframes hzRimOut{from{opacity:.9}to{opacity:0}}
-.hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark,.hz .novideo .hz-sl-star{display:none!important}
+.hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark{display:none!important}
 .hz .novideo .hz-sl-fill::after,.hz .novideo .hz-sl-bloom::after,.hz .novideo .hz-elevel.lum{animation:none!important}
-.hz.hz-ultra .novideo .hz-sl-core{opacity:1;transform:none}
 .hz.hz-pause .hz-sl-fill::after,.hz.hz-pause .hz-sl-bloom::after,.hz.hz-pause .hz-elevel.lum{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
   .hz #composer::after,.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after,.hz .hz-elevel.lum,.hz.hz-ignite #hz-aurw{animation:none!important}
-  .hz .hz-sl-spark,.hz .hz-sl-star,.hz #hz-ufield{display:none!important}
-  .hz.hz-ultra .hz-sl-core{opacity:1;transform:none}
+  .hz .hz-sl-spark,.hz #hz-ufield{display:none!important}
 }
+/* ---- THE ARRIVAL (6b553, per Patrick: "a little more smash effect when somebody slides to Ultra. Think like Astra or
+   Ultra Code in Claude"). Once per arrival from a lower level (never again within 1.5 s, once per drag; hzUltraGate),
+   about 700 ms, then the calm Ultra above. Ice, violet and white only; no circles, rings or ovals; transform and
+   opacity only, so the compositor runs it.
+   0-180 ms the light rush (the spark, above). 80-500 ms THE EDGE: the composer's top edge ignites at the knob's x
+   (--hz-kx) and races left and right as a bright ice-white line with a soft bloom (12 px), then gives way to the rim.
+   100-700 ms THE BURST: the stars above the box launch from the composer's top edge (--lx/--ly: from there to their
+   place), each on its own ease-out (380-600 ms), and settle into their twinkle; two or three (one in Balanced) go a
+   little further and fade. 0-220 ms THE KICK (Full only): the composer presses out and back, 1 > 1.012 > 1, no wobble.
+   Balanced: the rush, a dimmer edge, half the stars, no kick. Calm, reduced motion, effects off: none of it. */
+.hz #composer>.hz-uedge{position:absolute;top:-1.5px;left:var(--hz-r-composer);right:var(--hz-r-composer);height:2px;pointer-events:none;z-index:2;opacity:0;
+  background:linear-gradient(90deg,rgba(220,232,255,0),#fff 10%,#eef4ff 50%,#fff 90%,rgba(220,232,255,0));
+  box-shadow:0 0 10px 2px rgba(196,216,255,.6);transform-origin:var(--hz-kx,50%) 50%;transform:scaleX(0)}
+.hz.hz-ignite #composer>.hz-uedge{animation:hzUEdge .42s cubic-bezier(.16,1,.3,1) .08s both}
+.hz.hz-bal.hz-ignite #composer>.hz-uedge{animation-name:hzUEdgeBal}
+@keyframes hzUEdge{0%{opacity:1;transform:scaleX(0)}62%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}
+@keyframes hzUEdgeBal{0%{opacity:.5;transform:scaleX(0)}62%{opacity:.5;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}
+.hz #hz-ufield.burst{opacity:1;transition:none}
+.hz #hz-ufield.chat.burst{opacity:.55}
+.hz #hz-ufield.burst i{animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite,hzULaunch var(--lu) cubic-bezier(.16,1,.3,1) var(--ld) backwards}
+.hz #hz-ufield.burst i.up{animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite,hzURise 14s ease-in-out var(--dl) infinite,hzULaunch var(--lu) cubic-bezier(.16,1,.3,1) var(--ld) backwards}
+@keyframes hzULaunch{0%{translate:var(--lx) var(--ly);scale:.4;opacity:0}14%{opacity:1}}
+.hz #hz-ufield i.far{animation:hzUFar var(--lu) cubic-bezier(.16,1,.3,1) var(--ld) both}
+@keyframes hzUFar{0%{translate:var(--lx) var(--ly);scale:.4;opacity:0}14%{opacity:1}70%{opacity:.8}100%{translate:0 var(--fy);scale:1;opacity:0}}
+.hz.hz-full.hz-ignite #composer{animation:hzUKick .22s both}
+@keyframes hzUKick{0%{scale:1;animation-timing-function:cubic-bezier(.3,0,.2,1)}36%{scale:1.012;animation-timing-function:cubic-bezier(.4,0,.2,1)}100%{scale:1}}
+.hz .novideo #composer>.hz-uedge{display:none}
+@media (prefers-reduced-motion:reduce){.hz #composer>.hz-uedge{display:none!important}.hz #composer{animation:none!important}}
+/* ---- the arrival (6b553): end */
+/* ---- THE LIVING ULTRA (6b553, per Patrick: "Give Ultra a little more effect"): the steady state after the arrival,
+   Balanced and Full, tasteful; ice, violet and white; no circles or ovals; nothing new loops on text; transform and
+   opacity only; everything pauses with the page (hz-pause: hidden, or a minute unfocused).
+   THE RIM'S PASS (Full only): every 8 s a soft comet of ice-white light runs once along the composer's top edge, left
+   to right, in about 900 ms, then the rim rests (.hz-urim clips it to the straight edge). THE FIELD LIVES: it drifts
+   up a few px over 20 s and back (6 in Full, 3 in Balanced), each star twinkles on its own low, high and pace, and a
+   rare shooting star crosses the band above the composer (hzUShoot: 12-18 s in Full, 25-35 s in Balanced; the friend
+   page's streak: 1.1 px, a tail fading over its last 42 %, 120-260 px at 18-32 deg in 500 ms). THE CHARGED GLOW: a
+   faint wide strip of ice just above the composer's top edge, light spilling out of the box, breathing over 10 s
+   (.06-.08 in Full, half in Balanced). THE FILL'S GLINT: a soft travelling glint along the flowing fill every 5 s
+   (half in Balanced). Calm, reduced motion, effects off: none. */
+.hz #composer>.hz-urim{display:none;position:absolute;top:-6.5px;left:var(--hz-r-composer);right:var(--hz-r-composer);height:12px;overflow:hidden;pointer-events:none;z-index:2}
+.hz.hz-full.hz-ultra #composer>.hz-urim{display:block}
+.hz #composer>.hz-urim>i{position:absolute;inset:0;opacity:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,rgba(220,232,255,0) 70%,rgba(220,232,255,.85) 93%,#fff 98%,rgba(255,255,255,0)) center/100% 1.5px no-repeat}
+.hz #composer>.hz-urim>i::after{content:"";position:absolute;left:0;right:0;top:3px;height:6px;opacity:.35;filter:blur(3px);
+  background:linear-gradient(90deg,rgba(196,216,255,0) 76%,rgba(196,216,255,.9) 95%,rgba(196,216,255,0))}
+.hz.hz-full.hz-ultra #composer>.hz-urim>i{animation:hzUComet 8s 3s infinite}
+@keyframes hzUComet{0%{opacity:1;transform:translateX(-100%);animation-timing-function:cubic-bezier(.45,0,.25,1)}11.2%{opacity:1;transform:translateX(12%)}11.3%,100%{opacity:0;transform:translateX(12%)}}
+.hz.hz-ultra:not(.hz-calm) #hz-ufield{animation:hzUDrift 20s ease-in-out infinite alternate}
+.hz.hz-bal.hz-ultra #hz-ufield{animation-name:hzUDriftBal}
+@keyframes hzUDrift{from{translate:0 0}to{translate:0 -6px}}
+@keyframes hzUDriftBal{from{translate:0 0}to{translate:0 -3px}}
+.hz #hz-ufield i.shoot{left:0;top:0;width:var(--sl);height:1.1px;margin:0;opacity:0;transform-origin:100% 50%;
+  background:linear-gradient(90deg,rgba(220,232,255,0),rgba(220,232,255,.55) 58%,#fff 96%,#fff);animation:none}
+.hz #composer>.hz-uglow{display:none;position:absolute;left:8%;right:8%;bottom:100%;height:40px;margin-bottom:1px;pointer-events:none;opacity:0;
+  background:linear-gradient(0deg,rgba(196,216,255,1),rgba(196,216,255,0));
+  -webkit-mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent);mask:linear-gradient(90deg,transparent,#000 18%,#000 82%,transparent)}
+.hz.hz-ultra:not(.hz-calm) #composer>.hz-uglow{display:block;animation:hzUGlow 10s ease-in-out 1s infinite alternate both}
+.hz.hz-bal.hz-ultra #composer>.hz-uglow{animation-name:hzUGlowBal}
+@keyframes hzUGlow{from{opacity:.06}to{opacity:.08}}
+@keyframes hzUGlowBal{from{opacity:.03}to{opacity:.04}}
+.hz.hz-ultra .hz-sl-fill{isolation:isolate}
+.hz .hz-sl-fill::before{content:"";position:absolute;inset:0;z-index:1;opacity:0;pointer-events:none;transform:translateX(-100%);
+  background:linear-gradient(90deg,rgba(255,255,255,0) 78%,rgba(255,255,255,.55) 92%,rgba(255,255,255,0))}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-fill::before{animation:hzFillGlint 5s 1.5s infinite}
+.hz.hz-bal.hz-ultra .hz-sl-fill::before{animation-name:hzFillGlintBal}
+@keyframes hzFillGlint{0%{opacity:1;transform:translateX(-100%);animation-timing-function:cubic-bezier(.45,0,.25,1)}24%{opacity:1;transform:translateX(25%)}24.1%,100%{opacity:0;transform:translateX(25%)}}
+@keyframes hzFillGlintBal{0%{opacity:.5;transform:translateX(-100%);animation-timing-function:cubic-bezier(.45,0,.25,1)}24%{opacity:.5;transform:translateX(25%)}24.1%,100%{opacity:0;transform:translateX(25%)}}
+.hz.hz-pause #composer>.hz-urim>i,.hz.hz-pause #composer>.hz-uglow,.hz.hz-pause #hz-ufield,.hz.hz-pause .hz-sl-fill::before{animation-play-state:paused}
+.hz .novideo #composer>.hz-urim,.hz .novideo #composer>.hz-uglow{display:none}
+.hz .novideo .hz-sl-fill::before{animation:none}
+@media (prefers-reduced-motion:reduce){.hz #composer>.hz-urim,.hz #composer>.hz-uglow{display:none!important}.hz #hz-ufield,.hz .hz-sl-fill::before{animation:none!important}}
+/* ---- the living Ultra (6b553): end */
 /* ---- the focus ring on the slider (6b544; round the pill since 6b552): keyboard-only (:focus-visible on the range,
    never a click), a 1 px ember ring 2 px off the track with the knob inside, following its radius; never a box */
 .hz .hz-sl:has(input:focus-visible)::after{content:"";position:absolute;left:-2px;right:-2px;top:calc(50% - var(--hz-ph) / 2 - 2px);height:calc(var(--hz-ph) + 4px);border-radius:calc(var(--hz-sr) + 2px);pointer-events:none;box-shadow:0 0 0 1px var(--hz-ember)}
@@ -66528,12 +66587,11 @@ function hzModesPaint(){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
       // the slim pill (6b552): the channel, the bloom, the silver fill, the notches (shown only on hover, drag and
-      // keyboard focus), the spark, and the knob: its halo, the rounded square, Ultra's star (no stars in the track:
-      // they live above the box, hzUField)
+      // keyboard focus), the spark, and the knob: its halo and the rounded square, the same at every level (6b553: no
+      // star at Ultra; no stars in the track either: they live above the box, hzUField)
       +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
-      +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i>'
-      +'<svg class="hz-sl-star" viewBox="-10 -10 20 20" aria-hidden="true"><defs><radialGradient id="hz-ksg"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#f2f6ff"/><stop offset="1" stop-color="#d6e4ff"/></radialGradient></defs><path fill="url(#hz-ksg)" d="'+hzKForms()[0]+'"/></svg></span>'
+      +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i></span>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
@@ -66556,7 +66614,8 @@ function hzEffortPaint(){
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
   // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b552)
   const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);
-  hzKnobStar(i===4);hzUField(i===4);
+  hzUField(i===4);
+  if(i===4)hzUltraEls();
   const root=document.documentElement,was=hzS.effI;hzS.effI=i;
   root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
   // arriving at Ultra ignites it once; leaving drains it (a page that opens at Ultra just rests there)
@@ -66569,11 +66628,6 @@ function hzEffortPaint(){
 // (--hz-a0: the beam's start, seen from the composer's centre). Calm, reduced motion, a hidden or
 // long-unfocused window: no ignition, the still rim and label alone (Calm's rim fades, in the css).
 function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
-// THE LIVING STAR (6b552, the friend page's): at Ultra the knob is a crisp star that steps through four, six, eight
-// and six points, one form every 140 ms, like Claude Code's thinking glyph; it rests while the window is hidden, in
-// Calm and under reduced motion (the css shows the plain knob there). The forms are made on first use, never at load.
-function hzStarPath(n,R){const r=R*(n===4?.34:n===6?.44:.5);let d="";for(let k=0;k<n*2;k++){const a=-Math.PI/2+k*Math.PI/n,rr=k%2?r:R;d+=(k?"L":"M")+(Math.cos(a)*rr).toFixed(2)+" "+(Math.sin(a)*rr).toFixed(2);}return d+"Z";}
-function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,10)));}   // tips at the viewBox's edge: the star is exactly its box, 1.25 x the track
 // THE STARS ABOVE THE BOX (6b552, per Patrick: "more stars above the box versus in the box"). hzUFieldPlan is
 // pure: from the greeting's and the composer's rects it places n stars in the open sky between them (home), or in a
 // strip above the composer (a conversation), each kept clear of both boxes by its own size plus 6 px. hzUField builds
@@ -66592,36 +66646,94 @@ function hzUFieldPlan(home,g,c,vw,n,rnd){
 function hzUField(on){
   const f=$("#hz-ufield");if(!f)return;
   const lv=typeof hzFxLevel==="function"?hzFxLevel():"balanced";
-  if(!on||lv==="calm"||hzS.reduced||(typeof noVideo!=="undefined"&&noVideo)){f.classList.remove("on");hzS.ufKey="";return;}
+  if(!on||lv==="calm"||hzS.reduced||(typeof noVideo!=="undefined"&&noVideo)){f.classList.remove("on");hzS.ufKey="";clearTimeout(hzS.shootT);hzS.shootT=0;return;}
+  if(!hzS.shootT)hzUShootNext(lv==="full"?4000:9000);
   const home=!!$("#hero"),key=(home?"h":"c")+innerWidth+"x"+innerHeight+lv;
   if(hzS.ufKey===key){f.classList.add("on");return;}
   hzS.ufKey=key;f.classList.remove("on");
   clearTimeout(hzS.ufT);hzS.ufT=setTimeout(()=>{      // a beat for the page to settle (a timer, not a frame: a hidden page still places it)
-    const cb=$("#composer"),gr=$("#hero .greet");if(!cb||hzS.ufKey!==key)return;
+    hzS.ufT=0;const cb=$("#composer"),gr=$("#hero .greet");if(!cb||hzS.ufKey!==key)return;
     const n=(home?26:12)*(lv==="full"?1:.5);
     const stars=hzUFieldPlan(home,gr?gr.getBoundingClientRect():null,cb.getBoundingClientRect(),innerWidth,Math.round(n),Math.random);
     f.className=home?"":"chat";
-    f.innerHTML=stars.map(p=>'<i'+(p.up?' class="up"':'')+' style="--x:'+p.x+'px;--y:'+p.y+'px;--s:'+p.s+'px;--du:'+p.du+'s;--dl:'+p.dl+'s"></i>').join("");
+    // each star its own twinkle (6b553): its low, high and middle, and its pace a little either side of the plan's
+    const tw=k=>{const lo=.16+(k*29%25)/100,hi=.72+(k*17%29)/100;return ';--lo:'+lo.toFixed(2)+';--hi:'+Math.min(1,hi).toFixed(2)+';--mid:'+((lo+hi)/2).toFixed(2);};
+    f.innerHTML=stars.map((p,k)=>'<i'+(p.up?' class="up"':'')+' style="--x:'+p.x+'px;--y:'+p.y+'px;--s:'+p.s+'px;--du:'+(p.du*(.75+(k*31%50)/100)).toFixed(2)+'s;--dl:'+p.dl+'s'+tw(k)+'"></i>').join("");
+    if(hzS.uBurst&&hzS.ufKey===key){hzS.uBurst=false;hzUBurst(.04);return;}   // an arrival waiting on the field: it launches now (6b553)
     void f.offsetWidth;if(hzS.ufKey===key)f.classList.add("on");
   },60);
 }
-function hzKnobStar(on){
-  if(on&&hzS.kT)return;
-  clearInterval(hzS.kT);hzS.kT=0;hzS.kI=0;
-  const p=$("#hz-effort .hz-sl-star path");if(p)p.setAttribute("d",hzKForms()[0]);
-  if(on)hzS.kT=setInterval(()=>{if(!hzUltraFx())return;const q=$("#hz-effort .hz-sl-star path");if(!q)return;hzS.kI=(hzS.kI+1)%4;q.setAttribute("d",hzKForms()[hzS.kI]);},140);
+// THE BURST (6b553): the field's stars launch from the composer's top edge (a little toward the knob) to their places,
+// each on its own ease-out (380-600 ms) after delay d (s), then twinkle on; two or three (one in Balanced) go a little
+// further and fade. One layout read (the composer), at the arrival; the motion is translate, scale and opacity only.
+function hzUBurst(d){
+  const f=$("#hz-ufield"),cb=$("#composer");if(!f||!cb||!hzS.ufKey||!f.children.length)return;   // the field off (Calm, effects off, reduced motion): nothing
+  const c=cb.getBoundingClientRect(),kx=hzS.ukx!=null?hzS.ukx:c.left+c.width/2,full=hzFxLevel()==="full";
+  clearTimeout(hzS.uBurstT);f.querySelectorAll("i.far").forEach(x=>x.remove());
+  const st=[...f.querySelectorAll("i:not(.shoot):not(.far)")];if(!st.length)return;   // the field's own stars, not a streak in flight
+  st.forEach((el,k)=>{const x=parseFloat(el.style.getPropertyValue("--x")),y=parseFloat(el.style.getPropertyValue("--y"));
+    el.style.setProperty("--lx",((kx-x)*.35).toFixed(1)+"px");el.style.setProperty("--ly",(c.top-y).toFixed(1)+"px");
+    el.style.setProperty("--lu",(380+(k*53)%221)+"ms");});
+  for(let k=0;k<(full?3:1);k++){const e=st[(k*7+2)%st.length].cloneNode();e.className="far";e.style.setProperty("--fy",(-28-k*9)+"px");e.style.setProperty("--lu",(480+k*60)+"ms");f.appendChild(e);}
+  f.style.setProperty("--ld",d+"s");f.classList.remove("burst");void f.offsetWidth;f.classList.add("burst","on");
+  hzS.uBurstT=setTimeout(()=>{f.classList.remove("burst");f.querySelectorAll("i.far").forEach(x=>x.remove());},1000);
 }
 function hzUltraAngle(){
   const cb=$("#composer"),tr=$("#hz-effort .hz-sl-track");if(!cb||!tr)return;
   const c=cb.getBoundingClientRect(),t=tr.getBoundingClientRect();if(!c.width||!t.width)return;
   const dx=t.left-(c.left+c.width/2),dy=t.top-(c.top+c.height/2);
   cb.style.setProperty("--hz-a0",((Math.atan2(dx,-dy)*180/Math.PI+360)%360).toFixed(1)+"deg");
+  // the knob's x at Ultra (the track's end, half a track-height in), for the edge (6b553): along the composer's top
+  // edge, which runs between its two corners
+  const R=parseFloat(getComputedStyle(cb).getPropertyValue("--hz-r-composer"))||26,ph=t.height||16;
+  hzS.ukx=t.right-ph/2;cb.style.setProperty("--hz-kx",Math.max(0,Math.min(c.width-2*R,hzS.ukx-c.left-R)).toFixed(1)+"px");
 }
+// THE LIVING ULTRA's pieces on the composer (6b553): the rim's comet track and the charged glow, made once
+function hzUltraEls(){
+  const cb=$("#composer");if(!cb)return;
+  if(!cb.querySelector(":scope>.hz-urim")){const r=document.createElement("span");r.className="hz-urim";r.setAttribute("aria-hidden","true");r.appendChild(document.createElement("i"));cb.appendChild(r);}
+  if(!cb.querySelector(":scope>.hz-uglow")){const g=document.createElement("i");g.className="hz-uglow";g.setAttribute("aria-hidden","true");cb.appendChild(g);}
+}
+// THE SHOOTING STAR (6b553; the friend page's streak): every 12-18 s in Full, 25-35 s in Balanced, one thin streak
+// crosses the band above the composer (between the greeting and the box on the home), never over either; it waits
+// while the page is paused (hidden, or a minute unfocused) and never runs in Calm or reduced motion (the field is off)
+function hzUShootNext(ms){
+  clearTimeout(hzS.shootT);
+  hzS.shootT=setTimeout(()=>{hzS.shootT=0;hzUShoot();},ms!=null?ms:(hzFxLevel()==="full"?12000+Math.random()*6000:25000+Math.random()*10000));
+}
+function hzUShoot(){
+  const f=$("#hz-ufield"),cb=$("#composer");
+  if(!f||!cb||!hzS.ufKey||hzS.effI!==4||hzFxLevel()==="calm")return;               // the field is off: the shooter stops
+  if(document.documentElement.classList.contains("hz-pause")||!hzMotionOK()||!f.animate){hzUShootNext();return;}   // paused: no streak, try later
+  const c=cb.getBoundingClientRect(),g=$("#hero .greet"),gr=g?g.getBoundingClientRect():null;
+  const top=gr?gr.bottom+16:Math.max(64,c.top-120),bot=c.top-14,ang=18+Math.random()*14,a=ang*Math.PI/180;
+  let L=120+Math.random()*140;const room=bot-top-12;if(room<16){hzUShootNext();return;}
+  L=Math.min(L,room/Math.sin(a));if(L<60){hzUShootNext();return;}
+  const dir=Math.random()<.5?1:-1,dx=Math.cos(a)*L,dy=Math.sin(a)*L,tail=L*.42;
+  const x0=c.left+Math.random()*Math.max(1,c.width-dx),y0=top+6+Math.random()*Math.max(1,room-dy);
+  const e=document.createElement("i");e.className="shoot";e.setAttribute("aria-hidden","true");e.style.setProperty("--sl",tail.toFixed(1)+"px");
+  const rot=dir>0?ang:180-ang,sx=dir>0?x0:x0+dx;
+  const at=k=>"translate("+(sx-tail+(dir>0?1:-1)*dx*k).toFixed(1)+"px,"+(y0+dy*k).toFixed(1)+"px) rotate("+rot.toFixed(1)+"deg)";
+  e.style.transformOrigin="100% 50%";f.appendChild(e);
+  const an=e.animate([{transform:at(0),opacity:0},{transform:at(.27),opacity:1,offset:.15},{transform:at(.91),opacity:1,offset:.7},{transform:at(1),opacity:0}],{duration:500,easing:"linear"});
+  an.onfinish=an.oncancel=()=>e.remove();
+  hzUShootNext();
+}
+// ONCE PER ARRIVAL (6b553): from a lower level only (the caller), never again within 1.5 s of the last, and once per
+// drag (sliding about Ultra while held never re-fires it)
+function hzUltraGate(now,last,dragFired,dragging){return !(dragging&&dragFired)&&!(last&&now-last<1500);}
 function hzIgnite(){
-  const root=document.documentElement;clearTimeout(hzS.igniteT);
-  root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();
-  if(!hzUltraFx())return;
+  const root=document.documentElement;
+  if(!hzUltraFx()){clearTimeout(hzS.igniteT);root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();return;}
+  const now=performance.now(),dragging=hzS.effDrag!=null;
+  if(!hzUltraGate(now,hzS.ultraAt||0,!!hzS.ultraDrag,dragging)){root.classList.remove("hz-ultra-out");return;}
+  hzS.ultraAt=now;hzS.ultraDrag=dragging;
+  clearTimeout(hzS.igniteT);root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();
+  const cb=$("#composer");
+  if(cb&&!cb.querySelector(":scope>.hz-uedge")){const e=document.createElement("i");e.className="hz-uedge";e.setAttribute("aria-hidden","true");cb.appendChild(e);}
   void root.offsetWidth;root.classList.add("hz-ignite");
+  // the burst: now if the field stands built, else when it has (hzUField's timer)
+  if(hzS.ufT)hzS.uBurst=true;else{hzS.uBurst=false;hzUBurst(.1);}
   hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);
 }
 function hzUltraOut(){
@@ -66640,7 +66752,7 @@ function hzControlsWire(host){
     return Math.max(0,Math.min(1,(x-r.left-ph/2)/Math.max(1,r.width-ph)));};
   inp.addEventListener("pointerdown",e=>{if(e.button)return;sl.classList.add("dragging");hzS.effDrag=at(e.clientX);hzEffortPaint();});
   addEventListener("pointermove",e=>{if(hzS.effDrag==null)return;hzS.effDrag=at(e.clientX);hzEffortPaint();});
-  const up=()=>{sl.classList.remove("dragging");if(hzS.effDrag==null)return;hzS.effDrag=null;hzEffortPaint();};
+  const up=()=>{sl.classList.remove("dragging");hzS.ultraDrag=false;if(hzS.effDrag==null)return;hzS.effDrag=null;hzEffortPaint();};
   addEventListener("pointerup",up);addEventListener("pointercancel",up);inp.addEventListener("blur",up);
   pick.addEventListener("click",e=>{e.stopPropagation();const m=$("#hz-menu");if(m&&m.classList.contains("open"))hzMenuClose(false);else hzMenuOpen();});
   pick.addEventListener("keydown",e=>{if(e.key==="ArrowUp"||e.key==="ArrowDown"){e.preventDefault();hzMenuOpen();}});
