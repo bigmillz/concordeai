@@ -20804,9 +20804,7 @@ def _svc_stream(src):
     body = json.loads(sent[0]["body"])
     out["streamed"] = "".join(got) == "Hello" and last.get("eval_count") == 2
     out["signed"] = _sv_verify(pub, sent[0]) and sent[0]["path"] == "/api/chat"
-    # (6b560) and think:false: a model that reasons by default is told not to
-    out["only the chat"] = (set(body) == {"model", "messages", "stream", "options", "think"}
-                            and body["think"] is False
+    out["only the chat"] = (set(body) == {"model", "messages", "stream", "options"}
                             and body["model"] == "small:8b" and body["stream"] is True
                             and body["messages"] == [{"role": "system", "content": "sys"},
                                                      {"role": "user", "content": "hi"}]
@@ -25765,8 +25763,7 @@ check("servers (live): a signed chat streams end to end with Use cloud power off
       and _SVH.get("X-Models", "").isascii()
       and all(_SVLJ in f[1] for f in _sc1[2] if f[0] == "RUN")
       and _chat34 and _chat34[-1]["access"] and "X-O1-Signature" in _chat34[-1]["headers"]
-      and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options", "think"}
-      and json.loads(_chat34[-1]["body"])["think"] is False          # (6b560) no hidden reasoning
+      and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options"}
       and _stub34 and [m["role"] for m in _stub34[-1][2]["messages"]] == ["system", "user"]
       and _stub34[-1][2]["messages"][-1]["content"] == "stream me please 334"
       and _chat34[-1]["ua"].startswith("ConcordeAI/"),
@@ -41877,8 +41874,9 @@ def _c560_all(src):
         and "_new, _notes = answer_polish(_shown, _pk, prompt)" in sp
         and sp.index('LANE_ROLE.get(agent_name, "") == "code"') < sp.index("answer_polish(_shown"))
     ss = src[src.index("def server_stream("):src.index("def _srv_reads_pictures(")]
-    out["a server model is told not to reason unless a level is asked; one that refuses think:false is asked without it"] = (
-        '    _off_box = [not _think and (e.get("id"), model) not in _srv_nothink_refused]' in ss
+    out["think:false on the server is a dev copy's pilot only; one that refuses it is asked without it"] = (
+        '    _off_box = [not _think and srv_nothink() and (e.get("id"), model) not in _srv_nothink_refused]' in ss
+        and 'return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"' in src
         and '        elif _off_box[0]:\n            d["think"] = False' in ss
         and "            if _off_box[0] and resp.status == 400:" in ss
         and '                _srv_nothink_refused.add((e.get("id"), model))\n                _off_box[0] = False' in ss
@@ -41914,7 +41912,9 @@ _C560_MUT = [
      "_new, _notes = answer_polish(_shown, _pk)"),
     ("a reais range with 'and' not read as a range", r"(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?",
      r"(?:(?:\s?[–—-]\s?)(?:R\$)?"),
-    ("a server model left to reason", '        elif _off_box[0]:\n            d["think"] = False', '        elif False:\n            d["think"] = False'),
+    ("the pilot on in the shipped app", 'return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"',
+     'return os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"'),
+    ("the pilot never sends think:false", '        elif _off_box[0]:\n            d["think"] = False', '        elif False:\n            d["think"] = False'),
     ("a refusal of think:false never retried", "            if _off_box[0] and resp.status == 400:", "            if False:"),
     ("an empty server answer passed off as one", '            raise ServerError("server", "%s sent back an empty answer." % name)',
      "            pass"),
@@ -42690,7 +42690,8 @@ def _c36_updater(f):
     out["feed: GitHub, or a dev copy's stand-in"] = (
         'UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")\n'
         '               if DEV_HOME else "") or "https://api.github.com")' in s
-        and '"MILLENAI_UPDATE_API"))' in s and "https://api.github.com/repos" not in s
+        and '"MILLENAI_UPDATE_API",' in s[s.index("_KNOWN_ENV = frozenset(("):s.index("def _dev_home(")]   # (6b560: no longer the list's last)
+        and "https://api.github.com/repos" not in s
         and s.count('UPDATE_API + "/repos/%s/') == 3)
     out["one .0 falls away in the offer"] = (
         '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]\n        shown = num + mnum.group(2)' in s

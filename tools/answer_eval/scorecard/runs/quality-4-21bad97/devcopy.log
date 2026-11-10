@@ -1,0 +1,66 @@
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 60299)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 496, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 484, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41838, in do_GET
+    self._run(self._do_GET)
+    ~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41816, in _run
+    fn()
+    ~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 42194, in _do_GET
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+  ConcordeAI 7.0 beta 2
+  running on http://127.0.0.1:9916
+
+  no window — serving. ctrl-c to stop.
+
+Fetching 15 files:   0%|          | 0/15 [00:00<?, ?it/s]Fetching 15 files: 100%|██████████| 15/15 [00:00<00:00, 2018.63it/s]
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.36 out='One Hundred Years of Solitude author publication date\nOne Hundred Years of Solitude Gabriel Garcia Marquez'
+ground: who wrote one hundred years of solitude, and when did it com | queries=['wrote One Hundred Years Solitude', 'out One Hundred Years Solitude', 'wrote One Hundred Years Solitude out', 'One Hundred Years of Solitude author publication date', 'One Hundred Years of Solitude Gabriel Garcia Marquez'] model=['One Hundred Years of Solitude author publication date', 'One Hundred Years of Solitude Gabriel Garcia Marquez'] | official=[] | hits=72 kept=8 read=5 passages=16 pack=5516 | plan=1.37 search=8.01 read=5.0 total=13.08 | per-query wrote One Hundred Years Solitude: 16 hits 2.4s; wrote One Hundred Years Solitude out: 16 hits 5.9s; One Hundred Years of Solitude author pub: 16 hits 4.3s; out One Hundred Years Solitude: 16 hits 11.9s; One Hundred Years of Solitude Gabriel Ga: 16 hits 3.3s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.11 out='Brazil time zones\nBrazil official government site (IBGE)'
+ground: how many time zones does brazil have? | queries=['time zones Brazil', 'Brazil official government site (IBGE)'] model=['Brazil official government site (IBGE)'] | official=[] | hits=8 kept=7 read=5 passages=19 pack=5456 | plan=1.11 search=8.0 read=4.58 total=12.61 | per-query Brazil official government site (IBGE): 16 hits 11.3s; time zones Brazil: 16 hits 8.8s
+polish: 1 leak reworded
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.89 out='USD to BRL exchange rate 2026\ninvesting.gov USD to BRL'
+ground: what's the us dollar to brazilian real exchange rate right n | queries=['US dollar Brazilian real exchange rate 2026', 'USD to BRL exchange rate 2026', 'investing.gov USD to BRL'] model=['USD to BRL exchange rate 2026', 'investing.gov USD to BRL'] | official=['frankfurter.app'] | hits=40 kept=8 read=6 passages=30 pack=5480 | plan=0.9 search=8.01 read=1.24 total=9.27 | per-query news: US dollar Brazilian real exchange : 8 hits 1.1s; US dollar Brazilian real exchange rate 2: 16 hits 5.4s; investing.gov USD to BRL: 16 hits 4.6s; USD to BRL exchange rate 2026: 8 hits 8.3s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.72 out='No search queries are needed.'
+ground: a train is scheduled to leave at 9:40 and the trip takes 2 h | queries=['train scheduled leave 40 trip takes hours 35 minutes', 'leaves 15 minutes late', 'arrive train scheduled leave 40', 'train scheduled leave 40 trip takes hours 35', 'No search queries are needed.'] model=['No search queries are needed.'] | official=[] | hits=56 kept=8 read=3 passages=16 pack=5277 | plan=0.72 search=8.0 read=2.42 total=10.51 | per-query train scheduled leave 40 trip takes hour: 16 hits 5.3s; No search queries are needed.: 16 hits 7.2s; train scheduled leave 40 trip takes hour: 8 hits 3.7s; leaves 15 minutes late: 16 hits 7.8s; arrive train scheduled leave 40: 16 hits 9.7s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.71 out='2^30 vs 10^9 calculation'
+ground: which is bigger, 2^30 or 10^9, and by roughly how much? | queries=['bigger 30 10', '^30 vs 10^9 calculation'] model=['^30 vs 10^9 calculation'] | official=[] | hits=32 kept=4 read=4 passages=10 pack=2093 | plan=0.71 search=4.07 read=1.64 total=5.72 | per-query bigger 30 10: 16 hits 4.1s; ^30 vs 10^9 calculation: 16 hits 2.6s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.27 out='logic syllogism bloops razzies lazzies\nformal logic rules of inference'
+ground: all bloops are razzies, and some razzies are lazzies. does i | queries=['bloops razzies lazzies', 'follow bloops lazzies', 'bloops razzies lazzies follow', 'logic syllogism bloops razzies lazzies', 'formal logic rules of inference'] model=['logic syllogism bloops razzies lazzies', 'formal logic rules of inference'] | official=[] | hits=16 kept=6 read=4 passages=13 pack=3741 | plan=1.28 search=8.01 read=2.68 total=10.7 | per-query follow bloops lazzies: 16 hits 9.0s; logic syllogism bloops razzies lazzies: 16 hits 7.9s; formal logic rules of inference: 16 hits 8.1s; bloops razzies lazzies follow: 16 hits 10.2s; bloops razzies lazzies: 8 hits 10.6s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.29 out='javascript array sort behavior numbers\njavascript array sort documentation MDN'
+ground: in javascript, why does [1, 2, 10].sort() give [1, 10, 2], a | queries=['JavaScript 10', 'numbers properly JavaScript 10', 'javascript array sort behavior numbers', 'javascript array sort documentation MDN'] model=['javascript array sort behavior numbers', 'javascript array sort documentation MDN'] | official=[] | hits=24 kept=8 read=6 passages=30 pack=6569 | plan=1.3 search=8.01 read=6.4 total=14.48 | per-query numbers properly JavaScript 10: 16 hits 8.7s; javascript array sort behavior numbers: 16 hits 11.5s; javascript array sort documentation MDN: 16 hits 11.1s; JavaScript 10: 16 hits 11.0s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.30 out='linux find command -name *.log -mtime +7 -delete\nman find -mtime -delete'
+ground: what does this command do: find . -name '*.log' -mtime +7 -d | queries=['command name log mtime delete', 'linux find command -name *.log -mtime +7 -delete', 'man find -mtime -delete'] model=['linux find command -name *.log -mtime +7 -delete', 'man find -mtime -delete'] | official=[] | hits=40 kept=8 read=5 passages=31 pack=5763 | plan=1.3 search=8.01 read=2.16 total=10.21 | per-query linux find command -name *.log -mtime +7: 8 hits 2.2s; command name log mtime delete: 16 hits 6.4s; man find -mtime -delete: 16 hits 6.1s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.03 out='coffee shop names Florianópolis\nsmall cafe name ideas'
+ground: give me three name ideas for a small coffee shop in florianó | queries=['three name ideas small coffee shop Florianópolis one line', 'coffee shop names Florianópolis', 'small cafe name ideas'] model=['coffee shop names Florianópolis', 'small cafe name ideas'] | official=[] | hits=32 kept=8 read=7 passages=26 pack=5844 | plan=1.03 search=8.01 read=1.96 total=10.0 | per-query three name ideas small coffee shop Flori: 8 hits 2.0s; coffee shop names Florianópolis: 16 hits 7.0s; small cafe name ideas: 16 hits 6.5s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.95 out='ibuprofen and acetaminophen interaction\nFDA drug safety information'
+ground: is it okay to take ibuprofen and acetaminophen together for  | queries=['take ibuprofen acetaminophen together headache', 'ibuprofen and acetaminophen interaction', 'FDA drug safety information'] model=['ibuprofen and acetaminophen interaction', 'FDA drug safety information'] | official=[] | hits=32 kept=8 read=7 passages=25 pack=6262 | plan=0.95 search=8.0 read=2.35 total=10.41 | per-query ibuprofen and acetaminophen interaction: 16 hits 6.3s; FDA drug safety information: 16 hits 7.9s; take ibuprofen acetaminophen together he: 16 hits 9.5s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.83 out='average annual return S&P 500 index fund 2026\ncurrent average annual return stock market 2026'
+ground: i have $10,000. should i pay off my 6% car loan early or put | queries=['$10 000', 'one pick $10 000', 'average annual return S&P 500 index fund 2026', 'current average annual return stock market 2026'] model=['average annual return S&P 500 index fund 2026', 'current average annual return stock market 2026'] | official=[] | hits=48 kept=8 read=6 passages=30 pack=7143 | plan=0.83 search=8.01 read=3.32 total=11.39 | per-query current average annual return stock mark: 16 hits 3.1s; one pick $10 000: 16 hits 8.5s; $10 000: 16 hits 7.0s; average annual return S&P 500 index fund: 16 hits 8.8s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.87 out='I cannot answer this question because your personal notes are not provided in the prompt.'
+ground: according to my notes, when does my lease end and how much i | queries=['According notes lease end', 'rent According notes lease end'] model=[] | official=[] | hits=32 kept=8 read=6 passages=16 pack=5497 | plan=0.87 search=7.97 read=1.88 total=9.89 | per-query According notes lease end: 16 hits 3.4s; rent According notes lease end: 16 hits 8.0s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=0.88 out='GPU VRAM limit 30 billion parameter model\nNVIDIA technical specifications 2026'
+ground: in two sentences: what does a gpu's vram limit mean for runn | queries=["two sentences GPU's VRAM limit running 30-billion-parameter model", 'NVIDIA data center GPU 2026 site:nvidianews.nvidia.com', 'GPU VRAM limit 30 billion parameter model', 'NVIDIA technical specifications 2026'] model=['GPU VRAM limit 30 billion parameter model', 'NVIDIA technical specifications 2026'] | official=[] | hits=40 kept=8 read=8 passages=29 pack=8036 | plan=0.92 search=11.01 read=3.47 total=14.58 | per-query GPU VRAM limit 30 billion parameter mode: 16 hits 11.1s; two sentences GPU's VRAM limit running 3: 16 hits 10.3s; NVIDIA technical specifications 2026: 16 hits 9.5s; NVIDIA data center GPU 2026 site:nvidian: 8 hits 11.3s

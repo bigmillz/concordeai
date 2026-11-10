@@ -661,7 +661,8 @@ _KNOWN_ENV = frozenset((
     # a dev copy's release feed (6b537): the updater proven against a local
     # stand-in for api.github.com; honoured only when DEV_HOME is set
     "MILLENAI_UPDATE_API",
-    "MILLENAI_Q3_OFF"))      # 6b523: shape, followup, vendor, polish
+    "MILLENAI_Q3_OFF",       # 6b523: shape, followup, vendor, polish
+    "MILLENAI_Q4_NOTHINK"))  # 6b560: think:false on server answers (a pilot)
 
 
 def _dev_home(env, real):
@@ -23802,6 +23803,15 @@ def quality_ablate() -> set:
     return {w.strip().lower() for w in os.environ.get("MILLENAI_Q3_OFF", "").split(",") if w.strip()}
 
 
+def srv_nothink() -> bool:
+    """A dev copy's pilot (6b560, MILLENAI_Q4_NOTHINK=1): server answers that
+    ask for no reasoning level send think:false. Measured on the owner's
+    gemma4:12b: first words 31.8 -> 10.4 s, but the local judge's grade 8.2 ->
+    5.9 on the same 12 questions, so the shipped app keeps the model's own
+    reasoning (NOTES 6b560)."""
+    return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"
+
+
 def _ddg_news(query: str, limit: int = GROUND_PER_QUERY, timelimit=FRESH_NEWS_LIMIT) -> list:
     """The news engine's dated hits for a query (6b520), as text-search
     rows with a 'date'. Never raises."""
@@ -26800,14 +26810,15 @@ _srv_think = threading.local()
 SRV_THINK_MODELS = re.compile(r"^gpt-oss(?::|$)", re.I)
 SRV_THINK_EXTRA = 4096         # room for the longer reasoning in the context
 _srv_think_refused = set()
-# A MODEL THAT REASONS BY DEFAULT IS TOLD NOT TO (6b560): Ollama runs a
-# thinking model's hidden reasoning unless `think` says otherwise, and the
-# server's gemma4:12b spent 1,200-3,900 hidden tokens on a one-line answer
-# (USAGE "o" against ~30-80 visible), so its first word came 25-35 s in and
-# an 8,192 context ran out mid-answer: answers cut at "This zone dominates",
-# and 5 of 20 scorecard answers empty. Every server answer that asks for no
-# reasoning level now sends think:false; a server or model that refuses the
-# field (a 400) is asked again without it, and not asked again this run.
+# HIDDEN REASONING ON THE SERVER (6b560): Ollama runs a thinking model's
+# hidden reasoning unless `think` says otherwise, and the server's
+# gemma4:12b spends 1,200-3,900 hidden tokens on a one-line answer (USAGE
+# "o" against ~30-80 visible): first words 25-35 s in, and an 8,192 context
+# can run out mid-answer (cut or empty answers; an empty one now falls back,
+# server_first_answer). think:false makes it three times quicker and, on the
+# local judge, clearly worse (8.2 -> 5.9 on 12 questions), so it is a dev
+# copy's pilot only (srv_nothink, MILLENAI_Q4_NOTHINK=1) until the owner
+# picks; a server or model that refuses the field is asked again without it.
 _srv_nothink_refused = set()
 # THE CONTEXT A MODEL IS LOADED WITH (6b518): Ollama reloads a model whose
 # num_ctx changes, so a short side pass (the query plan) on the model the
@@ -27502,7 +27513,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         _ctx = max(_ctx, min(SRV_CTX_MAX, -(-(srv_ctx_for(messages, max_tokens) or SRV_CTX_DEFAULT)
                                           // 4096) * 4096 + SRV_THINK_EXTRA))
     _think_box = [_think]
-    _off_box = [not _think and (e.get("id"), model) not in _srv_nothink_refused]
+    _off_box = [not _think and srv_nothink() and (e.get("id"), model) not in _srv_nothink_refused]
     if getattr(_srv_sticky, "on", False):
         _was = _srv_ctx_seen.get((e.get("id"), model))
         if _was is not None and (_was or SRV_CTX_DEFAULT) >= (_ctx or SRV_CTX_DEFAULT):
