@@ -2328,7 +2328,7 @@ CLOUD_STRENGTH = ("claude", "kimi", "gemini", "groq")
 CLOUD_MODE_SEATS = {"Fast": 1, "Thinking": 3, "Pro": 99}
 CLOUD_MODE_KEYS = {"fast": "Fast", "think": "Thinking", "pro": "Pro"}
 CLOUD_PROMISE = "Only cloud models answer. Nothing runs on this computer."
-CLOUD_ADD_KEY = "Add a key in Settings > Cloud"
+CLOUD_ADD_KEY = "Add a key in Settings > Models > Cloud"
 # "cloud:fast", ":think", ":pro" and "cloud:m:<provider>" are Cloud Only's
 # modes and picks; plain "Cloud Only" keeps its old meaning. Read in one
 # place: cloud_tier_parse
@@ -3983,7 +3983,7 @@ def max_tier_row(ctx) -> dict:
     return {"desc": TIERS["Max"]["desc"], "models": labels, "cloud": cloud, "skipped": [],
             "available": n > 0, "count": n,
             "why": "" if n else ("Nothing available. Add a model in Settings > Models, "
-                                 "pair a server, or add a key in Settings > Cloud."),
+                                 "pair a server, or add a key in Settings > Models > Cloud."),
             "blend": blend_text(comp["label"]) if n > 1 else "",
             # who writes it, and who else could (6b442)
             "comp": max_comp_choices(ctx, labels) if n > 1 else None,
@@ -10091,8 +10091,8 @@ def studio_needs(kind: str) -> str:
     this computer and no working Gemini key is saved (6b326). Nothing has
     been sent anywhere."""
     if studio_supported():
-        return ("Add a Gemini key in Settings > Cloud, or add %s generation in Settings > Models." % ("image" if kind == "image" else "video"))
-    how = ("Add a Gemini key in Settings > Cloud to make this "
+        return ("Add a Gemini key in Settings > Models > Cloud, or add %s generation in Settings > Models." % ("image" if kind == "image" else "video"))
+    how = ("Add a Gemini key in Settings > Models > Cloud to make this "
            "with Gemini.")
     if kind == "image":
         return "Pictures on this computer need Apple silicon. " + how
@@ -10215,9 +10215,14 @@ def _channel_release():
         rels = [x for x in rels if not x.get("draft")]
         if ch == "nightly":
             # the one rolling nightly (6b285) — if it is missing, the
-            # newest release of any kind is the honest fallback
-            rels = ([x for x in rels if x.get("tag_name") == "nightly"]
-                    or rels)
+            # newest release of any kind is the honest fallback. Its body
+            # is a list of commit subjects, so it carries the newest
+            # numbered release's notes for people to read (6b551)
+            human = next((x.get("body") or "" for x in rels
+                          if x.get("tag_name") != "nightly"
+                          and (x.get("body") or "").strip()), "")
+            rels = ([dict(x, _human_notes=human) for x in rels
+                     if x.get("tag_name") == "nightly"] or rels)
         else:
             # beta: newest release that is not the nightly
             rels = [x for x in rels if x.get("tag_name") != "nightly"]
@@ -10233,6 +10238,22 @@ def _channel_release():
 
 
 _chk_cache = {"ts": 0.0, "data": None, "beta": None, "chan": None}
+
+
+# WHAT'S NEW ON A NIGHTLY (6b551, per Patrick: the About pane listed "beta-1 gauntlet: the
+# MLX engine's boot-order pin…"). The nightly release's body is the workflow's commit
+# subjects, written for us, not for people. A nightly shows the newest numbered release's
+# notes instead, or one plain line when there are none to read; never a commit subject.
+def _nightly_line() -> str:
+    m = re.match(r"(\d+\.\d+)", APP_VERSION or "")
+    return "Latest changes from the %s line." % (m.group(1) if m else "current")
+
+
+def _release_notes(rel) -> str:
+    if (rel or {}).get("tag_name") != "nightly":
+        return ((rel or {}).get("body") or "")[:4000]
+    human = ((rel or {}).get("_human_notes") or "").strip()
+    return human[:4000] if human else _nightly_line()
 
 
 def check_update(force=False):
@@ -10352,14 +10373,14 @@ def _check_update_live():
                 "manual": manual,
                 "latest": shown, "tag": tag, "current": short_version(),
                 "published": rel.get("published_at", ""),
-                "notes": (rel.get("body") or "")[:4000],
+                "notes": _release_notes(rel),
                 "size_mb": round(win.get("size", 0) / 1e6, 1)}
     return {"configured": True,
             "available": bool(dmg) and newer
                          and _app_bundle_path() is not None,
             "latest": shown, "tag": tag, "current": short_version(),
             "published": rel.get("published_at", ""),
-            "notes": (rel.get("body") or "")[:4000],
+            "notes": _release_notes(rel),
             "size_mb": round(dmg.get("size", 0) / 1e6, 1) if dmg else 0}
 
 
@@ -10368,10 +10389,11 @@ _whatsnew_cache = {}
 
 def whats_new(prev: str) -> dict:
     """The notes for THIS build, for the post-update dialog (6b288).
-    Nightly: the rolling release's body when its commit is ours, else
-    the commits between the previous identity and ours straight from
-    GitHub's compare API. Stable/beta: OUR release by tag — never the
-    channel's newest, which may be a different build."""
+    Nightly (6b551): the newest numbered release's notes, or one plain
+    line; its commit subjects (the rolling release's body, the compare
+    API) were written for us and are never shown. Stable/beta: OUR
+    release by tag — never the channel's newest, which may be a
+    different build."""
     key = (prev or "", short_version())
     if key in _whatsnew_cache:
         return _whatsnew_cache[key]
@@ -10387,29 +10409,17 @@ def whats_new(prev: str) -> dict:
     notes = ""
     try:
         if APP_NIGHTLY:
-            sha = APP_NIGHTLY.split()[-1]
+            # a nightly: the newest numbered release's notes, or one plain
+            # line; never its commit subjects (6b551)
             try:
-                rel = _get("releases/tags/nightly")
-                mm = re.search(r"nightly\s+([0-9a-f]{7,40})",
-                               rel.get("name") or "")
-                if mm and mm.group(1)[:7] == sha[:7]:
-                    notes = (rel.get("body") or "")[:4000]
+                rels = _get("releases?per_page=20")
+                notes = next(((x.get("body") or "")[:4000] for x in rels
+                              if not x.get("draft")
+                              and x.get("tag_name") != "nightly"
+                              and (x.get("body") or "").strip()), "")
             except Exception:
-                pass
-            if not notes:
-                # a newer nightly has replaced ours: list our commits
-                # ourselves, from the previous identity (or the last
-                # numbered release) up to our commit
-                pm = re.search(r"nightly\s+([0-9a-f]{7,40})", prev or "")
-                base = pm.group(1) if pm else "v%d" % APP_BUILD
-                cmp_ = _get("compare/%s...%s" % (base, sha))
-                subs = [((c.get("commit") or {}).get("message") or "")
-                        .split("\n")[0].strip()
-                        for c in (cmp_.get("commits") or [])]
-                subs = [x for x in subs if x][::-1][:12]
-                if subs:
-                    notes = "ConcordeAI %s\n\n%s" % (
-                        short_version(), "\n".join("- " + x for x in subs))
+                notes = ""
+            notes = notes or _nightly_line()
         else:
             rel = _get("releases/tags/v%d" % APP_BUILD)
             notes = (rel.get("body") or "")[:4000]
@@ -26736,10 +26746,10 @@ SRV_NOFIT_S = 7 * 86400
 # ?refresh=1 waits for it instead of starting its own (review of 6b334)
 _srv_busy = profile_cache("_srv_busy", {})
 
-SRV_GONE = ("That server isn\u2019t in Settings \u203a Your servers any more. "
+SRV_GONE = ("That server isn\u2019t in Settings \u203a Models \u203a Servers any more. "
             "Pick another model.")
 SRV_PAIR_LOST = ("%s no longer accepts this computer: the pairing was lost. "
-                 "Pair again in Settings \u203a Your servers.")
+                 "Pair again in Settings \u203a Models \u203a Servers.")
 SRV_NO_CRYPTO = ("Your servers need encryption, which isn\u2019t set up on "
                  "this computer yet. Nothing was sent.")
 
@@ -27235,7 +27245,7 @@ def _srv_fail_why(e, status: int, js: dict, model: str = "") -> ServerError:
                               if ch.isprintable()).split())[:160]
     if status in (301, 302, 303, 307, 308) or code == "access" \
             or (status == 403 and not code):
-        return ServerError("access", "Cloudflare Access refused the request. Change the token on %s’s card in Settings > Servers." % name,
+        return ServerError("access", "Cloudflare Access refused the request. Change the token on %s’s card in Settings > Models > Servers." % name,
                            code)
     if code in ("unpaired", "bad_signature", "unsigned") or (
             status == 401 and code not in ("clock_skew", "replay")):
@@ -27342,7 +27352,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         raise ServerError("gone", SRV_GONE)
     if not _srv_paired(e):
         raise ServerError("unpaired", "%s isn\u2019t paired with this "
-                          "computer. Pair it in Settings > Servers."
+                          "computer. Pair it in Settings > Models > Servers."
                           % e["name"])
     if not cai_crypto.available():
         raise ServerError("crypto", SRV_NO_CRYPTO)
@@ -27487,7 +27497,7 @@ def server_vision(label: str) -> str:
         raise ServerError("gone", SRV_GONE)
     if not _srv_paired(e):
         raise ServerError("unpaired", "%s isn\u2019t paired with this "
-                          "computer. Pair it in Settings > Servers."
+                          "computer. Pair it in Settings > Models > Servers."
                           % e["name"])
     if not cai_crypto.available():
         raise ServerError("crypto", SRV_NO_CRYPTO)
@@ -27779,7 +27789,7 @@ def server_only_resolve(sid: str, ctx, defer=False):
             and _srv_sleeps(e) and not e.get("wake")):
         # asleep on purpose, but this app was never told which card wakes it
         st["why"] = ("%s didn\u2019t answer, and this app doesn\u2019t know how to wake it. "
-                     "Open Settings \u203a Servers while it is on." % e["name"])
+                     "Open Settings \u203a Models \u203a Servers while it is on." % e["name"])
     return st["label"], e["name"], st["why"]
 
 
@@ -33358,7 +33368,7 @@ def _bench_plan_remote(target: str, spec: dict, ctx) -> dict:
             raise _BenchRefuse(SRV_GONE)
         if not _srv_paired(e):
             raise _BenchRefuse("%s isn\u2019t paired with this computer. Pair it in "
-                               "Settings > Servers." % e["name"])
+                               "Settings > Models > Servers." % e["name"])
         names = []
         for n in spec.get("models") or []:
             n = str(n)
@@ -34707,7 +34717,7 @@ def _cloud_all_down() -> str:
     if not resting and not broken and keyed:
         out.append("No cloud provider answered. Try again in a moment.")
     elif not resting and not broken:
-        out.append("Add a key in Settings > Cloud. Gemini and Groq are free.")
+        out.append("Add a key in Settings > Models > Cloud. Gemini and Groq are free.")
     out.append("Or switch to Fast, Thinking or Pro to answer here.")
     return AppText("\n\n".join(out))
 
@@ -37807,7 +37817,7 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         if (not cloud_allowed()
                 and work_ladder("work")):
             emit(AppText("Cloud models are off, so your key can\u2019t drive the agent. "
-                         "Turn them on in Settings > Cloud, or install a coding model."))
+                         "Turn them on in Settings > Models > Cloud, or install a coding model."))
             return
         emit(AppText("No model can drive the agent. Install a coding model or add a cloud key."))
         return
@@ -46315,7 +46325,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             for p in ("claude", "gemini"))
                 emit("Downloading the vision model (6.6 GB). Paste the image again when "
                      "Settings > Models shows it done."
-                     + (" Or turn on cloud models in Settings > Cloud and your saved key reads "
+                     + (" Or turn on cloud models in Settings > Models > Cloud and your saved key reads "
                         "pictures now." if _vkey else ""))
             except (BrokenPipeError, ConnectionResetError):
                 pass
@@ -46338,7 +46348,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "%d minute%s." % (_mins, "" if _mins == 1 else "s"))
                 else:
                     emit("**Cloud Only** reads images with a Claude or Gemini key. "
-                         "Add one in Settings > Cloud, or switch to Fast, Thinking or Pro.")
+                         "Add one in Settings > Models > Cloud, or switch to Fast, Thinking or Pro.")
             elif cloud_only:
                 run_cloud_only(full_messages, memit, status, step, _cplan, mode_pen)
             elif ag_remote:
@@ -52725,6 +52735,247 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}
 @media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}
   .hz .hz-new,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
+/* ---- SETTINGS LOOK (6b551, per Patrick: "It looks perfect as far as layout, but it doesn't match our
+   current look"). The same rail and pane, in the front's language (beta/DESIGN.md): one neutral glass
+   over a black scrim, champagne hairlines, Space Grotesk 14 for rows and 13 for notes, mono 11 caps for
+   labels, keys of 36 at radius 8, the 8 px grid. Few choices are the front's segmented control (a lit box
+   that slides, radius 6 and 4.5); many are a glass menu; the selects keep their ids, values and handlers,
+   hidden (slSel). Ember only at decisions: Erase, and the keyboard's hairline. The panel holds its size
+   from pane to pane. Horizon only: Classic keeps its own Settings. The classic tokens are re-set inside
+   the panel, so every pane's older rules read the new inks and lines without being rewritten. */
+.hz{--sl-ink:#f4f5fa;--sl-ink2:#c6cde0;--sl-ink3:#9aa6c6;--sl-hair:rgba(241,230,206,.09);--sl-hair2:rgba(241,230,206,.15);
+  --sl-line:rgba(243,235,216,.32);--sl-spec:rgba(255,250,240,.12);--sl-ember:#e8415a;--sl-out:cubic-bezier(.16,1,.3,1);
+  --sl-glass:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));
+  --sl-dense:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025)),rgba(8,8,10,.86);
+  --sl-shadow:0 1px 2px rgba(0,0,0,.22),0 16px 40px -8px rgba(0,0,0,.42),0 48px 120px -32px rgba(0,0,0,.6);
+  --sl-ui:'Space Grotesk',-apple-system,system-ui,sans-serif;--sl-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+.hz #about-veil{background:rgba(3,3,5,.72);-webkit-backdrop-filter:blur(12px) saturate(40%);backdrop-filter:blur(12px) saturate(40%);
+  --text:var(--sl-ink);--dim:var(--sl-ink2);--faint:var(--sl-ink3);--line:var(--sl-hair2);--line-soft:var(--sl-hair);--line-hi:var(--sl-line);
+  --panel:rgba(255,255,255,.03);--panel2:transparent;--accent:var(--sl-ink);--accent-hot:#fff;--helv:var(--sl-ui);--sans:var(--sl-ui);--disp:var(--sl-ui);--mono:var(--sl-mono)}
+.hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 48px));max-height:none;
+  grid-template-columns:216px minmax(0,1fr);border-radius:14px;border:1px solid var(--sl-hair2);background:var(--sl-dense);
+  box-shadow:inset 0 1px 0 var(--sl-spec),var(--sl-shadow);-webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);
+  color:var(--sl-ink);font:400 14px/1.5 var(--sl-ui);-webkit-font-smoothing:antialiased}
+/* the rail: the lockup, the spec, the sections */
+.hz #about-veil #set-rail{background:rgba(0,0,0,.18);border-right:1px solid var(--sl-hair);padding:24px 8px 16px;overflow-y:auto;scrollbar-width:none}
+.hz #about-veil #set-brand{gap:8px;padding:0 8px 16px}
+.hz #about-veil #set-brand b{font-family:'Michroma','Helvetica Neue',sans-serif;font-size:10.25px;letter-spacing:.18em;-webkit-text-stroke:.02em currentColor;color:#fff}
+.hz #about-veil #set-brand b b{font-size:.865em;-webkit-text-stroke:.14em currentColor;letter-spacing:.18em}
+.hz #about-veil #set-spec{padding:0 8px 16px;margin:0 0 8px;border-bottom:1px solid var(--sl-hair);font:400 11px/1 var(--sl-mono);letter-spacing:.12em}
+.hz #about-veil #set-spec>div{padding:4px 0;gap:8px}
+.hz #about-veil #set-spec dt{color:var(--sl-ink3)}
+.hz #about-veil #set-spec dd{color:var(--sl-ink2);font-variant-numeric:tabular-nums}
+.hz #about-veil #set-nav{display:flex;flex-direction:column;gap:2px}
+.hz #about-veil .snav{position:relative;display:flex;align-items:center;gap:8px;height:32px;padding:0 24px 0 8px;border:0;border-radius:8px;
+  font:400 14px/1 var(--sl-ui);color:var(--sl-ink2);transition:background-color .12s var(--sl-out),color .12s var(--sl-out)}
+.hz #about-veil .snav:hover{background:rgba(255,255,255,.06);color:var(--sl-ink)}
+.hz #about-veil .snav.on{background:rgba(255,255,255,.09);color:var(--sl-ink);font-weight:500}
+.hz #about-veil .snav.on::after{content:"";position:absolute;right:12px;top:50%;width:5px;height:5px;margin-top:-2.5px;background:#fff;transform:rotate(45deg);border-radius:.5px}
+.hz #about-veil .snav:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--sl-ember)}
+.hz #about-veil .snav-kid{padding-left:28px}
+.hz #about-veil .snav-grp.has-on{color:var(--sl-ink)}
+.hz #about-veil .snav-chev{width:6px;height:6px;margin:0 2px 0 1px;border-style:solid;border-width:0 1.5px 1.5px 0;border-color:currentColor;transform:rotate(-45deg);transition:transform .2s var(--sl-out)}
+.hz #about-veil .snav-grp[aria-expanded="true"] .snav-chev{transform:rotate(45deg)}
+/* the pane */
+.hz #about-veil #about-body{padding:24px 24px 24px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+.hz #about-veil #about-foot{padding:12px 24px;border-top:1px solid var(--sl-hair);background:transparent;align-items:center}
+.hz #about-veil #about-site{font-size:13px;color:var(--sl-ink3)}
+.hz #about-veil #about-site:hover{color:var(--sl-ink)}
+.hz #about-veil #about-site i{opacity:1}
+.hz #about-veil #plan-limits #nolimits-row,.hz #about-veil #plan-limits .giants-row{font-size:13px;line-height:1.5;color:var(--sl-ink2)}
+.hz #about-veil .giants-row.off span{opacity:.6}   /* inactive until No limits is on */
+.hz #about-veil .spane{animation:slPane .2s var(--sl-out) both}
+@keyframes slPane{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.hz #about-veil .set-h{font:400 11px/1 var(--sl-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sl-ink3);opacity:1;margin:0 0 16px}
+.hz #about-veil .tdesc{font-size:13px;line-height:1.5;color:var(--sl-ink3);margin:-8px 0 16px}
+.hz #about-veil .tdesc b,.hz #about-veil .kn-privacy{color:var(--sl-ink2);font-weight:500}
+.hz #about-veil a{color:var(--sl-ink2);text-decoration-color:var(--sl-hair2);text-underline-offset:3px}
+.hz #about-veil a:hover{color:var(--sl-ink)}
+/* About: the version, its date, the notes, then one column of rows */
+.hz #about-veil #up-version{font:500 22px/1.3 var(--sl-ui);letter-spacing:-.012em;text-transform:none;color:var(--sl-ink);margin:0}
+.hz #about-veil #up-reldate{font-size:13px;color:var(--sl-ink3);margin:4px 0 0}
+.hz #about-veil #up-notes{margin:16px 0 0;padding:16px;max-height:184px;border-radius:8px;border:1px solid var(--sl-hair);background:rgba(255,255,255,.025);
+  font-size:13px;line-height:1.6;color:var(--sl-ink2);text-align:left;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.14) transparent}
+.hz #about-veil #up-notes>p:first-child>b{display:block;font:400 11px/1 var(--sl-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sl-ink3);margin-bottom:12px}
+.hz #about-veil #up-notes b{color:var(--sl-ink);font-weight:500}
+.hz #about-veil #up-notes p{margin:0 0 8px}
+.hz #about-veil #up-notes ul{margin:0 0 8px;padding-left:16px}
+.hz #about-veil #up-notes li{margin:0 0 6px}
+.hz #about-veil #about-check{margin:16px 0 8px}
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  min-height:48px;margin:0;padding:8px 0;border-top:1px solid var(--sl-hair);font:400 14px/1.4 var(--sl-ui);font-style:normal;color:var(--sl-ink)}
+.hz #about-veil .toggle-row{flex-direction:row-reverse;cursor:pointer}
+.hz #about-veil #p-about #fx-toggle{display:none}   /* one Effects control: Calm is the old Off (6b551) */
+.hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span{color:var(--sl-ink);font-size:14px}
+.hz #about-veil .toggle-row:hover>span{color:#fff}
+.hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #sugg-note,.hz #about-veil #autoclean-note{font-size:13px;line-height:1.5;color:var(--sl-ink3);margin:-8px 0 0;padding:0 0 16px}
+/* the switch: a squared track, like the effort slider's */
+.hz #about-veil .switch{width:32px;height:18px;border-radius:5px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px var(--sl-hair2),inset 0 1px 2px rgba(0,0,0,.3);transition:background-color .2s var(--sl-out),box-shadow .2s var(--sl-out)}
+.hz #about-veil .switch::after{top:3px;left:3px;width:12px;height:12px;border-radius:3.5px;background:var(--sl-ink3);transition:transform .2s var(--sl-out),background-color .2s var(--sl-out)}
+.hz #about-veil .toggle-row.on .switch{background:linear-gradient(180deg,#f4f5fa,#dfe4f2);box-shadow:inset 0 0 0 1px rgba(255,255,255,.9)}
+.hz #about-veil .toggle-row.on .switch::after{left:3px;transform:translateX(14px);background:#0b0b0e}
+.hz #about-veil .toggle-row:focus-visible{outline:0}
+.hz #about-veil .toggle-row:focus-visible .switch{box-shadow:inset 0 0 0 1px var(--sl-hair2),0 0 0 1px var(--sl-ember)}
+/* keys: 36 tall, radius 8, the glass; a slim key 32 */
+.hz #about-veil .about-btn,.hz #about-veil .bm-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;min-height:0;padding:0 16px;
+  margin:0;border-radius:8px;border:1px solid var(--sl-hair2);background:var(--sl-glass);box-shadow:inset 0 1px 0 rgba(255,250,240,.06);
+  color:var(--sl-ink);font:500 14px/1 var(--sl-ui);letter-spacing:0;cursor:pointer;
+  transition:background-color .12s var(--sl-out),border-color .12s var(--sl-out),transform .12s var(--sl-out)}
+.hz #about-veil .about-btn{width:auto;align-self:flex-start}
+.hz #about-veil #about-check{width:100%;align-self:stretch}
+.hz #about-veil .about-btn.slim,.hz #about-veil .bm-btn{height:32px;padding:0 12px;font-size:13px;line-height:1}
+.hz #about-veil .about-btn:hover,.hz #about-veil .bm-btn:hover{background:rgba(255,255,255,.06);border-color:var(--sl-line);color:var(--sl-ink)}
+.hz #about-veil .about-btn:active,.hz #about-veil .bm-btn:active{transform:scale(.97)}
+.hz #about-veil .about-btn:disabled,.hz #about-veil .bm-btn:disabled{opacity:.45;cursor:default;transform:none}
+.hz #about-veil .about-btn:focus-visible,.hz #about-veil .bm-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--sl-ember)}
+.hz #about-veil .about-btn.primary{margin-left:auto;padding:0 24px;background:rgba(255,255,255,.09);border-color:var(--sl-hair2)}
+.hz #about-veil .about-btn.danger{color:#f0566c;border-color:rgba(232,65,90,.4);background:rgba(232,65,90,.06)}
+.hz #about-veil .about-btn.danger:hover{color:#f4f5fa;border-color:rgba(232,65,90,.7);background:rgba(232,65,90,.1)}
+.hz #about-veil .about-btn.quiet{border:0;background:none;box-shadow:none;color:var(--sl-ink3);height:32px;padding:0 8px}
+.hz #about-veil .about-btn[hidden],.hz #about-veil .bm-btn[hidden]{display:none}
+/* fields */
+.hz #about-veil input[type=text],.hz #about-veil input[type=password],.hz #about-veil input[type=search],.hz #about-veil input:not([type]),.hz #about-veil textarea{box-sizing:border-box;min-height:36px;padding:0 12px;
+  border-radius:8px;border:1px solid var(--sl-hair2);background:rgba(0,0,0,.24);color:var(--sl-ink);font:400 14px/1.4 var(--sl-ui);outline:0;
+  transition:border-color .12s var(--sl-out)}
+.hz #about-veil textarea{padding:8px 12px;line-height:1.5}
+.hz #about-veil input::placeholder,.hz #about-veil textarea::placeholder{color:rgba(154,166,198,.8)}
+.hz #about-veil input:focus,.hz #about-veil textarea:focus{border-color:var(--sl-line);box-shadow:none}
+.hz #about-veil .ctlrow>input,.hz #about-veil .ctlrow>.about-btn.slim{height:36px}
+.hz #about-veil .ctlrow{gap:8px}
+/* checkboxes: a 16 px square, the ink when on */
+.hz #about-veil input[type=checkbox]{-webkit-appearance:none;appearance:none;flex:none;width:16px;height:16px;margin:0;border-radius:4px;
+  border:1px solid var(--sl-line);background:rgba(255,255,255,.04);display:inline-grid;place-content:center;cursor:pointer;
+  transition:background-color .12s var(--sl-out),border-color .12s var(--sl-out)}
+.hz #about-veil input[type=checkbox]::after{content:"";width:8px;height:4px;border:solid #0b0b0e;border-width:0 0 1.5px 1.5px;transform:translateY(-1px) rotate(-45deg);opacity:0}
+.hz #about-veil input[type=checkbox]:checked{background:var(--sl-ink);border-color:var(--sl-ink)}
+.hz #about-veil input[type=checkbox]:checked::after{opacity:1}
+.hz #about-veil input[type=checkbox]:disabled{opacity:.4;cursor:default}
+.hz #about-veil input[type=checkbox]:focus-visible{outline:0;box-shadow:0 0 0 1px var(--sl-ember)}
+/* the length slider: a slim track, the effort knob's rounded square */
+.hz #about-veil input[type=range]{-webkit-appearance:none;appearance:none;height:24px;background:none;cursor:pointer}
+.hz #about-veil input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.04)}
+.hz #about-veil input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border-radius:4px;border:1px solid rgba(255,255,255,.95);
+  background:radial-gradient(110% 90% at 50% 25%,#fff,#f4f7ff 45%,#dde5fa);box-shadow:0 1px 2px rgba(0,0,0,.45),0 2px 6px rgba(0,0,0,.35)}
+.hz #about-veil input[type=range]:focus-visible{outline:0}
+.hz #about-veil input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 1px var(--sl-ember)}
+/* Account */
+.hz #about-veil #acct-card{gap:12px;padding:12px 16px;border-radius:8px;border:1px solid var(--sl-hair);background:rgba(255,255,255,.025);margin:0 0 16px}
+.hz #about-veil #acct-av{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px var(--sl-hair);color:var(--sl-ink2)}
+.hz #about-veil #acct-av svg{width:16px;height:16px}
+.hz #about-veil #acct-kind{font-size:14px;font-weight:500;color:var(--sl-ink)}
+.hz #about-veil #acct-sub{font-size:13px;color:var(--sl-ink3)}
+.hz #about-veil #imp-settings-row{padding:16px 0;border-top:1px solid var(--sl-hair)}
+.hz #about-veil #about-forget{align-self:flex-start;margin-top:8px;padding:0 12px;height:32px;font-size:13px;text-decoration:none;border-color:transparent;background:none;box-shadow:none}
+.hz #about-veil #about-forget:hover{border-color:rgba(232,65,90,.5);background:rgba(232,65,90,.08)}
+.hz #about-veil #acct-crypto{font-size:13px;color:var(--sl-ink3);margin:0 0 16px}
+.hz #about-veil #acct-window{margin-bottom:16px}
+.hz #about-veil #forget-steps{gap:8px;margin-top:16px}
+.hz #about-veil .fscope{gap:8px;font-size:14px}
+.hz #about-veil #forget-note{font-size:13px;color:var(--sl-ink3)}
+/* Personality */
+.hz #about-veil #user-name{margin-bottom:8px}
+.hz #about-veil #persona-save{align-self:flex-start;margin-top:8px}
+.hz #about-veil #len-row{margin-top:16px;padding-top:16px;border-top:1px solid var(--sl-hair)}
+.hz #about-veil #len-head{font:400 11px/1 var(--sl-mono);letter-spacing:.12em;color:var(--sl-ink3)}
+.hz #about-veil #len-head b{color:var(--sl-ink);font:500 14px/1 var(--sl-ui);letter-spacing:0;text-transform:none;margin-left:8px}
+.hz #about-veil #sugg-toggle{margin-top:16px}
+.hz #about-veil #sugg-row{margin-top:8px}
+/* Your stuff */
+.hz #about-veil .kn-line{font-size:14px;color:var(--sl-ink);padding:0 0 16px}
+.hz #about-veil .kn-row{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 0;border-top:1px solid var(--sl-hair);font-size:14px;color:var(--sl-ink)}
+.hz #about-veil .kn-hint,.hz #about-veil .kn-note,.hz #about-veil .kn-engine,.hz #about-veil .kn-empty{font-size:13px;line-height:1.5;color:var(--sl-ink3)}
+.hz #about-veil .kn-hint{margin:-8px 0 16px}
+.hz #about-veil .kn-add{margin:8px 0 16px}
+/* Models,Cloud,Servers,Usage: the cards and lists in the one glass */
+.hz #about-veil .us-card,Usage: the cards and lists in the one glass */
+.hz #about-veil #cloudkey-box,Usage: the cards and lists in the one glass */
+.hz #about-veil #srv-add,Usage: the cards and lists in the one glass */
+.hz #about-veil .srv-card,Usage: the cards and lists in the one glass */
+.hz #about-veil #manage-box,Usage: the cards and lists in the one glass */
+.hz #about-veil .plan-card,Usage: the cards and lists in the one glass */
+.hz #about-veil .mu{border-radius:8px;border-color:var(--sl-hair);background:rgba(255,255,255,.025)}
+.hz #about-veil #srv-add{border-style:solid}
+.hz #about-veil .us-k,.hz #about-veil .srv-h,.hz #about-veil #cloudkey-head,.hz #about-veil .ros-gh,.hz #about-veil .bm-e,.hz #about-veil #mg-stats dt{font:400 11px/1.2 var(--sl-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sl-ink3)}
+.hz #about-veil .us-v,.hz #about-veil .bm-v{color:var(--sl-ink);font-weight:500}
+.hz #about-veil .us-s,.hz #about-veil #us-fresh,.hz #about-veil .us-empty,.hz #about-veil #us-note,.hz #about-veil .bm-desc,.hz #about-veil #bm-note,.hz #about-veil .srv-about,.hz #about-veil #ck-note,.hz #about-veil #manage-note,.hz #about-veil #srv-note{color:var(--sl-ink3)}
+.hz #about-veil .bm-desc,.hz #about-veil #bm-note,.hz #about-veil .srv-about,.hz #about-veil #us-note{font-size:13px;line-height:1.5}
+.hz #about-veil .us-s,.hz #about-veil #us-fresh,.hz #about-veil .us-leg,.hz #about-veil #bm-status,.hz #about-veil .bm-d{font-size:12px}
+.hz #about-veil .bm-s{font-size:12px;color:var(--sl-ink3)}
+.hz #about-veil .bm-n{font-size:14px}
+.hz #about-veil #us-svg text{font-size:11px;fill:var(--sl-ink3)}
+.hz #about-veil .us-head{gap:8px;margin-bottom:16px}
+.hz #about-veil .us-title{font:500 17px/1.4 var(--sl-ui);color:var(--sl-ink)}
+.hz #about-veil .us-ico{color:var(--sl-ink3)}
+.hz #about-veil .us-grid{gap:8px}
+.hz #about-veil .us-card{padding:12px 16px}
+.hz #about-veil .bm{margin-top:24px;padding-top:24px;border-top-color:var(--sl-hair)}
+.hz #about-veil #bm-hw{font-size:12px;letter-spacing:0;color:var(--sl-ink2)}
+.hz #about-veil #roster-foot{margin-top:16px}
+.hz #about-veil .srv-grid{grid-template-columns:minmax(0,1fr)}
+.hz #about-veil .srv-grid input{font-size:14px}
+.hz #about-veil #srv-add{padding:16px}
+.hz #about-veil #srv-add-go{margin-top:8px}
+.hz #about-veil .srv-none{font-size:13px;color:var(--sl-ink3);margin:0 0 16px}
+.hz #about-veil .set-card{border-radius:8px;border-color:var(--sl-hair);background:rgba(255,255,255,.025)}
+.hz #about-veil .set-card:hover{border-color:var(--sl-line)}
+.hz #about-veil .set-card.on{border-color:var(--sl-line);background:rgba(255,255,255,.07)}
+.hz #about-veil .set-card .cur{background:#141416;border-color:var(--sl-line);border-radius:4px;color:var(--sl-ink2)}
+.hz #about-veil .set-card:focus-visible{outline:0;box-shadow:0 0 0 1px var(--sl-ember)}
+/* the selects, drawn: a segmented control or a menu (slSel); the select stays, hidden */
+.hz #about-veil select.sl-native{display:none!important}
+html:not(.hz) .sl-sel{display:none}
+.hz .sl-sel{display:inline-flex;flex:none;min-width:0;max-width:100%}
+.hz .sl-sel[hidden]{display:none}
+.hz .sl-seg{position:relative;display:inline-grid;grid-auto-flow:column;grid-auto-columns:1fr;height:32px;box-sizing:border-box;border-radius:6px;
+  border:1px solid var(--sl-hair2);background:var(--sl-glass);box-shadow:inset 0 1px 0 var(--sl-spec)}
+.hz .sl-seg button{position:relative;z-index:1;min-width:64px;height:30px;padding:0 12px;margin:0;border:0;border-radius:4.5px;background:none;
+  font:400 13px/1 var(--sl-ui);letter-spacing:.005em;color:var(--sl-ink3);cursor:pointer;white-space:nowrap;transition:color .2s var(--sl-out)}
+.hz .sl-seg button:hover{color:var(--sl-ink2)}
+.hz .sl-seg button[aria-checked="true"]{color:var(--sl-ink)}
+.hz .sl-seg button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--sl-ember)}
+.hz .sl-seg button:disabled{opacity:.45;cursor:default}
+.hz .sl-hi{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n,3));border-radius:4.5px;pointer-events:none;
+  transform:translateX(calc(var(--i,0) * 100%));background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(232,234,242,.28),0 0 12px -3px rgba(232,234,242,.3);transition:transform .2s var(--sl-out)}   /* silver: no hue in Settings but the ember */
+.hz .sl-seg.none .sl-hi{opacity:0}
+.hz .sl-menu{display:inline-flex;align-items:center;gap:8px;height:32px;max-width:100%;min-width:0;padding:0 8px 0 12px;box-sizing:border-box;border-radius:8px;
+  border:1px solid var(--sl-hair2);background:var(--sl-glass);box-shadow:inset 0 1px 0 rgba(255,250,240,.06);color:var(--sl-ink);font:400 13px/1 var(--sl-ui);cursor:pointer;
+  transition:background-color .12s var(--sl-out),border-color .12s var(--sl-out)}
+.hz .sl-menu span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.hz .sl-menu svg{flex:none;width:12px;height:12px;color:var(--sl-ink3);transition:transform .2s var(--sl-out)}
+.hz .sl-menu:hover,.hz .sl-menu[aria-expanded="true"]{background:rgba(255,255,255,.06);border-color:var(--sl-line)}
+.hz .sl-menu[aria-expanded="true"] svg{transform:rotate(180deg)}
+.hz .sl-menu:focus-visible{outline:0;box-shadow:0 0 0 1px var(--sl-ember)}
+.hz .sl-menu:disabled{opacity:.45;cursor:default}
+.hz .sl-sel.wide,.hz .sl-sel.wide .sl-menu{width:100%}
+.hz #sl-pop{position:fixed;z-index:90;min-width:160px;max-width:min(320px,calc(100vw - 32px));max-height:min(320px,calc(100vh - 32px));overflow-y:auto;padding:4px;box-sizing:border-box;
+  border-radius:12px;border:1px solid var(--sl-hair2);background:var(--sl-dense);box-shadow:inset 0 1px 0 var(--sl-spec),var(--sl-shadow);
+  -webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);opacity:0;transform:translateY(-4px);
+  transition:opacity .2s var(--sl-out),transform .2s var(--sl-out);scrollbar-width:thin}
+.hz #sl-pop.in{opacity:1;transform:none}
+.hz #sl-pop[hidden]{display:none}
+.hz #sl-pop button{position:relative;display:flex;align-items:center;width:100%;height:32px;padding:0 28px 0 12px;margin:0;border:0;border-radius:6px;background:none;
+  color:var(--sl-ink2);font:400 13px/1 var(--sl-ui);text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.hz #sl-pop button:hover,.hz #sl-pop button:focus-visible{background:rgba(255,255,255,.06);color:var(--sl-ink);outline:0}
+.hz #sl-pop button[aria-selected="true"]{background:rgba(255,255,255,.09);color:var(--sl-ink);font-weight:500}
+.hz #sl-pop button[aria-selected="true"]::after{content:"";position:absolute;right:12px;top:50%;width:5px;height:5px;margin-top:-2.5px;background:#fff;transform:rotate(45deg);border-radius:.5px}
+.hz #sl-pop button:disabled{opacity:.45;cursor:default}
+.hz #sl-pop .sl-pop-h{padding:8px 12px 4px;font:400 11px/1 var(--sl-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--sl-ink3)}
+@media (prefers-reduced-motion:reduce){.hz #about-veil .spane,.hz .sl-hi,.hz #sl-pop,.hz #about-veil .switch::after{animation:none;transition:none}}
+/* a narrow window: the panel is the window; the sections run along the top */
+@media (max-width:640px){
+  .hz #about-veil #about-card{width:calc(100vw - 16px);height:calc(100vh - 16px);grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .hz #about-veil #set-rail{border-right:0;border-bottom:1px solid var(--sl-hair);padding:8px;overflow:auto hidden}
+  .hz #about-veil #set-brand,.hz #about-veil #set-spec{display:none}
+  .hz #about-veil #set-nav{flex-direction:row;gap:4px;width:max-content}
+  .hz #about-veil #snav-models-kids:not([hidden]){display:contents}
+  .hz #about-veil .snav{width:auto;flex:none;padding:0 12px;white-space:nowrap}
+  .hz #about-veil .snav-kid{padding-left:12px}
+  .hz #about-veil .snav.on::after{display:none}
+  .hz #about-veil #about-body{padding:16px}
+  .hz #about-veil #about-foot{padding:12px 16px}
+  .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row{flex-wrap:wrap;row-gap:8px}
+}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -52980,7 +53231,7 @@ html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-ri
          header. Inside the one-row header their full-width rule ran them
          past the sidebar and squeezed the wordmark to nothing. -->
     <div id="models-flag" hidden
-         title="More models fit this Mac">More models</div>
+         title="More models fit this computer">More models</div>
   </div>
 
 
@@ -53184,7 +53435,7 @@ __CODE_ROWS__
     <header class="imp-head">
       <div class="imp-headtext">
         <h2 id="imp-title" class="imp-title">Bring your chats</h2>
-        <p id="imp-sub" class="imp-sub">From ChatGPT, Claude, Gemini or a file. Everything stays on this Mac.</p>
+        <p id="imp-sub" class="imp-sub">From ChatGPT, Claude, Gemini or a file. Everything stays on your machines.</p>
       </div>
       <button type="button" class="imp-x" id="imp-close" aria-label="Close"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     </header>
@@ -53317,7 +53568,7 @@ __CODE_ROWS__
     <div class="adv-h">Cloud models</div>
     <div id="adv-cloud"></div>
     <div class="adv-h">Compositor</div>
-    <p class="advp">Writes the final answer. The local one keeps everything on this Mac.</p>
+    <p class="advp">Writes the final answer. A local one keeps everything on your machines.</p>
     <select id="adv-comp"></select>
     <p class="advp" id="adv-comp-why"></p>
     <div id="adv-note"></div>
@@ -53409,14 +53660,15 @@ __CODE_ROWS__
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check now</button>
-      <!-- 6b285: three channels. Stable is the default; Prerelease
-           (value "beta", kept for saved prefs; renamed 6b318 per
-           Patrick) gets the betas and RCs; Nightly follows the rolling
+      <!-- 6b285: three channels. Stable is the default; Beta
+           (value "beta", kept for saved prefs; "Prerelease" from 6b318,
+           "Beta" again in 6b551 per Patrick, to match the website and the
+           release names) gets the betas and RCs; Nightly follows the rolling
            "nightly" release that GitHub Actions rebuilds on every push
            to main. -->
       <label id="beta-row"><span>Update channel</span>
         <select id="upchan"><option value="stable">Stable</option>
-          <option value="beta">Prerelease</option>
+          <option value="beta">Beta</option>
           <option value="nightly">Nightly</option></select></label>
       <!-- 6b292, per Patrick: automatic checks are a choice — on, the
            app checks at launch and daily; off, the button above is the
@@ -53497,7 +53749,7 @@ __CODE_ROWS__
       <!-- 6b390: the starter chips follow what you ask about -->
       <div class="toggle-row on" id="sugg-toggle">
         <div class="switch"></div><span>Personal suggestions</span></div>
-      <div id="sugg-note">From the titles of recent chats. Written on your server or this Mac.
+      <div id="sugg-note">From the titles of recent chats. Written on your machines.
         <div id="sugg-row" class="ctlrow"><button class="about-btn slim" id="sugg-refresh" type="button">Refresh</button><span id="sugg-status"></span></div></div>
     </section>
     <!-- YOUR STUFF (6b530, per Patrick: "It knows your life"). Minimal;
@@ -53522,16 +53774,15 @@ __CODE_ROWS__
       <div class="kn-note" id="know-note"></div>
       <label class="kn-row"><input type="checkbox" id="know-share">
         <span>Let cloud models read my stuff too</span></label>
-      <div class="kn-hint">Off: an answer that uses your stuff comes from this Mac
-        or your own servers. On: it may go to a cloud model too, and each such
-        answer says so.</div>
+      <div class="kn-hint">Off: answers that use your stuff stay on your machines.
+        On: a cloud model may read it too, and the answer says so.</div>
       <div class="ctlrow"><button class="about-btn slim" id="know-reindex"
         type="button">Read everything again</button>
         <span class="kn-engine" id="know-engine"></span></div>
     </section>
     <section class="spane" id="p-cloud">
       <div class="set-h">Cloud</div>
-      <p class="tdesc">Optional. While on, cloud models answer and your prompts leave this Mac. Gemini pictures and video go to Google whenever a Gemini key is saved. Keys stay saved when off. A question that needs the web goes, as typed, to a search engine; weather and place questions send the place name.</p>
+      <p class="tdesc">Optional. While on, cloud models answer and your prompts leave your machines. Gemini pictures and video go to Google whenever a Gemini key is saved. Keys stay saved when off. A question that needs the web goes, as typed, to a search engine; weather and place questions send the place name.</p>
       <label id="turbo-row" hidden><input type="checkbox" id="turbo">
         <span>Cloud models</span></label>
       <div id="turbo-note" hidden></div>
@@ -53568,7 +53819,7 @@ __CODE_ROWS__
              only set they change -->
         <div id="plan-row"><div id="plan-limits">
           <label id="nolimits-row"><input type="checkbox" id="nolimits">
-            <span>No limits. Everything includes models bigger than memory; they can crash this Mac.</span></label>
+            <span>No limits. Everything includes models bigger than memory; they can crash this computer.</span></label>
           <label id="giants-row" class="giants-row off"><input type="checkbox"
             id="giants" disabled><span>__GIANT_LABEL__</span><i
             class="hint" title="__GIANT_TIP__">i</i></label>
@@ -53795,13 +54046,13 @@ __CODE_ROWS__
         <b>Concorde<b>AI</b></b>
         <span id="wiz-ver">__APP_VER__</span>
       </div>
-      <p>ConcordeAI runs AI models on this Mac. Several draft an answer; the strongest writes the final. Cloud models are optional.</p>
+      <p>ConcordeAI runs AI models on your machines. Several draft an answer; the strongest writes the final. Cloud is optional.</p>
       <p>About a minute. Pick what to install, add any cloud keys, done. Everything is in Settings later.</p>
     </div>
 
     <div class="wstep" data-w="2" hidden>
       <div class="set-h">Local models</div>
-      <p>Models run on this Mac, no internet needed. Pick how much to install.</p>
+      <p>Models run on this computer, no internet needed. Pick how much to install.</p>
       <div id="wiz-plans"></div>
       <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac" checked>
         Remove outdated models after updates</label>
@@ -53810,7 +54061,7 @@ __CODE_ROWS__
       <label id="wiz-video"><input type="checkbox" id="wiz-vid">
         <span>Video generation <i class="wsz">(19.6 GB)</i></span></label>
       <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        No limits. Everything includes models bigger than memory; they can crash this Mac.</label>
+        No limits. Everything includes models bigger than memory; they can crash this computer.</label>
       <!-- 6b307, per Patrick: the giants sit behind a second box that
            only wakes up once the first is ticked -->
       <label id="wiz-giants" class="giants-row off"><input type="checkbox"
@@ -53820,7 +54071,7 @@ __CODE_ROWS__
 
     <div class="wstep" data-w="3" hidden>
       <div class="set-h">Cloud</div>
-      <p>Optional. Some are free, some need a paid key. While on, your prompts leave this Mac.</p>
+      <p>Optional. Some are free, some need a paid key. While on, your prompts leave your machines.</p>
       <div id="wiz-provs"></div>
     </div>
 
@@ -54284,6 +54535,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
+  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b551)
   if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
@@ -54405,7 +54657,7 @@ function detHtml(name,info,ci){
      &&name==="Cloud Only")){
     h="<b>"+esc(name)+"</b>"
       +'<div class="mline">No key saved</div>'
-      +'<span class="note">Add one in Settings > Cloud. Gemini and Groq are free.</span>';
+      +'<span class="note">Add one in Settings > Models > Cloud. Gemini and Groq are free.</span>';
   }else if(name==="Cloud Only"){
     h="<b>"+esc(name)+"</b>"
       +list.map(m=>'<div class="mline mcloud">'+esc(m)
@@ -54422,7 +54674,7 @@ function detHtml(name,info,ci){
         bench.map(m=>'<div class="mline mcloud">'+esc(m)
           +' <i>· cloud</i></div>').join("")+
         (cloudOn
-          ?'<span class="note">'+(info.fastcloud?'Cloud answers first. This Mac is the fallback.':'Cloud on')+'</span>'
+          ?'<span class="note">'+(info.fastcloud?'Cloud answers first. This computer is the fallback.':'Cloud on')+'</span>'
           :list.length>1?"":'<span class="note">One model. Fastest.</span>')
       : '<div class="mline">No models downloaded</div>')+
     // a mode with more server models than seats (6b339, final review)
@@ -54662,13 +54914,13 @@ async function openAdv(){
       +'<input type="checkbox" data-c="'+id+'"'
       +(ok?(sel.cloud.indexOf(id)>=0?" checked":""):" disabled")+'>'
       +'<span class="an"><b>'+nm+'</b>'
-      +'<span class="au">'+(ok?use:"No key. Add one in Settings > Cloud.")
+      +'<span class="au">'+(ok?use:"No key yet. Add one in Settings.")
       +'</span></span></label>';}).join("");
   // with the switch off the named clouds and a cloud compositor sit out
   // (6b326): say so rather than let them vanish from the answer
   if(cs&&cs.turbo===false&&Object.keys(ADV_CLOUD).some(id=>(pv[id]||{}).status==="ok"))
     $("#adv-cloud").insertAdjacentHTML("afterbegin",'<p class="advp" id="adv-cloud-off">'
-      +"Cloud models are off. Turn them on in Settings > Cloud.</p>");
+      +"Cloud models are off. Turn them on in Settings > Models > Cloud.</p>");
   // compositor: automatic, each keyed cloud, and the local Gemmas. Never a
   // server's model: run_council has no server compositor (6b337)
   const comps=advCompList(pv,ready);
@@ -54739,7 +54991,7 @@ function advPrune(){
 function advWhy(){
   const v=$("#adv-comp").value;
   $("#adv-comp-why").textContent=ADV_WHY[v]
-    ||(v?"Runs on this Mac. Nothing leaves it.":"");
+    ||(v?"Runs on this computer. Nothing leaves it.":"");
 }
 $("#adv-comp").addEventListener("change",advWhy);
 $("#adv-cancel").addEventListener("click",()=>{$("#adv-veil").hidden=true;});
@@ -55495,8 +55747,8 @@ function formCard(spec){
 // THE LIVE APPROVAL CARD (6b249): the Remote agent proposes a command
 // and blocks; this renders it with a risk chip and Run/Skip, and the
 // click answers the server's approval channel so the loop continues.
-const AP_RISK={read:"read-only",write:"changes the box",
-               danger:"irreversible — careful"};
+const AP_RISK={read:"Read only",write:"Makes changes",
+               danger:"Can’t be undone"};
 function showApprove(host,d){
   if(!host)return;
   const card=document.createElement("div");
@@ -58818,7 +59070,7 @@ const TASKS=[
    pop:1},
   {n:"Review open ports and tell me what's listening",i:"\u{1F4CB}",c:"sec"},
   {n:"Rotate SSH host keys",i:"\u{1F513}",c:"sec",
-   w:"Every client that has connected before, including this Mac and any CI, will refuse the next connection until its known_hosts is updated. This session stays open and you get the new fingerprints first."},
+   w:"Every client that has connected before, including this one and any CI, will refuse the next connection until its known_hosts is updated. This session stays open and you get the new fingerprints first."},
   {n:"Enable and configure SELinux/AppArmor",i:"\u{1F9F1}",c:"sec",
    w:"Enforcing mode can block services that worked a minute ago, sshd included, and SELinux may need a relabel and a reboot. Permissive mode runs first to see what it would block."},
   {n:"Update everything and tell me if a reboot is needed",i:"\u{2B06}\uFE0F",
@@ -61588,7 +61840,7 @@ function renderSetup(st){
   // Settings (6b405), the button downloading the one picked
   if(!setupManual){
     setTitle("Welcome",
-      "Setting up on this Mac. Chat opens when the first model is ready.");
+      "Setting up. Chat opens when the first model is ready.");
     const sets=st.sets||{};
     if(!setupPlanPicked){if(sets.chosen)setupPlan=sets.chosen;setupPlanPicked=true;}
     setupList.innerHTML=html+'<div class="set-row">'
@@ -61601,7 +61853,7 @@ function renderSetup(st){
   // that picked sets here is gone (6b405): adding models, or another set,
   // is Settings › Models; updates and clean-outs stay its Update models card
   setTitle("Done",
-    "More models: Settings > Models.");
+    "More models are in Settings.");
   setupList.innerHTML=html;
   setupLater.hidden=true;
   finishSetupChrome(st,stars,anyDl);
@@ -63805,7 +64057,7 @@ function bmPickHtml(){
       +(m.why?'<div class="bm-s bm-ckn"><span class="bm-f">'+esc(m.why)+"</span></div>":"")+"</div>").join("");
   }
   const P=(bmTD&&bmTD.cloud)||[];
-  if(!P.length)return '<div class="bm-row"><div class="bm-s">No cloud key. Add one in Settings > Cloud.</div></div>';
+  if(!P.length)return '<div class="bm-row"><div class="bm-s">No cloud key yet. Add one in Settings.</div></div>';
   let h="",est=false;
   P.forEach(p=>{
     h+='<div class="bm-gh">'+esc(p.name)+(p.rest?" Resting after a limit":"")+"</div>";
@@ -64063,6 +64315,7 @@ async function openAbout(){
   // whichever pane it was closed on
   if(aboutVeil.hidden)settingsPane("p-about");
   aboutVeil.hidden=false;
+  if(typeof slSelAll==="function")slSelAll();   // a look changed to Horizon since load draws its controls now (6b551)
   paintAccount();                    // the Account pane (6b257)
   try{
     const pr=await(await api("/api/prefs")).json();
@@ -64460,7 +64713,7 @@ function paintRoster(st,cloud){
   // section"): the cloud providers have their own home in Settings >
   // Cloud power; the roster is what is on this computer
   let h="";
-  if(rdy.length)h+='<div class="ros-gh">On this Mac</div>'
+  if(rdy.length)h+='<div class="ros-gh">On this computer</div>'
     +rdy.map(m=>rosRow(m,true)).join("");
   if(miss.length)h+='<div class="ros-gh">Not downloaded</div>'
     +miss.map(m=>rosRow(m,false)).join("");
@@ -64500,9 +64753,9 @@ function paintPlans(){
 // by hand rather than as <input type=range> so each notch can carry its
 // own colour and a rung this Mac cannot hold can refuse the click.
 const STUDIO_META={image:{title:"Image generation",
-    desc:"Pictures from a description, on this Mac"},
+    desc:"Pictures from a description, on this computer"},
   video:{title:"Video generation",
-    desc:"Short video from a description, on this Mac"}};
+    desc:"Short video from a description, on this computer"}};
 const stPick={};              // key -> tier id the user is looking at
 function studioHTML(key,st){
   const meta=STUDIO_META[key]||{},tiers=st.tiers||[];
@@ -64538,7 +64791,7 @@ function studioHTML(key,st){
       +'</div>'
       +'<div class="sttier"><b>'+esc(cur.name||"")+'</b> \u00b7 '
       +(cur.gb||0)+' GB to download. <i>'+esc(cur.note||"")+'</i>'
-      +(cur.fit==="red"?' <u>More memory than this Mac has</u>':"")
+      +(cur.fit==="red"?' <u>More memory than this computer has</u>':"")
       +'</div>'
       +'<div class="stlegend">'
       +'<span class="lg green">Green: runs well</span>'
@@ -65098,7 +65351,7 @@ async function paintUpdatesPane(){
     if(r.notes){
       nb.hidden=false;
       nb.innerHTML='<p><b>What’s new'
-        +(r.available?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);
+        +(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);   // a nightly's notes are the last release's (6b551)
     }else nb.hidden=true;
   }catch(e){}
 }
@@ -65112,10 +65365,12 @@ async function paintAccount(){
   const me=acctMe||{kind:"owner"};
   // one kind since the web version's visitor profiles went (6b320):
   // this computer's own
-  const K={owner:["💻","This Mac's owner",
-             "Local account. Everything stays on this Mac."]};
+  const K={owner:["💻","Owner",
+             "Local account. Everything stays on your machines."]};
   const row=K[me.kind]||K.owner;
-  $("#acct-av").textContent=row[0];
+  // Horizon draws a line icon where Classic has its emoji (6b551)
+  if(typeof document!=="undefined"&&document.documentElement&&document.documentElement.classList.contains("hz"))$("#acct-av").innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.9-5 7-5s5.8 1.7 7 5"/></svg>';
+  else $("#acct-av").textContent=row[0];
   $("#acct-kind").textContent=row[1];
   $("#acct-sub").textContent=row[2];
   // why accounts are off in a build that has them (6b327, CRY-4):
@@ -66857,6 +67112,130 @@ function hzInit(){
   }
 }
 hzInit();
+/* ---- SETTINGS LOOK (6b551, per Patrick). Under Horizon no <select> in Settings shows bare: each stays in
+   the page with its id, its value and its listeners, hidden (.sl-native), and beside it is drawn the front's
+   segmented control (two to four short choices: Update channel, Look, Effects) or a glass menu (more, or
+   longer: the usage period and model, the cloud provider, the benchmark's runs). A pick sets the select
+   and sends "input" and "change", as a person's pick always did; a value set in code repaints it (the
+   select's own value and selectedIndex are watched), as does a new set of options. From settings-2's
+   s2Sel (6b547), kept to this panel. */
+const SL_CHEV='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+const slValP=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"value");
+const slIdxP=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,"selectedIndex");
+function slOn(){return document.documentElement.classList.contains("hz");}
+function slKind(sel){
+  const o=[...sel.options];if(o.length<2)return "menu";
+  const len=o.reduce((n,x)=>n+x.text.trim().length,0);
+  return o.length<=4&&len<=28?"seg":"menu";
+}
+function slName(sel){
+  const l=sel.closest("label"),s=l&&l.querySelector("span");
+  return sel.getAttribute("aria-label")||(s?s.textContent.trim():"");
+}
+function slPaint(sel){
+  const host=sel._sl;if(!host)return;
+  host.hidden=sel.hidden;
+  const kind=slKind(sel),sig=kind+"\u0003"+[...sel.options].map(o=>o.value+"\u0001"+o.text).join("\u0002"),name=slName(sel);
+  if(host.dataset.sig!==sig){
+    host.dataset.sig=sig;host.dataset.kind=kind;
+    host.innerHTML=kind==="seg"
+      ?'<div class="sl-seg" role="radiogroup"'+(name?' aria-label="'+esc(name)+'"':"")+' style="--n:'+sel.options.length+'"><i class="sl-hi" aria-hidden="true"></i>'
+        +[...sel.options].map((o,i)=>'<button type="button" role="radio" data-i="'+i+'"'+(o.disabled?" disabled":"")+'>'+esc(o.text)+'</button>').join("")+'</div>'
+      :'<button type="button" class="sl-menu" aria-haspopup="listbox" aria-expanded="false"'+(name?' aria-label="'+esc(name)+'"':"")+'><span></span>'+SL_CHEV+'</button>';
+  }
+  const i=slIdxP.get.call(sel);
+  if(kind==="seg"){
+    const seg=host.firstElementChild;seg.style.setProperty("--i",Math.max(0,i));seg.classList.toggle("none",i<0);
+    host.querySelectorAll("[data-i]").forEach(b=>{const on=+b.dataset.i===i;b.setAttribute("aria-checked",on?"true":"false");b.tabIndex=on||(i<0&&b.dataset.i==="0")?0:-1;});
+  }else{const b=host.querySelector(".sl-menu");b.querySelector("span").textContent=i>=0&&sel.options[i]?sel.options[i].text:"";b.disabled=sel.disabled;}
+  host.classList.toggle("wide",sel.id==="ck-provider");
+}
+function slPick(sel,i){
+  if(i<0||i>=sel.options.length||sel.options[i].disabled)return;
+  if(slIdxP.get.call(sel)===i){slPaint(sel);return;}
+  slIdxP.set.call(sel,i);slPaint(sel);
+  sel.dispatchEvent(new Event("input",{bubbles:true}));sel.dispatchEvent(new Event("change",{bubbles:true}));
+}
+function slSel(sel){
+  if(sel._sl||!slOn())return;
+  const host=document.createElement("span");host.className="sl-sel";sel._sl=host;
+  sel.classList.add("sl-native");sel.tabIndex=-1;sel.setAttribute("aria-hidden","true");sel.after(host);
+  Object.defineProperty(sel,"value",{configurable:true,get(){return slValP.get.call(this);},set(v){slValP.set.call(this,v);slPaint(this);}});
+  Object.defineProperty(sel,"selectedIndex",{configurable:true,get(){return slIdxP.get.call(this);},set(v){slIdxP.set.call(this,v);slPaint(this);}});
+  new MutationObserver(()=>slPaint(sel)).observe(sel,{childList:true,subtree:true,attributes:true,characterData:true});
+  sel.addEventListener("change",()=>slPaint(sel));
+  host.addEventListener("click",e=>{
+    const b=e.target.closest("[data-i]");if(b&&host.contains(b)){slPick(sel,+b.dataset.i);return;}
+    const m=e.target.closest(".sl-menu");if(m)slPopOpen(sel,m);});
+  host.addEventListener("keydown",e=>{
+    if(host.dataset.kind==="seg"&&["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Home","End"].includes(e.key)){
+      e.preventDefault();const n=sel.options.length,cur=Math.max(0,slIdxP.get.call(sel));
+      const j=e.key==="Home"?0:e.key==="End"?n-1:(cur+((e.key==="ArrowLeft"||e.key==="ArrowUp")?-1:1)+n)%n;
+      slPick(sel,j);const nb=host.querySelector('[data-i="'+j+'"]');if(nb)nb.focus();return;}
+    const m=e.target.closest(".sl-menu");
+    if(m&&["ArrowDown","ArrowUp"].includes(e.key)){e.preventDefault();slPopOpen(sel,m);}});
+  slPaint(sel);
+}
+let slPop=null,slPopFor=null;
+function slPopClose(refocus){
+  if(!slPop||slPop.hidden)return;
+  slPop.classList.remove("in");slPop.hidden=true;
+  const b=slPopFor&&slPopFor._sl&&slPopFor._sl.querySelector(".sl-menu");
+  if(b){b.setAttribute("aria-expanded","false");if(refocus)b.focus({preventScroll:true});}
+  slPopFor=null;
+}
+function slPopOpen(sel,btn){
+  if(slPopFor===sel){slPopClose(true);return;}
+  slPopClose(false);
+  if(!slPop){
+    slPop=document.createElement("div");slPop.id="sl-pop";slPop.setAttribute("role","listbox");slPop.hidden=true;document.body.appendChild(slPop);
+    slPop.addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(!b||!slPopFor)return;const s=slPopFor;slPopClose(true);slPick(s,+b.dataset.i);});
+    slPop.addEventListener("keydown",e=>{
+      const it=[...slPop.querySelectorAll("[data-i]:not(:disabled)")];let k=it.indexOf(document.activeElement);
+      if(e.key==="Escape"){e.preventDefault();e.stopPropagation();slPopClose(true);return;}
+      if(e.key==="Tab"){slPopClose(true);return;}
+      if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();k=(k+(e.key==="ArrowDown"?1:-1)+it.length)%it.length;if(it[k])it[k].focus();}
+      if(e.key==="Home"||e.key==="End"){e.preventDefault();const t=it[e.key==="Home"?0:it.length-1];if(t)t.focus();}});
+    document.addEventListener("pointerdown",e=>{if(slPop&&!slPop.hidden&&!slPop.contains(e.target)&&!(slPopFor&&slPopFor._sl&&slPopFor._sl.contains(e.target)))slPopClose(false);},true);
+    addEventListener("resize",()=>slPopClose(false));
+    document.addEventListener("scroll",e=>{if(slPop&&!slPop.hidden&&!slPop.contains(e.target))slPopClose(false);},true);
+  }
+  const cur=slIdxP.get.call(sel);let h="",grp=null;
+  [...sel.options].forEach((o,i)=>{const g=o.parentElement&&o.parentElement.tagName==="OPTGROUP"?o.parentElement.label:null;
+    if(g&&g!==grp){h+='<div class="sl-pop-h">'+esc(g)+'</div>';grp=g;}
+    h+='<button type="button" role="option" data-i="'+i+'" aria-selected="'+(i===cur)+'"'+(o.disabled?" disabled":"")+'>'+esc(o.text)+'</button>';});
+  slPop.innerHTML=h||'<div class="sl-pop-h">Nothing here yet</div>';
+  slPopFor=sel;btn.setAttribute("aria-expanded","true");slPop.hidden=false;
+  const r=btn.getBoundingClientRect();slPop.style.minWidth=Math.max(r.width,160)+"px";
+  const ph=slPop.offsetHeight,below=innerHeight-r.bottom-16;
+  slPop.style.left=Math.max(16,Math.min(r.left,innerWidth-16-slPop.offsetWidth))+"px";
+  slPop.style.top=(below>=ph||below>r.top?r.bottom+4:Math.max(16,r.top-4-ph))+"px";
+  requestAnimationFrame(()=>slPop&&slPop.classList.add("in"));setTimeout(()=>slPop&&!slPop.hidden&&slPop.classList.add("in"),40);   // a hidden pane never runs rAF
+  const on=slPop.querySelector('[aria-selected="true"]')||slPop.querySelector("[data-i]:not(:disabled)");
+  if(on){on.focus({preventScroll:true});if(on.scrollIntoView)on.scrollIntoView({block:"nearest"});}
+}
+function slSelAll(){if(slOn())$$("#about-veil select").forEach(slSel);}
+/* ONE EFFECTS CONTROL (6b551; settings-2's call, 6b547): under Horizon, Effects alone decides and the old
+   Visual effects switch (#fx-toggle, the stills switch) is hidden. Calm is the old Off: it stops the moving
+   backdrop; Balanced and Full turn it back on. Classic, which has no levels, keeps its switch. */
+function slFxFold(lv){
+  if(!slOn()||typeof setVideo!=="function")return;
+  if(lv==="calm"&&!noVideo)setVideo(false);else if(lv!=="calm"&&noVideo)setVideo(true);
+}
+// and the other way: the palette's Visual effects (setVideo) moves the one control with it
+function slFxSync(on){
+  if(!slOn()||typeof hzFxLevel!=="function")return;
+  const lv=hzFxLevel();if(!on&&lv!=="calm")setFxLevel("calm");else if(on&&lv==="calm")setFxLevel("balanced");
+}
+(function(){
+  const fsel=$("#fx-level");if(fsel)fsel.addEventListener("change",()=>slFxFold(fsel.value));
+  // an install that had Visual effects off reads Calm (the one control says what is on screen)
+  if(slOn()&&typeof noVideo!=="undefined"&&noVideo&&hzFxLevel()!=="calm")setFxLevel("calm");
+  slSelAll();
+  if(window.MutationObserver){const av=$("#about-veil");if(av)new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){
+    if(n.nodeType!==1)continue;if(n.tagName==="SELECT")slSel(n);else n.querySelectorAll&&n.querySelectorAll("select").forEach(slSel);}})
+    .observe(av,{childList:true,subtree:true});}
+})();
 /* ===================================================== HORIZON end (6b526) */
 
 /* ==== bring your chats (6b529): script begin ==== */
@@ -66986,12 +67365,12 @@ function impAct(act,el){
 /* ------------------------------------------------------------ the steps */
 function impShowPick(){
   imp.step=1;impSetSteps();impPollStop();impWatchStop(false);impDripReset();
-  $("#imp-sub").textContent="From ChatGPT, Claude, Gemini or a file. Everything stays on this Mac.";
+  $("#imp-sub").textContent="From ChatGPT, Claude, Gemini or a file. Everything stays on your machines.";
   impStage('<p class="imp-lede">Where are your chats now?</p><div class="imp-tiles">'
     +Object.keys(IMP_APPS).map(k=>'<button type="button" class="imp-tile" data-act="pick" data-app="'+k+'">'+IMP_ICON[k]
       +'<b>'+esc(IMP_APPS[k].name)+'</b><span>'+esc(IMP_APPS[k].where)+'</span></button>').join("")+'</div>');
   impSide("",[],[["How it works","You export your chats from your old app. It emails you a zip.",
-    "Drop the zip here. MillenAI reads it on this Mac and nothing is uploaded anywhere.",
+    "Drop the zip here. It’s read on this computer and never uploaded.",
     "Your chats appear in the sidebar with their titles and dates, searchable, ready to continue."],
     ["Already brought some in?","Importing the same export again adds only what's new, and you can remove everything from an app in one step."]]);
   impSourcesSide();}
@@ -67040,7 +67419,7 @@ function impShowDrop(found){
     +'<div class="imp-actions" style="margin-top:12px"><button type="button" class="imp-btn" data-act="choose">Choose the file</button>'
     +(imp.app!=="file"?'<button type="button" class="imp-link" data-act="back">Pick another app</button>':'<button type="button" class="imp-link" data-act="back">Pick another app</button>')+'</div></div>';
   impStage(h);
-  impSide("What arrives",[["From",A.name]],[["What's in it",esc(A.arrives)],["Nothing leaves this Mac","The file is read here. Pictures are copied into your data folder; the zip itself isn't kept."]]);}
+  impSide("What arrives",[["From",A.name]],[["What's in it",esc(A.arrives)],["Nothing leaves your machines","The file is read here. Pictures are copied into your data folder; the zip itself isn't kept."]]);}
 /* --------------------------------------------------------- the import */
 async function impBegin(file){
   // a File from the drop zone or the picker, or {path} from Downloads

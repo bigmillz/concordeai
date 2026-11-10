@@ -19919,3 +19919,84 @@ checks green; not the full gauntlet.
 until the next press; a 3 s hold stopped at the release. The same script against main's code on 9907
 reproduced the bug: the hold became a toggle and was still recording 2.5 s after the release. Blink, not
 WKWebView: the real ⌘ keyup delivery in the app is unverified here.
+
+## 6b551 — settings-look: Settings in the front's look, the same layout (7.0 beta, per Patrick)
+
+Patrick, on the nightly's Settings › About: "I don't like this settings dialog. It looks perfect as far as
+layout, but it doesn't match our current look." The look is the friend page's (`concordeai-preview/beta/DESIGN.md`):
+the composite over near-black, neutral black-alpha glass, champagne hairlines, Space Grotesk / IBM Plex Mono,
+the 8 px grid, ember only at decisions.
+
+**Why not settings-2.** settings-2 (87d8119, 6b547-in-branch) merges onto main with one NOTES conflict, but it
+re-lays Settings out (seven sections, General first, About last, a near-window panel without the spec list or
+Close). Patrick's word was the layout is right, so this is done fresh on main's layout, taking from settings-2
+what fits: its select-to-control idea (s2Sel, here `slSel`, kept to the Settings panel), its one Effects
+control, and its 25 approved copy pairs (`scratchpad/settings2/tools/copy_pairs.json`, applied verbatim). Its
+loopback and "Rent one in the cloud" calls belong to Add a computer, which is only on settings-2, so nothing here.
+settings-2 stays unmerged; merging it later replaces this layout.
+
+**The look (CSS, the `SETTINGS LOOK (6b551)` block at the foot of the Horizon CSS; Horizon only, Classic keeps
+its own Settings).**
+- *The backdrop* a black scrim (`rgba(3,3,5,.72)`, blur 12, saturate 40 % so the sky's blue doesn't come
+  through); *the panel* one dense neutral glass (`rgba(8,8,10,.86)` under a white .06 → .025 gradient), radius
+  14, a champagne `--hair2` border, the 1 px specular, the long float shadow. 672 × 640 and the same size on
+  every pane (it no longer jumps); the rail 216, a shade darker, parted by `--hair`.
+- *The classic tokens are re-set inside the panel* (`--text`, `--dim`, `--faint`, `--line`, `--line-soft`,
+  `--panel`, `--accent`, `--helv`, `--disp`…), so every pane's older rules read the new inks and lines and
+  fonts without being rewritten; the rules that needed more are restyled by id.
+- *Type*: rows and nav 14, notes 13 in `--ink3`, labels mono 11 caps +.12em, the version 22/500 Space Grotesk
+  (was Michroma caps), the wordmark per DESIGN (Michroma, .18em, the hairline stroke, AI bolder). No italics:
+  "Update channel" is a row label like the rest.
+- *Rows*: Update channel, Check for updates, Look, Effects, Keep microphone ready are one row style (label left,
+  control right, 48 tall, a hairline between); notes sit 8 px under their row with 16 below.
+- *Controls*: keys 36 (32 slim), radius 8, the glass, hover to `--line`, press .97; Close a key on the right,
+  no white pill; Erase everything a quiet ember text key. Switches squared like the effort slider (32 × 18,
+  radius 5, a 12 px rounded-square knob; on is the ink with a dark knob). Checkboxes 16 px, radius 4. Fields 36,
+  radius 8, focus by the border. The length slider a 4 px track and the effort knob's rounded square. Nav rows
+  32, radius 8, the chosen one filled with the mode menu's 5 px diamond; the Models arrow a 1.5 px chevron.
+- *Narrow (≤ 640)*: the panel is the window, the sections run along the top as a scrolling row; the lockup and
+  spec list step aside.
+- Usage, Benchmark, Models, Cloud, Servers: cards in the same glass (radius 8, `--hair`), small figures up to 12,
+  the server form one column, the set cards' "Yours" tag on a solid chip.
+
+**Segmented controls and menus (JS, the `SETTINGS LOOK (6b551)` block before HORIZON end).** `slSel` draws each
+select in `#about-veil` (Horizon only): up to four short choices (≤ 28 characters together) are the front's
+lanes control — a glass box radius 6, a lit box radius 4.5 that slides between equal segments in 200 ms on
+`--out`, labels `--ink3` → `--ink`, arrow keys, Home, End; anything longer a glass menu (`#sl-pop`, rows of 32,
+the diamond on the chosen, keys and Esc). So Update channel (Stable · Beta · Nightly; the label "Beta" again, its value still `beta`), Look and Effects
+are segmented; the usage period and model, the cloud provider and the benchmark's runs are menus. The select
+keeps its id, value and handler (hidden, `.sl-native`); a pick sets it and sends input and change; a value the
+page sets in code repaints it (the instance's `value` and `selectedIndex` are watched), as does a new option
+list; selects added later are picked up. Opening Settings runs it again, so a switch to Horizon draws them.
+
+**One Effects control.** Under Horizon the Visual effects switch is hidden (Classic, with no levels, keeps it)
+and folded in: Calm is the old Off (it stops the moving backdrop), Balanced and Full bring it back; an install
+with Visual effects off opens on Calm; the palette's "Visual effects" (it clicks the hidden switch) moves the
+control with it (`slFxSync` in `setVideo`).
+
+**What's new on a nightly.** The nightly release's body is the workflow's commit subjects ("beta-1 gauntlet: the
+MLX engine's boot-order pin…"). `_channel_release` now hands the nightly the newest numbered release's notes
+(`_human_notes`), `_release_notes()` serves those for a nightly (else one line, "Latest changes from the 7.0
+line."), and `whats_new` (the post-update card) does the same instead of the compare API's commits. The About
+heading says "What's new" on a nightly, not "What's new in 7.0 nightly …".
+
+**Copy.** The 25 approved settings-2 pairs; the Cloud pane's "your prompts leave this Mac" → "your machines";
+the Account avatar a line icon instead of 💻 under Horizon; the stale pointers swept to this build's names
+(17 strings: "Settings > Cloud" → "Settings > Models > Cloud", "Settings > Servers" / "Settings › Your servers"
+/ "Settings › Servers" → "Settings › Models › Servers"; user-facing strings only, comments left).
+
+**Gauntlet.** Re-pinned at the same strength: the Owner line, the roster's "On this computer", the studio's
+"on this computer", the suggestions note, the cloud paragraph, the swept pointers (13 pins), the notes source
+(`_release_notes` twice, its def), `_check_update_live`'s exec list. The PC-words check follows the approved copy ("Setting up.", "On this computer"); `HTMLSelectElement`
+joins the page's host names (the controls watch a select's own setters). New (`# ==== settings-look (6b551)`), each
+with mutants: the glass and the layout kept; no Visual effects beside Effects (the fold run in node); the
+segmented controls and menus (`slKind` run in node over six real option lists); a nightly's What's new never a
+commit subject (`_check_update_live` and `whats_new` run against stand-in releases).
+
+**Checked.** ast; the page's scripts parse alone and together; no undeclared names. Every statement of the
+gauntlet run offline against the served page and the source, main and this branch side by side (the live
+copies not started): no check that passes on main fails here. The pin checker: the same three hard fails as
+main (the home import card's pins, red on main too). Playwright at 1440 and 390, Horizon and Balanced: every
+pane and the menu open, zero page errors, zero WCAG AA misses over 418 texts (322 at 390; the panel taken at its
+lightest measured pixel); Classic's Settings unchanged. Not seen in WKWebView (the checkbox tick is an `::after`
+on an `appearance:none` input, the switch knob a transform). The full gauntlet was not run.
