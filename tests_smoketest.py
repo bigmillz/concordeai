@@ -38537,7 +38537,7 @@ def _hz_scoped(css):
             s_ = s_.strip()
             if not s_ or s_.startswith(":root") or s_.startswith("__HZ_FONTS__"):
                 continue
-            if not (".hz" in s_ or s_.startswith("#hz-") or s_.startswith("#look-row") or s_.startswith("#fx-level") or s_.startswith(".hz-ring")):
+            if not (".hz" in s_ or s_.startswith("#hz-") or s_.startswith("#look-row") or s_.startswith("#fx-level")):
                 return False
     return True
 
@@ -38623,7 +38623,7 @@ check("horizon: Deep (6b544) and the old display names (6b534's Alpha, Gamma, Si
       and "function hzLineupOf(mode)" in _hz_js and "const rows=hzLineupOf(m)" in _hz_js, "")
 # the GPU night: one WebGL canvas over the app's own aerial, same-origin; capped, pausable; a plain fallback
 check("horizon: the night is one GPU canvas over the app's own aerial (same-origin, the clip's own speed, trail threshold and rise), with trails, bloom, the neon aurora following the mode, the effort and the work, capped while a local model answers, plain footage without WebGL",
-      '<video id="hz-vid" muted loop playsinline preload="auto" crossorigin="anonymous"></video>' in page
+      '<video id="hz-vid" muted playsinline preload="auto" crossorigin="anonymous"></video>' in page   # no native loop: the seam fades through (6b553)
       and 'v.src="/static/sky/"+c.i+".mov";' in _hz_js and "v.playbackRate=c.rate;" in _hz_js
       and "float hi=smoothstep(hiT,hiT+.54,l);" in _hz_js and "smoothstep(0.,rise,uv.y)" in _hz_js
       and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
@@ -38768,7 +38768,7 @@ check("horizon: the opening is the wordmark alone, traced, then a 2.8 s streak, 
 _hz_send = _MILLENAI_SRC[_MILLENAI_SRC.index("  if(globalThis.hzReady)hzBeforeSend(text);"):_MILLENAI_SRC.index("  if(globalThis.hzReady)hzOnSend();")]
 check("horizon: a question sent from the home glides the composer to the foot and arcs into its chat's row, which keeps a live die in the working machine's colour until the answer lands and renames itself",
       "messages.push({role:\"user\",content:shown});\n  // the attached files ride as chips with their size in tokens (6b528)\n  const uDiv=addMsg(\"user\",shown,null,null,null,null,null,null," in _hz_send
-      and "if(from&&from.home)hzArc(from,hzS.liveChat);" in _hz_js and "if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}" in _hz_js
+      and "if(from&&from.home)hzArc(from,hzS.liveChat);" in _hz_js and "if(hzMotionOK()){hzSendPress();if(from&&from.home)hzGlide(from.comp);}" in _hz_js
       and 'if(v.w==="server"){hzS.srvWorking=String(v.s||"");hzS.genLocal=false;hzS.liveV=hzSrvV(hzS.srvWorking);}' in _hz_js
       and 'new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});' in _hz_js
       and "if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK())" in _hz_js
@@ -42829,7 +42829,7 @@ check("6b542 the sky by level: Calm no footage, no neon, no loop (one still on b
 def _c542_gated(js, css, pg):
     return ('function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
             and 'if(hzFxLevel()==="calm")return;      // Calm shows the words plainly' in js
-            and "if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}\n    if(from&&from.home)hzArc(from,hzS.liveChat);}\n  else hzStrike();" in js
+            and "if(hzFxFull()){if(hzMotionOK()){hzSendPress();if(from&&from.home)hzGlide(from.comp);}\n    if(from&&from.home)hzArc(from,hzS.liveChat);}\n  else hzStrike();" in js
             and "cometFor(" not in pg and "rippleAt(" not in pg and "hzLandSweep" not in pg      # the asking flow is the writing star's (6b544)
             and 'if(!w||!hzMotionOK()||hzCalm()||document.documentElement.classList.contains("hz-intro"))return;' in js
             # present still, for Full: the trace, the streak, the sweep, the comets, the ring, the bloom, the sheen, the dies
@@ -43679,6 +43679,112 @@ check("6b553 the living Ultra: the rim's comet every 8 s in Full only, the field
       and not _liv553(_hz_css.replace("rgba(196,216,255,.9) 95%", "rgba(243,210,122,.9) 95%"), _hz_js)                                                                    # a gold comet
       and not _liv553(_hz_css.replace("@keyframes hzUDrift{from{translate:0 0}to{translate:0 -6px}}", "@keyframes hzUDrift{from{top:0}to{top:-6px}}"), _hz_js), "")        # a layout drift
 # ==== the Ultra arrival (6b553): end ====
+
+# ==== the calm send and the footage's seam (6b553): begin ====
+# Patrick: "Clear up this flash in the bottom right and this shine in the send button... we want to run VFX hard, but not
+# tacky." The send key presses (.96 > 1 in 120 ms, no overshoot) and draws no rings (no circles, the standing rule);
+# the strike stays; hover is a brighter hairline at every level, no glow; the footage has no native loop, and about a
+# second before a clip's end it fades out through the sky's own fade, starts again and fades back in.
+print("== the calm send and the footage's seam (6b553) ==")
+_CS_KEYS = ("#send", "#attach", "#mic", "#voicebtn", ".cbtn", ".hz-ib", ".hz-pick")
+def _cs553_bez_ok(text):
+    """no overshoot: every cubic-bezier's two y values within 0 to 1"""
+    for b_ in re.findall(r"cubic-bezier\(([^)]*)\)", text):
+        v_ = [float(x) for x in b_.split(",")]
+        if len(v_) != 4 or not (0 <= v_[1] <= 1 and 0 <= v_[3] <= 1):
+            return False
+    return True
+def _cs553_send(css, js, pg):
+    try:
+        press = _jsfn(js, "function hzSendPress(){")
+    except ValueError:
+        return False
+    nc = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    send_rules = [b_ for sel, b_ in re.findall(r"([^{}]+)\{([^{}]*)\}", nc) if "#send" in sel]
+    return ('b.animate([{transform:"scale(.96)"},{transform:"scale(1)"}],{duration:120,easing:"cubic-bezier(.2,0,0,1)"});' in press
+            and _cs553_bez_ok(press) and "createElement" not in press and "appendChild" not in press
+            and all(_cs553_bez_ok(b_) and "hz-ease-spring" not in b_ and "border-radius:50%" not in b_ for b_ in send_rules)
+            and "hz-ring" not in pg.replace("hz-ring-static", "") and "hzBoom" not in pg
+            and "if(hzFxFull()){if(hzMotionOK()){hzSendPress();" in js and "\n  else hzStrike();" in js
+            and ".hz .hz-strike{position:absolute;left:14px;right:14px;top:-1px;height:1px;pointer-events:none;background:var(--hz-ember);" in css
+            and "box-shadow" not in re.search(r"\.hz \.hz-strike\{[^}]*\}", nc).group(0)
+            and 'if(d.state==="boom")$("#send").style.transform="scale(.96)";' in js)
+def _cs553_hover(css):
+    """hover on the composer's keys at every level: a hairline (inset, no blur) at most; no glow, filter or gradient"""
+    nc = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    seen = 0
+    for sel, body in re.findall(r"([^{}]+)\{([^{}]*)\}", nc):
+        for x in (x_.strip() for x_ in sel.split(",")):
+            if ":hover" not in x or not any(k in x for k in _CS_KEYS):
+                continue
+            seen += 1
+            m = re.search(r"box-shadow:([^;}]*)", body)
+            if m and m.group(1).strip() != "none":
+                for sh_ in re.split(r",(?![^()]*\))", m.group(1)):
+                    if not re.fullmatch(r"\s*inset 0 0 0 [\d.]+px rgba?\([^)]*\)\s*", sh_):
+                        return False
+            if re.search(r"(?<![-\w])filter:|text-shadow:|background-image:|gradient\(", body):
+                return False
+    return seen >= 3 and "0 0 26px rgba(159,192,255,.38)" not in css
+def _cs553_seam_run(js):
+    seam = _jsfn(js, "function hzSeam(t,dur,rate,out){"); wire = _jsfn(js, "function hzSeamWire(v){")
+    head = js[js.index("const HZ_SEAM_S="):js.index("\n", js.index("const HZ_SEAM_S="))]
+    src = head + "\n" + seam + wire + r"""
+const out={};
+out.cases=[hzSeam(10,84.3,.6,false),hzSeam(84.3-.5,84.3,.6,false),hzSeam(83.6,84.3,1,false),hzSeam(84,84.3,.6,true),hzSeam(5,NaN,.6,false),hzSeam(84,84.3,0,false)];
+// a clip played at .6, timeupdate every 250 ms of real time; then the end, the seek, the start again
+let hzS={seamOut:false,mediaOn:true,reduced:false,sky:{footTo:1}};const foot=[];let plays=0;
+const v={currentTime:0,duration:84.3,playbackRate:.6,play(){plays++;return Promise.resolve();}};
+hzSeamWire(v);let firedLeft=null,fires=0;
+for(let real=0;real<200;real+=.25){v.currentTime=Math.min(v.duration,real*v.playbackRate);const was=hzS.seamOut;v.ontimeupdate();
+  if(!was&&hzS.seamOut){fires++;firedLeft=(v.duration-v.currentTime)/v.playbackRate;foot.push(hzS.sky.footTo);}
+  if(v.currentTime>=v.duration)break;}
+v.onended();const reset=v.currentTime;v.onseeked();foot.push(hzS.sky.footTo);
+// hidden at the seam: the seek still restores the fade, the play waits for the page
+hzS={seamOut:true,mediaOn:false,reduced:false,sky:{footTo:0}};plays=0;v.currentTime=84.3;v.onended();v.onseeked();
+out.sim={fires,firedLeft,foot,reset,plays_hidden:plays,foot_hidden:hzS.sky.footTo,out_after:hzS.seamOut};
+process.stdout.write(JSON.stringify(out));
+"""
+    try:
+        return _node_json(src, "seam553.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _cs553_seam(js, pg):
+    r = _cs553_seam_run(js)
+    if "err" in r:
+        return False
+    tag = re.search(r'<video id="hz-vid"[^>]*>', pg)
+    load = _jsfn(js, "function hzClipLoad(c){")
+    sim = r["sim"]
+    return (tag is not None and not re.search(r"\sloop(\s|>|=)", tag.group(0))
+            and "v.loop=false;hzS.seamOut=false;hzSeamWire(v);" in load                       # a clip change starts clean: no double fade
+            and "if(S){S.footTo=0;S.footMul=0;S.reset();}" in load
+            and r["cases"] == ["", "out", "out", "", "", "out"]
+            and sim["fires"] == 1 and sim["firedLeft"] is not None and .7 <= sim["firedLeft"] <= 1.0   # the fade starts 0.7-1 s before the cut
+            and sim["foot"] == [0, 1] and sim["reset"] == 0
+            and sim["plays_hidden"] == 0 and sim["foot_hidden"] == 1 and sim["out_after"] is False
+            and "S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;" in js)                       # the sky's own fade carries it
+check("6b553 the calm send: the send key presses .96 > 1 in 120 ms with no overshoot and draws no rings or circles (none in the page at all), the strike stays a 1 px line with no glow; hover on the composer's keys is a brighter hairline at every level, never a glow; the dead send glow is gone; the mutants are caught",
+      _cs553_send(_hz_css, _hz_js, page) and _cs553_hover(_hz_css)
+      and not _cs553_send(_hz_css, _hz_js.replace('easing:"cubic-bezier(.2,0,0,1)"});\n}', 'easing:"cubic-bezier(.34,1.56,.64,1)"});\n}'), page)      # the overshoot back
+      and not _cs553_send(_hz_css, _hz_js.replace('  b.animate([{transform:"scale(.96)"}', '  const el=document.createElement("i");el.className="hz-pulse";document.body.appendChild(el);\n  b.animate([{transform:"scale(.96)"}'), page)   # a ring element back
+      and not _cs553_send(_hz_css, _hz_js, page + '<style>.hz-ring{border-radius:50%}</style>')                                                    # the ring's css back
+      and not _cs553_send(_hz_css + ".hz #send{transition:transform .3s var(--hz-ease-spring)}", _hz_js, page)                                     # a springy key
+      and not _cs553_send(_hz_css.replace("background:var(--hz-ember);transform-origin:0 50%;", "background:var(--hz-ember);box-shadow:0 0 8px var(--hz-ember);transform-origin:0 50%;"), _hz_js, page)   # a glowing strike
+      and not _cs553_hover(_hz_css + ".hz.hz-bal #composer.hastext #send:not(:disabled):not(.stop):hover{box-shadow:0 6px 18px -6px rgba(232,65,90,.5)}")   # Balanced's ember glow back
+      and not _cs553_hover(_hz_css.replace("{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}", "{box-shadow:0 0 0 1px rgba(255,255,255,.08),0 6px 18px -6px rgba(159,192,255,.4)}"))   # the ice glow back
+      and not _cs553_hover(_hz_css + ".hz.hz-full #mic:hover{filter:drop-shadow(0 0 6px #9fc0ff)}")                                              # a Full glow by filter
+      and not _cs553_hover(_hz_css + ".hz .hz-pick:hover{background-image:linear-gradient(90deg,#fff0,#fff4,#fff0)}"), "")                     # a sheen on hover
+check("6b553 the footage's seam: no native loop on the clip; a second before the end (the clip's rate counted) the footage fades out through the sky's own fade, once; at the end it seeks to 0, plays if the page is live, and fades back in on the seek, hidden or not; a clip change starts clean; the mutants are caught",
+      _cs553_seam(_hz_js, page)
+      and not _cs553_seam(_hz_js, page.replace('<video id="hz-vid" muted playsinline', '<video id="hz-vid" muted loop playsinline'))             # the native loop back
+      and not _cs553_seam(_hz_js.replace("const HZ_SEAM_S=1;", "const HZ_SEAM_S=0;"), page)                                                       # no fade before the cut
+      and not _cs553_seam(_hz_js.replace("return (dur-t)/Math.max(.1,rate||1)<=HZ_SEAM_S", "return (dur-t)<=HZ_SEAM_S"), page)                    # the rate ignored (too late at .6)
+      and not _cs553_seam(_hz_js.replace("hzS.seamOut=false;if(hzS.sky)hzS.sky.footTo=1;};", "hzS.seamOut=false;};"), page)                        # never fading back in
+      and not _cs553_seam(_hz_js.replace("hzS.seamOut=false;if(hzS.sky)hzS.sky.footTo=1;};", "hzS.seamOut=false;if(hzS.sky&&hzS.mediaOn)hzS.sky.footTo=1;};"), page)   # dark for good if hidden at the seam
+      and not _cs553_seam(_hz_js.replace("v.onended=()=>{v.currentTime=0;", "v.onended=()=>{"), page)                                             # stuck on the last frame
+      and not _cs553_seam(_hz_js.replace("v.loop=false;hzS.seamOut=false;hzSeamWire(v);", "v.loop=false;hzSeamWire(v);"), page), "")               # a stale fade across a clip change
+# ==== the calm send and the footage's seam (6b553): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

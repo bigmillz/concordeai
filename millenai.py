@@ -52085,9 +52085,6 @@ __HZ_FONTS__
 @keyframes hzPulse{0%{opacity:1}30%{opacity:1.35}100%{opacity:1}}
 .hz #hz-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,4,10,.1),rgba(3,4,10,.34) 55%,rgba(3,4,10,.5));opacity:0;transition:opacity 1s ease}
 .hz #main:not(:has(#hero)) #hz-scrim{opacity:1}
-.hz-ring{position:fixed;left:0;top:0;width:44px;height:44px;border-radius:50%;pointer-events:none;z-index:4;
-  border:1px solid rgba(214,226,255,.75);box-shadow:0 0 12px rgba(159,192,255,.45);opacity:0}
-.hz-ring.frozen{opacity:.5}
 .hz-tracefx{position:fixed;z-index:8;pointer-events:none;transition:opacity .6s var(--hz-ease-out)}
 /* ---- the header (72px on the home, 56px in a conversation) */
 #hz-top{display:none}
@@ -52210,8 +52207,6 @@ __HZ_FONTS__
 .hz .cbtn:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz #attach{border:1px solid rgba(255,255,255,.16)}
 .hz #voicebtn.parked{display:none}
-.hz #send{width:42px;height:42px;background:#eef2fc;color:#071026;font-weight:600;box-shadow:0 0 26px rgba(159,192,255,.38)}
-.hz #send:hover{background:#fff;color:#071026;transform:none;box-shadow:0 0 0 1px rgba(255,255,255,.2),0 0 30px rgba(159,192,255,.5)}
 .hz #send:disabled{background:rgba(255,255,255,.1);color:var(--hz-ink-3);box-shadow:none}
 .hz #send.stop{background:#eef2fc;color:#071026;font-size:12px}
 /* the More-modes button (the engine menu: Max, Cloud only, your servers, Advanced); it never names a model */
@@ -52633,10 +52628,9 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* asking: the status dot breathes while working; the words fade in; the landing is the star's (6b544) */
 .hz.hz-bal .msg.ai.live .who .dot{animation:hzBreathe 2.2s ease-in-out infinite;opacity:1}
 .hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}
-/* hover: the controls lift with a faint light */
-.hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover,.hz.hz-bal .hz-pick:hover,.hz.hz-bal .mab:hover,.hz.hz-bal #newchat:hover{box-shadow:0 0 0 1px rgba(255,255,255,.08),0 6px 18px -6px rgba(159,192,255,.4)}
+/* hover: the controls lift a pixel and their hairline brightens; no glow, no bloom (6b553, per Patrick: "not tacky") */
+.hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover,.hz.hz-bal .hz-pick:hover,.hz.hz-bal .mab:hover,.hz.hz-bal #newchat:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}   /* a brighter hairline, no glow (6b553) */
 .hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}
-.hz.hz-bal #composer.hastext #send:not(:disabled):not(.stop):hover{box-shadow:0 6px 18px -6px rgba(232,65,90,.5)}
 @media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}
 /* ---- ULTRA (6b544, per Patrick: "that's where I want to use VFX to have it pull something off to show
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
@@ -53472,7 +53466,7 @@ __CODE_ROWS__
        served same-origin). Over it the colour wash, the ice rays, the Moon's
        light; a scrim for conversations. -->
   <div id="hz-sky" aria-hidden="true">
-    <video id="hz-vid" muted loop playsinline preload="auto" crossorigin="anonymous"></video>
+    <video id="hz-vid" muted playsinline preload="auto" crossorigin="anonymous"></video>
     <canvas id="hz-gl"></canvas>
     <div id="hz-moonglow"></div>
     <div id="hz-washw"><canvas id="hz-wash"></canvas></div>
@@ -66229,9 +66223,25 @@ async function hzVideoBoot(){
   if(ch.later)api("/api/sky/status?i="+ch.later.i+"&warm=1").catch(()=>{});   // for a later open, never waited on
   if(ch.play)hzClipLoad(ch.play);
 }
+// THE LOOP SEAM (6b553, per Patrick: "clear up this flash in the bottom right"): the clips end and begin on different
+// light (Tahiti waves: nearly black, then bright surf in the bottom right, +164 %), and a native loop cut straight
+// between them. No loop attribute now: about a second (real time, the clip's rate counted) before the end the footage
+// eases out through the sky's own fade (footTo, the path a clip change takes), the clip starts again from 0 and eases
+// back in once the seek lands. Near-black is under the footage, so the seam reads as a slow breath. hzSeam is pure.
+const HZ_SEAM_S=1;
+function hzSeam(t,dur,rate,out){
+  if(!(dur>0)||!(t>=0)||out)return "";
+  return (dur-t)/Math.max(.1,rate||1)<=HZ_SEAM_S?"out":"";
+}
+function hzSeamWire(v){
+  v.ontimeupdate=()=>{if(hzSeam(v.currentTime,v.duration,v.playbackRate,hzS.seamOut)!=="out")return;
+    hzS.seamOut=true;if(hzS.sky)hzS.sky.footTo=0;};
+  v.onended=()=>{v.currentTime=0;if(hzS.mediaOn&&!hzS.reduced){const p=v.play();if(p&&p.catch)p.catch(()=>{});}};
+  v.onseeked=()=>{if(!hzS.seamOut)return;hzS.seamOut=false;if(hzS.sky)hzS.sky.footTo=1;};
+}
 function hzClipLoad(c){
   const v=$("#hz-vid");if(!v)return;
-  hzS.clip=c;v.dataset.i=String(c.i);
+  hzS.clip=c;v.dataset.i=String(c.i);v.loop=false;hzS.seamOut=false;hzSeamWire(v);
   const S=hzS.sky;if(S){S.footTo=0;S.footMul=0;S.reset();}
   v.addEventListener("loadedmetadata",()=>{try{v.playbackRate=c.rate;}catch(e){}},{once:true});
   v.addEventListener("loadeddata",()=>{document.documentElement.classList.add("hz-vid-on");
@@ -67010,7 +67020,7 @@ function hzOnSend(){
   hzMachinesPaint();hzSideLive();
   const from=hzS.sendFrom;hzS.sendFrom=null;
   // Full's send: the rings, the glide and the arc. Calm's: the one ember strike (6b542)
-  if(hzFxFull()){if(hzMotionOK()){hzBoom();if(from&&from.home)hzGlide(from.comp);}
+  if(hzFxFull()){if(hzMotionOK()){hzSendPress();if(from&&from.home)hzGlide(from.comp);}
     if(from&&from.home)hzArc(from,hzS.liveChat);}
   else hzStrike();
 }
@@ -67080,16 +67090,11 @@ function hzRenameCheck(){
     const t=ct.textContent,was=hzS.titles.get(id);hzS.titles.set(id,t);
     if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK()){r.classList.remove("hz-renamed");void r.offsetWidth;r.classList.add("hz-renamed");}});
 }
-function hzBoom(){
-  const b=$("#send");if(!b)return;const r=b.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
-  for(let i=0;i<2;i++){
-    const el=document.createElement("i");el.className="hz-ring";el.style.left=cx+"px";el.style.top=cy+"px";
-    document.body.appendChild(el);
-    const a=el.animate([{transform:"translate(-50%,-50%) scale(.25)",opacity:.9},{transform:"translate(-50%,-50%) scale("+(i?14:8)+")",opacity:0}],
-      {duration:i?980:640,delay:i*90,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
-    a.onfinish=()=>el.remove();
-  }
-  b.animate([{transform:"scale(.92)"},{transform:"scale(1)"}],{duration:420,easing:"cubic-bezier(.34,1.56,.64,1)"});
+// THE SEND KEY'S PRESS (6b553, per Patrick: "clear up ... this shine in the send button ... we want to run VFX hard,
+// but not tacky"): the two expanding rings are gone (no circles); the key presses in and is back in 120 ms, no overshoot
+function hzSendPress(){
+  const b=$("#send");if(!b||!b.animate)return;
+  b.animate([{transform:"scale(.96)"},{transform:"scale(1)"}],{duration:120,easing:"cubic-bezier(.2,0,0,1)"});
 }
 // the stream's frames: who is working (RUN), and the stages (STATUS, STEP, DRAFT)
 function hzTele(kind,v){
@@ -67263,10 +67268,7 @@ function hzDebugApply(){
       if(d.server==="1"&&typeof srvList!=="undefined"&&srvList[0])hzS.srvWorking=srvList[0].name;
       if(hzS.sky)hzS.sky.setBusy(true);
       $("#send").classList.add("stop");$("#send").textContent="■";hzMachinesPaint();}
-    if(d.state==="boom"){
-      const b=$("#send"),r=b.getBoundingClientRect();
-      for(let i=0;i<2;i++){const el=document.createElement("i");el.className="hz-ring frozen";el.style.left=(r.left+r.width/2)+"px";el.style.top=(r.top+r.height/2)+"px";
-        el.style.transform="translate(-50%,-50%) scale("+(i?6:3.5)+")";el.style.opacity=i?".3":".55";document.body.appendChild(el);}}
+    if(d.state==="boom")$("#send").style.transform="scale(.96)";   // the press, held (6b553: no rings)
   }
   setTimeout(hzGlowFit,80);
 }

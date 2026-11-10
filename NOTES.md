@@ -20188,3 +20188,29 @@ both boxes; the composer's top edge is still the composer to `elementFromPoint`.
 here:** headless Chromium draws the sky in software GL, about 100 ms a frame with a long task every frame at High
 before any of this, and the arrival and the rest are no worse; the new motion is transform and opacity only, but
 the 6b552 fill flow and the label sweep (background-position) were already main-thread paints.
+
+**The calm send and the footage's seam** (per Patrick: "Clear up this flash in the bottom right and this shine in
+the send button… we want to run VFX hard, but not tacky"). Measured first, in a dev copy: none of the composer's
+keys had a sheen, glint, sweep, ::before/::after or animation at rest. The shine was Full's send, `hzBoom`: two
+`.hz-ring` circles (44 px, border-radius 50 %, a 1 px ice border and a 12 px glow) growing to 8× and 14× from the
+send key, and the key bouncing on `cubic-bezier(.34,1.56,.64,1)`. In a conversation the send key is bottom right, so
+every send flashed there. Balanced also hung glows under the keys on hover (an ember drop shadow under send, ice under
+attach, mic, the picker). Gone: the rings (JS, CSS and the dev copy's frozen "boom" state, which now holds the press);
+the bounce, now `hzSendPress`, .96 → 1 in 120 ms on `cubic-bezier(.2,0,0,1)`; the hover glows, now a brighter inset
+hairline (`inset 0 0 0 1px rgba(255,255,255,.14)`) with the 1 px lift kept; the dead `.hz #send` glow rules that
+later rules overrode. The strike stays a 1 px ember line with no glow. The scope check no longer whitelists `.hz-ring`.
+**The flash at rest was the footage's loop.** Headless Chromium can't decode the 2K H.264 aerials, so the page alone
+showed nothing (≤ 1.1 % in 100 ms over 60 s, home and Ultra). The clips themselves are steady inside (≤ 1.4 % in
+100 ms), but `<video loop>` cut straight from each one's last frame to its first, and three of the six cached clips
+end on different light: Tahiti waves (39) from nearly black to bright surf across the bottom right, +164 % in that
+quadrant every ~140 s at rate .6; Mexico City to New York (75) +79 %; Alaskan jellyfish (47) +18 %. Now there is no
+loop attribute: `hzSeam` (pure) says "out" once the clip's real time left, counting its rate, is under
+`HZ_SEAM_S` (1 s), and `hzSeamWire` (assigned handlers, so a reload never stacks them) eases the footage out through
+the sky's own `footTo` (the path a clip change takes), seeks to 0 at `ended` (playing only if the page is live),
+and eases back in on `seeked`, hidden or not. `hzClipLoad` clears the seam state, so a clip change never inherits a
+fade. The sky's ease is per frame (.045), so a second ahead is about 92 % out by the cut at 60 Hz, all of it at 120.
+Gauntlet: "6b553 the calm send" (the press, no overshoot anywhere on the send key, no element made on send, no ring
+in the page, the strike without glow, every hover on the composer's keys an inset hairline at most; 9 mutants) and
+"6b553 the footage's seam" (no loop attribute; `hzSeam`'s cases and a played-through clip at .6 run in node with a
+stand-in video: one fade, 0.7–1 s before the cut, the seek to 0, the fade back, a hidden page; 7 mutants). The
+HORIZON night check pins the tag without `loop`; the 6b526 asking and 6b542 gating checks pin `hzSendPress`.
