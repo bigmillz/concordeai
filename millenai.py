@@ -53109,7 +53109,6 @@ html:not(.hz) .sl-sel{display:none}
 /* on the home it sits in the header's centre, over the column; in a conversation it takes its place in the header's row
    (the effort sits at the right there), between the chat's title and the controls */
 .hz #hz-lanes{flex:none}
-@media (min-width:761px){.hz #main:has(#hero) #hz-lanes{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}}
 @media (prefers-reduced-motion:reduce){.hz #hz-lanes .hz-seg-hi,.hz #hz-lanes button{transition:none}.hz #hz-lanes .hz-fstar{animation:none!important}}
 /* ---- THE INK (hzStarWrap): one word to a box while it lands, at its rest weight's width (zero reflow); it fades in over
    300 ms with a 1 px rise and a 2 px blur coming sharp, its neutral white light fading (the wet-ink edge on the newest
@@ -53152,6 +53151,59 @@ html:not(.hz) .sl-sel{display:none}
   .hz #hz-lanes button{min-width:76px;padding:0 10px}
 }
 /* ==== beta 3 chrome end ==== */
+/* ---- THE HEADER, ONE ROW (6b555, per Patrick, on the Nightly: "Fix this, man. It looks rough": in a conversation the
+   title ran over the wordmark and the lanes over its end). One row, three groups that never overlap: left the menu, the
+   wordmark and the conversation's title; the lanes in the centre of the space between the groups (the two flexible
+   spacers), never the window's absolute centre; right the mode and effort, the machines and Settings. Nothing in a group
+   shrinks except the title, which truncates with an ellipsis behind a hairline. As the room runs out, hzHeaderFit steps
+   down one level at a time (classes on #hz-top): 1 the title hides; 2 the wordmark becomes the wing alone; 3 the lanes
+   turn compact; 4 the right group compacts (the effort pill narrower, the machines as dots); 5 the lanes take their own
+   row just under the header (as the phone rule does under 600 px) and the conversation steps down to clear them; 6 the
+   effort pill at its phone width and the machines out of the row (Settings stays); 7 the effort's word goes (the
+   pill's knob and its accessible value still say it). The Mac shell's traffic-light
+   zone stays clear (html.tl). */
+.hz #hz-top{flex-wrap:nowrap}
+.hz #hz-brand{flex:0 1 auto;min-width:0;overflow:hidden}   /* only the title gives way inside it; hzHeaderFit never lets it clip the menu or the wordmark */
+.hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}
+.hz #hz-top>.hz-sp{flex:1 1 0;min-width:12px}
+.hz #hz-mark{min-width:max-content}
+.hz #hz-title{flex:0 1 auto;min-width:0;position:relative;padding-left:12px;margin-left:2px}
+.hz #hz-title::before{content:"";position:absolute;left:0;top:50%;width:1px;height:14px;margin-top:-7px;background:var(--hz-hair2)}
+.hz #hz-top.hz-hd1 #hz-title{display:none!important}
+.hz #hz-top.hz-hd2 #hz-mark b{display:none}
+.hz #hz-top.hz-hd2 #hz-mark #hz-vmark{margin-right:0}
+.hz #hz-top.hz-hd3 #hz-lanes button{min-width:0;padding:0 9px;font-size:12.5px}
+.hz #hz-top.hz-hd3 #hz-lanes .hz-fstar{display:none}
+.hz #hz-top.hz-hd4 #hz-effort-slot .hz-sl{--hz-sw:120px}
+.hz #hz-top.hz-hd4 #hz-right{gap:8px}
+.hz #hz-top.hz-hd4 .hz-rig>b{display:none}
+.hz #hz-top.hz-hd5 #hz-lanes{position:absolute;left:50%;top:calc(100% - 4px);transform:translateX(-50%);z-index:4}
+.hz #hz-top.hz-hd6 #hz-effort-slot .hz-sl{--hz-sw:88px}
+.hz #hz-top.hz-hd6 #hz-machines{display:none}
+.hz #hz-top.hz-hd6 #hz-right{gap:6px}
+.hz #hz-top.hz-hd7 #hz-effort-slot .hz-elevel{display:none}
+.hz #main:has(#hz-top.hz-hd5):not(:has(#hero)) #chat-inner{padding-top:128px}
+/* the conversation starts a clear step below the header (32 px), whatever its height */
+.hz #main:not(:has(#hero)) #chat-inner{padding-top:88px}
+html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
+@media (max-width:600px){.hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:120px}html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #hz-lanes{top:72px}}
+/* ---- SETTINGS AND UPDATES IN THE HEADER (6b555, per Patrick: "Where are the settings and updates, buddy? Things like that
+   for average users."): the gear is a 32 px glass key on every screen, sidebar open or closed, its tooltip "Settings (⌘,)";
+   when an update is ready a quiet pill "Update ready" sits just left of it (silver, a hairline, no glow), "Updating…" while
+   it installs; at the header's compact levels the pill becomes a small square mark on the gear. No shine. */
+.hz #hz-settings{width:32px;height:32px;border-radius:8px;position:relative;background:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.03));box-shadow:inset 0 0 0 1px var(--hz-hair2);color:var(--hz-ink-2)}
+.hz #hz-settings:hover{background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px var(--hz-line);color:var(--hz-ink)}
+.hz #hz-settings svg{width:17px;height:17px}
+.hz #hz-update{flex:none;height:26px;padding:0 10px;border-radius:6px;border:1px solid var(--hz-hair2);background:rgba(255,255,255,.03);color:var(--hz-ink-2);
+  font:500 12px/1 var(--hz-font-ui);letter-spacing:.005em;white-space:nowrap;cursor:pointer;transition:border-color var(--hz-t1,120ms) ease,color var(--hz-t1,120ms) ease}
+.hz #hz-update:hover{border-color:var(--hz-line);color:var(--hz-ink)}
+.hz #hz-update[hidden],#hz-update{display:none}
+.hz #hz-update:not([hidden]){display:inline-flex;align-items:center}
+.hz #hz-top.hz-hd4 #hz-update{display:none}
+.hz #hz-settings.hz-upd::after{content:"";display:none;position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:1.5px;background:var(--hz-ink)}
+.hz #hz-top.hz-hd4 #hz-settings.hz-upd::after{display:block}
+/* the status dot says what it shows: its card opens with a heading */
+.hz .hz-mdot .tip::before{content:"Your machines";font:500 11px/1.2 var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3)}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -53576,8 +53628,11 @@ __CODE_ROWS__
     <div id="hz-right" data-tauri-drag-region>
       <div id="hz-effort-slot"></div>
       <div id="hz-machines" role="list" aria-label="Your machines"></div>
-      <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      <!-- the update badge (6b555, per Patrick: "where are the settings and updates?"): shown while the app's own update
+           check says one is ready (it mirrors #update-flag), "Updating…" while it installs; never in the Nightly -->
+      <button id="hz-update" type="button" hidden>Update ready</button>
+      <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings" title="Settings (⌘,)">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
       </button>
     </div>
   </header>
@@ -67075,10 +67130,48 @@ function hzKbWire(){
   addEventListener("keydown",e=>{if(/^(Tab|Arrow|Home$|End$|Page)/.test(e.key))root.classList.add("hz-kb");},true);
   addEventListener("pointerdown",()=>root.classList.remove("hz-kb"),true);
 }
+// THE HEADER, ONE ROW (6b555): the least compaction at which nothing in the header overlaps, spills past its edge or
+// sits in the Mac shell's traffic-light zone; recomputed from level 0 each time, so it never oscillates. The title is
+// kept only while it can show at least 96 px of itself.
+const HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7"];
+function hzHeaderOK(top){
+  const tr=top.getBoundingClientRect(),cs=getComputedStyle(top),padR=parseFloat(cs.paddingRight)||0,tl=document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs");
+  const vis=e=>{if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?r:null;};
+  const lanesOwn=getComputedStyle($("#hz-lanes")||top).position!=="absolute";
+  const B=[vis($("#hz-sb")),vis($("#hz-mark")),vis($("#hz-title")),lanesOwn?vis($("#hz-lanes")):null,vis($("#hz-right"))].filter(Boolean);
+  for(const r of B){if(r.right>tr.right-padR+.5||r.left<tr.left-.5)return false;if(tl&&r.left<88&&r.top<56)return false;}
+  for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++){const a=B[i],b=B[j];if(a.left<b.right-.5&&b.left<a.right-.5)return false;}
+  const t=vis($("#hz-title"));if(t&&$("#hz-title").textContent.trim()&&t.width<96)return false;
+  const m=$("#hz-mark"),mr=vis(m);if(mr&&m.scrollWidth>Math.ceil(mr.width)+1)return false;
+  const br=$("#hz-brand");if(br&&br.scrollWidth>br.clientWidth+1)return false;   // nothing in the left group clipped away
+  return true;
+}
+function hzHeaderFit(){
+  const top=$("#hz-top");if(!top||!document.documentElement.classList.contains("hz")||hzS.hdFit)return;
+  hzS.hdFit=true;
+  try{top.classList.remove(...HZ_HD);for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);}
+  finally{hzS.hdFit=false;}
+}
+// THE UPDATE BADGE (6b555): no new network call; it mirrors the app's own check (#update-flag, set by checkUpdate and
+// About's Check now) and the install (the update dialog's key going busy). Its click opens Settings > About with the
+// update key in focus. The gear names its shortcut.
+function hzUpdateBadge(){
+  const b=$("#hz-update"),g=$("#hz-settings"),f=$("#update-flag"),go=$("#up-go");if(!b||!f)return;
+  const on=!f.hidden,busy=!!(go&&go.disabled&&on);
+  b.hidden=!on;b.textContent=busy?"Updating…":"Update ready";if(g)g.classList.toggle("hz-upd",on);
+  hzHeaderFit();
+}
+function hzUpdateWire(){
+  const g=$("#hz-settings");if(g)g.title="Settings ("+(hzIsPC()?"Ctrl+,":"⌘,")+")";
+  const b=$("#hz-update");if(b)b.addEventListener("click",async()=>{if(typeof openAbout==="function")await openAbout();setTimeout(()=>{const k=$("#about-check");if(k)k.focus();},250);});
+  if(typeof MutationObserver==="function"){const mo=new MutationObserver(hzUpdateBadge);["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});}
+  hzUpdateBadge();
+}
 function hzTitlePaint(){
   const t=$("#hz-title");if(!t)return;
   const c=(typeof chats!=="undefined"&&typeof curChat!=="undefined")?chats.find(x=>x.id===curChat):null;
   t.textContent=c&&c.title?c.title:"";
+  hzHeaderFit();
 }
 // ---- the mode and the effort, apart (OVERRIDE 3, as Claude and ChatGPT keep them).
 // The picker shows the mode's name only and opens a glass menu: each mode, what it
@@ -67778,6 +67871,11 @@ function hzInit(){
   hzReady=true;
   try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}
   const sbtn=$("#hz-sb");if(sbtn)sbtn.addEventListener("click",hzSidebarToggle);
+  // the header refits whenever it, its groups or the page under it change size (a window resize, the sidebar, the
+  // conversation's title, the mode and effort moving in)
+  if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzHeaderFit());["#hz-top","#hz-right","#hz-title","#chat-inner"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}
+  addEventListener("resize",()=>{hzHeaderFit();setTimeout(hzHeaderFit,120);});   // and once more after the window settles
+  hzUpdateWire();
   try{if(localStorage.getItem("millen.sbhide")==="1")root.classList.add("sbhide");}catch(e){}
   $$("#hz-lanes [role=tab]").forEach(b=>b.addEventListener("click",()=>{if(typeof switchLane==="function")switchLane(b.dataset.m);}));
   const lanes=$("#hz-lanes");if(lanes)lanes.addEventListener("keydown",e=>{

@@ -44258,7 +44258,7 @@ ch.stderr.on("data", async d => {
   await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
   await send("Page.navigate", { url: base + "/" });
   const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
-  let ready = false; for (let i = 0; i < 150 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&!!document.querySelector("#send")&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&!!document.querySelector("#send")&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
   if (!ready) { out.errs.push("page not ready"); return done(0); }
   await new Promise(r => setTimeout(r, 1200));
   await ev(`(()=>{const i=document.querySelector("#input");i.focus();i.value="How long does moonlight take to reach us?";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
@@ -44305,6 +44305,171 @@ check("6b555 a whole streamed answer through the real page (headless Chromium, a
       _b3_landed_ok(_b3_s_bal) and _b3_landed_ok(_b3_s_full)
       and _b3_s_mut.get("mutated") == 1 and _b3_s_mut.get("couldnt") is True and "dripOff is not defined" in (_b3_s_mut.get("ph") or ""),
       json.dumps({"bal": _b3_s_bal, "full": _b3_s_full, "mut": _b3_s_mut})[:900])
+# THE HEADER, ONE ROW (per Patrick, on the Nightly: "Fix this, man. It looks rough": the conversation's title ran over the
+# wordmark and the lanes over its end), AND SETTINGS AND UPDATES IN IT ("Where are the settings and updates, buddy?").
+# Measured in headless Chromium over the DevTools protocol at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell,
+# html.tl, at 1440, 1100 and 940, its narrowest window), on the home and in a conversation with a long title, the sidebar
+# open and closed: the menu, the wordmark, the title, the lanes, the update pill and the right group's boxes never
+# intersect, nothing is clipped, nothing sits in the traffic-light zone, nothing scrolls sideways, and the Settings gear
+# is there and hittable (elementFromPoint) in every case, its tooltip naming the shortcut. With a stand-in update check:
+# no pill while nothing is pending; "Update ready" beside the gear once the app's own check finds one; at 760 and 390 a
+# mark on the gear instead. Two mutants, served in place of the page: the fit and the groups' no-shrink rules removed
+# (a collision), and the gear hidden with the badge's wiring cut (no gear, no badge).
+_B3_HDR = r'''// THE HEADER, ONE ROW, MEASURED (6b555): headless Chromium over the DevTools protocol (node's own WebSocket), the copy's
+// own page, at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell, html.tl, at 1440, 1100 and 940: its window is never
+// narrower), on the home and in a conversation with a long title, the sidebar open and closed. Prints one row per case:
+// the boxes that intersect, the ones in the traffic-light zone, anything clipped, the sideways overflow.
+// argv: <chromium> <base> <cookie name> <key> <token> [mutation.json: [[from, to], ...] applied to the page]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, mutf] = process.argv.slice(2);
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-hdr-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { cases: [], errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 230000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const MEASURE = `(()=>{
+  const V=s=>{const e=document.querySelector(s);if(!e)return null;const c=getComputedStyle(e),r=e.getBoundingClientRect();
+    return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?{s,l:r.left,t:r.top,r:r.right,b:r.bottom}:null;};
+  const B=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-effort-slot","#hz-machines","#hz-update","#hz-settings"].map(V).filter(Boolean);
+  const hit=(a,b)=>a.l<b.r-.5&&b.l<a.r-.5&&a.t<b.b-.5&&b.t<a.b-.5,over=[];
+  for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++)if(hit(B[i],B[j]))over.push(B[i].s+" x "+B[j].s);
+  const root=document.documentElement,tl=root.classList.contains("tl")&&!root.classList.contains("tl-fs");
+  const zone={l:0,t:0,r:88,b:56},inZone=tl?B.filter(b=>hit(b,zone)).map(b=>b.s):[];
+  const br=document.querySelector("#hz-brand"),m=document.querySelector("#hz-mark"),mv=V("#hz-mark");
+  const clipped=(br&&br.scrollWidth>br.clientWidth+1?["#hz-brand"]:[]).concat(mv&&m.scrollWidth>Math.ceil(mv.r-mv.l)+1?["#hz-mark"]:[]);
+  const t=document.querySelector("#hz-title"),tv=V("#hz-title"),title=tv?Math.round(tv.r-tv.l):0;
+  const g=document.querySelector("#hz-settings"),gv=V("#hz-settings"),ge=gv?document.elementFromPoint((gv.l+gv.r)/2,(gv.t+gv.b)/2):null;
+  return {over,inZone,clipped,sw:root.scrollWidth-innerWidth,title,marks:!!mv,lanes:!!V("#hz-lanes"),gear:!!(g&&ge&&g.contains(ge)),gearTitle:g?g.title:"",
+    badge:!!V("#hz-update"),badgeText:(document.querySelector("#hz-update")||{}).textContent||"",gearMark:!!(g&&g.classList.contains("hz-upd")&&getComputedStyle(g,"::after").display!=="none"),cls:document.querySelector("#hz-top").className,bsw:[br.scrollWidth,br.clientWidth],okNow:hzHeaderOK(document.querySelector("#hz-top"))};})()`;
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel","calm");}catch(e){}
+    (function(){const real=window.fetch.bind(window);window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){const enc=new TextEncoder();
+      return Promise.resolve(new Response(new ReadableStream({start(c){c.enqueue(enc.encode("A short stand-in answer."));setTimeout(()=>c.close(),50);}}),{status:200,headers:{"Content-Type":"text/plain; charset=utf-8"}}));}
+      if(String(u).split("?")[0].endsWith("/api/update/check"))return Promise.resolve(new Response(JSON.stringify(window.__upd?{configured:true,available:true,latest:"7.0 beta 4",current:"7.0 beta 3",size_mb:6,manual:false,auto:true}:{configured:true,available:false,auto:true}),{status:200,headers:{"Content-Type":"application/json"}}));
+      return real(u,o);};})();` });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  const size = async w => { await send("Emulation.setDeviceMetricsOverride", { width: w, height: 900, deviceScaleFactor: 1, mobile: false }); await ev(`dispatchEvent(new Event("resize"))`); await sleep(300); };
+  for (const tl of [false, true]) {
+    await size(1440);
+    let ready = false;
+    for (let tries = 0; tries < 2 && !ready; tries++) {   // a busy copy (another check's downloads in flight) can be slow: wait, then load once more
+      await send("Page.navigate", { url: base + "/" });
+      for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#hz-top")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro`); } }
+    if (!ready) { out.errs.push("page not ready: " + await ev(`JSON.stringify({rs:document.readyState,hz:typeof hzS,intro:typeof hzS!=="undefined"&&hzS?hzS.intro:null,top:!!document.querySelector("#hz-top")})`)); return done(); }
+    if (tl) await ev(`document.documentElement.classList.add("tl")`);
+    await sleep(800);
+    for (const where of ["home", "chat"]) {
+      if (where === "chat") {
+        await ev(`(()=>{const i=document.querySelector("#input");i.value="Hi lol, can you plan a long weekend in Lisbon with two good walks, one great dinner and somewhere quiet to read?";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`);
+        await sleep(2500);
+        await ev(`(()=>{const t=document.querySelector("#hz-title");if(t&&!t.textContent.trim()){t.textContent="Hi lol, can you plan a long weekend in Lisbon with two good walks";dispatchEvent(new Event("resize"));}})()`);
+        await sleep(300);
+      }
+      for (const side of [true, false]) {
+        for (const w of (tl ? [1440, 1100, 940] : [1440, 1100, 900, 760, 600, 390])) {
+          await size(w);
+          for (let k = 0; k < 3; k++) {
+            const vis = await ev(`(()=>{const e=document.querySelector("#sidebar");if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50;})()`);
+            if (vis === side || (side && w <= 760)) break;   // under 760 the sidebar is a drawer over the page: "open" is the drawer, not the row
+            await ev(`document.querySelector("#hz-sb").click()`); await sleep(500); }
+          await sleep(200);
+          const r = await ev(MEASURE); out.cases.push({ tl, where, side, w, ...r });
+        }
+      }
+    }
+  }
+  // the update badge: none while nothing is pending; "Update ready" beside the gear once the app's own check finds one;
+  // at the narrowest the pill gives way to a mark on the gear
+  out.badge = {};
+  await ev(`document.documentElement.classList.remove("tl")`);   // a plain window: the Mac shell is never under 940
+  await size(1440); out.badge.none = await ev(MEASURE);
+  await ev(`(async()=>{window.__upd=true;await checkUpdate();})()`); await sleep(400);
+  for (const w of [1440, 760, 390]) { await size(w); out.badge["w" + w] = await ev(MEASURE); }
+  done();
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
+'''
+def _b3_hdr_run(mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="b3hdr-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "hdr.js"), "w").write(_B3_HDR)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "hdr.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation)); args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=240)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b3_hdr_bad(r):
+    return [c for c in r.get("cases", []) if c["over"] or c["inZone"] or c["clipped"] or c["sw"] > 0]
+def _b3_hdr_badge_ok(r):
+    b_ = r.get("badge") or {}
+    if set(b_) != {"none", "w1440", "w760", "w390"}:
+        return False
+    clean = all(not v["over"] and not v["clipped"] and v["sw"] <= 0 and v["gear"] for v in b_.values())
+    return (clean and not b_["none"]["badge"] and not b_["none"]["gearMark"]
+            and b_["w1440"]["badge"] and b_["w1440"]["badgeText"] == "Update ready" and not b_["w1440"]["gearMark"]
+            and not b_["w760"]["badge"] and b_["w760"]["gearMark"] and not b_["w390"]["badge"] and b_["w390"]["gearMark"])
+def _b3_hdr_static(css, js, pg):
+    fit = _jsfn(js, "function hzHeaderFit(){"); upd = _jsfn(js, "function hzUpdateBadge(){")
+    return (".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}" in css and ".hz #hz-top>.hz-sp{flex:1 1 0;min-width:12px}" in css
+            and ".hz #hz-mark{min-width:max-content}" in css and ".hz #hz-title{flex:0 1 auto;min-width:0;" in css
+            and ".hz #hz-top.hz-hd1 #hz-title{display:none!important}" in css and ".hz #hz-top.hz-hd2 #hz-mark b{display:none}" in css
+            and ".hz #hz-top.hz-hd3 #hz-lanes button{min-width:0;" in css and ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;" in css
+            and "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)" not in css                  # the lanes never at the window's absolute centre
+            and "for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);" in fit and "top.classList.remove(...HZ_HD);" in fit
+            and 'const HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7"];' in js
+            and "if(tl&&r.left<88&&r.top<56)return false;" in js and "t.width<96)return false;" in js
+            and 'ro.observe(e);' in js and "  hzHeaderFit();\n}" in js
+            # the gear and the badge: a 32 px glass key with its shortcut; the pill mirrors the app's own check, no new call
+            and '<button id="hz-update" type="button" hidden>Update ready</button>' in pg and 'aria-label="Settings" title="Settings (⌘,)"' in pg
+            and ".hz #hz-settings{width:32px;height:32px;border-radius:8px;" in css and 'b.textContent=busy?"Updating…":"Update ready";' in upd
+            and "const on=!f.hidden" in upd and "api(" not in upd and 'g.title="Settings ("+(hzIsPC()?"Ctrl+,":"⌘,")+")";' in js
+            and ".hz #hz-top.hz-hd4 #hz-update{display:none}" in css and ".hz #hz-top.hz-hd4 #hz-settings.hz-upd::after{display:block}" in css
+            and not re.search(r"#hz-(settings|update)[^{}]*\{[^{}]*(text-shadow|filter:|animation:)", css))     # no shine, no glow
+_b3_h_ok = _b3_hdr_run()
+_b3_h_mut = _b3_hdr_run([["try{top.classList.remove(...HZ_HD);for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);}", "try{top.classList.remove(...HZ_HD);}"],
+                         [".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}\n", ""], [".hz #hz-mark{min-width:max-content}\n", ""]])
+_b3_h_mut2 = _b3_hdr_run([['<button id="hz-settings" type="button" class="hz-ib"', '<button id="hz-settings" type="button" class="hz-ib" style="display:none"'],
+                          ['["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});', ""]])
+check("6b555 the header, one row, with Settings and updates in it: at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
+      _b3_hdr_static(_hz_css, _hz_js, page) and not _b3_hdr_static(_hz_css.replace(".hz #hz-mark{min-width:max-content}", ""), _hz_js, page)
+      and not _b3_hdr_static(_hz_css, _hz_js.replace("for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);", ""), page)
+      and not _b3_hdr_static(_hz_css.replace(".hz #hz-settings{width:32px;height:32px;border-radius:8px;", ".hz #hz-settings{width:32px;height:32px;border-radius:8px;filter:drop-shadow(0 0 6px #fff);"), _hz_js, page)   # a glowing gear
+      and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 36 and not _b3_hdr_bad(_b3_h_ok)
+      and all(c["gear"] and c["gearTitle"] == "Settings (⌘,)" for c in _b3_h_ok["cases"])
+      and any(c["where"] == "chat" and c["title"] >= 96 for c in _b3_h_ok["cases"])                              # the title still shows where there is room
+      and _b3_hdr_badge_ok(_b3_h_ok)
+      and _b3_h_mut.get("mutated", 0) >= 1 and len(_b3_hdr_bad(_b3_h_mut)) >= 1
+      and _b3_h_mut2.get("mutated", 0) >= 1 and not all(c["gear"] for c in _b3_h_mut2.get("cases", [])) and not _b3_hdr_badge_ok(_b3_h_mut2),
+      json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "mut_bad": len(_b3_hdr_bad(_b3_h_mut))})[:900])
 # ==== beta-3 the sky and Ultra (6b555): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
