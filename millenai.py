@@ -36614,7 +36614,7 @@ def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
         t = t[m.end():]
         notes.append("heading dropped")
     t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)
-    if t2 != t:
+    if t2.rstrip() != t.rstrip():          # (6b560) trailing space alone is no recap
         t = t2
         notes.append("recap trimmed")
     return t, notes

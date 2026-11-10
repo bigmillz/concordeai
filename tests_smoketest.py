@@ -23619,7 +23619,13 @@ def _p2c_pins(src):
         < ch.index("                _run_lbl([lbl])\n"),
         "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
                          "                        status, step,\n                        first_s=30.0 if tier == \"Fast\" else 60.0,\n"
-                         "                        polish=_revise if _pol else None)\n                    hb_stop.set()\n                    return" in ch
+                         "                        polish=_revise if _pol else None)\n"
+                         "                    # the server's answer gets the same post-pass (6b560):\n"
+                         "                    # a mode with a paired server answers there first, so\n"
+                         "                    # the 6b523 fixes reached almost no answer without it\n"
+                         "                    if _seat_res[0] in (\"server\", \"fallback\"):\n"
+                         "                        _single_polish()\n"
+                         "                    hb_stop.set()\n                    return" in ch
         and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
             "                            and _is_substantive(prompt))" in ch
@@ -24937,7 +24943,7 @@ def _smc_pins(src):
         and not re.search(r"resolve_tier|run_council|cloud|MODEL_ROUTES|ensure_mlx|run_model|TIERS|MERGE_RANK", br),
         "still the server's": "        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])\n" in ch,
         "fast": '            elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail\n                  and not images):' in ch
-        and '                server_first_answer(\n                    _srv_lbl, "", full_messages, memit, emit, status, step,\n'
+        and '                _so_res = server_first_answer(\n                    _srv_lbl, "", full_messages, memit, emit, status, step,\n'
             "                    first_s=None," in ch
         and ch.index('_so_mode == "Fast" and not _so_fail') < ch.index("            elif _srv_lbl:\n                server_answer(")
         < ch.index("            elif len(council) > 1:"),
@@ -40087,7 +40093,7 @@ def _c520_all(src):
         and nw and nw[0]["date"] == "2026-10-14" and nw[0]["href"] == "https://apnews.com/a")
     out["the shipped app never runs without the fixes (the knob is a dev copy's only)"] = (
         g["fresh_ablate"]() == set() and '"MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"' in src
-        and "    if not DEV_HOME:\n        return set()\n" in src)
+        and "    if not DEV_HOME:\n        return set()\n" in src[src.index("def fresh_ablate"):src.index("def fresh_ablate") + 500])
     return out
 
 
@@ -41588,7 +41594,8 @@ def _names523(src, names, ns):
 _POLISH523 = {"_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
               "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
               "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
-              "answer_polish", "shown_answer", "_RECAP_RX", "trim_recap", "quality_ablate"}
+              "answer_polish", "shown_answer", "_RECAP_RX", "trim_recap", "quality_ablate",
+              "_ANS_FORM_ASK_RX", "_ANS_SUM_ASK_RX", "_ans_asked"}   # 6b560: what the person asked for stays
 
 
 class _Ctl523(str):
@@ -41730,13 +41737,13 @@ def _c523_all(src):
     hs = src[src.index("def _single_polish():"):src.index("        except (BrokenPipeError, ConnectionResetError):\n            pass  # user hit Stop")]
     out["the single writer's answer goes through the post-pass on both paths, and a changed one is re-sent after a RESET"] = (
         hs.count("\n                    _single_polish()\n") == 2 and "_shown = shown_answer(answer_buf)" in hs
-        and "_new, _notes = answer_polish(_shown, _pk)" in hs
+        and "_new, _notes = answer_polish(_shown, _pk, prompt)" in hs
         and 'memit(Ctl(NUL + "RESET" + NUL))\n                    memit(_new)' in hs
         and 'step("polish", "Sharpened", "done",' in hs
         and hs.index("_stream_guarded(lbl, full_messages,\n                                    memit, status, None,") < hs.rindex("_single_polish()"))
     rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
     out["the council's final answer goes through the post-pass too, before the fact-check's re-send"] = (
-        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "")' in rc
+        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "",' in rc
         and rc.index('report["polish"] = answer_polish') < rc.index('report["verify"] = verify_pass(')
         and 'changed=_trim != _final)' in rc)
     out["a follow-up with nothing new to look up tells the writer what a follow-up is for"] = (
@@ -41763,8 +41770,10 @@ _C523_MUT = [
     ("two differing rates taken as one", "    return rates.pop() if len(rates) == 1 else 0.0", "    return sorted(rates)[0] if rates else 0.0"),
     ("the leaks kept", "    for rx, rep in _ANS_LEAK_RXS:\n        t, k = rx.subn(rep, t)\n        n += k", "    pass"),
     ("a sentence left opening in lower case", '        t = re.sub(r"(^|[.!?]\\s+|\\n\\s*)what I found", r"\\1What I found", t)', "        pass"),
-    ("the heading kept", '    m = re.match(r"\\s*#{1,4} [^\\n]{1,100}\\n+", t)\n    if m:', '    m = None\n    if m:'),
-    ("the recap kept", "    t2 = trim_recap(t)\n    if t2 != t:\n        t = t2\n        notes.append(\"recap trimmed\")", "    pass"),
+    ("the heading kept", '    m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(r"\\s*#{1,4} [^\\n]{1,100}\\n+", t)\n    if m:',
+     '    m = None\n    if m:'),
+    ("the recap kept", "    t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)\n    if t2.rstrip() != t.rstrip():          # (6b560) trailing space alone is no recap\n        t = t2\n        notes.append(\"recap trimmed\")",
+     "    pass"),
     ("the post-pass knob honoured in the shipped app", "    if not DEV_HOME:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\"",
      "    if False:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\""),
     ("no estimate rule", '    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE', '    if False:\n        rules += GROUND_ESTIMATE'),
@@ -41781,7 +41790,8 @@ _C523_MUT = [
     ("a far-off query still seats its best", '    floor = (max(s["score"] for s in out) * 0.5) if (out and "vendor" not in quality_ablate()) else 0', "    floor = 0"),
     ("the post-pass not run after the one-pass stream", '                                    "kept the part before it wandered")\n                    _single_polish()\n        except (BrokenPipeError',
      '                                    "kept the part before it wandered")\n        except (BrokenPipeError'),
-    ("the council's final not post-passed", '            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "")',
+    ("the council's final not post-passed", '            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "",\n'
+     '                                                    report.get("question") or "")',
      '            report["polish"] = []'),
     ("the follow-up note never passed", "            _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)", "            _gturn = grounded_turn(query, _gpack, note=_oai_note)"),
 ]
@@ -41796,6 +41806,168 @@ for _mn, _ma, _mb in _C523_MUT:
 check("6b523's rules each break a check when broken (%d mutants)" % len(_C523_MUT), not _c523_caught,
       "%r" % _c523_caught)
 # ==== quality-3 (6b523): end ====
+
+# ==== quality-4 (6b560) the post-pass on the server's answers, what was asked for stays, the scorecard: begin ====
+# quality-3 (6b523) ported onto 7.0 beta 2 (NOTES 6b560). A mode with a paired server answers there first
+# (6b339), and that path returned before the post-pass ran, so the 6b523 fixes reached almost none of the
+# owner's answers: the server seat's answer (and a fallback's) and Fast on one server alone now go through
+# it too. The post-pass drops a leading heading and a closing summary because the standing instructions
+# forbid them on a chat answer; asked for a README, a report or an outline, the heading is what was asked
+# for, and asked for a summary or a TL;DR, the summary is: the person's own words now decide. The Code lane's
+# answers are code and are left as written. The scorecard (tools/answer_eval/scorecard.py) is the per-build
+# measure: it runs only when SCORECARD=1 ./release.sh asks, never in this gauntlet.
+print("== quality-4: the server's answers post-passed, asked-for form kept, the scorecard (6b560) ==")
+
+
+def _c560_all(src):
+    out = {}
+    try:
+        p = _names523(src, _POLISH523 | {"_ANS_FORM_ASK_RX", "_ANS_SUM_ASK_RX", "_ans_asked"},
+                      {"re": re, "os": os, "DEV_HOME": "", "Ctl": _Ctl523, "NUL": "\0"})
+    except Exception as e_:
+        return {"the sections run: %r" % (e_,): False}
+    P = p["answer_polish"]
+    doc = "# tidyup\n\nTidyup clears old files out of Downloads so the folder stays small.\n"
+    out["a heading the person asked for stays; one they didn't goes"] = (
+        P(doc, "", "Write a README intro for tidyup: a title and one paragraph.") == (doc, [])
+        and P(doc + "\n\n", "", "What is tidyup?  ")[1] == ["heading dropped"]
+        and P(doc, "", "What does tidyup do?")[1] == ["heading dropped"]
+        and P(doc, "", "evidence\n\nPROMPT: write a short report on tidyup") == (doc, []))
+    rec = "Eggs cost $2.27.\n\nA year ago $3.49.\n\nThe spike unwound.\n\n**TL;DR:** cheaper now."
+    out["a summary the person asked for stays; an unasked recap goes"] = (
+        P(rec, "", "Why did eggs get cheaper? End with a TL;DR.") == (rec, [])
+        and P(rec, "", "Why did eggs get cheaper?")[1] == ["recap trimmed"])
+    out["the person's words are the grounded turn's last PROMPT line, or the whole message"] = (
+        p["_ans_asked"]("pages about a summary\n\nPROMPT: what costs less?") == "what costs less?"
+        and p["_ans_asked"]("give me the gist") == "give me the gist" and p["_ans_asked"](None) == "")
+    out["the leaks and the arithmetic are fixed whatever was asked"] = (
+        P("Fuel: 583 × $3.40 = $1,883.", "", "write a report on fuel")[0] == "Fuel: 583 × $3.40 = $1,982.")
+    # the handler's wiring, from the text
+    try:
+        hd = src[src.index("        def _single_polish():\n"):
+                 src.index("        except (BrokenPipeError, ConnectionResetError):\n            pass  # user hit Stop")]
+        sp = hd[:hd.index("\n        try:\n")]
+    except ValueError:
+        return dict(out, **{"the handler's post-pass is where the dispatch can reach it": False})
+    out["the post-pass is defined once, before the dispatch, so every single-writer path can run it"] = (
+        src.count("def _single_polish():") == 1
+        and hd.index("def _single_polish():") < hd.index("            if images and _vis_cloud and _cloud_vision():"))
+    out["a mode's server seat answer (or its fallback's) goes through the post-pass"] = (
+        "                        polish=_revise if _pol else None)\n"
+        "                    # the server's answer gets the same post-pass (6b560):" in hd
+        and '                    if _seat_res[0] in ("server", "fallback"):\n                        _single_polish()\n'
+            "                    hb_stop.set()\n                    return\n" in hd)
+    out["Fast on one server alone goes through it too"] = (
+        '                _so_res = server_first_answer(\n                    _srv_lbl, "", full_messages,' in hd
+        and '                if _so_res == "server":\n                    _single_polish()' in hd)
+    out["the Code lane is left as written; the person's words ride along"] = (
+        '                if LANE_ROLE.get(agent_name, "") == "code":\n                    return' in sp
+        and "_new, _notes = answer_polish(_shown, _pk, prompt)" in sp
+        and sp.index('LANE_ROLE.get(agent_name, "") == "code"') < sp.index("answer_polish(_shown"))
+    rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
+    out["the council's final passes the question as the person's words"] = (
+        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "",\n'
+        '                                                    report.get("question") or "")' in rc)
+    return out
+
+
+for _n560, _o560 in _c560_all(_MILLENAI_SRC).items():
+    check("6b560 quality-4 — " + _n560, _o560, "")
+_C560_MUT = [
+    ("an asked-for heading dropped", "    m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(",
+     "    m = None if False else re.match("),
+    ("an asked-for summary trimmed", "    t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)", "    t2 = trim_recap(t)"),
+    ("the whole grounded turn read as the person's words", '    i = q.rfind("PROMPT: ")', "    i = -1"),
+    ("the server seat's answer not post-passed",
+     '                    if _seat_res[0] in ("server", "fallback"):\n                        _single_polish()\n',
+     '                    if _seat_res[0] in ("server", "fallback"):\n                        pass\n'),
+    ("Fast on one server alone not post-passed", '                if _so_res == "server":\n                    _single_polish()',
+     '                if _so_res == "server":\n                    pass'),
+    ("the Code lane post-passed", '                if LANE_ROLE.get(agent_name, "") == "code":\n                    return',
+     "                if False:\n                    return"),
+    ("the person's words not passed", "_new, _notes = answer_polish(_shown, _pk, prompt)",
+     "_new, _notes = answer_polish(_shown, _pk)"),
+]
+_c560_caught = []
+for _mn, _ma, _mb in _C560_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c560_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c560_all(_ms).values()):
+        _c560_caught.append((_mn, "not caught"))
+check("6b560's rules each break a check when broken (%d mutants)" % len(_C560_MUT), not _c560_caught,
+      "%r" % _c560_caught)
+
+# THE SCORECARD (6b560): a fixed small set, judged the same way every build, gated in the release only when
+# asked. Offline-safe means this gauntlet never runs it: it is only read here.
+_sc_dir = os.path.join("tools", "answer_eval")
+_sc_set = json.load(open(os.path.join(_sc_dir, "scorecard.json"), encoding="utf-8"))
+_sc_qs = _sc_set["questions"]
+_sc_cats = {q["category"] for q in _sc_qs}
+check("6b560 scorecard: 20 questions across facts, reasoning, code, writing and advice, one private-notes and one "
+      "server-only case, each with a reference sheet",
+      len(_sc_qs) == 20 and {"facts", "reasoning", "code", "writing", "advice"} <= _sc_cats
+      and sum(1 for q in _sc_qs if q.get("private")) == 1 and sum(1 for q in _sc_qs if q.get("server_only")) == 1
+      and all((q.get("reference") or {}).get("key_facts") for q in _sc_qs)
+      and len({q["id"] for q in _sc_qs}) == 20 and bool(_sc_set.get("notes_file", {}).get("text")),
+      "%r" % sorted(_sc_cats))
+_sc_bad = []
+for _q in _sc_qs:
+    for _rx in (_q.get("must") or []) + (_q.get("never") or []):
+        try:
+            re.compile(_rx)
+        except re.error as _e:
+            _sc_bad.append((_q["id"], _rx, str(_e)))
+check("6b560 scorecard: every facts-check pattern compiles", not _sc_bad, "%r" % _sc_bad)
+_rel = open("release.sh", encoding="utf-8").read()
+_gt = open("tests_smoketest.py", encoding="utf-8").read()
+check("6b560 scorecard: release.sh runs it only under SCORECARD=1, gated, before the version is written; "
+      "the plain gauntlet never runs it",
+      'if [[ "${SCORECARD:-0}" == 1 ]]; then' in _rel
+      and 'tools/answer_eval/scorecard.py run --label "build-$BUILD" --gate' in _rel
+      and _rel.index('SCORECARD:-0}" == 1') < _rel.index("s = re.sub(r'APP_VERSION = \"[^\"]*\"'")
+      and not re.search(r"(subprocess\.\w+|Popen|os\.system)\([^)]*scorecard\.py", _gt), "")
+import importlib.util as _ilu560
+_sc_spec = _ilu560.spec_from_file_location("_scorecard560", os.path.join(_sc_dir, "scorecard.py"))
+_sc = _ilu560.module_from_spec(_sc_spec)
+sys.path.insert(0, _sc_dir)
+try:
+    _sc_spec.loader.exec_module(_sc)
+finally:
+    sys.path.remove(_sc_dir)
+
+
+def _sc_entry(label, overall, ttfw, errors=0):
+    recs = [{"id": "q%02d" % i, "category": "facts", "grade": {"overall": v, "correct": v, "complete": v,
+             "concise": v, "fit": v}, "first_text_s": t, "elapsed_s": t * 3, "error": "",
+             "facts": {"ok": 1, "of": 1}} for i, (v, t) in enumerate(zip(overall, ttfw))]
+    for r in recs[:errors]:
+        r["error"] = "error answer"
+    e = {"label": label, "records": recs}
+    _sc.entry_numbers(e)
+    return e
+
+
+_sc_old = _sc_entry("old", [7, 6, 8, 5, 7, 6, 8, 7], [2.0] * 8)
+_sc_same = _sc_entry("same", [7, 6, 8, 5, 7, 6, 8, 7], [2.2] * 8)
+_sc_drop = _sc_entry("drop", [6, 5, 7, 5, 6, 5, 7, 6], [2.0] * 8)
+_sc_noise = _sc_entry("noise", [8, 5, 8, 6, 6, 6, 7, 7], [2.0] * 8)
+_sc_slow = _sc_entry("slow", [7, 6, 8, 5, 7, 6, 8, 7], [2.4] * 8)
+_sc_err = _sc_entry("err", [7, 6, 8, 5, 7, 6, 8, 7], [2.0] * 8, errors=1)
+check("6b560 scorecard: the gate fails a quality drop beyond one standard error, a first-words median over 15% "
+      "slower and a new error answer; it passes noise and +10%",
+      not _sc.compare(_sc_same, _sc_old)[1] and _sc.compare(_sc_drop, _sc_old)[1]
+      and not _sc.compare(_sc_noise, _sc_old)[1] and _sc.compare(_sc_slow, _sc_old)[1]
+      and _sc.compare(_sc_err, _sc_old)[1] and _sc.TTFW_SLACK == 0.15
+      and _sc_old["summary"]["quality"] == 6.75 and _sc_old["summary"]["ttfw_median_s"] == 2.0,
+      "%r" % ([_sc.compare(x, _sc_old) for x in (_sc_same, _sc_drop, _sc_noise, _sc_slow, _sc_err)],))
+check("6b560 scorecard: the judge's reply is read as the last JSON object with an overall, scores clamped to 1-10",
+      _sc.parse_grade('<think>{"overall": 2}</think> ok {"correct": 12, "complete": 7, "concise": 7, "fit": 7, '
+                      '"overall": 8.4, "why": "x"}')
+      == {"correct": 10, "complete": 7, "concise": 7, "fit": 7, "overall": 8, "why": "x"}
+      and _sc.parse_grade("no json") is None, "")
+# ==== quality-4 (6b560): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
