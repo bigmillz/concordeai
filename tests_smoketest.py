@@ -44066,6 +44066,247 @@ check("6b553 the footage's seam (6b555: the preview's dissolve): no native loop 
       and not _cs553_seam(_hz_js.replace("-S.footMul)*(1-Math.exp(-dn/.36));", "-S.footMul)*.045;"), page), "")                                   # the ease by frame again (twice as fast at 120 Hz)
 # ==== the calm send and the footage's seam (6b553): end ====
 
+# ==== beta-3 the sky and Ultra (6b555): begin ====
+# Patrick: "start beta 3 now" -- the preview's whole look in the app (scratchpad/preview-site/beta, DESIGN.md). The sky:
+# the near-black ground, the hour's grade on the footage, three layers of stars with cores and halos, the vignette, the
+# toe and the dither; the aurora level, wandering 10-25 %, its folds, its wavy lower edge and split, blue to violet; the
+# field above the box, the dot matrix, the star signs, the shooting stars and the showers, all on the GPU; Ultra's
+# arrival with its hang (anticipation, release, hang, settle), once per arrival; the fill's dots and marquee; the
+# greeting's rim light. And, after beta 2's dripOff: a whole streamed answer driven through the real page.
+print("== beta-3 the sky and Ultra (6b555) ==")
+def _b3_sky(js, css, pg):
+    sky = _jsfn(js, "function hzSkyBoot(){")
+    return (# the ground: near-black and the same all day; the hour lives in the footage's grade (the preview's moods)
+            "const HZ_SKYCOL=[[0,3,3,5,4,4,6,7,7,10],[24,3,3,5,4,4,6,7,7,10]];" in js
+            and "night:[[6,6,8],[62,63,78],[232,234,240],[.64,1.45,0]]" in js and "day:[[9,10,12],[150,178,206],[255,247,236],[.66,1.28,0]]" in js
+            and 'const HZ_MOOD_AT=[[5.5,"night","dawn"],[7.5,"dawn","day"],[17.5,"day","dusk"],[19.5,"dusk","night"]];' in js
+            and "if(Math.abs(h-b)<=1/6){const u=(h-b)*3+.5,t=u*u*(3-2*u)" in js                              # 20 minutes on a smoothstep
+            and "{const e=still?1:1-Math.exp(-dt/2);for(let i=0;i<4;i++)for(let j=0;j<3;j++)gp[i][j]+=(GP[i][j]-gp[i][j])*e;}" in sky   # eased (2 s), never a step
+            and '"vec3 gradeF(vec3 c){float l=L(c);return mix(gmap(l)*smoothstep(0.,.18,l),c,gx.x);}"' in sky
+            # the beauty pass: three depths, a core and a halo, the vignette, the toe, the dither, the slow drift
+            and '"float st=starLayer(q,46.,.84,.8,cq)+starLayer(qm+31.,19.,.93,.55,cq+31.)*.5+starLayer(qf+57.,12.,.955,.42,cq+57.)*.3;"' in sky
+            and "(exp(-d2/(sz*sz))+.14*exp(-d2/(sz*sz*10.)))" in sky
+            and '"vec2 d=(uv-vec2(.5,.48))*vec2(.9,1.15);col*=clamp(1.-dot(d,d)*1.25,.16,1.);"' in sky
+            and '"col*=1.-.3*exp(-dot(col,vec3(.3,.59,.11))*28.);"' in sky and "col+=g*.012;" in sky
+            and "camX=still?0:4*Math.sin(t*2*Math.PI/97);camY=still?0:3*Math.sin(t*2*Math.PI/131+1.3);" in sky
+            and "*.9*br[0]);" in sky                                                                        # a touch darker
+            and '"vec4 rs=texture2D(stars,vec2(uv.x,1.-uv.y));' in sky                                      # the real stars kept
+            and '"vec4 moonRamp(float r){return vec4(mix(vec3(.965,.95,.92),vec3(.84,.85,.87),smoothstep(0.,.9,r)),.22*exp(-r*r*5.5));}"' in sky   # moonlight, no disc
+            # the aurora: level (no turn, no slant: the CSS curtains only slide), wandering 10-25 % on 60-120 s legs,
+            # three in ten back to the centre; its width .22-.38; folds; the wavy edge; a split every 2-4 min; Balanced
+            # 1.6 x slower and half; Calm and reduced motion still and centred; never into the composer or over the greeting
+            and "n=.5+(arnd()<.5?-1:1)*(.1+arnd()*.15)*(arnd()<.3?0:1);}while(Math.abs(n-AW.from)<.08);AW.to=n;AW.legD=60+arnd()*60;" in sky
+            and "AW.wt=.22+arnd()*.16;" in sky and "AW.nextSplit=120+arnd()*120;" in sky
+            and 'const still=hzS.reduced||skyMode==="calm",k=skyMode==="bal"?1/1.6:1,A=skyMode==="bal"?.5:1;' in sky
+            and '"float wav=wam*(.07*sin(x*4.2+lt*1.2+fk*1.7)+.03*sin(x*7.3-lt*.35+fk));"' in sky
+            and '"float body=smoothstep(-(.014+.085*rays),0.,d)*smoothstep(flo-.01,flo+.03,p.y)' in sky
+            and "b0=mix(cl,b0,hc)-.06*hc*(1.-hc);" in sky and "aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;" in sky
+            and ".hz #hz-aurw{position:absolute;left:50%;top:8vh;width:1800px;height:640px;margin-left:-900px;transform:none;" in css
+            and "@keyframes hzSway{from{transform:translateX(-48px)}to{transform:translateX(48px)}}" in css
+            and "@keyframes hzSway2{from{transform:translateX(40px)}to{transform:translateX(-44px)}}" in css
+            and not re.search(r"skew|rotate\(-?\d", re.sub(r"/\*.*?\*/", "", css[css.index(".hz #hz-aurw{"):css.index(".hz #hz-scrim{")], flags=re.S))
+            # the dot matrix: 11 px pitch, 1.8 px dots, about 4 % white; linear sweeps (horizontal or diagonal, never
+            # radial) at 180 px/s every 3.4-4.6 s (Balanced 5.2-6.8); half in Balanced; never in Calm
+            and '"vec2 gg=(qq-mrect.xy)/11.,cell=floor(gg),fo=(fract(gg)-.5)*11.;float led=1.-smoothstep(.65,1.15,max(abs(fo.x),abs(fo.y)));"' in sky
+            and '"float lw=.04+.31*mw0.w*exp(-pow((dot(cc,mw0.xy)-mw0.z)/52.,2.))' in sky and "length(cc" not in sky
+            and "if(live)w.s+=dt*180;" in sky and 'MX.next=nowT+(skyMode==="full"?3400+Math.random()*1200:5200+Math.random()*1600)*(Math.random()<.25?.4:1);' in sky
+            and 'lvm=skyMode==="full"?1:.5;' in sky
+            # the star signs: every 20-30 s (the first 9-15 s after arriving), 4-6 stars joined by their minimum spanning
+            # tree, 420 ms a line, held 2 s, dissolving over 1.2 s; lines and points, no art
+            and "nextSign=nowT+20000+Math.random()*10000;" in sky and "nextSign=n+9000+Math.random()*6000;" in sky
+            and "const P=pts.slice(0,4+Math.floor(Math.random()*3)),inT=[0],edges=[];" in sky and "per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;" in sky
+            # meteor showers: every 60-90 s in Full (110-130 s in Balanced), 3-5 from one radiant
+            and 'nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);' in sky and "n=3+Math.floor(Math.random()*3);" in sky
+            # all of it paused while the page is hidden or a minute unfocused
+            and "const fxLive=()=>!document.hidden&&!hzS.blurred;" in sky and "if(on&&fxLive()&&!sign&&nowT>nextSign)" in sky)
+check("6b555 the sky: the near-black ground with the hour in the footage's grade (eased, never a step), three layers of stars with cores and halos, the vignette, the toe and the dither, the slow drift, the real stars kept, moonlight with no disc; the aurora level and sliding only, wandering 10-25 %, its wavy edge kept off the composer and the greeting, Balanced slower and half, Calm still; the dot matrix's linear sweeps; the star signs and the showers on their clocks; paused with the page; the mutants are caught",
+      _b3_sky(_hz_js, _hz_css, page)
+      and not _b3_sky(_hz_js.replace("const HZ_SKYCOL=[[0,3,3,5,4,4,6,7,7,10],[24,3,3,5,4,4,6,7,7,10]];", "const HZ_SKYCOL=[[0,3,4,10,6,11,28,16,34,79],[24,3,4,10,6,11,28,16,34,79]];"), _hz_css, page)   # the navy sky back
+      and not _b3_sky(_hz_js.replace("{const e=still?1:1-Math.exp(-dt/2);", "{const e=1;"), _hz_css, page)                                      # the hour's grade stepping
+      and not _b3_sky(_hz_js.replace("(.1+arnd()*.15)", "(.1+arnd()*.35)"), _hz_css, page)                                                         # wandering to the edges
+      and not _b3_sky(_hz_js.replace('const still=hzS.reduced||skyMode==="calm",k=', 'const still=hzS.reduced,k='), _hz_css, page)              # the aurora moving in Calm
+      and not _b3_sky(_hz_js, _hz_css.replace("@keyframes hzSway{from{transform:translateX(-48px)}to{transform:translateX(48px)}}", "@keyframes hzSway{from{transform:translateX(-48px) skewX(-12deg)}to{transform:translateX(48px) skewX(-18deg)}}"), page)   # slanted rays
+      and not _b3_sky(_hz_js, _hz_css.replace("margin-left:-900px;transform:none;", "margin-left:-900px;transform:rotate(-3deg);"), page)        # a tilted curtain
+      and not _b3_sky(_hz_js.replace("exp(-pow((dot(cc,mw0.xy)-mw0.z)/52.,2.))", "exp(-pow((length(cc-mw0.xy)-mw0.z)/52.,2.))"), _hz_css, page)   # a radial sweep (a ring)
+      and not _b3_sky(_hz_js.replace("nextSign=nowT+20000+Math.random()*10000;", "nextSign=nowT+2000+Math.random()*1000;"), _hz_css, page)      # star signs every 2 s
+      and not _b3_sky(_hz_js.replace("if(on&&fxLive()&&!sign&&nowT>nextSign)", "if(on&&!sign&&nowT>nextSign)"), _hz_css, page), "")            # star signs while hidden
+# ONCE PER ARRIVAL, WITH ITS HANG: hzIgnite and hzUltraFire run in node over a sequence: an arrival fires once, 140 ms
+# after the held breath; a return within 1.5 s is quiet; leaving inside the 140 ms fires nothing; Calm never fires
+def _b3_arrival_run(js):
+    fns = "".join(_jsfn(js, h) for h in ("function hzUltraGate(now,last,dragFired,dragging){", "function hzIgnite(){", "function hzUltraFire(){", "function hzUltraOut(){"))
+    src = r"""
+let NOW=0,Q=[],fires=0,quiet=0,ant=0,cls=new Set(),calm=false;
+const performance={now:()=>NOW};
+function setTimeout(f,ms){Q.push([NOW+ms,f]);return Q.length;} function clearTimeout(){}
+function run(to){Q.sort((a,b)=>a[0]-b[0]);while(Q.length&&Q[0][0]<=to){const [t,f]=Q.shift();NOW=t;f();Q.sort((a,b)=>a[0]-b[0]);}NOW=to;}
+const document={documentElement:{classList:{add:c=>{cls.add(c);if(c==="hz-ignite")fires++;},remove:(...c)=>c.forEach(x=>cls.delete(x)),contains:c=>cls.has(c)},offsetWidth:1},hidden:false};
+const hzS={effI:1,effDrag:null,sky:{anticipate(){ant++;}}};
+const $=()=>null;function hzUltraFx(){return !calm;}function hzMotionOK(){return true;}function hzUltraAngle(){}function hzBurstBoot(){return null;}function hzFxLevel(){return calm?"calm":"full";}
+function hzSkyUltra(on,smash){if(on&&!smash)quiet++;}
+const arrive=t=>{run(t);hzS.effI=4;hzIgnite();},leave=t=>{run(t);hzS.effI=1;hzUltraOut();};
+const out=[];
+arrive(1000);run(1100);out.push(fires);run(1200);out.push(fires);   // nothing in the held breath; the release at 140 ms
+leave(1600);arrive(1800);run(2200);out.push(fires,quiet);           // back within 1.5 s: quiet
+leave(3500);arrive(4000);run(4300);out.push(fires);                 // a new arrival
+leave(6000);arrive(7000);leave(7050);run(7400);out.push(fires);     // left inside the 140 ms: nothing fires
+calm=true;leave(9000);arrive(10000);run(10400);out.push(fires,quiet,ant);
+process.stdout.write(JSON.stringify(out));
+"""
+    try:
+        return _node_json(fns + src, "arrive555.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b3_arrival(js, css):
+    r = _b3_arrival_run(js)
+    sky = _jsfn(js, "function hzSkyBoot(){")
+    return (r == [0, 1, 1, 1, 2, 2, 2, 2, 3]
+            # the hang: the breath dims to .92 in 140 ms and the clock to a tenth, back by 500 ms; the settle 1600-2600 ms
+            and "return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<1600?.92:.92+.08*ease(1600,2600,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];" in sky
+            # the field's stars: nine tenths on a hard ease-out in 420 ms, the last tenth floating on the smootherstep
+            and "e=.9*(u1>=1?1:1-Math.pow(2,-10*u1))+.1*ss5(u2);" in sky
+            # the matrix's sweep out from the knob, then the wave up to the greeting from 360 ms (1.1 s, in-out)
+            and "if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=n+360;" in sky and "const u=(nowT-MX.up)/1100;" in sky
+            # the aurora's swell x^2 e^(2(1-x)), peak at 1 s; the twist 5.5 deg on a smootherstep over 1.6 s, springing back
+            and "env=sx<7?sx*sx*Math.exp(2*(1-sx)):0" in sky and "UTW_DEG=5.5,UTW_S=1.6" in sky
+            # the greeting's rim light rides the hang (Full 1.16 s at full, Balanced .86 s at half), fades over 1.2 s
+            and 'g.style.setProperty("--hz-rim-a",full?"1":".5");g.classList.add("hz-rim");' in js and "},full?1160:860);" in js
+            and '.hz #hero .greet::after{content:attr(data-g);position:absolute;inset:0;z-index:-1;pointer-events:none;color:transparent;-webkit-text-fill-color:transparent;\n  text-shadow:0 -1px 0 rgba(214,230,255,.9),0 -1px 3px rgba(170,200,255,.3);opacity:0;transition:opacity 1.2s ease}' in css
+            and ".hz #hero .greet.hz-rimglide::after{opacity:.55;" in css and "animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) both}" in css
+            and 'if(hzS.effI!==4||hzFxLevel()!=="full"||!hzMotionOK()||document.documentElement.classList.contains("hz-pause"))return;' in js   # the rest glide: Full, live
+            and "if(!hzS.rimI)hzS.rimI=setInterval(hzRimGlide,16000);" in js
+            and ".hz.hz-calm #hero .greet::after,.hz .novideo #hero .greet::after{display:none}" in css and "@media (prefers-reduced-motion:reduce){.hz #hero .greet::after{display:none}}" in css)
+check("6b555 Ultra's arrival with its hang: once per arrival (140 ms of held breath, then the release; a return within 1.5 s quiet; leaving inside the breath fires nothing; never in Calm), the stars' float at the top of their arc, the matrix's wave, the aurora's swell, the twist, the greeting's rim light (no sideways offset, under the letters, no loop; the rest glide Full only); the mutants are caught",
+      _b3_arrival(_hz_js, _hz_css)
+      and not _b3_arrival(_hz_js.replace("if(!hzUltraGate(now,hzS.ultraAt||0,!!hzS.ultraDrag,dragging))", "if(false)"), _hz_css)                     # every return fires
+      and not _b3_arrival(_hz_js.replace("hzS.fireT=0;if(hzS.effI!==4||!hzUltraFx())return;", "hzS.fireT=0;"), _hz_css)                         # fires after leaving
+      and not _b3_arrival(_hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,140);", "hzUltraFire();"), _hz_css)                                   # no held breath
+      and not _b3_arrival(_hz_js.replace("+.1*ss5(u2);", "+.1*u2;"), _hz_css)                                                                  # no float: a linear landing
+      and not _b3_arrival(_hz_js, _hz_css.replace("text-shadow:0 -1px 0 rgba(214,230,255,.9),", "text-shadow:2px -1px 0 rgba(214,230,255,.9),"))   # a sideways double
+      and not _b3_arrival(_hz_js, _hz_css.replace("animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) both}", "animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) infinite}")), "")   # the rim looping
+# NO CIRCLES, NO RAINBOW, NO SHINE in what beta 3 added for the sky and Ultra: no round radius, radial gradient, ellipse,
+# ring or disc in its css; Ultra's stars white and ice (the faintest violet), no gold or rose; the fill's dots on Ultra only
+def _b3_shapes(js, css):
+    blk = re.sub(r"/\*.*?\*/", "", css[css.index("/* THE STARS ABOVE THE BOX, THE DOT MATRIX, THE STAR SIGNS"):css.index("/* the fill at Ultra: the one cool pair")], flags=re.S)
+    cols = re.findall(r'"(#[0-9a-f]{6})"', js[js.index("const HZ_UCOL=["):js.index("].map(hzHexRGB);")])
+    hz = [_sl549_hue(tuple(int(c_[i:i + 2], 16) / 255 for i in (1, 3, 5))) for c_ in cols]
+    return (not re.search(r"border-radius:\s*(50%|9{2,}px|100%)|radial-gradient|ellipse|circle", blk)
+            and len(cols) == 8 and all(ch_ < .2 or 200 <= h_ <= 285 for h_, ch_ in hz)
+            and _arr553_colours_ok(blk) and _arr553_shapes_ok(blk)
+            and ".hz.hz-ultra .hz-sl-led::before{opacity:.16}" in blk and ".hz .hz-sl-led::before,.hz .hz-sl-led::after{content:\"\";position:absolute;inset:0;opacity:0;" in blk   # dots at Ultra only
+            and ".hz.hz-calm.hz-ultra .hz-sl-led::after,.hz .novideo .hz-sl-led::after{opacity:0;animation:none}" in blk                        # Calm: the dots, still
+            and '<i class="hz-sl-fill"></i><i class="hz-sl-led"></i>' in js
+            and "#hz-fxgl{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:40}" in blk)
+check("6b555 no circles, no rainbow in the beta 3 sky and Ultra: no round radius, radial gradient, ellipse or ring in its css, the stars white and ice (the faintest violet), the fill's dots at Ultra only and still in Calm; the burst's canvas takes no pointer; the mutants are caught",
+      _b3_shapes(_hz_js, _hz_css)
+      and not _b3_shapes(_hz_js, _hz_css.replace("#hz-fxgl{position:fixed;", ".hz .hz-sl-led{border-radius:50%}\n#hz-fxgl{position:fixed;"))
+      and not _b3_shapes(_hz_js, _hz_css.replace(".hz.hz-ultra .hz-sl-led::before{opacity:.16}", ".hz.hz-ultra .hz-sl-led::before{opacity:.16;background:radial-gradient(circle,#fff,transparent)}"))
+      and not _b3_shapes(_hz_js.replace('"#d9d4ff","#ffffff"].map(hzHexRGB)', '"#ffd27a","#ffffff"].map(hzHexRGB)'), _hz_css)                     # a gold star
+      and not _b3_shapes(_hz_js.replace('"#d9d4ff","#ffffff"].map(hzHexRGB)', '"#f2a6b4","#ffffff"].map(hzHexRGB)'), _hz_css)                     # a rose star
+      and not _b3_shapes(_hz_js, _hz_css.replace(".hz.hz-ultra .hz-sl-led::before{opacity:.16}", ".hz .hz-sl-led::before{opacity:.16}")), "")   # the dots below Ultra
+# A WHOLE STREAMED ANSWER THROUGH THE REAL PAGE (per the beta-2 dripOff bug: every answer ended with "Couldn't send.
+# dripOff is not defined", and no check drove a send): headless Chromium (Playwright's, --use-mock-keychain) over the
+# DevTools protocol with node's own WebSocket, the copy's own page, /api/chat a stand-in stream (a status, a draft, a
+# RESET, the polish); the answer must land whole, with no page error and no "Couldn't send". The mutant (the declaration
+# back inside the try, served in place of the page) must be caught.
+_B3_CDP = r'''// A FULL STREAMED ANSWER THROUGH THE REAL PAGE (6b555, per the beta-2 dripOff bug): headless Chromium driven over the
+// DevTools protocol (no packages: node's own WebSocket), the page served by the copy, /api/chat a stand-in stream (a
+// status, a draft, a RESET, the polish, as a real one arrives), then the landing. Prints {landed, text, errs, sent}.
+// argv: <chromium> <base> <cookie name> <key> <token> <fx> [mutation.json: {"from":..., "to":...} applied to the page]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, fx, mutf] = process.argv.slice(2);
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-cdp-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { landed: false, text: "", errs: [], sent: false };
+const done = code => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(code); };
+setTimeout(() => { out.errs.push("timeout"); done(0); }, 90000);
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await new Promise(r => setTimeout(r, 100)); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(0); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Runtime.consoleAPICalled" && msg.params.type === "error") out.errs.push("console: " + msg.params.args.map(a => a.value || a.description || "").join(" ").slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      out.mutated = (out.mutated || 0) + 1; if (mut) for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing"); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});}catch(e){}
+    (function(){const real=window.fetch.bind(window);window.__sent=0;
+      window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){window.__sent++;
+        const enc=new TextEncoder(),NUL=String.fromCharCode(0),plan=[];let t=120;
+        const push=s=>{const w=s.split(/(?<=\\s)/);for(let i=0;i<w.length;i+=3){plan.push([t,w.slice(i,i+3).join("")]);t+=40;}};
+        plan.push([0,NUL+"STATUS:Thinking"+NUL]);
+        push("Light from the Moon takes about 1.3 seconds to reach Earth. ");t+=300;plan.push([t,NUL+"RESET"+NUL]);t+=50;
+        push("Moonlight takes about **1.28 seconds** to reach us.\\n\\nThe trip runs from 1.21 s to 1.35 s over the month. Stand-in answer complete.");
+        const body=new ReadableStream({start(c){for(const [at,s] of plan)setTimeout(()=>c.enqueue(enc.encode(s)),at);setTimeout(()=>c.close(),t+100);}});
+        return Promise.resolve(new Response(body,{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","X-Models":"stand-in","X-Web-Search":"0"}}));}
+        return real(u,o);};})();`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  let ready = false; for (let i = 0; i < 150 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&!!document.querySelector("#send")&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await new Promise(r => setTimeout(r, 1200));
+  await ev(`(()=>{const i=document.querySelector("#input");i.focus();i.value="How long does moonlight take to reach us?";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+  for (let i = 0; i < 200; i++) { await new Promise(r => setTimeout(r, 150));
+    const st = await ev(`(()=>{const a=[...document.querySelectorAll(".msg.ai")].pop();return {sent:window.__sent,live:a?a.classList.contains("live"):null,text:a?a.innerText:"",page:/Couldn.t send/.test(document.body.innerText+" "+[...document.querySelectorAll("textarea,input")].map(x=>x.placeholder).join(" ")),ph:(document.querySelector("#input")||{}).placeholder}})()`);
+    if (!st) continue; out.sent = st.sent > 0; out.text = st.text; out.couldnt = st.page;
+    if (st.live === false && st.text.indexOf("Stand-in answer complete") >= 0) { await new Promise(r => setTimeout(r, 1500)); const s2 = await ev(`({t:[...document.querySelectorAll(".msg.ai")].pop().innerText,c:/Couldn.t send/.test(document.body.innerText+" "+[...document.querySelectorAll("textarea,input")].map(x=>x.placeholder).join(" ")),ph:(document.querySelector("#input")||{}).placeholder})`); out.text = s2.t; out.couldnt = s2.c; out.ph = s2.ph; out.landed = true; break; }
+    if (st.page) { out.couldnt = true; out.ph = st.ph; break; } }
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _b3_chromium():
+    import glob as _g
+    for pat in ("~/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-mac-arm64/chrome-headless-shell",
+                "~/Library/Caches/ms-playwright/chromium_headless_shell-*/chrome-mac/headless_shell",
+                "~/Library/Caches/ms-playwright/chromium-*/chrome-mac-arm64/Chromium.app/Contents/MacOS/Chromium",
+                "~/Library/Caches/ms-playwright/chromium-*/chrome-mac/Chromium.app/Contents/MacOS/Chromium"):
+        hits = sorted(_g.glob(os.path.expanduser(pat)))
+        if hits:
+            return hits[-1]
+    return None
+def _b3_stream(fx, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="b3cdp-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_B3_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, fx]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation)); args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=120)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b3_landed_ok(r):
+    return (not r.get("err") and r.get("sent") and r.get("landed") and r.get("couldnt") is False and not r.get("errs")
+            and "Moonlight takes about 1.28 seconds to reach us." in r.get("text", "") and "Stand-in answer complete." in r.get("text", "")
+            and "Light from the Moon" not in r.get("text", ""))                                     # the draft gave way to the polish
+_b3_s_bal = _b3_stream("balanced"); _b3_s_full = _b3_stream("full")
+_b3_s_mut = _b3_stream("balanced", [["  let dripOff=false;\n", ""], ["let dripShown=0,dripOn=false,", "let dripShown=0,dripOn=false,dripOff=false,"]])
+check("6b555 a whole streamed answer through the real page (headless Chromium, a stand-in /api/chat: status, draft, RESET, polish) lands in Balanced and in Full with no page error and no \"Couldn't send\"; with dripOff declared inside send's try again (the beta-2 bug, served in place of the page) it is caught",
+      _b3_landed_ok(_b3_s_bal) and _b3_landed_ok(_b3_s_full)
+      and _b3_s_mut.get("mutated") == 1 and _b3_s_mut.get("couldnt") is True and "dripOff is not defined" in (_b3_s_mut.get("ph") or ""),
+      json.dumps({"bal": _b3_s_bal, "full": _b3_s_full, "mut": _b3_s_mut})[:900])
+# ==== beta-3 the sky and Ultra (6b555): end ====
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
