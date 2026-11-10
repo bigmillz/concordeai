@@ -20242,3 +20242,86 @@ of the inner `let`. The gauntlet never drove a whole send through the page, whic
 Check: "send: no name declared inside its try is assigned after it" collects every `let`/`const` declared on a 4-space
 line inside send's try and fails if one is assigned on a 2-space line after it closes; its mutant (the old placement)
 is caught. Follow-up worth doing: a gauntlet check that drives a full streamed answer through the real page.
+
+## 6b555 — beta-3: the design preview's whole look in the app (7.0 beta 3, per Patrick: "start beta 3 now")
+
+Source of truth: the friend page (`scratchpad/preview-site/beta/index.html` and `beta/DESIGN.md`, including the
+aurora's final wavy edge, its greeting guard and sidebar dim, taken from the working copy at the cut). Horizon only;
+Classic untouched (one shared change: the Space Grotesk link is the variable 300..700, the same file). Two halves: the
+chrome (a helper, branch `beta-3-chrome`, renumbered 6b554 -> 6b555 at the merge since the dripOff hotfix took 6b554)
+and the sky and Ultra.
+
+**The chrome.** The composer flat and low: 99 px at rest (padding 13/14/12/16, one 26 px line, a 10 px gap, the 36 px
+row), typed text grows it to 156 px then it scrolls, `hzBalance` keeps its centre at the golden point (within 0.4 px at
+1280/1440/2000); the one glass (blur 30, saturate 108, the top highlight, the inner foot shadow). Keys flat at every
+level: send neutral glass when empty, ember with the night's arrow with text (5.2:1), every row key and lane presses
+1 px and to .985 in 80 ms (`hzSendPress` the same); the mic's listening state a plain fill. Keyboard-only focus
+(`html.hz-kb`, set by Tab/arrows/Home/End/Page, cleared by any pointer press; also the slider's ring after a click). The
+lanes once: the header's sliding glass segmented control (`.hz-seg-hi`, 200 ms on --out, Funnels' star twinkling on hover
+only); the sidebar's `#mode-tabs` hidden under `.hz` (Classic keeps them); the per-lane sidebar panels unchanged. The ink:
+each new word its own box held at its rest width read before the weight moves, weight 320 -> 400 in 280 ms (bold and
+headings 450 -> 600), the wet-ink light gone in 300 ms, `text-wrap: wrap` and no kerning while live (0 words moved,
+CLS <= 0.0006 in headless Chromium); the polish dims to .12 with a 1.5 px blur in 220 ms and shimmers in over 620 ms
+(Calm a 400 ms fade); the per-passage word diff is not ported (the polish streams in). The greeting one node at every
+level, traced in Balanced and Full, then the still two-layer afterglow (close glow 16/34 px, the `::before` bloom at
+.66/.78 touched 22 % by `--hz-hour-light`), tracking -.03em (-.02em on a phone). The sidebar in the glass, 248 wide,
+32 px rows, mono caps day labels with the dark halo. Tokens set to DESIGN (night #030305, no bounce anywhere).
+
+**The sky (hzSkyBoot, rewritten from the preview's Sky; the app's real stars, the Moon's real side, the Apple aerials,
+Calm's one still frame and the 15 fps hold while a local engine writes all kept).** The ground near-black all day
+(`HZ_SKYCOL` 3,3,5 / 4,4,6 / 7,7,10); the hour lives in the footage's grade (`HZ_MOODS`: night silver, dawn rose-gold,
+day soft sky, dusk amber, 62-66 % real colour kept, turning at 5:30/7:30/17:30/19:30 over 20 minutes, eased over 2 s;
+`--hz-hour-light` set from it). Three layers of stars with a core and a halo, the brightest with faint spikes; the
+vignette, the toe, the blue-noise dither, exposure x .9, the 4 x 3 px drift. No flashes: the trails' attack limiter (.8
+of full scale a second) runs in Balanced too, unseen; the knee. The loop seam is the preview's: through the clip's last
+second the sky keeps the newest frame (`hzS.seamOut`), and on the restart's seek dissolves from it into the new start
+over 1.4 s (`S.dissolve`); beta 2's fade through black (`footTo` 0 then 1) is gone. The aurora: level (the CSS curtains
+no longer turn or skew: they slide +-48/44 px, and the sky slides their layer with the wander), wandering 10-25 % on
+60-120 s legs, width .22-.38, folds, the wavy lower edge with each ray at its own depth, a reach that breathes, a smooth
+floor 36 px above the composer, crests rounding off under the greeting, dimmed 60 % behind the open sidebar, a split every
+2-4 minutes, blue at the edge to violet at the tips, at resting Ultra 20 % stronger by measured luminance and leaning
+violet; Balanced 1.6 x slower and half; Calm and reduced motion still and centred.
+
+**Ultra (replacing 6b553's DOM field, burst and shooter; not stacked).** On the GPU (`hzPfxProgram`, pooled quads, no
+DOM): the field above the box (`hzUFieldPlan`, pure: 40 in Full, 20 in Balanced, half in a conversation's strip, four
+glints in Full and two in Balanced on the home, four in ten on the matrix's 11 px grid, every star kept inside the band),
+drifting up 4 px/s with its own twinkles; the dot matrix in the sky's shader (1.8 px dots, 11 px pitch, linear sweeps
+at 180 px/s every 3.4-4.6 s, half in Balanced); the star signs (every 20-30 s, 4-6 near-layer stars joined star to star
+by their minimum spanning tree, a travelling light at each head); the arrival's constellation; shooting stars beside the
+column and in the band; meteor showers every 60-90 s (110-130 s in Balanced); the chandelier; the edge rain. The burst
+(`hzBurstBoot`, its own canvas above the glass, `#hz-fxgl`, no pointer): 120 stars from the knob (60 in Balanced) and the
+knob's glint. THE HANG: `hzIgnite` keeps the gate (once per arrival, 1.5 s, once per drag), calls the sky's
+`anticipate()` (exposure to .92 in 140 ms, the sky's clock to a tenth, back by 500 ms, settle 1.6-2.6 s), and
+`hzUltraFire` releases 140 ms later (nothing if Ultra was left in between): the rush (56 px), the edge (from 40 ms into the
+release), the kick (Full, 1 -> 1.012 -> 1 in 360 ms on the in-out), the label's fast sweep, the sky's surge, sweep band,
+matrix sweep and wave, the field's launch (nine tenths on a hard ease-out in 420 ms, the last tenth floating on the
+smootherstep), the 5.5 deg twist; the greeting's rim light (a `data-g` copy under the letters, a 1 px upward ice shadow,
+no sideways offset) rises as the wave arrives (Full 1.16 s at full, Balanced .86 s at half). Resting Ultra: the rim's
+comet (Full) and the glow strip (now 52 px, 5 % in) stay; the fill's glint is gone for the dot texture and the LED
+marquee (`.hz-sl-led`, named apart from `.hz-sl-dot` so the notch pins keep their meaning), every 2.5 s in step with the
+label's sweep; the rim glide across the greeting every 16 s (Full). The sweep band's rise was the preview's 56 ms; it is
+210 ms here (a flash otherwise). Not ported: the preview's DOM motes round the composer and the knob's .97 settle (the
+6b553 pins keep script and animation off the knob). Fixed on the way: the send key stayed ember after send emptied the
+box (`hasText` was never re-run on the programmatic clear).
+
+**Gauntlet.** Re-pinned at the same strength, with mutants: HORIZON (the level), 6b540 (the eased neon), 6b542 (the sky by
+level, three new mutants), 6b544 (the loop count re-reasoned to 6), 6b552 (the field's plan run in node: counts, glints,
+the band, the grid; five new mutants), 6b553 arrival (the gate, the breath before the release, the GPU burst; four new
+mutants) and living (the field's drift and twinkle, the shooters' clocks, no disc in the star shader, the marquee's
+pause; new mutants), the seam (no dip, one dissolve; four new mutants). New section "beta-3 the sky and Ultra (6b555)":
+the sky (nine mutants), the arrival's hang run in node over a sequence (six mutants), no circles or rainbow (five
+mutants), and a whole streamed answer driven through the real page: headless Chromium over the DevTools protocol (node's
+own WebSocket, no packages), a stand-in /api/chat (status, draft, RESET, polish), landing in Balanced and Full with no
+page error and no "Couldn't send"; the dripOff mutant (served in place of the page) is caught. The chrome's section
+"beta-3 the chrome (6b555)" (seven checks with mutants: the composer's height, no shine, one lane control, the
+keyboard-only ring, the ink, no rings, the tokens). "mobile drawer present and openable" pins one `max-width:760px`
+block: the chrome's drawer rule moved inside it.
+
+**Measured.** Headless Chromium (Metal ANGLE) and a real WKWebView (a Swift harness against a dev copy, and the built
+shell's own window): no page errors; no sideways scroll at 2000, 1440, 1280 and 390; 60 Hz rAF p95 16.7 ms in Chromium,
+19 ms in WKWebView on screen at Ultra rest (both cap at 60 Hz here: 120 Hz not measurable). Contrast, Full at Ultra
+with the aurora's reach held low (`?hz=time=...,aurlow=1`, over the hour's graded footage): greeting 3.8:1 at noon and
+4.0:1 at night (large text, against its own afterglow), lanes >= 5.0, the mode chip >= 9.3, "Ultra" >= 8.2. Flashes
+(per-region luma, 8 x 5 regions, 60 fps screen recording of the WKWebView window): at rest under Ultra 1.0/255 within
+200 ms; during the arrival 21.8/255 round the composer's top edge (the edge bloom and the burst: the preview's designed
+smash). Known: on a phone the composer is 133 px (the effort wraps to its own row; 95 needs one row control fewer).
