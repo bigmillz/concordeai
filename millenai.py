@@ -10217,7 +10217,7 @@ def _channel_release():
             # the one rolling nightly (6b285) — if it is missing, the
             # newest release of any kind is the honest fallback. Its body
             # is a list of commit subjects, so it carries the newest
-            # numbered release's notes for people to read (6b550)
+            # numbered release's notes for people to read (6b551)
             human = next((x.get("body") or "" for x in rels
                           if x.get("tag_name") != "nightly"
                           and (x.get("body") or "").strip()), "")
@@ -10240,7 +10240,7 @@ def _channel_release():
 _chk_cache = {"ts": 0.0, "data": None, "beta": None, "chan": None}
 
 
-# WHAT'S NEW ON A NIGHTLY (6b550, per Patrick: the About pane listed "beta-1 gauntlet: the
+# WHAT'S NEW ON A NIGHTLY (6b551, per Patrick: the About pane listed "beta-1 gauntlet: the
 # MLX engine's boot-order pin…"). The nightly release's body is the workflow's commit
 # subjects, written for us, not for people. A nightly shows the newest numbered release's
 # notes instead, or one plain line when there are none to read; never a commit subject.
@@ -10389,7 +10389,7 @@ _whatsnew_cache = {}
 
 def whats_new(prev: str) -> dict:
     """The notes for THIS build, for the post-update dialog (6b288).
-    Nightly (6b550): the newest numbered release's notes, or one plain
+    Nightly (6b551): the newest numbered release's notes, or one plain
     line; its commit subjects (the rolling release's body, the compare
     API) were written for us and are never shown. Stable/beta: OUR
     release by tag — never the channel's newest, which may be a
@@ -10410,7 +10410,7 @@ def whats_new(prev: str) -> dict:
     try:
         if APP_NIGHTLY:
             # a nightly: the newest numbered release's notes, or one plain
-            # line; never its commit subjects (6b550)
+            # line; never its commit subjects (6b551)
             try:
                 rels = _get("releases?per_page=20")
                 notes = next(((x.get("body") or "")[:4000] for x in rels
@@ -52735,7 +52735,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}
 @media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}
   .hz .hz-new,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
-/* ---- SETTINGS LOOK (6b550, per Patrick: "It looks perfect as far as layout, but it doesn't match our
+/* ---- SETTINGS LOOK (6b551, per Patrick: "It looks perfect as far as layout, but it doesn't match our
    current look"). The same rail and pane, in the front's language (beta/DESIGN.md): one neutral glass
    over a black scrim, champagne hairlines, Space Grotesk 14 for rows and 13 for notes, mono 11 caps for
    labels, keys of 36 at radius 8, the 8 px grid. Few choices are the front's segmented control (a lit box
@@ -52805,7 +52805,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;
   min-height:48px;margin:0;padding:8px 0;border-top:1px solid var(--sl-hair);font:400 14px/1.4 var(--sl-ui);font-style:normal;color:var(--sl-ink)}
 .hz #about-veil .toggle-row{flex-direction:row-reverse;cursor:pointer}
-.hz #about-veil #p-about #fx-toggle{display:none}   /* one Effects control: Calm is the old Off (6b550) */
+.hz #about-veil #p-about #fx-toggle{display:none}   /* one Effects control: Calm is the old Off (6b551) */
 .hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span{color:var(--sl-ink);font-size:14px}
 .hz #about-veil .toggle-row:hover>span{color:#fff}
 .hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #sugg-note,.hz #about-veil #autoclean-note{font-size:13px;line-height:1.5;color:var(--sl-ink3);margin:-8px 0 0;padding:0 0 16px}
@@ -53662,7 +53662,7 @@ __CODE_ROWS__
       <button class="about-btn" id="about-check">Check now</button>
       <!-- 6b285: three channels. Stable is the default; Beta
            (value "beta", kept for saved prefs; "Prerelease" from 6b318,
-           "Beta" again in 6b550 per Patrick, to match the website and the
+           "Beta" again in 6b551 per Patrick, to match the website and the
            release names) gets the betas and RCs; Nightly follows the rolling
            "nightly" release that GitHub Actions rebuilds on every push
            to main. -->
@@ -54535,7 +54535,7 @@ function setVideo(on){
   noVideo=!on; document.body.classList.toggle("novideo",noVideo);
   const t=$("#fx-toggle");if(t)t.classList.toggle("on",on);
   localStorage.setItem("millen.video",on?"1":"0");
-  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b550)
+  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b551)
   if(globalThis.hzReady){hzPauseSync();if(on)hzMediaBoot();hzFxApply();}   // Horizon's sky follows the switch (6b526); the Effects level reads it (6b542)
   const v=$("#sky-color");
   if(!on){if(v&&!v.paused)v.pause();}
@@ -64309,7 +64309,7 @@ async function openAbout(){
   // whichever pane it was closed on
   if(aboutVeil.hidden)settingsPane("p-about");
   aboutVeil.hidden=false;
-  if(typeof slSelAll==="function")slSelAll();   // a look changed to Horizon since load draws its controls now (6b550)
+  if(typeof slSelAll==="function")slSelAll();   // a look changed to Horizon since load draws its controls now (6b551)
   paintAccount();                    // the Account pane (6b257)
   try{
     const pr=await(await api("/api/prefs")).json();
@@ -65345,7 +65345,7 @@ async function paintUpdatesPane(){
     if(r.notes){
       nb.hidden=false;
       nb.innerHTML='<p><b>What’s new'
-        +(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);   // a nightly's notes are the last release's (6b550)
+        +(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);   // a nightly's notes are the last release's (6b551)
     }else nb.hidden=true;
   }catch(e){}
 }
@@ -65362,7 +65362,7 @@ async function paintAccount(){
   const K={owner:["💻","Owner",
              "Local account. Everything stays on your machines."]};
   const row=K[me.kind]||K.owner;
-  // Horizon draws a line icon where Classic has its emoji (6b550)
+  // Horizon draws a line icon where Classic has its emoji (6b551)
   if(typeof document!=="undefined"&&document.documentElement&&document.documentElement.classList.contains("hz"))$("#acct-av").innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 19.5c1.2-3.3 3.9-5 7-5s5.8 1.7 7 5"/></svg>';
   else $("#acct-av").textContent=row[0];
   $("#acct-kind").textContent=row[1];
@@ -67106,7 +67106,7 @@ function hzInit(){
   }
 }
 hzInit();
-/* ---- SETTINGS LOOK (6b550, per Patrick). Under Horizon no <select> in Settings shows bare: each stays in
+/* ---- SETTINGS LOOK (6b551, per Patrick). Under Horizon no <select> in Settings shows bare: each stays in
    the page with its id, its value and its listeners, hidden (.sl-native), and beside it is drawn the front's
    segmented control (two to four short choices: Update channel, Look, Effects) or a glass menu (more, or
    longer: the usage period and model, the cloud provider, the benchmark's runs). A pick sets the select
@@ -67209,7 +67209,7 @@ function slPopOpen(sel,btn){
   if(on){on.focus({preventScroll:true});if(on.scrollIntoView)on.scrollIntoView({block:"nearest"});}
 }
 function slSelAll(){if(slOn())$$("#about-veil select").forEach(slSel);}
-/* ONE EFFECTS CONTROL (6b550; settings-2's call, 6b547): under Horizon, Effects alone decides and the old
+/* ONE EFFECTS CONTROL (6b551; settings-2's call, 6b547): under Horizon, Effects alone decides and the old
    Visual effects switch (#fx-toggle, the stills switch) is hidden. Calm is the old Off: it stops the moving
    backdrop; Balanced and Full turn it back on. Classic, which has no levels, keeps its switch. */
 function slFxFold(lv){

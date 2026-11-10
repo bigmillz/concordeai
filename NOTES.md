@@ -19673,7 +19673,7 @@ mutant), the corner's full-screen rule, the home pill's absence, the menu's Impo
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
 
-## 6b550 — settings-look: Settings in the front's look, the same layout (7.0 beta, per Patrick)
+## 6b551 — settings-look: Settings in the front's look, the same layout (7.0 beta, per Patrick)
 
 Patrick, on the nightly's Settings › About: "I don't like this settings dialog. It looks perfect as far as
 layout, but it doesn't match our current look." The look is the friend page's (`concordeai-preview/beta/DESIGN.md`):
@@ -19688,7 +19688,7 @@ control, and its 25 approved copy pairs (`scratchpad/settings2/tools/copy_pairs.
 loopback and "Rent one in the cloud" calls belong to Add a computer, which is only on settings-2, so nothing here.
 settings-2 stays unmerged; merging it later replaces this layout.
 
-**The look (CSS, the `SETTINGS LOOK (6b550)` block at the foot of the Horizon CSS; Horizon only, Classic keeps
+**The look (CSS, the `SETTINGS LOOK (6b551)` block at the foot of the Horizon CSS; Horizon only, Classic keeps
 its own Settings).**
 - *The backdrop* a black scrim (`rgba(3,3,5,.72)`, blur 12, saturate 40 % so the sky's blue doesn't come
   through); *the panel* one dense neutral glass (`rgba(8,8,10,.86)` under a white .06 → .025 gradient), radius
@@ -19712,7 +19712,7 @@ its own Settings).**
 - Usage, Benchmark, Models, Cloud, Servers: cards in the same glass (radius 8, `--hair`), small figures up to 12,
   the server form one column, the set cards' "Yours" tag on a solid chip.
 
-**Segmented controls and menus (JS, the `SETTINGS LOOK (6b550)` block before HORIZON end).** `slSel` draws each
+**Segmented controls and menus (JS, the `SETTINGS LOOK (6b551)` block before HORIZON end).** `slSel` draws each
 select in `#about-veil` (Horizon only): up to four short choices (≤ 28 characters together) are the front's
 lanes control — a glass box radius 6, a lit box radius 4.5 that slides between equal segments in 200 ms on
 `--out`, labels `--ink3` → `--ink`, arrow keys, Home, End; anything longer a glass menu (`#sl-pop`, rows of 32,
@@ -19741,7 +19741,7 @@ the Account avatar a line icon instead of 💻 under Horizon; the stale pointers
 **Gauntlet.** Re-pinned at the same strength: the Owner line, the roster's "On this computer", the studio's
 "on this computer", the suggestions note, the cloud paragraph, the swept pointers (13 pins), the notes source
 (`_release_notes` twice, its def), `_check_update_live`'s exec list. The PC-words check follows the approved copy ("Setting up.", "On this computer"); `HTMLSelectElement`
-joins the page's host names (the controls watch a select's own setters). New (`# ==== settings-look (6b550)`), each
+joins the page's host names (the controls watch a select's own setters). New (`# ==== settings-look (6b551)`), each
 with mutants: the glass and the layout kept; no Visual effects beside Effects (the fold run in node); the
 segmented controls and menus (`slKind` run in node over six real option lists); a nightly's What's new never a
 commit subject (`_check_update_live` and `whats_new` run against stand-in releases).

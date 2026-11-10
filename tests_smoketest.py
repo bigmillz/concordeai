@@ -2795,7 +2795,7 @@ _PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Int
 _PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" otherwise; filled before the page is sent
 _PAGE_HOST |= {"Int16Array"}         # 6b543: the page turns captured audio into 16 kHz PCM
 _PAGE_HOST |= {"isNaN"}              # 6b544: the writing star tests its unset position (isNaN is on window in WKWebView, WebView2 and Qt)
-_PAGE_HOST |= {"HTMLSelectElement"}  # 6b550: Settings' controls watch a select's own value and selectedIndex (the prototype's setters)
+_PAGE_HOST |= {"HTMLSelectElement"}  # 6b551: Settings' controls watch a select's own value and selectedIndex (the prototype's setters)
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -7796,7 +7796,7 @@ _mac_page = _pw["pc_words"](_page_src)
 _mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
 check("off a Mac the app says PC; on a Mac nothing changes",
       not _mac_left and _mac_page == _page_src
-      # (6b550) settings-2's approved copy says neither Mac nor PC here: "Setting up." and "On this computer"
+      # (6b551) settings-2's approved copy says neither Mac nor PC here: "Setting up." and "On this computer"
       and '"Setting up. Chat opens when the first model is ready.");' in _pc_page
       and '<div class="ros-gh">On this computer</div>' in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
@@ -9049,7 +9049,7 @@ check("chats: a 61st chat no longer erases the oldest; 1,000 kept, pins always",
 # whole-list saves: see "== chat store (0b) ==" at the end.
 
 # 6b318, per Patrick: the Beta channel read "Prerelease" (it carries the
-# RCs too); 6b550, per Patrick: "Beta" again, as on the website and in the
+# RCs too); 6b551, per Patrick: "Beta" again, as on the website and in the
 # release names ("7.0 beta 1"). The stored value stays "beta", so saved
 # choices still match.
 check("Settings: the channel between Stable and Nightly is called Beta (its value still beta)",
@@ -42748,13 +42748,13 @@ check("6b544 the writing star: one star at the end of the newest text (aimed onc
       and not _star544(page.replace("const dt=s.at?Math.min(64,t-s.at):16;s.at=t;", "const dt=s.at?Math.min(64,t-s.at):16;s.at=t;s.ty=s.el.getBoundingClientRect().top;")), "")    # a layout read per frame
 # ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): end ====
 
-# ==== settings-look (6b550): begin ====
+# ==== settings-look (6b551): begin ====
 # Settings in the front's look (per Patrick: "It looks perfect as far as layout, but it doesn't match our
 # current look"): the same rail and pane in one neutral glass, Horizon only; no Visual effects beside
 # Effects; few choices drawn as the front's segmented control and many as a glass menu, the selects kept;
 # a nightly's What's new never lists commit subjects.
-_sl_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b550"):_MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
-_sl_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b550, per Patrick). Under Horizon"):_MILLENAI_SRC.index("/* ===================================================== HORIZON end (6b526) */")]
+_sl_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b551"):_MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
+_sl_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ---- SETTINGS LOOK (6b551, per Patrick). Under Horizon"):_MILLENAI_SRC.index("/* ===================================================== HORIZON end (6b526) */")]
 
 
 def _sl_glass(css):
@@ -42770,7 +42770,7 @@ def _sl_glass(css):
             and "#10204a" not in css and "#070a16" not in css and "--hz-deep" not in css and "--hz-accent" not in css)
 
 
-check("6b550 Settings look: one neutral glass over a black scrim, champagne hairlines, the classic tokens re-set inside, Space Grotesk titles, Close a key; the mutants are caught",
+check("6b551 Settings look: one neutral glass over a black scrim, champagne hairlines, the classic tokens re-set inside, Space Grotesk titles, Close a key; the mutants are caught",
       _sl_glass(_sl_css) and _hz_scoped(_sl_css)
       and not _sl_glass(_sl_css.replace(".hz #about-veil{background:rgba(3,3,5,.72);", ".hz #about-veil{background:rgba(7,10,22,.72);"))
       and not _sl_glass(_sl_css + ".hz #about-veil #set-rail{background:var(--hz-deep)}")
@@ -42789,7 +42789,7 @@ def _sl_onefx(css, js, pg):
             and 'const lv=hzFxLevel();if(!on&&lv!=="calm")setFxLevel("calm");else if(on&&lv==="calm")setFxLevel("balanced");' in js
             and 'const fsel=$("#fx-level");if(fsel)fsel.addEventListener("change",()=>slFxFold(fsel.value));' in js
             and 'if(slOn()&&typeof noVideo!=="undefined"&&noVideo&&hzFxLevel()!=="calm")setFxLevel("calm");' in js
-            and '  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b550)\n' in pg)
+            and '  if(typeof slFxSync==="function")slFxSync(on);   // under Horizon, Effects says what is on screen (6b551)\n' in pg)
 
 
 # run in node: a pick on the Effects control and the palette's switch keep the level and the stills together
@@ -42807,7 +42807,7 @@ try:
     _sl_fx = _node_json(_sl_fx_js, "slfx.js")
 except Exception as _e:
     _sl_fx = repr(_e)
-check("6b550 no Visual effects beside Effects: under Horizon the switch is hidden and folded in (Calm is the old Off; Balanced and Full bring the backdrop back; the palette's switch moves the one control), Classic keeps it; the mutants are caught",
+check("6b551 no Visual effects beside Effects: under Horizon the switch is hidden and folded in (Calm is the old Off; Balanced and Full bring the backdrop back; the palette's switch moves the one control), Classic keeps it; the mutants are caught",
       _sl_onefx(_sl_css, _sl_js, page)
       and _sl_fx == [["calm", "calm", True], ["full", "full", False], ["balanced", "balanced", False],
                      ["switch off", "calm", True], ["switch on", "balanced", False]]
@@ -42842,7 +42842,7 @@ try:
     _sl_kind = _node_json(_sl_kind_js, "slkind.js")
 except Exception as _e:
     _sl_kind = repr(_e)
-check("6b550 segmented controls: Update channel, Look and Effects are the front's control (a lit box that slides), the usage period, the model and the cloud provider glass menus; every select keeps its id, value and handler; the mutants are caught",
+check("6b551 segmented controls: Update channel, Look and Effects are the front's control (a lit box that slides), the usage period, the model and the cloud provider glass menus; every select keeps its id, value and handler; the mutants are caught",
       _sl_segs(_sl_css, _sl_js) and _sl_kind == ["seg", "seg", "seg", "menu", "menu", "menu"]
       and '<select id="upchan"><option value="stable">Stable</option>' in page and '<select id="fx-level"><option value="calm">Calm</option>' in page
       and '<select id="look-sel"><option value="horizon">Horizon</option>' in page and '<select id="us-range" aria-label="Time period">' in page
@@ -42883,7 +42883,7 @@ _sl_n2 = _sl_upd({"tag_name": "nightly", "name": "ConcordeAI 7.0 nightly 38f247b
 _sl_b1 = _sl_upd({"tag_name": "v278", "name": "7.0 beta", "body": _SL_HUMAN, "assets": []}, nightly="")
 _sl_w1 = _sl_wn([{"tag_name": "nightly", "body": _SL_COMMITS}, {"tag_name": "v278", "body": _SL_HUMAN}])
 _sl_w2 = _sl_wn([{"tag_name": "nightly", "body": _SL_COMMITS}])
-check("6b550 a nightly's What's new never lists commit subjects: the last release's notes, else one plain line (About and the post-update card, run against stand-in releases); a numbered release keeps its own notes",
+check("6b551 a nightly's What's new never lists commit subjects: the last release's notes, else one plain line (About and the post-update card, run against stand-in releases); a numbered release keeps its own notes",
       _sl_n1.get("notes") == _SL_HUMAN and _sl_n2.get("notes") == "Latest changes from the 7.0 line."
       and _sl_b1.get("notes") == _SL_HUMAN
       and _sl_w1.get("notes") == _SL_HUMAN and _sl_w2.get("notes") == "Latest changes from the 7.0 line."
@@ -42892,7 +42892,7 @@ check("6b550 a nightly's What's new never lists commit subjects: the last releas
       and 'cmp_ = _get("compare/' not in _MILLENAI_SRC and '"- " + x for x in subs' not in _MILLENAI_SRC
       and '+(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")' in page,
       "%r" % [_sl_n1.get("notes"), _sl_n2.get("notes"), _sl_w1.get("notes"), _sl_w2.get("notes")])
-# ==== settings-look (6b550): end ====
+# ==== settings-look (6b551): end ====
 
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
