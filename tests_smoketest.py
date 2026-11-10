@@ -42817,6 +42817,23 @@ def _sl549_calm_colour(css, pg):
             if hs and max(hs) - min(hs) > 60:
                 return False
     return True
+def _sl549_aurora(js):
+    """per Patrick (the aurora is blue-violet only): every colour the sky's aurora and wash are drawn in (the GL neon's
+    palette and fringe, the canvas curtains, the wash's blooms) is a blue-to-violet hue (200 to 285 deg) or near-white
+    (chroma under .2): no rose, gold, mint or teal"""
+    pals = re.findall(r'vec3 pal\(float t\)\{vec3 a=vec3\(([^)]*)\),b=vec3\(([^)]*)\),c=vec3\(([^)]*)\),d=vec3\(([^)]*)\);', js)   # the neon's curtain and the greeting's trace
+    fr = re.search(r'vec3 c=mix\(vec3\(([^)]*)\),pal\(', js)
+    cur = re.findall(r'hzDrawAuroraLayer\(\w+,\{w:\d+,h:\d+,rgb:"(\d+),(\d+),(\d+)"', js)
+    wash = re.findall(r'bloom\([.\d]+,[.\d]+,[.\d]+,[.\d]+,"(\d+),(\d+),(\d+)",', js)
+    if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 4:
+        return False
+    cols = [tuple(float(v) for v in g_.split(",")) for g_ in [x_ for p_ in pals for x_ in p_] + [fr.group(1)]]
+    cols += [tuple(int(v) / 255 for v in c_) for c_ in cur + wash]
+    for c_ in cols:
+        h_, ch_ = _sl549_hue(c_)
+        if ch_ >= .2 and not (200 <= h_ <= 285):
+            return False
+    return True
 def _sl549_star_bounds(css, js):
     """per Patrick ("be careful with the star that doesn't stick"): the Ultra star is sized from the track (at most
     1.25 x its height), drawn within its own box (tips at the viewBox's edge), its arrival overshoot small enough that
@@ -42911,7 +42928,7 @@ def _sl549(css, js, pg):
             and "if(on&&hzS.kT)return;" in js and "if(!hzUltraFx())return;" in _jsfn(js, "function hzKnobStar(on){") and "},140);" in _jsfn(js, "function hzKnobStar(on){")
             and "hzKnobStar(i===4);" in paint
             and "hz-sl-tst" not in pg                                                       # no stars in the track
-            and _sl549_star_bounds(css, js) and _sl549_field(css, js, pg)
+            and _sl549_star_bounds(css, js) and _sl549_field(css, js, pg) and _sl549_aurora(js)
             # the beam is gone
             and "hz-sl-thumbw" not in pg and "hz-sl-glow" not in pg and "rotate(45deg);transition:transform 120ms ease}" not in pg and "letter-spacing:.14em;text-transform:uppercase" not in css
             # the wire unchanged
@@ -42935,6 +42952,12 @@ check("6b549 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       and not _sl549(_hz_css.replace(".hz.hz-ultra .hz-sl-halo{background:linear-gradient(135deg,#8fb7ff,#a58bff)}", ".hz.hz-ultra .hz-sl-halo{background:#f2a6b4}"), _hz_js, page)
       and not _sl549(_hz_css.replace("conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);", "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);"), _hz_js, page)
       and not _sl549(_hz_css.replace("linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff)", "linear-gradient(90deg,#4fd1ff,#a58bff 50%,#7dff9b)"), _hz_js, page)   # a third hue (cyan to green): no more than one cool pair
+      # the aurora blue-violet only (6b549): its rose back, its mint fringe back, the wash's rose back
+      and not _sl549(_hz_css, _hz_js.replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)"), page)
+      and not _sl549(_hz_css, _hz_js.replace(_jsfn(_hz_js, "async function hzTraceIn(el,opts){"), _jsfn(_hz_js, "async function hzTraceIn(el,opts){").replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)")), page)   # the greeting's trace alone back to rose
+      and not _sl549(_hz_css, _hz_js.replace("vec3 c=mix(vec3(.72,.84,1.),pal(", "vec3 c=mix(vec3(.5,.94,.84),pal("), page)
+      and not _sl549(_hz_css, _hz_js.replace('rgb:"186,176,255",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
+      and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"150,118,255",.4);', 'bloom(.72,.30,.38,.32,"255,118,178",.4);'), page)
       # the anchored star (6b549): twice the track, drawn past its box, a big overshoot, a wide glow, a wide halo
       and not _sl549(_hz_css.replace("width:calc(var(--hz-ph) * 1.25);height:calc(var(--hz-ph) * 1.25)", "width:calc(var(--hz-ph) * 2);height:calc(var(--hz-ph) * 2)"), _hz_js, page)
       and not _sl549(_hz_css, _hz_js.replace("[4,6,8,6].map(n=>hzStarPath(n,10))", "[4,6,8,6].map(n=>hzStarPath(n,14))"), page)

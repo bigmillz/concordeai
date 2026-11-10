@@ -52026,7 +52026,7 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
   --hz-font-display:'Space Grotesk',system-ui,sans-serif;
   --hz-font-read:'Space Grotesk',system-ui,sans-serif;
   --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
-  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:150,236,212;
+  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:186,176,255;
   --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
   --hz-r-composer:26px; --hz-t-drift:28s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
 }
@@ -65750,7 +65750,9 @@ function hzSkyBoot(){
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
-    +"vec3 pal(float t){vec3 a=vec3(.624,.659,1.),b=vec3(1.,.561,.769),c=vec3(1.,.773,.541),d=vec3(.498,.941,.839);t=fract(t)*4.;"
+    // the palette is blue-violet only (6b549, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
+    // violet-blue, each as bright as the pink, gold and mint it replaced, so the light keeps its strength and motion
+    +"vec3 pal(float t){vec3 a=vec3(.62,.74,1.),b=vec3(.76,.66,1.),c=vec3(.82,.88,1.),d=vec3(.68,.68,1.);t=fract(t)*4.;"
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
     +"void main(){vec2 p=vec2(uv.x*asp,uv.y);float t=time*.035;vec3 col=vec3(0.);"
     +"for(int k=0;k<2;k++){float fk=float(k);float x=p.x;"
@@ -65759,7 +65761,7 @@ function hzSkyBoot(){
     +"float rays=smoothstep(.25,.95,fbm(vec2(x*(18.+fk*7.)+wave*2.+t*(1.2+fk*.5),d*.9+t*.2)));"
     +"float body=smoothstep(-.035,0.,d)*exp(-max(d,0.)*(4.+fk*2.)),fringe=exp(-abs(d)*30.)*.8;"
     +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk);"
-    +"vec3 c=mix(vec3(.5,.94,.84),pal(x*.35+t*.15+fk*.3),smoothstep(0.,.08,d));"
+    +"vec3 c=mix(vec3(.72,.84,1.),pal(x*.35+t*.15+fk*.3),smoothstep(0.,.08,d));"
     +"c=mix(c,pal(x*.35+t*.15+fk*.3+.25),smoothstep(.08,.24,d));col+=c*a;}"
     +"col*=smoothstep(0.,.25,uv.x)*smoothstep(1.,.75,uv.x)*smoothstep(.99,.8,uv.y);"
     +"gl_FragColor=vec4(col*neon,1.);}";
@@ -65999,7 +66001,7 @@ function hzDrawAuroras(){
   const r=hzS.rnd,k=0.9+r()*0.25,gain=0.85+r()*0.3,fr=0.8+r()*0.4,ph=r()*6.283,ph2=r()*6.283;
   const w1=$("#hz-aur1 canvas"),w2=$("#hz-aur2 canvas"),f1=$("#hz-aur1f");
   if(w1)hzDrawAuroraLayer(w1,{w:1800,h:640,rgb:"168,198,255",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
-  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"150,236,212",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});
+  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"186,176,255",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});   // the fringe soft violet, not mint (6b549)
   if(w2)hzDrawAuroraLayer(w2,{w:1800,h:600,rgb:"186,208,255",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
 }
 // the wash flowers on arriving home (the intro has its own moment)
@@ -66016,8 +66018,9 @@ function hzDrawWash(){
   const bloom=(cx,cy,rx,ry,col,a)=>{x.save();x.translate(cx*W,cy*H);x.scale(rx*W,ry*H);
     const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,"rgba("+col+","+a+")");g.addColorStop(.72,"rgba("+col+",0)");g.addColorStop(1,"rgba("+col+",0)");
     x.fillStyle=g;x.beginPath();x.arc(0,0,1,0,7);x.fill();x.restore();};
-  bloom(.24,.40,.42,.36,"98,96,255",.6);bloom(.72,.30,.38,.32,"255,118,178",.4);
-  bloom(.50,.64,.40,.30,"255,182,108",.44);bloom(.88,.58,.34,.30,"58,214,198",.34);
+  // blue-violet only (6b549): the rose, amber and teal blooms became violet, ice and blue at the same strength
+  bloom(.24,.40,.42,.36,"98,96,255",.6);bloom(.72,.30,.38,.32,"150,118,255",.4);
+  bloom(.50,.64,.40,.30,"150,186,255",.44);bloom(.88,.58,.34,.30,"86,140,255",.34);
 }
 // ---- TRACED IN LIGHT (the reference's tracer): the same letters are drawn
 // into a mask; sparks leave the top of each outline and run both ways round
@@ -66066,7 +66069,9 @@ async function hzTraceIn(el,opts){
   if(!gl)return;
   const IFS="precision highp float;varying vec2 uv;uniform sampler2D map;uniform float t,TE;"
     +"float tf(vec4 s){return (s.r*65280.+s.g*255.)/65535.*TE;}"
-    +"vec3 pal(float t){vec3 a=vec3(.624,.659,1.),b=vec3(1.,.561,.769),c=vec3(1.,.773,.541),d=vec3(.498,.941,.839);t=fract(t)*4.;"
+    // the palette is blue-violet only (6b549, per Patrick: "too much rainbow"): ice, soft violet, ice-white,
+    // violet-blue, each as bright as the pink, gold and mint it replaced, so the light keeps its strength and motion
+    +"vec3 pal(float t){vec3 a=vec3(.62,.74,1.),b=vec3(.76,.66,1.),c=vec3(.82,.88,1.),d=vec3(.68,.68,1.);t=fract(t)*4.;"
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
     +"void main(){vec4 s=texture2D(map,vec2(uv.x,1.-uv.y));float d=t-tf(s);"
     +"float e=step(.5/255.,s.b),hue=(s.b*255.-1.)/254.;vec3 neon=pal(hue+t*.18),ice=vec3(.62,.77,1.);"

@@ -19783,3 +19783,16 @@ at both track heights, the glow, the Ultra halo) and `_sl549_field` (the plan ru
 the sky; Calm and effects off hide it; Balanced half); nine mutants (twice the track, a radius past its box, a 1.4
 overshoot, a 12 px glow, a wide halo, a field reaching into the composer, Balanced at the full count, the field on in
 Calm, the track's stars back), and one more in the Ultra check (track stars back). The five slider sections pass (37).
+
+**The aurora, blue-violet only (the owner's settled rule).** Full's aurora still drew rose, gold and mint bands
+behind the greeting. Retinted at the same intensity and motion: the GL neon's four-stop palette (pink, gold,
+mint) is now ice `(.62,.74,1)`, soft violet `(.76,.66,1)`, ice-white `(.82,.88,1)` and violet-blue `(.68,.68,1)`,
+each about as bright as the stop it replaced, and its fringe base ice `(.72,.84,1)` (was mint); the canvas
+curtain's fringe layer is soft violet `186,176,255` (was mint `150,236,212`), as is the unused
+`--hz-aurora-fringe`; the colour wash beneath it (rose, amber and teal blooms) is violet, ice and blue at the same
+strengths. The greeting's light-trace shares the neon's palette and is retinted with it. Not touched: the NASA
+footage's own colour (the moon's warm reflection on the water in the right foot of the home) and its hour grade.
+Gauntlet: `_sl549_aurora` reads every colour the aurora and the wash are drawn in (both palettes, the fringe,
+the three curtains, the four wash blooms): a blue-to-violet hue (200–285°) or near-white, nothing else; five
+mutants (the neon's rose back, the mint fringe back, the canvas fringe's mint back, the wash's rose back, the
+trace's rose back on its own). The five slider sections pass (37).
