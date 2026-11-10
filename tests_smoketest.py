@@ -8788,7 +8788,7 @@ _plr = _pl["model_sets"]()
 check("plans count a shared download once; an abandoned council draft stops and writes nowhere else",
       "Qwen 3.5 9B" in _plr["recommended"] and "Qwen 3.5 Vision 9B" not in _plr["recommended"]
       and "Qwen 3.5 Vision 9B" not in _plr["everything"]
-      and "def _collect(chunk, _p=parts, _s=_stop):" in _M
+      and "def _collect(chunk, _p=parts, _s=_stop, _l=label):" in _M   # the live draft (6b570)
       and "def _draft_local(_lbl=label, _c=_collect, _e=_err):" in _M
       and "                run_model(_lbl, messages, _c," in _M
       and "                _e.append(exc)" in _M
@@ -26453,7 +26453,11 @@ check("servers (live): a council of server models that none answers says why, an
       "%r" % [_scC[1], _scC[2][-4:]])
 # ==== 6b570 fluent (live): begin ====
 print("== fluent, live: a greeting in one pass; through the page, an answer lands whole, a follow-up waits, a stop says so (6b570) ==")
-# "hi" on Thinking on the server alone: one request to the stub, asked not to reason (think: false), and its words land
+# "hi" on Thinking on the server alone: one request to the stub, asked not to reason (think: false), and its words land.
+# The stub's "sneaky" spills into memory when it loads (the refusal checks above), so it steps aside for these and comes
+# back after; the mode the person had is put back too
+_t570 = _svq("/api/prefs")[1].get("tier")
+_o1("/drop", {"name": "sneaky:14b"})
 _svq("/api/servers/test", "POST", {"id": _sid34})
 _nf570 = len(_o1("/stub")["calls"])
 _f570c = _svchat(text="hi", tier="srv:%s:think" % _sid34, models=[])
@@ -26609,7 +26613,9 @@ else:
     finally:
         _o1("/reply", {"text": ""})
         _o1("/delay", {"s": 0})
-        _svq("/api/prefs", "POST", {"tier": "Fast"})
+_svq("/api/prefs", "POST", {"tier": _t570 or "Fast"})
+_o1("/restore", {})
+_svq("/api/servers/test", "POST", {"id": _sid34})
 # ==== 6b570 fluent (live): end ====
 
 
@@ -35837,8 +35843,10 @@ check("Chat: pictures and the agents that run their own flow keep the old wake; 
       and "server_refresh_modes(self.ctx, wake=False)\n                    _ag_wake = server_sleepers(self.ctx)" in _s465)
 check("\"<name> Only\" waits its minute on the same step, with the page's Skip (6b465)",
       "_so_wake, self.ctx, status,\n                    lambda: not _client_gone(self.connection), step, skip_ev)" in _s465
-      and "def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:" in _s465
-      and _s465.count("server_wake_step(e, status,") == 3 and "SRV_WAKE_WAIT_S)" in _s465[_s465.index("def server_only_wake"):_s465.index("def server_sleepers")])
+      and "def server_wake_step(e, status, step, skip, alive, wait_s: int, rewait=False) -> str:" in _s465
+      # (6b570) its minute is server_only_wait's: the whole minute for a new call, what is left of it inside the gap
+      and _s465.count("server_wake_step(e, status,") == 3 and "wait = server_only_wait(e)" in _s465[_s465.index("def server_only_wake"):_s465.index("def server_sleepers")]
+      and "    if last is None or not (0 <= now - last < SRV_WAKE_GAP_S):\n        return SRV_WAKE_WAIT_S" in _MILLENAI_SRC)
 _cm465 = {"MODEL_ROUTES": {"A": 1, "B": 2, "C": 3}, "merge_pref_label": lambda: "B"}
 exec(_s465[_s465.index("def council_merger_last"):_s465.index("def server_wake_step")], _cm465)
 _f465 = _cm465["council_merger_last"]
@@ -38124,7 +38132,7 @@ check("the grounded turn pulls the evidence's figures out for the writer and car
 _ss18 = _MILLENAI_SRC[_MILLENAI_SRC.index("def server_stream("):_MILLENAI_SRC.index("def _srv_reads_pictures(")]
 check("the final writer's reasoning level goes only to gpt-oss, and a server that refuses it is asked without it",
       'SRV_THINK_MODELS.match(str(model or ""))' in _ss18 and 'd["think"] = _think_box[0]' in _ss18
-      and "if _think_box[0] and resp.status == 400:" in _ss18
+      and "if _think_box[0] is not None and resp.status == 400:" in _ss18   # (6b570) think: false is asked too
       and 'synth[0]["_think"] = final_think_level()' in _MILLENAI_SRC
       and 'm.get("_think") for m in messages' in _ss18, "")
 # ==== quality-2 (6b518): end ====
@@ -39668,7 +39676,7 @@ check("the asking flow hangs off real frames: the live line painted from the str
       and "if(!drafts.some(x=>x.m===d.m))drafts.push(d);" in page
       and "liveLinePaint(aiDiv);              // the live line follows the frames (6b528)" in page
       and "const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);" in page
-      and "liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});" in page
+      and "liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo,stopped:wasAborted&&!!full});" in page   # a stop says so (6b570)
       and "if(full&&!wasAborted)answerLanded();" in page and 'document.dispatchEvent(new Event("hz-answer-done"))' in page
       and 'id="comets"' not in page and "function cometsDraw(){" not in page
       and ".msg.ai.live .body{color:#fff;text-shadow" not in page
@@ -39784,8 +39792,11 @@ def _f570_offer(src):
     got["it didn't answer: the way on"] = o == [{"server": "Desktop"}] and "\u26a0" in t
     t, o = run("Desktop \u00b7 small:8b", script=[_SvResp(200, lines=[{"message": {"content": "Hel"}, "done": False}])])
     got["cut partway: none (one answer, said)"] = o == [] and t.startswith("Hel")
-    # the turn as saved: the way on with it; a stop says so; an error line is still not saved
-    tr = _cs["turn_record"]
+    # the turn as saved: the way on with it; a stop says so; an error line is still not saved (the turn writer
+    # from this source, on the chat store's helpers)
+    _ct = dict(_cs)
+    exec(src[src.index("_TURN_TAGS = ("):src.index("def _turn_rec(t):")], _ct)
+    tr = _ct["turn_record"]
     r1 = tr("Desktop didn\u2019t wake.\x00OFFER:{\"server\": \"Desktop\", \"asleep\": 1}\x00")
     r2 = tr("I'm read", aborted=True)
     r3 = tr("the whole answer")
@@ -39801,6 +39812,9 @@ def _f570_think(src):
     second, so an abandoned draft closes the line."""
     ns, ctx, d = _sv_ns(src)
     _sv_paired(ns, ctx, name="Desktop")
+    e = ns["_srv_read"](ctx)[0]
+    ns["_srv_update"](ctx, lambda es: ([x.update(models=["small:8b", "gpt-oss:20b", "gemma4:12b"]) for x in es],
+                                       {"ok": True})[1])
     e = ns["_srv_read"](ctx)[0]
     _so_seen(ns, e, [_so_model("small:8b"), _so_model("gpt-oss:20b"), _so_model("gemma4:12b")])
     got = {}
@@ -39866,7 +39880,46 @@ process.stdout.write(JSON.stringify(o));
     return not bad and "srv:" not in json.dumps(o) and "this Mac" not in o.get("st", "") + o.get("run", ""), bad
 
 
+def _f570_live(src):
+    """The first draft streams into the answer as it is written, marked provisional; the final writer's first
+    word comes after a RESET; a run with nothing to merge keeps the draft (its rest only, never twice)."""
+    def rm(label, msgs, emit, thinking=False):
+        for w in ("draft ", "from ", label):
+            emit(w)
+
+    def sg(label, msgs, emit, status, fb, note):
+        emit("FINAL ")
+        emit("ANSWER")
+        return True
+    got = {}
+    ns, calls = _p2_council(src, rm, _stream_guarded=sg, COUNCIL_LIVE_DRAFT=True)
+    seq = []
+    ns["run_council"](["Desk · a", "Desk · b"], [{"role": "user", "content": "q"}],
+                      lambda c: seq.append(("F", str(c)) if isinstance(c, _RcCtl) else ("T", c)), [].append)
+    texts = [t for k, t in seq if k == "T"]
+    i_prov = next((i for i, (k, t) in enumerate(seq) if k == "F" and '"prov": 1' in t), -1)
+    i_reset = next((i for i, (k, t) in enumerate(seq) if k == "F" and t == "\0RESET\0"), -1)
+    i_final = next((i for i, (k, t) in enumerate(seq) if k == "T" and t == "FINAL "), -1)
+    got["the draft streams, provisional, then a RESET before the final's first word"] = (
+        -1 < i_prov < i_reset < i_final and "".join(t for k, t in seq[i_prov:i_reset] if k == "T").startswith("draft from Desk")
+        and "".join(t for k, t in seq[i_reset:] if k == "T") == "FINAL ANSWER")
+    seq2 = []
+    ns2, _c = _p2_council(src, rm, _stream_guarded=sg, COUNCIL_LIVE_DRAFT=True)
+    ns2["run_council"](["Desk · a"], [{"role": "user", "content": "q"}],
+                       lambda c: seq2.append(("F", str(c)) if isinstance(c, _RcCtl) else ("T", c)), [].append)
+    got["nothing to merge: the draft stays, once"] = ("".join(t for k, t in seq2 if k == "T") == "draft from Desk · a"
+                                                      and not any(t == "\0RESET\0" for k, t in seq2))
+    seq3 = []
+    ns3, _c = _p2_council(src, rm, _stream_guarded=sg)
+    ns3["run_council"](["Desk · a", "Desk · b"], [{"role": "user", "content": "q"}],
+                       lambda c: seq3.append(("F", str(c)) if isinstance(c, _RcCtl) else ("T", c)), [].append)
+    got["switched off: the old run"] = "".join(t for k, t in seq3 if k == "T") == "FINAL ANSWER"
+    return all(got.values()), got
+
+
 _F570_CHECKS = [
+    ("fluent: the first draft streams in provisional while the council works; the final writer's first word replaces "
+     "it after a RESET; a run with nothing to merge keeps it, once", _f570_live),
     ("fluent: the triage reads a greeting or thanks as chat, a short question or a consent as short, and a real "
      "question as full; a doubt, a number or a subject is never chat", _f570_triage),
     ("fluent: \"<name> Only\" inside the five minutes waits for the wake already on its way (what is left of its "
@@ -39917,6 +39970,9 @@ _F570_MUT = [
     ("a long prompt left to reason to the window's edge", "        # the answer comes whole.\n        _think = False\n", "        # the answer comes whole.\n        pass\n"),
     ("silent reasoning that never ticks", '                    _tick[0] = time.time()\n                    emit("")\n', "                    pass\n"),
     ("the tier key on the byline", "  const mn=signMode(mode);", '  const mn=mode?modeName(mode):"";'),
+    ("the live draft's words not sent", "            emit(txt[len(was):])\n", "            pass\n"),
+    ("the live draft left under the final", "            if _pend[0]:\n                _pend[0] = False\n                _emit0(Ctl(NUL + \"RESET\" + NUL))\n",
+     "            if _pend[0]:\n                _pend[0] = False\n"),
     ("the server's name taken for a model of this Mac", '  const m=/^asking (.+?) · (?:\\d+ of \\d+|cloud)$/.exec(String(status||""));',
      '  const m=/^asking (.+?) ·/.exec(String(status||""));'),
 ]

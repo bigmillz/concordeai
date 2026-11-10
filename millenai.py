@@ -34857,6 +34857,9 @@ def _cloud_all_down() -> str:
     return AppText("\n\n".join(out))
 
 
+COUNCIL_LIVE_DRAFT = True      # (6b570) the first draft streams into the answer, provisional
+
+
 def run_council(labels: list, messages: list, emit, status,
                 reflect: bool = False, peer: bool = False,
                 cloud_only: bool = False, srv_only: bool = False,
@@ -35111,10 +35114,11 @@ def run_council(labels: list, messages: list, emit, status,
     # the draft as it is.
     _live = {"owner": None, "sent": "", "on": False}
     _live_lock = threading.Lock()
+    _live_ok = bool(globals().get("COUNCIL_LIVE_DRAFT", False))
 
     def _live_draft(label, parts):
         """Stream the newest words of `label`'s draft if it holds the live slot."""
-        if cloud_only or _live["owner"] not in (None, label):
+        if not _live_ok or cloud_only or _live["owner"] not in (None, label):
             return
         raw = "".join(parts)
         if "<" in raw[-8:]:
@@ -41230,8 +41234,8 @@ def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=Non
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
               "|STEP|APPROVE|RATE"      # RATE: the writer's pace (6b515), the page's twin
               "|USAGE|DONE"             # a model call's tokens; the run's clock (6b528)
-              "|RUBIN"                  # Vera Rubin's console (6b519)
-              "|OFFER")                 # the way on when a server didn't answer (6b570)
+              "|OFFER"                  # the way on when a server didn't answer (6b570)
+              "|RUBIN")                 # Vera Rubin's console (6b519)
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
 _TURN_FRAME = re.compile("\x00(" + _TURN_TAGS
@@ -46954,10 +46958,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not sent[0]:
                 emit("The engine stopped and the backup didn’t answer. Ask again.")
         finally:
+            _srv_think.brief = False       # (6b570) a greeting's one pass ends with it
             # the effort ends with the answer (6b534): a title or a memory
             # pass after it on this thread reasons at the model's default
             _srv_think.level = _srv_think.effort = None
-            _srv_think.brief = False       # (6b570) a greeting's one pass ends with it
             # the hurry registry entry dies with the request — a set()
             # arriving after this harmlessly answers ok:false (6b257)
             with _hurry_lock:
@@ -53310,7 +53314,7 @@ html:not(.hz) .sl-sel{display:none}
 /* ---- ONE WORKING LINE: while the answer is on its way the byline steps aside and one quiet line says what is
    happening ("Waking Ollama1", "Asking Ollama1", "Reviewing the draft", "Writing the answer"), the words in the silver
    sweep, no colour, no machine dies; a small elapsed clock after 3 s. When the answer lands the line goes and the
-   byline is back: "Concorde Thinking · Ollama1", never an id. A stopped answer keeps a quiet "Stopped". */
+   byline is back: the brand, "Thinking · Ollama1", never an id. A stopped answer keeps a quiet "Stopped". */
 .hz .msg.ai.live>.who{display:none}
 .hz .msg.ai.live>.liveline{margin:0 0 16px;padding-top:22px;border-top:1px solid var(--hz-hair)}
 .hz .msg.ai.live>.liveline .die{display:none}
@@ -53328,13 +53332,12 @@ html:not(.hz) .sl-sel{display:none}
 .hz .msg.ai .body.prov{opacity:.74;transition:opacity .4s var(--hz-ease-out)}
 /* ---- THE WAY ON: under a server pick that couldn't answer, "Answer on this Mac" and "Try <name> again" */
 .hz .offerrow{grid-column:1;display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
-.msg.ai:not(:last-child)>.offerrow{display:none}   /* only the chat's last answer keeps the way on */
+.hz .msg.ai:not(:last-child)>.offerrow{display:none}   /* only the chat's last answer keeps the way on */
 .hz .offerrow button{font:500 13px/1 var(--hz-font-ui);color:var(--hz-ink);background:rgba(255,255,255,.05);height:32px;padding:0 14px;
   border:1px solid var(--hz-hair-2);border-radius:8px;cursor:pointer;transition:background .12s var(--hz-ease-out),border-color .12s var(--hz-ease-out)}
 .hz .offerrow button:hover{background:rgba(255,255,255,.08);border-color:var(--hz-line)}
 .hz .offerrow button:active{transform:scale(.97)}
 .hz .offerrow button.sec{color:var(--hz-ink-2);background:none}
-.offerrow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
 .hz .ghostnote.here{border-left:0;padding-left:0;font-size:12.5px;color:var(--hz-ink-3);margin:0 0 10px}
 /* ---- a follow-up typed while an answer is on its way waits for it: said under the box */
 .hz #composer.queued::after{content:"Sends when this answer is done";position:absolute;left:18px;bottom:-19px;
@@ -57592,7 +57595,7 @@ function isCloud(c){const w=(c&&c.w)||"local";return w!=="local"&&w!=="server";}
 // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick: "make it sound like, okay,
 // you have it on Thinking right now"): the byline is the brain, a breathing dot
 // while it works, and one plain word for what it is doing
-// THE BYLINE'S WORDS (6b570, per Patrick's screenshot: "Concorde srv:5b346919:think"): a tier key is never shown.
+// THE BYLINE'S WORDS (6b570, per Patrick's screenshot: the brand and "srv:5b346919:think"): a tier key is never shown.
 // A mode is its shown name; a mode on one server alone is the mode and the server's own name ("Thinking · Ollama1");
 // "<name> Only" is "· Ollama1"; a cloud mode or pick says the cloud; anything else unknown is the brand alone
 function signMode(mode){
@@ -59174,9 +59177,9 @@ async function send(){
     const uniq=[...new Set(bold)].slice(0,4).map(s=>({n:s,d:"",h:""}));
     if(uniq.length)places=uniq;
   }
+  body.classList.remove("prov");   // the provisional draft's dim goes with the landing (6b570)
   const treeKeep=(body.querySelector(".worktree")||{}).outerHTML||"";
   dripOff=true;                    // from here the prose is the landing's; a late drip frame paints nothing
-  body.classList.remove("prov");
   // no loose srcRow here any more — collapseSteps() folded the chips
   // inside the disclosure, so a settled answer is prose (6b242)
   body.innerHTML=treeKeep
