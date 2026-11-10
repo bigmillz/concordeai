@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.4,\"ftok\":143,\"est\":false}",
+  "X-Hurry": "22109f7be46fd1e5"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.57,
+ "elapsed_s": 25.37,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.75,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.75,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.75,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 18 passages"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.16,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.57,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.37,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.4,
+    "tok": 517,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 25.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2070 chars"
+   }
+  },
+  {
+   "t": 25.37,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.37,
+   "tag": "DONE",
+   "data": {
+    "f": 17.57,
+    "t": 25.37,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.75,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.75
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.75
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 18 passages",
+   "t_s": 14.16
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.16
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.16
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2070 chars",
+   "t_s": 25.37
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.37
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Morning Person or Night Owl: How Your Chronotype Shifts With ...",
+   "u": "https://www.youragecalculator.com/blog/morning-person-chronotype-age-shift/",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "Morning Person vs. Night Owl: Your Chronotype Explained",
+   "u": "https://sleepcalculator.bio/blog/morning-person-vs-night-owl-chronotype/",
+   "d": "2026-05-02"
+  },
+  {
+   "t": "Morningness vs Eveningness: Systematic Review with ☸️SAIMSARA.",
+   "u": "https://saimsara.com/sessions/morningness-eveningness-20260219-202619-d5075212/",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "How to Become a Morning Person—Even If You're a Night Owl",
+   "u": "https://www.rd.com/article/how-to-become-a-morning-person/",
+   "d": "2021"
+  },
+  {
+   "t": "Morning People Are Actually Happier Than Night Owls | Live Science",
+   "u": "https://www.livescience.com/20880-morning-people-happier.html",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "The Effect of Morningness-Eveningness on Shift Work Nurses: Sleep...",
+   "u": "https://sleepmedres.org/journal/view.php?number=93",
+   "d": ""
+  },
+  {
+   "t": "Morning People vs Night Owls: Is One Better Than the Other?",
+   "u": "https://bedthreads.com/blogs/journal/morning-people-vs-night-people",
+   "d": ""
+  },
+  {
+   "t": "Understanding Psychosis - National Institute of Mental Health (NIMH)",
+   "u": "https://www.nimh.nih.gov/health/publications/understanding-psychosis",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.16,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 232,
+   "o": 29,
+   "d": 571,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4320,
+   "o": 483,
+   "d": 11158,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 66.4,
+  "tok": 517,
+  "s": 7.8
+ },
+ "app_first_s": 17.57,
+ "app_total_s": 25.37,
+ "answer_raw": "The idea that morning people are happier is not a myth, though it isn't a universal rule of personality. While there is no single \"best\" chronotype, research suggests that morningness and eveningness are associated with different health and behavioral outcomes.\n\n## Happiness and Well-being\nThe relationship between sleep timing and mood is well-documented. Morning people are often perceived as happier, and some studies suggest they do possess better working memories [4]. \n\nHowever, the \"happiness\" gap often comes down to sleep quality and social alignment. For example, in studies involving shift-work nurses, those with an \"eveningness\" type reported lower subjective sleep quality and more severe daytime sleepiness compared to morning types [6, undated]. While morningness/eveningness profiles were not decisive factors for own-reported depressive symptoms or occupational stress, the tendency for poor sleep efficiency and daytime sleepiness is more common among night owls [6, undated].\n\n## Can a Night Owl Switch?\nYou cannot fundamentally change your biological chronotype through willpower or habit [2, 2026-05-02]. Chronotype is a biological phase, not a personality trait, and it follows a predictable curve across a human lifespan [1, 2026-10-28].\n\nWhile you can't rewrite your DNA, you can manage your timing. The most realistic goal for a night owl is to shift their schedule 1–2 hours earlier and minimize \"social jet lag\" by keeping sleep times consistent between weekdays and weekends [2, s.bio, 2026-05-02]. One way to influence this is through morning exercise, which can help advance your circadian phase [2, s.bio, 2026-05-02].\n\nTo find your true baseline, researchers suggest calculating your **Mid-Sleep on Free Days (MSF)**. This is the clock time halfway between when you fall asleep and when you wake up on days when nothing forces you out of bed [1, 2026-10-28]. You can calculate this by logging your sleep for seven days (including a weekend morning without an alarm) and averaging the midpoints of your two freest nights [1, 2026-10-28].",
+ "answer": "The idea that morning people are happier is not a myth, though it isn't a universal rule of personality. While there is no single \"best\" chronotype, research suggests that morningness and eveningness are associated with different health and behavioral outcomes.\n\n## Happiness and Well-being\nThe relationship between sleep timing and mood is well-documented. Morning people are often perceived as happier, and some studies suggest they do possess better working memories [4]. \n\nHowever, the \"happiness\" gap often comes down to sleep quality and social alignment. For example, in studies involving shift-work nurses, those with an \"eveningness\" type reported lower subjective sleep quality and more severe daytime sleepiness compared to morning types [6, undated]. While morningness/eveningness profiles were not decisive factors for own-reported depressive symptoms or occupational stress, the tendency for poor sleep efficiency and daytime sleepiness is more common among night owls [6, undated].\n\n## Can a Night Owl Switch?\nYou cannot fundamentally change your biological chronotype through willpower or habit [2, 2026-05-02]. Chronotype is a biological phase, not a personality trait, and it follows a predictable curve across a human lifespan [1, 2026-10-28].\n\nWhile you can't rewrite your DNA, you can manage your timing. The most realistic goal for a night owl is to shift their schedule 1–2 hours earlier and minimize \"social jet lag\" by keeping sleep times consistent between weekdays and weekends [2, s.bio, 2026-05-02]. One way to influence this is through morning exercise, which can help advance your circadian phase [2, s.bio, 2026-05-02].\n\nTo find your true baseline, researchers suggest calculating your **Mid-Sleep on Free Days (MSF)**. This is the clock time halfway between when you fall asleep and when you wake up on days when nothing forces you out of bed [1, 2026-10-28]. You can calculate this by logging your sleep for seven days (including a weekend morning without an alarm) and averaging the midpoints of your two freest nights [1, 2026-10-28].",
+ "chars": 2070,
+ "raw_bytes": 4373,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.4,
+ "rate_gen_tok_s": 66.35,
+ "id": "q14",
+ "turn": 1,
+ "category": "health",
+ "topic": "Morning people and happiness",
+ "question": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:37:12",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Are morning people really happier, or is that a myth? Can a night owl actually switch?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

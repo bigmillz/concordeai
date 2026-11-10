@@ -1,0 +1,353 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.5,\"ftok\":130,\"est\":false}",
+  "X-Hurry": "035288bce009840d"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.75,
+ "elapsed_s": 26.54,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.01,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 28 passages"
+   }
+  },
+  {
+   "t": 14.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 images found"
+   }
+  },
+  {
+   "t": 14.13,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.13,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 14.13,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.54,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.3,
+    "tok": 431,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 26.54,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1724 chars"
+   }
+  },
+  {
+   "t": 26.54,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.54,
+   "tag": "DONE",
+   "data": {
+    "f": 18.75,
+    "t": 26.54,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.01,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.01
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.01
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 28 passages",
+   "t_s": 14.13
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.13
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 images found",
+   "t_s": 14.13
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.13
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1724 chars",
+   "t_s": 26.54
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.54
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis vs Lisbon: Cost of Living & Immigrant Guide (2026)",
+   "u": "https://onbuju.com/en/compare/florianopolis-vs-lisbon",
+   "d": "2026"
+  },
+  {
+   "t": "Athens vs Lisbon: Cost of Living 2026",
+   "u": "https://globalcostdata.com/cities/athens-vs-lisbon/",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: Rent, Budget & Prices",
+   "u": "https://expatlife.ai/brazil/cities/florianopolis/cost-of-living",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon, Portugal And...",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "15 Cities Where $100 Goes The Furthest [New Research]Where the Dollar Stretches ",
+   "u": "https://financebuzz.com/cities-where-100-goes-furthest",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "Cost of Living in ColombiaCost of living for digital nomads by city (2026)Cost o",
+   "u": "https://internationalliving.com/countries/colombia/cost-of-living-in-colombia/",
+   "d": "2026-06-14"
+  },
+  {
+   "t": "Voos de Florianópolis (FLN) para... - Voos low cost em eDreams",
+   "u": "https://www.edreams.pt/voos/florianopolis-medellin/FLN/MDE/",
+   "d": ""
+  },
+  {
+   "t": "10 American Cities Where Your Dollar Goes Furthest in 2025",
+   "u": "https://travelbinger.com/american-cities-where-your-dollar-goes-furthest-in-2025",
+   "d": "2025-09-28"
+  }
+ ],
+ "photos": [
+  "https://a1.odistatic.net/images/landingpages/destinations/1920x800/destination-default_1920x800.jpg",
+  "https://backend.travelbinger.com/wp-content/uploads/2025/09/Untitled-design-37-1.jpg",
+  "https://expatlife.ai/countries/brazil.jpg"
+ ],
+ "run_frames": [
+  [
+   14.13,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 249,
+   "o": 28,
+   "d": 731,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5294,
+   "o": 486,
+   "d": 12357,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 55.3,
+  "tok": 431,
+  "s": 7.8
+ },
+ "app_first_s": 18.75,
+ "app_total_s": 26.54,
+ "answer_raw": "Florianópolis offers the greatest purchasing power for a $4,000 monthly budget, as its cost of living is significantly lower than Lisbon's. Since the provided data does not contain specific cost-of-living indices or rent for Medellín, I cannot determine exactly where your money stretches furthest between all three, but I can compare the other two.\n\n## Comparison: Florianópolis vs. Lisbon\n\nIn Florianópolis, your $4,000 will go much further than in Lisbon. For example, maintaining a specific standard of living in Lisbon requires roughly €4,800, whereas you could achieve that same lifestyle in Florianópolis with approximately €2,856.6 (R$16,917.9) as of undated [4].\n\n**Rent and Budgeting**\n\n*   **Lisbon** — Rent is significantly higher, averaging roughly €1,401.56 per month as of 2026 [1]. The city has a cost rating of 65/100 as of 2026 [1].\n*   **Florianópolis** — Rent is much more affordable, typically ranging between €500 and €800 per month as of 2026 [1]. For an expat looking for a one-bedroom in a good area, rent is estimated between R$2,500 and R$3,800 as of 2026 [3]. The city's cost rating is much lower at 38/100 as of 2026 [1].\n\n**Safety and Logistics**\n\nLisbon is slightly safer with a score of 85/100, compared to 82/100 in Florianópolis as of 2026 [1]. If you are looking to move to Brazil, the VITEM XIV digital nomad visa allows for a 1-year renewable residence permit with simple income proof of approximately $1,500/month as of sdtated in the source [1].\n\nRegarding Medellín, the provided sources only mention that gentrified neighborhoods like El Poblado have higher costs for rent and dining [6, undated]. To give you a complete answer, I would need specific cost-of-living data for Medellín.",
+ "answer": "Florianópolis offers the greatest purchasing power for a $4,000 monthly budget, as its cost of living is significantly lower than Lisbon's. Since the provided data does not contain specific cost-of-living indices or rent for Medellín, I cannot determine exactly where your money stretches furthest between all three, but I can compare the other two.\n\n## Comparison: Florianópolis vs. Lisbon\n\nIn Florianópolis, your $4,000 will go much further than in Lisbon. For example, maintaining a specific standard of living in Lisbon requires roughly €4,800, whereas you could achieve that same lifestyle in Florianópolis with approximately €2,856.6 (R$16,917.9) as of undated [4].\n\n**Rent and Budgeting**\n\n*   **Lisbon** — Rent is significantly higher, averaging roughly €1,401.56 per month as of 2026 [1]. The city has a cost rating of 65/100 as of 2026 [1].\n*   **Florianópolis** — Rent is much more affordable, typically ranging between €500 and €800 per month as of 2026 [1]. For an expat looking for a one-bedroom in a good area, rent is estimated between R$2,500 and R$3,800 as of 2026 [3]. The city's cost rating is much lower at 38/100 as of 2026 [1].\n\n**Safety and Logistics**\n\nLisbon is slightly safer with a score of 85/100, compared to 82/100 in Florianópolis as of 2026 [1]. If you are looking to move to Brazil, the VITEM XIV digital nomad visa allows for a 1-year renewable residence permit with simple income proof of approximately $1,500/month as of sdtated in the source [1].\n\nRegarding Medellín, the provided sources only mention that gentrified neighborhoods like El Poblado have higher costs for rent and dining [6, undated]. To give you a complete answer, I would need specific cost-of-living data for Medellín.",
+ "chars": 1724,
+ "raw_bytes": 4400,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.24,
+ "rate_gen_tok_s": 55.33,
+ "id": "q09",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Cost of living comparison",
+ "question": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:34:23",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

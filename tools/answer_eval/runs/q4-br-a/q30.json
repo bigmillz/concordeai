@@ -1,0 +1,206 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":9.1,\"ftok\":262,\"est\":false}",
+  "X-Hurry": "9edf00bde483b395"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 3.25,
+ "elapsed_s": 33.73,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.25,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 15.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2148 chars"
+   }
+  },
+  {
+   "t": 15.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 15.89,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 15.89,
+   "tag": "RESET"
+  },
+  {
+   "t": 33.73,
+   "tag": "RATE",
+   "data": {
+    "tps": 47.5,
+    "tok": 578,
+    "s": 12.2
+   }
+  },
+  {
+   "t": 33.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2315 chars"
+   }
+  },
+  {
+   "t": 33.73,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   15.89,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2148 chars",
+   "t_s": 15.89
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 15.89
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2315 chars",
+   "t_s": 33.73
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 33.73
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 47.5,
+  "tok": 578,
+  "s": 12.2
+ },
+ "answer_raw": "Quantization reduces the precision of model weights from high-bit formats like **FP16** or **BF16** to lower-bit representations to shrink the memory footprint and increase throughput.\n\nIn a 16-bit model, each parameter occupies 2 bytes of VRAM. Moving to **4-bit quantization** reduces that footprint to roughly **0.5 bytes per parameter**, allowing you to fit much larger models into much smaller memory pools.\n\n## The Mechanism\nThe process maps a wide range of continuous floating-point values to a narrow set of discrete levels (16 possible values in 4-bit). This creates **quantization error**, where the rounding between the original weight and the new value causes a loss in mathematical precision.\n\nModern algorithms like **GPTQ** (Post-Training Quantization) or **AWQ** (Activation-aware Weight Quantization) mitigate this by using calibration datasets to protect \"salient\" weights. They ensure that the weights most responsible for the model's output stability are preserved with higher fidelity, while less impactful weights absorb the bulk of the rounding error.\n\n## When it matters\nThe decision involves a trade-off between **VRAM capacity** and **perplexity** (the measure of how much the model's predictive accuracy degrades).\n\n*   **Hardware constraints:** This is the primary driver. A **70B parameter** model in FP16 requires roughly **140GB of VRAM**; it is impossible to run on a single consumer GPU. At 4-bit, that same model fits into roughly **40GB**, making it runnable on two consumer cards or a single professional-grade GPU.\n*   **Inference speed:** Because LLM inference is typically **memory-bandwidth bound**, moving smaller 4-bit weights from VRAM to the compute cores is faster than moving 16-bit weights. This often results in a significant increase in **tokens per second**.\n*   **Model scale vs. Quality:** The \"intelligence\" loss from 4-bit quantization is much more noticeable in small models (e.g., **1B–8B** parameters) because every weight represents a larger percentage of the total logic. For models **30B and larger**, the loss is often negligible for most practical tasks.\n\n**The verdict:** Use 4-bit to fit a larger, more capable model onto hardware that would otherwise be too small. If you have the VRAM to spare, 8-bit or FP16 is the better path to maximize accuracy.",
+ "answer": "Quantization reduces the precision of model weights from high-bit formats like **FP16** or **BF16** to lower-bit representations to shrink the memory footprint and increase throughput.\n\nIn a 16-bit model, each parameter occupies 2 bytes of VRAM. Moving to **4-bit quantization** reduces that footprint to roughly **0.5 bytes per parameter**, allowing you to fit much larger models into much smaller memory pools.\n\n## The Mechanism\nThe process maps a wide range of continuous floating-point values to a narrow set of discrete levels (16 possible values in 4-bit). This creates **quantization error**, where the rounding between the original weight and the new value causes a loss in mathematical precision.\n\nModern algorithms like **GPTQ** (Post-Training Quantization) or **AWQ** (Activation-aware Weight Quantization) mitigate this by using calibration datasets to protect \"salient\" weights. They ensure that the weights most responsible for the model's output stability are preserved with higher fidelity, while less impactful weights absorb the bulk of the rounding error.\n\n## When it matters\nThe decision involves a trade-off between **VRAM capacity** and **perplexity** (the measure of how much the model's predictive accuracy degrades).\n\n*   **Hardware constraints:** This is the primary driver. A **70B parameter** model in FP16 requires roughly **140GB of VRAM**; it is impossible to run on a single consumer GPU. At 4-bit, that same model fits into roughly **40GB**, making it runnable on two consumer cards or a single professional-grade GPU.\n*   **Inference speed:** Because LLM inference is typically **memory-bandwidth bound**, moving smaller 4-bit weights from VRAM to the compute cores is faster than moving 16-bit weights. This often results in a significant increase in **tokens per second**.\n*   **Model scale vs. Quality:** The \"intelligence\" loss from 4-bit quantization is much more noticeable in small models (e.g., **1B–8B** parameters) because every weight represents a larger percentage of the total logic. For models **30B and larger**, the loss is often negligible for most practical tasks.\n\n**The verdict:** Use 4-bit to fit a larger, more capable model onto hardware that would otherwise be too small. If you have the VRAM to spare, 8-bit or FP16 is the better path to maximize accuracy.",
+ "chars": 2315,
+ "raw_bytes": 5188,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.09,
+ "rate_gen_tok_s": 20.02,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:16:25",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 3.25,
+ "app_total_s": 33.73,
+ "first_text_s_unreliable": true
+}

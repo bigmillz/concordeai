@@ -37709,7 +37709,9 @@ print("== quality-1: the grounded turn survives every cut (6b516) ==")
 _q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t),
         # (6b520) the grounded turn's dating rules read these; a question with no stamp skips the stale note
         "fresh_ablate": lambda: set(), "_gq_stamp": lambda q, t: "", "_src_months_ago": lambda d, t: -1,
-        "FRESH_STALE_MONTHS": 12}
+        "FRESH_STALE_MONTHS": 12,
+        # (6b560) and the shape rule's knob (6b523), off in the shipped app
+        "quality_ablate": lambda: set()}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
 _pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
 _turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
@@ -41672,18 +41674,18 @@ def _c523_all(src):
     gt = g["grounded_turn"]("What's a furnished one-bedroom in Lagoa per month, in reais and dollars?",
                             "[1] Rents \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    rent R$59 per square metre a month",
                             note=g["GROUND_FOLLOWUP"])
-    out["the grounded turn carries the estimate rule and the shape, after the dating rules and before the note"] = (
-        "- ESTIMATE WHEN ASKED:" in gt and "ANSWER SHAPE:" in gt and "name ONE pick" in gt
+    out["the grounded turn carries the shape, after the dating rules and before the note; the estimate rule is gone (6b560)"] = (
+        "ESTIMATE WHEN ASKED" not in gt and "ANSWER SHAPE:" in gt and "name ONE pick" in gt
         and "'The provided data'" in gt and "are banned" in gt
-        and gt.index("DATE EVERY CURRENT FIGURE") < gt.index("ESTIMATE WHEN ASKED") < gt.index("ANSWER SHAPE")
+        and gt.index("DATE EVERY CURRENT FIGURE") < gt.index("ANSWER SHAPE")
         < gt.index("[This is a follow-up") < gt.index("PROMPT: What's a furnished")
         and "Do not restate that answer" in gt)
     _gqa = g["quality_ablate"]
-    g["quality_ablate"] = lambda: {"shape", "estimate"}
+    g["quality_ablate"] = lambda: {"shape"}
     gt2 = g["grounded_turn"]("rent in Lagoa?", "[1] R \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    R$59")
     g["quality_ablate"] = _gqa
-    out["the knob takes the shape and the estimate rule out of a dev copy's turn"] = (
-        "ANSWER SHAPE" not in gt2 and "ESTIMATE WHEN ASKED" not in gt2 and "GROUNDING RULES" in gt2)
+    out["the knob takes the shape out of a dev copy's turn"] = (
+        "ANSWER SHAPE" not in gt2 and "GROUNDING RULES" in gt2)
     out["the dating rule puts the vendor's own site with official data, over a reseller's figure"] = (
         "THE VENDOR'S OWN SITE is the agency's, the maker's or the seller's own record" in g["GROUND_DATING"]
         and "beat any article's, listicle's or reseller's" in g["GROUND_DATING"])
@@ -41776,10 +41778,11 @@ _C523_MUT = [
      "    pass"),
     ("the post-pass knob honoured in the shipped app", "    if not DEV_HOME:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\"",
      "    if False:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\""),
-    ("no estimate rule", '    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE', '    if False:\n        rules += GROUND_ESTIMATE'),
+    ("the estimate rule back (6b560 dropped it)", '    q3 = quality_ablate()\n    if "shape" not in q3:',
+     '    q3 = quality_ablate()\n    rules += "- ESTIMATE WHEN ASKED: build it.\\n"\n    if "shape" not in q3:'),
     ("no shape", '    if "shape" not in q3:\n        rules += GROUND_SHAPE', '    if False:\n        rules += GROUND_SHAPE'),
-    ("the shape before the dating rules", '    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE          # (6b523) a figure asked for is given\n    if "shape" not in q3:\n        rules += GROUND_SHAPE             # (6b523) the shape, read last\n',
-     '    if "shape" not in q3:\n        rules = GROUND_SHAPE + rules\n    if "estimate" not in q3:\n        rules += GROUND_ESTIMATE\n'),
+    ("the shape before the dating rules", '    if "shape" not in q3:\n        rules += GROUND_SHAPE             # (6b523) the shape, read last\n',
+     '    if "shape" not in q3:\n        rules = GROUND_SHAPE + rules\n'),
     ("the vendor's page not flagged", '        vendor = bool(own and topical and "vendor" not in quality_ablate() and (', "        vendor = bool(False and ("),
     ("the vendor's page not seated", '        if s.get("vendor") and s["score"] > 0:\n            take(s, seat=True)              # the vendor\'s own page (6b523)', "        pass"),
     ("the pack's vendor mark missing", '        if s.get("vendor"):\n            lines.append("    (THE VENDOR\'S OWN SITE: the maker\'s or seller\'s own page)")', "        pass"),
@@ -41842,6 +41845,12 @@ def _c560_all(src):
         and p["_ans_asked"]("give me the gist") == "give me the gist" and p["_ans_asked"](None) == "")
     out["the leaks and the arithmetic are fixed whatever was asked"] = (
         P("Fuel: 583 × $3.40 = $1,883.", "", "write a report on fuel")[0] == "Fuel: 583 × $3.40 = $1,982.")
+    fx = ("Expect between R$ 4,500 and R$ 7,500 per month (roughly $2,500\u2013$4,200 USD, using 1 USD = 5.5167 BRL).")
+    w, n = P(fx)
+    out["a reais range written with 'and', at a rate written '1 USD = 5.5167 BRL', is converted at that rate"] = (
+        "(roughly $815\u2013$1,359 USD" in w and len(n) == 2
+        and p["answer_fx_rate"]("1 USD = 5.5167 BRL") == 5.52
+        and P("R$4,500 to R$7,500 ($816 to $1,360) at 5.5167 BRL per USD.")[1] == [])
     # the handler's wiring, from the text
     try:
         hd = src[src.index("        def _single_polish():\n"):
@@ -41887,6 +41896,9 @@ _C560_MUT = [
      "                if False:\n                    return"),
     ("the person's words not passed", "_new, _notes = answer_polish(_shown, _pk, prompt)",
      "_new, _notes = answer_polish(_shown, _pk)"),
+    ("a reais range with 'and' not read as a range", r"(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?",
+     r"(?:(?:\s?[–—-]\s?)(?:R\$)?"),
+    ("'1 USD = 5.5 BRL' not read as a rate", r're.compile(r"\b1\s?(?:USD|', r're.compile(r"\bNEVER\s?(?:USD|'),
 ]
 _c560_caught = []
 for _mn, _ma, _mb in _C560_MUT:

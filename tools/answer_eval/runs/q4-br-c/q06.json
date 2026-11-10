@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":94,\"est\":false}",
+  "X-Hurry": "33972eddef345c4e"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 18.33,
+ "elapsed_s": 19.19,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 9.91,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.91,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.91,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 36 passages"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.94,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.33,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.19,
+   "tag": "RATE",
+   "data": {
+    "tps": 43.7,
+    "tok": 37,
+    "s": 0.9
+   }
+  },
+  {
+   "t": 19.19,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "150 chars"
+   }
+  },
+  {
+   "t": 19.19,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 19.19,
+   "tag": "DONE",
+   "data": {
+    "f": 18.33,
+    "t": 19.19,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   9.91,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.91
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.91
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 36 passages",
+   "t_s": 12.94
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.94
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.94
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "150 chars",
+   "t_s": 19.19
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.19
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "BLS average price: Eggs, grade A, large (U.S. city average)",
+   "u": "https://data.bls.gov/timeseries/APU0000708111",
+   "d": "2026-09"
+  },
+  {
+   "t": "Egg Prices Today: Average Price of Eggs per Dozen (October ...",
+   "u": "https://coopeduplife.com/egg-prices/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen) in U.S ...Average Price: Eg",
+   "u": "https://fred.stlouisfed.org/series/APU0000708111",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen)... | St. Louis Fed",
+   "u": "https://fred.stlouisfed.org/graph/?g=1EpXX",
+   "d": ""
+  },
+  {
+   "t": "Egg Prices by Year (1980–2026): Price History & Inflation",
+   "u": "https://www.in2013dollars.com/Eggs/price-inflation",
+   "d": "2026-09"
+  },
+  {
+   "t": "Grocery Prices October 2026: Bread $1.83, Eggs $2.27, Beef $6.79",
+   "u": "https://www.summitplate.com/grocery-price-index",
+   "d": "2026-10"
+  },
+  {
+   "t": "US Egg Prices Hit Record High of $4.95 per Dozen | The Epoch Times",
+   "u": "https://www.theepochtimes.com/us/us-egg-prices-hit-record-high-of-4-95-per-dozen-5808886",
+   "d": "2025-02-12"
+  },
+  {
+   "t": "Egg prices up in October? Odds & Predictions 2026",
+   "u": "https://kalshi.com/markets/kxeggs/egg-prices/kxeggs-oct26",
+   "d": "2026-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.94,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 230,
+   "o": 28,
+   "d": 677,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5810,
+   "o": 55,
+   "d": 6194,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 43.7,
+  "tok": 37,
+  "s": 0.9
+ },
+ "app_first_s": 18.33,
+ "app_total_s": 19.19,
+ "answer_raw": "A dozen Grade A large eggs cost **$2.27** as of September 2026, which is **35% cheaper** than the $3.49 per dozen price seen in September 2025 [1][2].",
+ "answer": "A dozen Grade A large eggs cost **$2.27** as of September 2026, which is **35% cheaper** than the $3.49 per dozen price seen in September 2025 [1][2].",
+ "chars": 150,
+ "raw_bytes": 2343,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 1.95,
+ "rate_gen_tok_s": 43.6,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:47:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

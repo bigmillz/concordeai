@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.4,\"ftok\":161,\"est\":false}",
+  "X-Hurry": "5a3462064cf7b514"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 0.5,
+ "elapsed_s": 24.28,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 0.5,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.82,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.33,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 13.33,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.33,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.33,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.28,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.4,
+    "tok": 412,
+    "s": 6.2
+   }
+  },
+  {
+   "t": 24.28,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1651 chars"
+   }
+  },
+  {
+   "t": 24.28,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   10.82,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.82
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.82
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 13.33
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.33
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.33
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1651 chars",
+   "t_s": 24.28
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.28
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Development of a nutritionally balanced pizza as a functional meal...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC10282456/",
+   "d": ""
+  },
+  {
+   "t": "How Often Should You Eat Pizza for Good Health: Surprising ...",
+   "u": "https://mypizzadoc.com/how-often-should-you-eat-pizza-for-good-health/",
+   "d": "2026-01-02"
+  },
+  {
+   "t": "The Nutritional Value Of Pizza: Key Nutrients, Healthier Options, And...",
+   "u": "https://thisnutrition.com/the-nutritional-value-of-pizza-key-nutrients-healthier-options-and-recipes",
+   "d": ""
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "Italian Researchers Find Possible Health Benefits to Eating Pizza",
+   "u": "https://www.mensjournal.com/news/pizza-health-benefits-italian-researchers",
+   "d": ""
+  },
+  {
+   "t": "8 Worst Pizza Chains in America, According to Customers",
+   "u": "https://www.cheapism.com/worst-pizza-chains-america/",
+   "d": "2025-09-15"
+  },
+  {
+   "t": "Sulfite Allergy & Sensitivity: Symptoms, Tests & Treatments",
+   "u": "https://my.clevelandclinic.org/health/diseases/11323-sulfite-sensitivity",
+   "d": "2024-04-24"
+  },
+  {
+   "t": "15 Pizza Places (And Brands) To Avoid + 5 That Are Shockingly Bad",
+   "u": "https://chefstandards.com/shockingly-bad-pizza-places/",
+   "d": "2025-05-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.33,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.4,
+  "tok": 412,
+  "s": 6.2
+ },
+ "answer_raw": "Pizza is not inherently \"bad,\" but its nutritional profile depends entirely on the ingredients and portion sizes used. For many, the primary health risks stem from frequent consumption of pizzas that are high in calories, saturated fats, and refined carbohydrates, which can lead to weight gain and heart problems [2].\n\n## Nutritional Profile and Frequency\n\nThe impact of pizza on your health is largely determined by the balance of nutrients. A standard pizza can vary significantly in its composition; for instance, studies comparing different Margherita pizzas show wide variations in macronutrients even when they appear to be the same dish [1].\n\n**How often is fine?**\nThere is no single universal answer, but the following guidelines apply to most healthy eating patterns:\n\n*   **Avoid daily consumption:** Eating pizza every day is generally considered unhealthy for most people because it often lacks the nutrient variety required for good health [2].\n*   **Moderation is key:** Pizza can fit into a healthy diet if eaten in moderation [2].\n*   **Balance with sides:** Pairing pizza with a side salad or fruit can help increase the overall nutritional value of the meal [3].\n*   **Watch the \"bad\" pizzas:** Many commercial options—particularly frozen products or certain low-cost chains—may be overly processed, greasy, or lack sufficient nutrients [8].\n\nThe average American eats roughly **180 slices per year** [6, as of 2025-09-15]. While some research suggests there may be potential health benefits to certain pizza compositions, more in-depth studies are needed to fully understand their impact on specific conditions like arthritis [5].",
+ "answer": "Pizza is not inherently \"bad,\" but its nutritional profile depends entirely on the ingredients and portion sizes used. For many, the primary health risks stem from frequent consumption of pizzas that are high in calories, saturated fats, and refined carbohydrates, which can lead to weight gain and heart problems [2].\n\n## Nutritional Profile and Frequency\n\nThe impact of pizza on your health is largely determined by the balance of nutrients. A standard pizza can vary significantly in its composition; for instance, studies comparing different Margherita pizzas show wide variations in macronutrients even when they appear to be the same dish [1].\n\n**How often is fine?**\nThere is no single universal answer, but the following guidelines apply to most healthy eating patterns:\n\n*   **Avoid daily consumption:** Eating pizza every day is generally considered unhealthy for most people because it often lacks the nutrient variety required for good health [2].\n*   **Moderation is key:** Pizza can fit into a healthy diet if eaten in moderation [2].\n*   **Balance with sides:** Pairing pizza with a side salad or fruit can help increase the overall nutritional value of the meal [3].\n*   **Watch the \"bad\" pizzas:** Many commercial options—particularly frozen products or certain low-cost chains—may be overly processed, greasy, or lack sufficient nutrients [8].\n\nThe average American eats roughly **180 slices per year** [6, as of 2025-09-15]. While some research suggests there may be potential health benefits to certain pizza compositions, more in-depth studies are needed to fully understand their impact on specific conditions like arthritis [5].",
+ "chars": 1651,
+ "raw_bytes": 3934,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.25,
+ "rate_gen_tok_s": 19.66,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:23:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 18.06,
+ "app_total_s": 24.28,
+ "first_text_s_unreliable": true
+}

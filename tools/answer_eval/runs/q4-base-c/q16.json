@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.5,\"ftok\":147,\"est\":false}",
+  "X-Hurry": "fe9f4eedff62d2ed"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 20.45,
+ "elapsed_s": 26.64,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.83,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.45,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.64,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.2,
+    "tok": 453,
+    "s": 6.2
+   }
+  },
+  {
+   "t": 26.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1812 chars"
+   }
+  },
+  {
+   "t": 26.64,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.64,
+   "tag": "DONE",
+   "data": {
+    "f": 20.45,
+    "t": 26.64,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.83,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.83
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.83
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 16.87
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.87
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1812 chars",
+   "t_s": 26.64
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.64
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "Set Boundaries with Toxic Family During Holidays | Livecub | Livecub",
+   "u": "https://livecub.com/how-to-set-boundaries-with-toxic-family-members-during-holidays",
+   "d": "2026-01-18"
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "A systematic review and narrative summary of family-based ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4921023/",
+   "d": ""
+  },
+  {
+   "t": "3 important things to know about quitting nicotine during times of stress",
+   "u": "https://truthinitiative.org/research-resources/emerging-tobacco-products/3-important-things-know-about-quitting-nicotine-during",
+   "d": "2023-03-23"
+  },
+  {
+   "t": "Nicotine Dependence: Causes, Symptoms & Treatment",
+   "u": "https://my.clevelandclinic.org/health/diseases/24482-nicotine-dependence",
+   "d": "2022-12-02"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  },
+  {
+   "t": "Effectiveness of family-based behavioral intervention for ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12359190/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 22,
+   "d": 698,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4456,
+   "o": 387,
+   "d": 9720,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 73.2,
+  "tok": 453,
+  "s": 6.2
+ },
+ "app_first_s": 20.45,
+ "app_total_s": 26.64,
+ "answer_raw": "To get your family to pivot from nagging to supporting, you need to redefine their role from \"supervisors\" to \"environment builders.\"\n\nThe most effective approach is to tell them exactly how you want help, then follow your own lead; their role is to provide a stable environment while you manage the expertise of professional cessation programs [3].\n\n## Establish the Rules of Engagement\n\nFamily members often default to nagging or silence because they don't know what else to do. You can prevent this by setting clear boundaries in advance:\n\n*   **Define their role:** Explain that their job is to listen without lecturing and to keep the home smoke-free [3].\n*   **Set boundaries on \"checking up\":** If they are micromanaging, let them know that you need them to be a stable environment rather than a coach [3].\n*   **Pre-rehearse difficult moments:** Since family conflict often repeats in the same patterns, decide in advance which topics are off-limits and how you will respond if they cross those lines [2].\n*   **Prepare for the withdrawal window:** Expect irritability during the first two to four weeks of withdrawal [3]. If they know this is a physiological symptom of the process rather than a personal attack, they may be less likely to nag during those tense weeks [3].\n\n## Shift the Focus to Information\n\nWhen a slip happens, prevent the \"I told you so\" cycle by reframing the event. Treat a slip as a source of information rather than a failure [3]. If they can view a setback as data to help refine your plan, it prevents the cycle of judgment that leads to nagging.\n\nIf you find yourself needing more structure, you can look into digital resources like the EX Program (from Truth Initiative and Mayo Clinic) to provide the \"expert\" guidance your family might be trying to provide themselves [5].",
+ "answer": "To get your family to pivot from nagging to supporting, you need to redefine their role from \"supervisors\" to \"environment builders.\"\n\nThe most effective approach is to tell them exactly how you want help, then follow your own lead; their role is to provide a stable environment while you manage the expertise of professional cessation programs [3].\n\n## Establish the Rules of Engagement\n\nFamily members often default to nagging or silence because they don't know what else to do. You can prevent this by setting clear boundaries in advance:\n\n*   **Define their role:** Explain that their job is to listen without lecturing and to keep the home smoke-free [3].\n*   **Set boundaries on \"checking up\":** If they are micromanaging, let them know that you need them to be a stable environment rather than a coach [3].\n*   **Pre-rehearse difficult moments:** Since family conflict often repeats in the same patterns, decide in advance which topics are off-limits and how you will respond if they cross those lines [2].\n*   **Prepare for the withdrawal window:** Expect irritability during the first two to four weeks of withdrawal [3]. If they know this is a physiological symptom of the process rather than a personal attack, they may be less likely to nag during those tense weeks [3].\n\n## Shift the Focus to Information\n\nWhen a slip happens, prevent the \"I told you so\" cycle by reframing the event. Treat a slip as a source of information rather than a failure [3]. If they can view a setback as data to help refine your plan, it prevents the cycle of judgment that leads to nagging.\n\nIf you find yourself needing more structure, you can look into digital resources like the EX Program (from Truth Initiative and Mayo Clinic) to provide the \"expert\" guidance your family might be trying to provide themselves [5].",
+ "chars": 1812,
+ "raw_bytes": 4216,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.0,
+ "rate_gen_tok_s": 73.18,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:38:09",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

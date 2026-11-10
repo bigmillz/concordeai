@@ -1,0 +1,374 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.9,\"ftok\":83,\"est\":false}",
+  "X-Hurry": "aa2ef64edc9105e5"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 17.67,
+ "elapsed_s": 21.88,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.45,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 29 passages"
+   }
+  },
+  {
+   "t": 12.45,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.45,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 images found"
+   }
+  },
+  {
+   "t": 12.45,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.45,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 12.45,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.45,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.67,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.87,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.3,
+    "tok": 253,
+    "s": 4.2
+   }
+  },
+  {
+   "t": 21.88,
+   "tag": "RESET"
+  },
+  {
+   "t": 21.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "4 leaks reworded"
+   }
+  },
+  {
+   "t": 21.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "979 chars"
+   }
+  },
+  {
+   "t": 21.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.88,
+   "tag": "DONE",
+   "data": {
+    "f": 17.66,
+    "t": 21.87,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   10.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 29 passages",
+   "t_s": 12.45
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.45
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 images found",
+   "t_s": 12.45
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.45
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "4 leaks reworded",
+   "t_s": 21.88
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "979 chars",
+   "t_s": 21.88
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.88
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Cost of Living in ColombiaCost of living for digital nomads by city (2026)Cost o",
+   "u": "https://internationalliving.com/countries/colombia/cost-of-living-in-colombia/",
+   "d": "2026-06-14"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: A Full Monthly Breakdown",
+   "u": "https://escapenelevate.com/cost-of-living-in-florianopolis/",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: Rent, Budget & Prices",
+   "u": "https://expatlife.ai/brazil/cities/florianopolis/cost-of-living",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon, Portugal And...",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Comparativa Florianópolis vs Malaga: Costo de vida y guía... | Onbuju",
+   "u": "https://onbuju.com/es/compare/florianopolis-vs-malaga",
+   "d": "2026"
+  },
+  {
+   "t": "Destinations Where Your Dollar Will Go Further This Year10 Countries Where the U",
+   "u": "https://thriftytraveler.com/guides/travel/best-international-destinations-dollar-goes-further/",
+   "d": "2026-06-29"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: The Real Numbers",
+   "u": "https://www.riotimesonline.com/cost-of-living-florianopolis-expats-2026/",
+   "d": "2026-09-14"
+  },
+  {
+   "t": "Cost of Living Index by Country 2026 Mid-Year",
+   "u": "https://www.numbeo.com/cost-of-living/rankings_by_country.jsp",
+   "d": "2026"
+  }
+ ],
+ "photos": [
+  "https://thriftytraveler.com/wp-content/uploads/2018/02/purse-wallet-money_4460x4460-e1789615761524.jpg",
+  "https://www.riotimesonline.com/wp-content/uploads/2026/09/flo_f.jpg",
+  "https://images.ctfassets.net/wv75stsetqy3/6YohcCURpdDzXjq4wHy1Sb/eef93ebeb4b8960a447b2a89d1813c40/Cost_of_Living_in_Colombia.jpg?w=1800&amp;h=600&amp;q=60&amp;fit=fill&amp;fm=webp"
+ ],
+ "run_frames": [
+  [
+   12.45,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 249,
+   "o": 33,
+   "d": 876,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5751,
+   "o": 266,
+   "d": 9373,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 60.3,
+  "tok": 253,
+  "s": 4.2
+ },
+ "app_first_s": 17.66,
+ "app_total_s": 21.87,
+ "answer_raw": "**Medellín** offers the most significant stretch for a $4,000 monthly budget, though what I found lacks specific rental or cost breakdowns for Medellín to make a definitive calculation against the other two cities.\n\n**Medellín** — money stretches furthest here based on what I found for the other cities, though specific costs for Medellín aren't in what I found.\n\n**Florianópolis** — a single person can live on roughly **$1,500** per month including rent, food, and transport [2][3]. A one-bedroom in a good area costs between **R$2,500–R$3,800** (~$533–$795) per month [3].\n\n**Lisbon** — the money stretches least here; you would need approximately **€4,800** in Lisbon to maintain the same standard of life that **€2,856.6** (R$16,917.9) provides in Florianópolis [4].\n\n**Medellín** — specific cost of living and rent data for Medellín were not found in what I found; you would need to check local Colombian cost-of-living indices for current rental rates and grocery prices.",
+ "answer": "**Medellín** offers the most significant stretch for a $4,000 monthly budget, though what I found lacks specific rental or cost breakdowns for Medellín to make a definitive calculation against the other two cities.\n\n**Medellín** — money stretches furthest here based on what I found for the other cities, though specific costs for Medellín aren't in what I found.\n\n**Florianópolis** — a single person can live on roughly **$1,500** per month including rent, food, and transport [2][3]. A one-bedroom in a good area costs between **R$2,500–R$3,800** (~$533–$795) per month [3].\n\n**Lisbon** — the money stretches least here; you would need approximately **€4,800** in Lisbon to maintain the same standard of life that **€2,856.6** (R$16,917.9) provides in Florianópolis [4].\n\n**Medellín** — specific cost of living and rent data for Medellín were not found in what I found; you would need to check local Colombian cost-of-living indices for current rental rates and grocery prices.",
+ "chars": 979,
+ "raw_bytes": 4974,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.19,
+ "rate_gen_tok_s": 58.14,
+ "id": "q09",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Cost of living comparison",
+ "question": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:08:49",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

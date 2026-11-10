@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.5,\"ftok\":144,\"est\":false}",
+  "X-Hurry": "3bef8a4675494f05"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.88,
+ "elapsed_s": 24.71,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 9.22,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.22,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.22,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.59,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.59,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.59,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.59,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.71,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.2,
+    "tok": 377,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 24.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1510 chars"
+   }
+  },
+  {
+   "t": 24.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.71,
+   "tag": "DONE",
+   "data": {
+    "f": 16.88,
+    "t": 24.71,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.22,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.22
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.22
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 12.59
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.59
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.59
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1510 chars",
+   "t_s": 24.71
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.71
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone Price List 2026: Every Model and What to Pay",
+   "u": "https://geekblog.net/mobile/iphone-price-list-2026/",
+   "d": "2026-07-08"
+  },
+  {
+   "t": "Which iPhone Should You Buy in 2026? Every Model Compared",
+   "u": "https://applescoop.org/story/which-iphone-should-you-buy-2026-every-model-compared",
+   "d": "2026-10-03"
+  },
+  {
+   "t": "iPhone 18 Pro Max vs. iPhone 17 Pro Max: Is Apple’s Latest Flagship Actually Wor",
+   "u": "https://www.geeky-gadgets.com/iphone-18-pro-max-vs-17-pro-max-2/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": ""
+  },
+  {
+   "t": "iPhone Duo arrives at Apple Store locations worldwide - Apple",
+   "u": "https://www.apple.com/newsroom/2026/10/iphone-duo-arrives-at-apple-store-locations-worldwide/",
+   "d": "2026-10"
+  },
+  {
+   "t": "iPhone 14 Pro Max Colors: Which One Suits Your Style? – Fonezone.ae",
+   "u": "https://www.fonezone.ae/blogs/news/iphone-14-pro-max-colors",
+   "d": "2026-02-25"
+  },
+  {
+   "t": "Best iPhone in 2026 ranked from best to worst",
+   "u": "https://www.stuff.tv/features/best-iphone/",
+   "d": "2026-10-19"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.59,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 239,
+   "o": 18,
+   "d": 788,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5024,
+   "o": 474,
+   "d": 12073,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 48.2,
+  "tok": 377,
+  "s": 7.8
+ },
+ "app_first_s": 16.88,
+ "app_total_s": 24.71,
+ "answer_raw": "The newest flagship is the **iPhone 18 Pro Max** (as of October 2026) [4].\n\nThe current lineup features prices ranging from **$599** for the iPhone 17e to **$1,199** for the iPhone 17 Pro Max (as of July 2026) [2]. However, the latest flagship, the **iPhone 18 Pro Max**, carries a price increase over its predecessor due to rising production costs like global RAM shortages (as of October 2026) [4].\n\nWhether it is \"worth it\" depends on your specific needs:\n\n**The Case for Upgrading**\nIf you are coming from an iPhone 14, you will notice a significant leap in performance and features [4]. The jump from the 14 to the 18 Pro Max represents a multi-generation leap in processing power, camera systems, and potentially new form factors like the **iPhone Duo**, which debuted in late October 2026 [1][6].\n\n**The Case for Waiting or Skipping**\nIf you don't need the absolute top-tier specs, the **iPhone 17** at **$799** (as of July 2026) is considered the value sweet spot [2]. The iPhone 18 Pro Max's price increase may not fully justify the expense for everyone, as it refines the user experience rather than drastically altering it [4]. \n\n| Model | Price (Approx. US MSRP) | Verdict |\n| :--- | :--- | :--- |\n| **iPhone 17e** | ~$599 (as of July 2026) [2] | Cheapest new model |\n| **iPhone 17** | ~$799 (as of July 2026) [2] | Value sweet spot |\n| **iPhone 17 Pro Max** | ~$1,199 (as of July 2026) [2] | High-end flagship |\n| **iPhone 18 Pro Max** | Higher than $1,199 (as of Oct 2026) [4] | Latest flagship |",
+ "answer": "The newest flagship is the **iPhone 18 Pro Max** (as of October 2026) [4].\n\nThe current lineup features prices ranging from **$599** for the iPhone 17e to **$1,199** for the iPhone 17 Pro Max (as of July 2026) [2]. However, the latest flagship, the **iPhone 18 Pro Max**, carries a price increase over its predecessor due to rising production costs like global RAM shortages (as of October 2026) [4].\n\nWhether it is \"worth it\" depends on your specific needs:\n\n**The Case for Upgrading**\nIf you are coming from an iPhone 14, you will notice a significant leap in performance and features [4]. The jump from the 14 to the 18 Pro Max represents a multi-generation leap in processing power, camera systems, and potentially new form factors like the **iPhone Duo**, which debuted in late October 2026 [1][6].\n\n**The Case for Waiting or Skipping**\nIf you don't need the absolute top-tier specs, the **iPhone 17** at **$799** (as of July 2026) is considered the value sweet spot [2]. The iPhone 18 Pro Max's price increase may not fully justify the expense for everyone, as it refines the user experience rather than drastically altering it [4]. \n\n| Model | Price (Approx. US MSRP) | Verdict |\n| :--- | :--- | :--- |\n| **iPhone 17e** | ~$599 (as of July 2026) [2] | Cheapest new model |\n| **iPhone 17** | ~$799 (as of July 2026) [2] | Value sweet spot |\n| **iPhone 17 Pro Max** | ~$1,199 (as of July 2026) [2] | High-end flagship |\n| **iPhone 18 Pro Max** | Higher than $1,199 (as of Oct 2026) [4] | Latest flagship |",
+ "chars": 1510,
+ "raw_bytes": 3688,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.28,
+ "rate_gen_tok_s": 48.21,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:31:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

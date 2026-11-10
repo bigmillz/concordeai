@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.1,\"ftok\":252,\"est\":false}",
+  "X-Hurry": "043dc646bc8c413c"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 21.97,
+ "elapsed_s": 25.99,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.97,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.99,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.5,
+    "tok": 271,
+    "s": 4.0
+   }
+  },
+  {
+   "t": 25.99,
+   "tag": "RESET"
+  },
+  {
+   "t": 25.99,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "2 leaks reworded"
+   }
+  },
+  {
+   "t": 25.99,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1060 chars"
+   }
+  },
+  {
+   "t": 25.99,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.99,
+   "tag": "DONE",
+   "data": {
+    "f": 21.97,
+    "t": 25.99,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 18.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.06
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.06
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "2 leaks reworded",
+   "t_s": 25.99
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1060 chars",
+   "t_s": 25.99
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.99
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "10 high-paying jobs that can lead to wealth without a college degree",
+   "u": "https://www.msn.com/en-us/news/other/10-high-paying-jobs-that-can-lead-to-wealth-without-a-college-degree/ar-AA2g6QeP?ocid=BingNewsVerp",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "226 Jobs That Pay Over $50K Without a Degree (2026 BLS Data)",
+   "u": "https://www.apollotechnical.com/jobs-that-pay-over-50k-without-a-degree/",
+   "d": "2026-08"
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree",
+   "u": "https://www.job200.com/blog/the-highest-paying-jobs-that-do-not-require-a-college-degree-in-2026",
+   "d": "2026"
+  },
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-08-21"
+  },
+  {
+   "t": "These jobs pay six figures without a college degree. One has over 18,000 opening",
+   "u": "https://www.msn.com/en-us/news/other/these-jobs-pay-six-figures-without-a-college-degree-one-has-over-18000-openings-a-year-another-just-400/ar-AA2eaRCg?ocid=BingNewsVerp",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 23,
+   "d": 543,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4556,
+   "o": 235,
+   "d": 7826,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 67.5,
+  "tok": 271,
+  "s": 4.0
+ },
+ "app_first_s": 21.97,
+ "app_total_s": 25.99,
+ "answer_raw": "The top five realistic paths involve specialized licenses, vocational training, or apprenticeships to prove competence [1][2].\n\nBecause I didn't find specific job titles with their individual salary ranges and entry timelines, I cannot provide a ranked list of five distinct roles with those exact metrics; I would need to check the full reports from sites like **resumly.ai** or **bestjobsearchapps.com** to extract the specific names and numbers.\n\nWhat I found identifies these general career categories and constraints:\n\n*   **High-pay occupations** — These roles require a license, professional certificate, or apprenticeship rather than a four-year degree [1].\n*   **Six-figure potential** — Approximately **9 occupations** pay a median of **$100,000 or more** without a degree [3].\n*   **Growth sectors** — Certain high-paying roles are projected to grow through **2034** [6].\n*   **Logistics vs. Specialized Tech** — Managing **warehouses and supply chains** offers more frequent opportunities than specialized roles like operating nuclear reactors [7].",
+ "answer": "The top five realistic paths involve specialized licenses, vocational training, or apprenticeships to prove competence [1][2].\n\nBecause I didn't find specific job titles with their individual salary ranges and entry timelines, I cannot provide a ranked list of five distinct roles with those exact metrics; I would need to check the full reports from sites like **resumly.ai** or **bestjobsearchapps.com** to extract the specific names and numbers.\n\nWhat I found identifies these general career categories and constraints:\n\n*   **High-pay occupations** — These roles require a license, professional certificate, or apprenticeship rather than a four-year degree [1].\n*   **Six-figure potential** — Approximately **9 occupations** pay a median of **$100,000 or more** without a degree [3].\n*   **Growth sectors** — Certain high-paying roles are projected to grow through **2034** [6].\n*   **Logistics vs. Specialized Tech** — Managing **warehouses and supply chains** offers more frequent opportunities than specialized roles like operating nuclear reactors [7].",
+ "chars": 1060,
+ "raw_bytes": 4782,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.2,
+ "rate_gen_tok_s": 65.92,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:58:45",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

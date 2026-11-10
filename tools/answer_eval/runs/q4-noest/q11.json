@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.8,\"ftok\":88,\"est\":false}",
+  "X-Hurry": "4bdf3dc916f3907f"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 17.13,
+ "elapsed_s": 22.67,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.2,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 20 passages"
+   }
+  },
+  {
+   "t": 13.2,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.2,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.2,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.2,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.13,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.67,
+   "tag": "RATE",
+   "data": {
+    "tps": 79.8,
+    "tok": 442,
+    "s": 5.5
+   }
+  },
+  {
+   "t": 22.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1770 chars"
+   }
+  },
+  {
+   "t": 22.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.67,
+   "tag": "DONE",
+   "data": {
+    "f": 17.13,
+    "t": 22.67,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   10.35,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.35
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.35
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 20 passages",
+   "t_s": 13.2
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.2
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.2
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1770 chars",
+   "t_s": 22.67
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.67
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Magnesium For Anxiety Clinical Research – Verdant Wellness",
+   "u": "https://verdantwellness.co/blogs/cortisol-balance/magnesium-for-anxiety-clinical-research",
+   "d": "2026-08-06"
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "Does Magnesium Help With Anxiety? Benefits, Dosage & Best Forms",
+   "u": "https://villabehavioralhealth.com/does-magnesium-help-with-anxiety/",
+   "d": "2026-05-26"
+  },
+  {
+   "t": "The Effects of Magnesium Supplementation on Subjective Anxiety...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5452159/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium for Anxiety: Which Form Actually Works?",
+   "u": "https://stopanxiety.org/magnesium-for-anxiety/",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Does Magnesium Help with Anxiety? Evidence and Safety Guide...",
+   "u": "https://www.boltpharmacy.co.uk/guide/does-magnesium-help-with-anxiety",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Magnesium Supplement UK — Forms & Evidence Guide",
+   "u": "https://www.kojo.life/blogs/journal/magnesium-complete-guide-forms-evidence",
+   "d": ""
+  },
+  {
+   "t": "Magnesium for Anxiety: Which Type Works, What Dose, and What...",
+   "u": "https://resetmindhub.com/magnesium-for-anxiety/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.2,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 230,
+   "o": 21,
+   "d": 565,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4756,
+   "o": 352,
+   "d": 9421,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 79.8,
+  "tok": 442,
+  "s": 5.5
+ },
+ "app_first_s": 17.13,
+ "app_total_s": 22.67,
+ "answer_raw": "The best forms for anxiety are **magnesium glycinate** and **magnesium taurate**, though the quality of clinical evidence remains moderate to low due to methodological limitations in existing studies [2][6][8].\n\n**Magnesium glycinate** (or bisglycinate) is a preferred option because it binds magnesium to glycine, an amino acid with own calming, inhibitory effects on the nervous system [1]. It is generally well-tolerated with minimal laxative effects [7].\n\n**Magnesium taurate** is another primary candidate due to the calming neurological properties of taurine and its influence on GABA receptor function; however, clinical trial data specific to this form is currently limited [1][8].\n\n**Magnesium L-threonate** is a newer form designed for neurological applications that shows higher concentrations in brain tissue in animal research, though its clinical evidence for anxiety specifically is limited [1].\n\nResearch shows positive outcomes for doses ranging from **75 mg to 360 mg** of elemental magnesium [3]. There is no clear linear dose-response relationship, meaning higher doses are not necessarily more effective [3].\n\nThe strength of the evidence is limited by several factors:\n* **Heterogeneity**: Studies use different dosages, formulations, and durations, making it difficult to draw firm conclusions [2].\n* **Study Design**: Many studies involve small sample sizes and short durations [6].\n* **Baseline Variables**: The effectiveness of magnesium often depends on an individual's baseline stress levels and existing nutritional deficiencies [3][5].\n\nWhile magnesium is a natural NMDA receptor antagonist that helps prevent hyperactive excitatory neurotransmission, current research quality is insufficient for definitive clinical recommendations [5][6].",
+ "answer": "The best forms for anxiety are **magnesium glycinate** and **magnesium taurate**, though the quality of clinical evidence remains moderate to low due to methodological limitations in existing studies [2][6][8].\n\n**Magnesium glycinate** (or bisglycinate) is a preferred option because it binds magnesium to glycine, an amino acid with own calming, inhibitory effects on the nervous system [1]. It is generally well-tolerated with minimal laxative effects [7].\n\n**Magnesium taurate** is another primary candidate due to the calming neurological properties of taurine and its influence on GABA receptor function; however, clinical trial data specific to this form is currently limited [1][8].\n\n**Magnesium L-threonate** is a newer form designed for neurological applications that shows higher concentrations in brain tissue in animal research, though its clinical evidence for anxiety specifically is limited [1].\n\nResearch shows positive outcomes for doses ranging from **75 mg to 360 mg** of elemental magnesium [3]. There is no clear linear dose-response relationship, meaning higher doses are not necessarily more effective [3].\n\nThe strength of the evidence is limited by several factors:\n* **Heterogeneity**: Studies use different dosages, formulations, and durations, making it difficult to draw firm conclusions [2].\n* **Study Design**: Many studies involve small sample sizes and short durations [6].\n* **Baseline Variables**: The effectiveness of magnesium often depends on an individual's baseline stress levels and existing nutritional deficiencies [3][5].\n\nWhile magnesium is a natural NMDA receptor antagonist that helps prevent hyperactive excitatory neurotransmission, current research quality is insufficient for definitive clinical recommendations [5][6].",
+ "chars": 1770,
+ "raw_bytes": 4003,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.52,
+ "rate_gen_tok_s": 79.87,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:09:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

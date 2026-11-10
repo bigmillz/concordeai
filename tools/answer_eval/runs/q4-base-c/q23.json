@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.4,\"ftok\":147,\"est\":false}",
+  "X-Hurry": "a4f2a220c23d19d7"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.37,
+ "elapsed_s": 27.62,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.77,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.93,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 13.93,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.93,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.93,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.93,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.37,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.62,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.2,
+    "tok": 749,
+    "s": 10.2
+   }
+  },
+  {
+   "t": 27.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2999 chars"
+   }
+  },
+  {
+   "t": 27.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 27.62,
+   "tag": "DONE",
+   "data": {
+    "f": 17.37,
+    "t": 27.61,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.77,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.77
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.77
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 13.93
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.93
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.93
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2999 chars",
+   "t_s": 27.62
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.62
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Job Displacement Data Exposes a $1 Trillion Due Diligence ...",
+   "u": "https://developmentcorporate.com/saas/ai-job-displacement-data-exposes-a-1-trillion-due-diligence-blind-spot/",
+   "d": "2025-11-23"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S ... - SHRM",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment/2026-full-report",
+   "d": ""
+  },
+  {
+   "t": "Is AI taking white-collar jobs? Latest hiring report suggests not yet.",
+   "u": "https://www.washingtonpost.com/business/2026/11/07/white-collar-hiring-jumps-october-complicating-ai-story/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "4 Conditions That Make It Hard for AI to Take Your Job",
+   "u": "https://note.com/ryoga_hanafusa/n/n5205823d484c?hl=en",
+   "d": "2026-11-07"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "SysAdmin to DevOps in 2026: A Practical Transition Roadmap",
+   "u": "https://sysadmin.co.in/sysadmin-to-devops-2026-roadmap/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "We Work Remotely: Advanced Remote Job Search",
+   "u": "https://weworkremotely.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.93,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 35,
+   "d": 913,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4374,
+   "o": 650,
+   "d": 13640,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 73.2,
+  "tok": 749,
+  "s": 10.2
+ },
+ "app_first_s": 17.37,
+ "app_total_s": 27.61,
+ "answer_raw": "The displacement risk for sysadmins over the next five years is not a total replacement of the role, but a shift in which tasks you own. You aren't being replaced by an AI; you are being replaced by a human who knows how to leverage AI to do your current workload.\n\n## The Displacement Landscape\n\nThe real risk isn't entry-level automation; it's the displacement of experienced, well-compensated knowledge workers [1]. While AI can handle specific routine tasks, it struggles with the \"on the ground\" judgment required to handle complex, real-world edge cases [5].\n\nIn IT ops, the risk follows a specific pattern:\n* **Task-level exposure:** AI is highly effective at automating specific, repeatable functions (like certain diagnostic or documentation tasks), but professions are a mix of routine automation and situational judgment [5].\n* **The \"Pipeline\" shift:** In the ops world, the transition from legacy sysadmin work to DevOps-style workflows is where the friction happens. The risk is being stuck in manual, repeatable tasks that are prime for automation [7].\n* **Economic reality:** Theoretical AI capability does not always equal economic displacement [1]. If your job is purely about executing a predefined set of steps, you are at higher risk than if your job involves architectural oversight or complex troubleshooting [1][5].\n\n## Your Strategic Roadmap\n\nTo mitigate risk, you need to move from being the person who \"handles the box\" to the person who \"manages the system state.\" \n\n**1. Pivot to DevOps-oriented workflows**\nThe goal is to make your sysadmin skills repeatable and reviewable [7]. If you are still performing manual configurations, you are at the highest risk.\n* **Master the basics:** Ensure your Linux fundamentals are airtight [7].\n* **Adopt \"Infrastructure as Code\" (IaC) habits:** Focus on Git, desired state configuration, packaging, and cloud objects [7].\n* **Containerization:** Master multi-stage Dockerfiles, Compose for multi-service stacks, and understanding the nuances of volumes vs. bind mounts [7].\n* **Avoid the K8s trap:** Don't jump straight to Kubernetes orchestration if your packaging and container habits aren't solid yet [7].\n\n**2. Focus on human-centric value**\nSince AI struggles with tasks requiring judgment based on \"the situation on the ground,\" lean into the parts of your job that require human context [5]. This means:\n* **Architecture and Design:** Moving from \"fixing it\" to \"designing it so it doesn't break.\"\n* **Security and Compliance:** Managing the complex interplay of human policy and technical controls.\n* **Complex Troubleshooting:** Handling the \"weird\" failures that don't fit a standard model.\n\n**3. Redefine your role**\nInstead of asking if your profession is safe, identify which tasks you should hand off to AI and which you must retain to remain indispensable [5]. If you can use AI to handle the \"grunt work\" of sysadmin tasks, you free yourself to handle the higher-level engineering problems that keep the lights on.",
+ "answer": "The displacement risk for sysadmins over the next five years is not a total replacement of the role, but a shift in which tasks you own. You aren't being replaced by an AI; you are being replaced by a human who knows how to leverage AI to do your current workload.\n\n## The Displacement Landscape\n\nThe real risk isn't entry-level automation; it's the displacement of experienced, well-compensated knowledge workers [1]. While AI can handle specific routine tasks, it struggles with the \"on the ground\" judgment required to handle complex, real-world edge cases [5].\n\nIn IT ops, the risk follows a specific pattern:\n* **Task-level exposure:** AI is highly effective at automating specific, repeatable functions (like certain diagnostic or documentation tasks), but professions are a mix of routine automation and situational judgment [5].\n* **The \"Pipeline\" shift:** In the ops world, the transition from legacy sysadmin work to DevOps-style workflows is where the friction happens. The risk is being stuck in manual, repeatable tasks that are prime for automation [7].\n* **Economic reality:** Theoretical AI capability does not always equal economic displacement [1]. If your job is purely about executing a predefined set of steps, you are at higher risk than if your job involves architectural oversight or complex troubleshooting [1][5].\n\n## Your Strategic Roadmap\n\nTo mitigate risk, you need to move from being the person who \"handles the box\" to the person who \"manages the system state.\" \n\n**1. Pivot to DevOps-oriented workflows**\nThe goal is to make your sysadmin skills repeatable and reviewable [7]. If you are still performing manual configurations, you are at the highest risk.\n* **Master the basics:** Ensure your Linux fundamentals are airtight [7].\n* **Adopt \"Infrastructure as Code\" (IaC) habits:** Focus on Git, desired state configuration, packaging, and cloud objects [7].\n* **Containerization:** Master multi-stage Dockerfiles, Compose for multi-service stacks, and understanding the nuances of volumes vs. bind mounts [7].\n* **Avoid the K8s trap:** Don't jump straight to Kubernetes orchestration if your packaging and container habits aren't solid yet [7].\n\n**2. Focus on human-centric value**\nSince AI struggles with tasks requiring judgment based on \"the situation on the ground,\" lean into the parts of your job that require human context [5]. This means:\n* **Architecture and Design:** Moving from \"fixing it\" to \"designing it so it doesn't break.\"\n* **Security and Compliance:** Managing the complex interplay of human policy and technical controls.\n* **Complex Troubleshooting:** Handling the \"weird\" failures that don't fit a standard model.\n\n**3. Redefine your role**\nInstead of asking if your profession is safe, identify which tasks you should hand off to AI and which you must retain to remain indispensable [5]. If you can use AI to handle the \"grunt work\" of sysadmin tasks, you free yourself to handle the higher-level engineering problems that keep the lights on.",
+ "chars": 2999,
+ "raw_bytes": 5304,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 27.15,
+ "rate_gen_tok_s": 73.15,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:41:43",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

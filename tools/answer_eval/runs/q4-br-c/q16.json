@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.1,\"ftok\":105,\"est\":false}",
+  "X-Hurry": "0179931969ed51c8"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 17.9,
+ "elapsed_s": 25.02,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.55,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.55,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.55,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.51,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 13.51,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.51,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.51,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.51,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.9,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.02,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.4,
+    "tok": 394,
+    "s": 7.1
+   }
+  },
+  {
+   "t": 25.02,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1579 chars"
+   }
+  },
+  {
+   "t": 25.02,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.02,
+   "tag": "DONE",
+   "data": {
+    "f": 17.9,
+    "t": 25.01,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   9.55,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.55
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.55
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 13.51
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.51
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.51
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1579 chars",
+   "t_s": 25.02
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.02
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Set Healthy Family Boundaries in Addiction Recovery",
+   "u": "https://avedisrecovery.com/blog/addiction-recovery/setting-healthy-family-boundaries-in-addiction-recovery/",
+   "d": ""
+  },
+  {
+   "t": "How to Set Boundaries in Addiction Recovery | Family Program MI",
+   "u": "https://sanfordbehavioralhealth.com/2022/12/27/boundaries-family-addiction-recovery-beyond/",
+   "d": "2022-12-27"
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "Examining pathways between family or peer factors and smoking ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9382825/",
+   "d": ""
+  },
+  {
+   "t": "3 important things to know about quitting nicotine during times of stress",
+   "u": "https://truthinitiative.org/research-resources/emerging-tobacco-products/3-important-things-know-about-quitting-nicotine-during",
+   "d": "2023-03-23"
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "A systematic review and narrative summary of family-based ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4921023/",
+   "d": ""
+  },
+  {
+   "t": "How to Set Boundaries With Family When You’re In Recovery",
+   "u": "https://northgeorgiarecoverycenter.com/how-to-draw-boundaries-with-family-members/",
+   "d": "2026-11-02"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.51,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 18,
+   "d": 1040,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5051,
+   "o": 326,
+   "d": 11451,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 55.4,
+  "tok": 394,
+  "s": 7.1
+ },
+ "app_first_s": 17.9,
+ "app_total_s": 25.01,
+ "answer_raw": "The most effective approach is to **set clear boundaries** and tell them exactly how you want to be helped, as the best support often looks like following your lead rather than coaching you. \n\nIn many families, boundaries become blurred during active addiction, and re-establishing them is necessary for everyone to heal [2]. You should clearly communicate that you need them to **listen without lecturing** and to ask how they can help rather than assuming they know [6]. Since families often default to either silence or nagging, you need to define what \"support\" looks like for you—whether that is space to deal with irritability during the first two to four weeks of withdrawal or having a smoke-free home environment [6].\n\nBecause family behaviors can either support or undermine your chances of staying abstinent, it is vital to establish these rules early [7]. You might consider these specific strategies:\n\n*   **Define the role**: Tell them if you need them to be a sounding board, a distraction, or simply to leave you alone during certain hours.\n*   **Address the \"checking up\"**: Explain that constant monitoring can feel like control or caretaking, both of which are unproductive behaviors in recovery [2].\n*   **Treat slips as data**: If you have a lapse, instruct them to treat it as information to help adjust your plan rather than a reason to lecture you [6].\n\nIf their behavior doesn't change, you may need to look into professional family counseling or recovery-specific boundary-setting resources to mediate the transition from \"caretaker\" to \"supporter\" [2].",
+ "answer": "The most effective approach is to **set clear boundaries** and tell them exactly how you want to be helped, as the best support often looks like following your lead rather than coaching you. \n\nIn many families, boundaries become blurred during active addiction, and re-establishing them is necessary for everyone to heal [2]. You should clearly communicate that you need them to **listen without lecturing** and to ask how they can help rather than assuming they know [6]. Since families often default to either silence or nagging, you need to define what \"support\" looks like for you—whether that is space to deal with irritability during the first two to four weeks of withdrawal or having a smoke-free home environment [6].\n\nBecause family behaviors can either support or undermine your chances of staying abstinent, it is vital to establish these rules early [7]. You might consider these specific strategies:\n\n*   **Define the role**: Tell them if you need them to be a sounding board, a distraction, or simply to leave you alone during certain hours.\n*   **Address the \"checking up\"**: Explain that constant monitoring can feel like control or caretaking, both of which are unproductive behaviors in recovery [2].\n*   **Treat slips as data**: If you have a lapse, instruct them to treat it as information to help adjust your plan rather than a reason to lecture you [6].\n\nIf their behavior doesn't change, you may need to look into professional family counseling or recovery-specific boundary-setting resources to mediate the transition from \"caretaker\" to \"supporter\" [2].",
+ "chars": 1579,
+ "raw_bytes": 4009,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.78,
+ "rate_gen_tok_s": 55.44,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:52:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

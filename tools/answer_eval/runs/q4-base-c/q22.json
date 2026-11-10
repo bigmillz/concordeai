@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":141,\"est\":false}",
+  "X-Hurry": "bdcee72ac0f60975"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.49,
+ "elapsed_s": 26.04,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.37,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.37,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.29,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 22 passages"
+   }
+  },
+  {
+   "t": 14.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.29,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.29,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.49,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.04,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.0,
+    "tok": 490,
+    "s": 7.5
+   }
+  },
+  {
+   "t": 26.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1961 chars"
+   }
+  },
+  {
+   "t": 26.04,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.04,
+   "tag": "DONE",
+   "data": {
+    "f": 18.49,
+    "t": 26.04,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.37,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.37
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.37
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 22 passages",
+   "t_s": 14.29
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.29
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.29
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1961 chars",
+   "t_s": 26.04
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.04
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Highest-Paying Jobs Without a Degree",
+   "u": "https://www.job200.com/blog/the-highest-paying-jobs-that-do-not-require-a-college-degree-in-2026",
+   "d": "2026"
+  },
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-08-21"
+  },
+  {
+   "t": "High-Paying Jobs Without a Degree: 2026 Guide - choosefi.com",
+   "u": "https://choosefi.com/article/high-paying-jobs-without-degree",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  },
+  {
+   "t": "Field of degree: Biology : Occupational Outlook Handbook: : U ...",
+   "u": "https://www.bls.gov/ooh/field-of-degree/biology/biology-field-of-degree.htm",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "High-Paying Careers With an Associate’s Degree: Top 8 Picks",
+   "u": "https://www.investopedia.com/financial-edge/0811/8-high-paying-jobs-that-require-2-year-degrees.aspx",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "Movies with Long Takes That Amaze - films.io",
+   "u": "https://films.io/list/2026/04/27/best-long-takes-movies/",
+   "d": "2026-04-27"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.29,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 25,
+   "d": 756,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4964,
+   "o": 480,
+   "d": 11697,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 65.0,
+  "tok": 490,
+  "s": 7.5
+ },
+ "app_first_s": 18.49,
+ "app_total_s": 26.04,
+ "answer_raw": "Finding high-paying roles without a degree usually requires trading academic credentials for specialized certifications, technical training, or high-stakes responsibility.\n\nThe following five roles represent the highest-earning paths identified in current reports where a degree is not the primary entry requirement:\n\n**1. Air Traffic Controller** — ~$144,580 (median annual wage as of May 2024) [1].\nThis is one of the highest-paying roles in the federal workforce and is highly cognitively demanding [1]. Getting in typically involves completing an FAA-approved training program or joining the FAA academy, which can take several months to a year depending on the track.\n\n**2. Airline Captain** — ~$226,600+ (median as of Sept 2026) [5].\nWhile the path is long, it relies on flight hours, FAA certifications, and union seniority rather than a degree [5]. You can expect to spend several years building hours and progressing through co-pilot roles before hitting these wide-body international route medians.\n\n**3. Elevator Installer and Repairer** — ~$106,580 (median as of 2026) [1].\nThis is a top-tier skilled trade where the top 10% of earners can clear $149,250 [1]. Entry requires vocational training or apprenticeship, typically taking 3–5 years to master the trade and reach senior pay levels.\n\n**4. Specialized Skilled Trades (General)** — ~$50,980+ (median as of Aug 2026) [2].\nVarious roles in utilities, transportation, and public safety offer pay well above the U.S. median of $50,980 (as of May 2025) [2]. These roles require vocational training or professional certifications rather than degrees and are projected to grow through 2034 [2].\n\n**5. Specialized Technical/Field Roles** — Variable [2][4].\nDepending on the specific niche in logistics or public safety, these roles allow you to enter the workforce via competency-based hiring [4]. The time to entry varies from a few months of certification to a few years of on-the-job experience [2].",
+ "answer": "Finding high-paying roles without a degree usually requires trading academic credentials for specialized certifications, technical training, or high-stakes responsibility.\n\nThe following five roles represent the highest-earning paths identified in current reports where a degree is not the primary entry requirement:\n\n**1. Air Traffic Controller** — ~$144,580 (median annual wage as of May 2024) [1].\nThis is one of the highest-paying roles in the federal workforce and is highly cognitively demanding [1]. Getting in typically involves completing an FAA-approved training program or joining the FAA academy, which can take several months to a year depending on the track.\n\n**2. Airline Captain** — ~$226,600+ (median as of Sept 2026) [5].\nWhile the path is long, it relies on flight hours, FAA certifications, and union seniority rather than a degree [5]. You can expect to spend several years building hours and progressing through co-pilot roles before hitting these wide-body international route medians.\n\n**3. Elevator Installer and Repairer** — ~$106,580 (median as of 2026) [1].\nThis is a top-tier skilled trade where the top 10% of earners can clear $149,250 [1]. Entry requires vocational training or apprenticeship, typically taking 3–5 years to master the trade and reach senior pay levels.\n\n**4. Specialized Skilled Trades (General)** — ~$50,980+ (median as of Aug 2026) [2].\nVarious roles in utilities, transportation, and public safety offer pay well above the U.S. median of $50,980 (as of May 2025) [2]. These roles require vocational training or professional certifications rather than degrees and are projected to grow through 2034 [2].\n\n**5. Specialized Technical/Field Roles** — Variable [2][4].\nDepending on the specific niche in logistics or public safety, these roles allow you to enter the workforce via competency-based hiring [4]. The time to entry varies from a few months of certification to a few years of on-the-job experience [2].",
+ "chars": 1961,
+ "raw_bytes": 4333,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.83,
+ "rate_gen_tok_s": 64.93,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:41:13",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

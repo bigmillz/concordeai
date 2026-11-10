@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.9,\"ftok\":98,\"est\":false}",
+  "X-Hurry": "6a63acf9e2ff170f"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.83,
+ "elapsed_s": 25.79,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.13,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.53,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 12.53,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.53,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.53,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.53,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.79,
+   "tag": "RATE",
+   "data": {
+    "tps": 54.6,
+    "tok": 489,
+    "s": 9.0
+   }
+  },
+  {
+   "t": 25.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1958 chars"
+   }
+  },
+  {
+   "t": 25.79,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.79,
+   "tag": "DONE",
+   "data": {
+    "f": 16.83,
+    "t": 25.79,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.13,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.13
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.13
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 12.53
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.53
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.53
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1958 chars",
+   "t_s": 25.79
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.79
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Power of Family Support in Addiction Recovery Page 1 of 3",
+   "u": "https://cypresslakerecovery.com/the-power-of-family-support-in-addiction-recovery/",
+   "d": "2025-11-12"
+  },
+  {
+   "t": "What are treatments for tobacco dependence? | National ...Behavioural interventi",
+   "u": "https://nida.nih.gov/publications/research-reports/tobacco-nicotine-e-cigarettes/what-are-treatments-tobacco-dependence",
+   "d": "2021-01-04"
+  },
+  {
+   "t": "How Do Family Triggers Relate To An Addiction? - Arista Recovery",
+   "u": "https://www.aristarecovery.com/blog/how-do-family-triggers-relate-to-an-addiction",
+   "d": ""
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "How to Set Boundaries With Family When You're the One Everyone...",
+   "u": "https://www.everyherwellness.com/post/how-to-set-boundaries-with-family",
+   "d": "2025-09-20"
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Support Someone in Quitting Nicotine Effectively",
+   "u": "https://www.coloradoquits.com/friends-family",
+   "d": ""
+  },
+  {
+   "t": "Guide to Help A Friend or Family Quit Smoking | Way to Quit",
+   "u": "https://waytoquit.org/help-someone-quit-a-guide-for-friends-and-family/",
+   "d": "2025-08-14"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.53,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 19,
+   "d": 873,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4790,
+   "o": 411,
+   "d": 13200,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 54.6,
+  "tok": 489,
+  "s": 9.0
+ },
+ "app_first_s": 16.83,
+ "app_total_s": 25.79,
+ "answer_raw": "The best way to manage family dynamics is to **set clear boundaries** by telling them exactly how you want to be supported before the withdrawal symptoms hit.\n\nYou need to lead with a plan that defines their role: tell them you want them to **listen without lecturing** and that you need them to **follow your lead** on how help is provided [6]. Most families default to two extremes—silence or nagging—but the most effective support comes from asking them how they can help and then letting you dictate the terms [6].\n\nTo prevent them from \"checking up\" on you or acting as intrusive monitors, use these strategies:\n\n*   **Define the support role**: Explain that support means sitting with you in the discomfort of withdrawal—which often includes irritability during the first two to four weeks—rather than coaching you like a teammate [6].\n*   **Establish communication protocols**: Use the conversation to clarify that you need space to manage your own emotions and that they should avoid using \"you should\" statements, opting instead for supportive, non-judgmental language [7].\n*   **Set boundaries on \"slips\"**: Make it clear upfront that if you have a setback, you need them to treat it as **information rather than failure** [6]. This prevents the cycle of \"checking up\" to see if you've failed.\n*   **Address triggers**: Discuss how their specific behaviors might act as \"family triggers\" that could jeopardize your recovery, making it clear that their role is to help you sidestep these traps rather than create them [3].\n\nIf they struggle with the transition, you might suggest they focus on practical tasks—like keeping the home environment smoke-free—rather than emotional policing [6]. If you need clinical tools to manage the physical side, you can look into **Nicotine Replacement Therapy (NRT)** options like patches, sprays, gum, or lozenges, which can help stabilize your mood so you have more bandwidth to manage family conversations [2].",
+ "answer": "The best way to manage family dynamics is to **set clear boundaries** by telling them exactly how you want to be supported before the withdrawal symptoms hit.\n\nYou need to lead with a plan that defines their role: tell them you want them to **listen without lecturing** and that you need them to **follow your lead** on how help is provided [6]. Most families default to two extremes—silence or nagging—but the most effective support comes from asking them how they can help and then letting you dictate the terms [6].\n\nTo prevent them from \"checking up\" on you or acting as intrusive monitors, use these strategies:\n\n*   **Define the support role**: Explain that support means sitting with you in the discomfort of withdrawal—which often includes irritability during the first two to four weeks—rather than coaching you like a teammate [6].\n*   **Establish communication protocols**: Use the conversation to clarify that you need space to manage your own emotions and that they should avoid using \"you should\" statements, opting instead for supportive, non-judgmental language [7].\n*   **Set boundaries on \"slips\"**: Make it clear upfront that if you have a setback, you need them to treat it as **information rather than failure** [6]. This prevents the cycle of \"checking up\" to see if you've failed.\n*   **Address triggers**: Discuss how their specific behaviors might act as \"family triggers\" that could jeopardize your recovery, making it clear that their role is to help you sidestep these traps rather than create them [3].\n\nIf they struggle with the transition, you might suggest they focus on practical tasks—like keeping the home environment smoke-free—rather than emotional policing [6]. If you need clinical tools to manage the physical side, you can look into **Nicotine Replacement Therapy (NRT)** options like patches, sprays, gum, or lozenges, which can help stabilize your mood so you have more bandwidth to manage family conversations [2].",
+ "chars": 1958,
+ "raw_bytes": 4366,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.98,
+ "rate_gen_tok_s": 54.63,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:12:12",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

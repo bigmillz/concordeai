@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.6,\"ftok\":259,\"est\":false}",
+  "X-Hurry": "df5d2aa771d2b1e6"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 20.53,
+ "elapsed_s": 26.82,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.95,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.95,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.12,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 23 passages"
+   }
+  },
+  {
+   "t": 16.12,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.12,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.12,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.12,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.53,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.82,
+   "tag": "RATE",
+   "data": {
+    "tps": 72.6,
+    "tok": 456,
+    "s": 6.3
+   }
+  },
+  {
+   "t": 26.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1827 chars"
+   }
+  },
+  {
+   "t": 26.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.82,
+   "tag": "DONE",
+   "data": {
+    "f": 20.53,
+    "t": 26.82,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   10.95,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.95
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.95
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 23 passages",
+   "t_s": 16.12
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.12
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.12
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1827 chars",
+   "t_s": 26.82
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.82
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Job Displacement Data Exposes a $1 Trillion Due Diligence ...",
+   "u": "https://developmentcorporate.com/saas/ai-job-displacement-data-exposes-a-1-trillion-due-diligence-blind-spot/",
+   "d": "2025-11-23"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S ... - SHRM",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment/2026-full-report",
+   "d": ""
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "Is AI taking white-collar jobs? Latest hiring report suggests not yet.",
+   "u": "https://www.washingtonpost.com/business/2026/11/07/white-collar-hiring-jumps-october-complicating-ai-story/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "AI could force 11 million Americans to change careers. At 60, five more years ea",
+   "u": "https://www.msn.com/en-us/money/government-support-and-welfare/ai-could-force-11-million-americans-to-change-careers-at-60-five-more-years-earning-70-000-could-replace-five-zero-years-in-social-security/ar-AA2h60DI?ocid=BingNewsVerp",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "81 AI Job Replacement Statistics 2026 (New Reports) - Demand Sage",
+   "u": "https://www.demandsage.com/ai-job-replacement-stats/",
+   "d": "2026-07-29"
+  },
+  {
+   "t": "4 Conditions That Make It Hard for AI to Take Your Job",
+   "u": "https://note.com/ryoga_hanafusa/n/n5205823d484c?hl=en",
+   "d": "2026-11-07"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.12,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 88,
+   "d": 1720,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5096,
+   "o": 397,
+   "d": 10646,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 72.6,
+  "tok": 456,
+  "s": 6.3
+ },
+ "app_first_s": 20.53,
+ "app_total_s": 26.82,
+ "answer_raw": "Your displacement risk is not a binary \"yes\" or \"no,\" but rather a shift from being a generalist to being the person who manages the automation.\n\nThe risk for experienced, well-compensated knowledge workers—the demographic often found in IT leadership and specialized ops—is significant because they are frequently the ones most exposed to AI-driven shifts [1]. While the idea of total job disappearance is often noise, the reality of workforce reduction is visible: in March 2026, AI became the #1 most-cited reason for workforce reductions for the first time, accounting for 25% of total cuts that month [7]. In the first four months of 2026, AI was cited for 49,135 job cuts in the U.S. [7].\n\nFor a sysadmin or IT ops professional, the next five years will likely involve a transition of tasks rather than a total loss of roles. Every profession is a mix of routine tasks and tasks requiring judgment based on ground-level reality; while AI can handle the routine, it cannot independently take charge of complex, situational decision-making [8].\n\n**The Strategy**\n\n**Shift from execution to oversight** — Move your focus from performing manual tasks to managing the AI agents that perform them. If AI performance becomes 10x better, you need to be the one defining the parameters and troubleshooting when the automation hits a wall [8].\n\n**Focus on the \"judgment\" layer** — Since AI is often used for routine or theoretical tasks, double down on the parts of IT ops that require physical presence, complex troubleshooting, or human-level accountability that cannot be easily automated [8].\n\n**Master the new stack** — With employers referencing \"AI\" in job descriptions surging by 400% over the last two years, your role will increasingly require being an expert in the tools that are currently causing the displacement [7].",
+ "answer": "Your displacement risk is not a binary \"yes\" or \"no,\" but rather a shift from being a generalist to being the person who manages the automation.\n\nThe risk for experienced, well-compensated knowledge workers—the demographic often found in IT leadership and specialized ops—is significant because they are frequently the ones most exposed to AI-driven shifts [1]. While the idea of total job disappearance is often noise, the reality of workforce reduction is visible: in March 2026, AI became the #1 most-cited reason for workforce reductions for the first time, accounting for 25% of total cuts that month [7]. In the first four months of 2026, AI was cited for 49,135 job cuts in the U.S. [7].\n\nFor a sysadmin or IT ops professional, the next five years will likely involve a transition of tasks rather than a total loss of roles. Every profession is a mix of routine tasks and tasks requiring judgment based on ground-level reality; while AI can handle the routine, it cannot independently take charge of complex, situational decision-making [8].\n\n**The Strategy**\n\n**Shift from execution to oversight** — Move your focus from performing manual tasks to managing the AI agents that perform them. If AI performance becomes 10x better, you need to be the one defining the parameters and troubleshooting when the automation hits a wall [8].\n\n**Focus on the \"judgment\" layer** — Since AI is often used for routine or theoretical tasks, double down on the parts of IT ops that require physical presence, complex troubleshooting, or human-level accountability that cannot be easily automated [8].\n\n**Master the new stack** — With employers referencing \"AI\" in job descriptions surging by 400% over the last two years, your role will increasingly require being an expert in the tools that are currently causing the displacement [7].",
+ "chars": 1827,
+ "raw_bytes": 4397,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.03,
+ "rate_gen_tok_s": 72.62,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:56:20",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

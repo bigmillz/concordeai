@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":21.6,\"ftok\":305,\"est\":false}",
+  "X-Hurry": "15ccf41cc6feacd6"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.64,
+ "elapsed_s": 25.51,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.64,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.52,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.52,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 22 passages"
+   }
+  },
+  {
+   "t": 13.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.01,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.01,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.01,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.51,
+   "tag": "RATE",
+   "data": {
+    "tps": 68.8,
+    "tok": 563,
+    "s": 8.2
+   }
+  },
+  {
+   "t": 25.51,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2254 chars"
+   }
+  },
+  {
+   "t": 25.51,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.52,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.52
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 22 passages",
+   "t_s": 13.01
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.01
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.01
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2254 chars",
+   "t_s": 25.51
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.51
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "AI Job Displacement 2026: What the Data Means for Ops Teams",
+   "u": "https://blog.opshero.ai/articles/ai-job-displacement-2026-what-the-data-means-for-ops-teams",
+   "d": "2026-03-21"
+  },
+  {
+   "t": "Will AI Take My Job? What the 2026 US Data Shows",
+   "u": "https://techjournal.org/will-ai-take-my-job",
+   "d": "2026"
+  },
+  {
+   "t": "AI Workforce Displacement in 2026 | Impact, Trends & Job Loss ...",
+   "u": "https://knowitol.com/ai-workforce-impact/thematic/ai-workforce-displacement-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Is AI taking white-collar jobs? Latest hiring report suggests not yet.",
+   "u": "https://www.washingtonpost.com/business/2026/11/07/white-collar-hiring-jumps-october-complicating-ai-story/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist!",
+   "u": "https://www.npr.org/2026/11/04/nx-s1-6028029/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "Sysadmin careers: Is your sysadmin job going away?",
+   "u": "https://www.redhat.com/en/blog/sysadmin-job-going-away",
+   "d": "2020-05-18"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.01,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 68.8,
+  "tok": 563,
+  "s": 8.2
+ },
+ "answer_raw": "Your job is more likely to change than to vanish, but the nature of your daily tasks will shift significantly over the next five years.\n\nThe real risk isn't total displacement, but rather the automation of specific tasks that currently make up a large portion of a sysadmin's workload. While the headlines suggest a hollowing out of the workforce, the data shows that AI-attributed layoffs accounted for only about 8% of all job cuts through early March 2s026 [2]. For IT ops, the danger lies in the reduction of demand for certain entry-level roles and repetitive manual tasks [3].\n\n## The Displacement Reality\n\nThe projected shift is more about task-level disruption than role-level elimination.\n\n*   **Net Job Growth**: While 22% of jobs globally are expected to be disrupted by 2030, the same projections suggest a net gain of 78 million jobs worldwide once displacement is balanced against new creation [1].\n*   **US Employment Trends**: Through September 2026, employers cited AI in 120,136 announced US job cuts, but the broader employment landscape remains growing, with projections expecting 5.9 million more jobs from 2025 to 2035 [3].\n*   **The \"Fixer\" Factor**: Historically, the need for humans to troubleshoot breaking software and hardware has kept sysadmin roles stable [8].\n\n## Your Strategic Playbook\n\nSince AI is moving toward automating the \"ops\" in IT ops, you should pivot from being the person who executes tasks to the person who manages the systems that execute them.\n\n**Focus on high-level architecture and complex troubleshooting**\nAs routine tasks move to automated pipelines, your value moves to the edge cases where AI fails—the \"breaking\" points that require human intuition and physical/logical intervention [8].\n\n**Master the automation layer**\nDon't fight the automation; own it. If AI is reducing demand for certain manual tasks, you need to be the one managing the AI-driven workflows.\n\n**Move toward \"Full-Stack\" Reliability**\nThe data suggests that while some tasks are being reduced, the overall need for technical oversight remains [3]. Developing a broader understanding of how AI-driven infrastructure interacts with business logic will make you harder to replace than a specialist in a single, automatable silo.",
+ "answer": "Your job is more likely to change than to vanish, but the nature of your daily tasks will shift significantly over the next five years.\n\nThe real risk isn't total displacement, but rather the automation of specific tasks that currently make up a large portion of a sysadmin's workload. While the headlines suggest a hollowing out of the workforce, the data shows that AI-attributed layoffs accounted for only about 8% of all job cuts through early March 2s026 [2]. For IT ops, the danger lies in the reduction of demand for certain entry-level roles and repetitive manual tasks [3].\n\n## The Displacement Reality\n\nThe projected shift is more about task-level disruption than role-level elimination.\n\n*   **Net Job Growth**: While 22% of jobs globally are expected to be disrupted by 2030, the same projections suggest a net gain of 78 million jobs worldwide once displacement is balanced against new creation [1].\n*   **US Employment Trends**: Through September 2026, employers cited AI in 120,136 announced US job cuts, but the broader employment landscape remains growing, with projections expecting 5.9 million more jobs from 2025 to 2035 [3].\n*   **The \"Fixer\" Factor**: Historically, the need for humans to troubleshoot breaking software and hardware has kept sysadmin roles stable [8].\n\n## Your Strategic Playbook\n\nSince AI is moving toward automating the \"ops\" in IT ops, you should pivot from being the person who executes tasks to the person who manages the systems that execute them.\n\n**Focus on high-level architecture and complex troubleshooting**\nAs routine tasks move to automated pipelines, your value moves to the edge cases where AI fails—the \"breaking\" points that require human intuition and physical/logical intervention [8].\n\n**Master the automation layer**\nDon't fight the automation; own it. If AI is reducing demand for certain manual tasks, you need to be the one managing the AI-driven workflows.\n\n**Move toward \"Full-Stack\" Reliability**\nThe data suggests that while some tasks are being reduced, the overall need for technical oversight remains [3]. Developing a broader understanding of how AI-driven infrastructure interacts with business logic will make you harder to replace than a specialist in a single, automatable silo.",
+ "chars": 2254,
+ "raw_bytes": 4581,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 24.24,
+ "rate_gen_tok_s": 24.86,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:30:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 17.32,
+ "app_total_s": 25.51,
+ "first_text_s_unreliable": true
+}

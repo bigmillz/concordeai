@@ -659,7 +659,7 @@ _KNOWN_ENV = frozenset((
     # a dev copy's release feed (6b537): the updater proven against a local
     # stand-in for api.github.com; honoured only when DEV_HOME is set
     "MILLENAI_UPDATE_API",
-    "MILLENAI_Q3_OFF"))      # 6b523: shape, estimate, followup, vendor, polish
+    "MILLENAI_Q3_OFF"))      # 6b523: shape, followup, vendor, polish
 
 
 def _dev_home(env, real):
@@ -23793,7 +23793,7 @@ def fresh_ablate() -> set:
 
 def quality_ablate() -> set:
     """The 6b523 fixes a DEV copy runs without (MILLENAI_Q3_OFF, comma-
-    separated: shape, estimate, followup, vendor, polish), for the bench's
+    separated: shape, followup, vendor, polish), for the bench's
     ablations; the shipped app always runs them all."""
     if not DEV_HOME:
         return set()
@@ -25445,19 +25445,14 @@ GROUND_SHAPE = (
     "not provide', 'the search results', 'I cannot pull live data' are "
     "banned: say what you found, and for what you didn't find, say what "
     "to check in one clause.\n")
-# ESTIMATE WHEN ASKED (6b523): the writer had the exchange rate and the
-# price per square metre and still wrote "the sources do not list a rent"
-# (q17.t2, three runs of four); asked for a two-week total it gave fares
-# alone (q19). A figure the person asked for is built, shown and dated.
-GROUND_ESTIMATE = (
-    "- ESTIMATE WHEN ASKED: when the person asks for a figure (a rent, a "
-    "total, a cost, a limit, a fare) and no source states it, you still "
-    "give one. Build it from the figures the evidence has (a rate, a price "
-    "per square metre, a cost per day, a fare) and the typical ranges you "
-    "know, show the arithmetic in one short line, mark it 'roughly' or "
-    "'typically' with its date, then say where to confirm it. 'I cannot "
-    "give an exact figure' or 'check the listings' alone is the one answer "
-    "that is never acceptable.\n")
+# ESTIMATE WHEN ASKED (6b523) IS GONE (6b560, measured): the rule told the
+# writer to build a figure no source states "from the typical ranges you
+# know". Over three samples a side and three blind gradings, the branch with
+# it carried 0.28 high-severity invented figures an answer against main's
+# 0.17 (a euro rent relabelled as dollars, a two-week budget above the
+# monthly one, Medellin's rent in reais); the same build without it, graded
+# beside them, carried main's rate and scored +0.26 (se 0.23) over the build
+# with it. It also contradicted the older rule never to invent a price.
 # A FOLLOW-UP THAT ADDS NOTHING NEW (6b523): "explain more" reuses the
 # earlier evidence (6b518) and the writer restated the earlier answer
 # (q01.t2, two runs of four). The turn says what a follow-up is for.
@@ -25554,8 +25549,6 @@ def grounded_turn(query: str, pack: str, today=None, note: str = "") -> str:
                 rules += GROUND_STALE.format(months=FRESH_STALE_MONTHS,
                                              newest=max(ds) if ds else "undated")
     q3 = quality_ablate()
-    if "estimate" not in q3:
-        rules += GROUND_ESTIMATE          # (6b523) a figure asked for is given
     if "shape" not in q3:
         rules += GROUND_SHAPE             # (6b523) the shape, read last
     figs = evidence_figures(pack, query)
@@ -36452,6 +36445,8 @@ _ANS_RATE_RXS = (
     re.compile(r"R\$\s?(\d\.\d{1,4})\s?(?:per|/|to the|to|=|≈)\s?(?:US)?(?:\$|USD|dollar)"),
     re.compile(r"(\d\.\d{1,4})\s?(?:BRL|reais|R\$)\s?(?:per|/|to the|to|=|≈)\s?(?:USD|US\$|\$|dollar)"),
     re.compile(r"(?:at|rate of|around|about|roughly)\s(?:R\$|BRL)?\s?(\d\.\d{1,4})\s?(?:BRL|reais|R\$)?\s?(?:per|/|to the)\s?(?:USD|US\$|\$|dollar)"),
+    # "1 USD = 5.5167 BRL" (6b560: the writer's own order, q17.t2 of the quality-4 runs)
+    re.compile(r"\b1\s?(?:USD|US\$|US dollars?|dollars?)\s?(?:=|≈|~|is|buys|gets)\s?(?:R\$|BRL)?\s?(\d\.\d{1,4})\b"),
 )
 
 
@@ -36476,7 +36471,8 @@ def answer_fx_rate(*texts) -> float:
 _ANS_PLAIN = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
 _ANS_FX_RXS = (
     # R$3,500-R$5,500 ($700-$1,100 ...)   and   R$3,800 (about $750)
-    re.compile(r"R\$\s?(?P<b1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?(?:R\$)?\s?(?P<b2>" + _ANS_PLAIN + r"))?"
+    # (6b560) a reais range written "R$ 4,500 and R$ 7,500" or "R$4,500 to R$7,500" counts as a range
+    re.compile(r"R\$\s?(?P<b1>" + _ANS_PLAIN + r")(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?\s?(?P<b2>" + _ANS_PLAIN + r"))?"
                r"(?P<mid>[^.\n;]{0,45}?(?:≈|~|about|roughly|around|or|=|\(|,\s)\s?(?:US)?)"
                r"\$\s?(?P<u1>" + _ANS_PLAIN + r")(?:\s?[–—-]\s?\$?\s?(?P<u2>" + _ANS_PLAIN + r"))?"),
     # $750 (R$3,800)

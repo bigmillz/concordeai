@@ -1,0 +1,274 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":60,\"est\":false}",
+  "X-Hurry": "5b7817e88d8b3798"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 4.39,
+ "elapsed_s": 10.2,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources · nothing new to look up"
+   }
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 0.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 0.08,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 4.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.2,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.5,
+    "tok": 310,
+    "s": 5.8
+   }
+  },
+  {
+   "t": 10.2,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1243 chars"
+   }
+  },
+  {
+   "t": 10.2,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 10.2,
+   "tag": "DONE",
+   "data": {
+    "f": 4.39,
+    "t": 10.2,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [],
+ "steps": [
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 0.08
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources · nothing new to look up",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 0.08
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.08
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1243 chars",
+   "t_s": 10.2
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 10.2
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Issue #70: Anthropic's Million TPU Google Deal, Crusoe Heads to...",
+   "u": "https://thegpu.ai/p/issue-70-anthropic-million-tpu-google-deal-neocloud-crusoe-heads-to-orbit-ai-browsers",
+   "d": "2025-10-25"
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": "2024-12-11"
+  },
+  {
+   "t": "Photo | The NVIDIA Tesla V100 data center GPU... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/file?fid=59134e2fed6ae56721d47bbe",
+   "d": ""
+  },
+  {
+   "t": "Designing more efficient quantum circuits with Claude \\ Anthropic",
+   "u": "https://www.anthropic.com/research/designing-efficient-quantum-circuits",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Cloud TPU documentation | Google Cloud Documentation",
+   "u": "https://docs.cloud.google.com/tpu/docs",
+   "d": ""
+  },
+  {
+   "t": "Claude by Anthropic | The AI for problem solvers",
+   "u": "https://claude.com/",
+   "d": ""
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   0.08,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5070,
+   "o": 365,
+   "d": 10095,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 53.5,
+  "tok": 310,
+  "s": 5.8
+ },
+ "app_first_s": 4.39,
+ "app_total_s": 10.2,
+ "answer_raw": "I cannot see the response you are referring to, so I cannot judge its quality. My previous answer was thin because it didn't fully explore the scale of the hardware or the specific relationship between the companies involved.\n\nThe most powerful specialized AI hardware currently being used for large-scale training is the **Google Trillium TPU** (as of s2024-12-11) [2].\n\n**Claude** is powered by these **TPU clusters** through a massive deal with Google that provides up to **1 million specialized AI chips** to Anthropic (as of 2025-10-25) [1]. This partnership is worth tens of billions of dollars and ensures Anthropic has the compute needed to scale future Claude models [1].\n\nOther major players and their hardware include:\n- **Google** used **Trillium TPUs** to train its own **Gemini 2.0** model (as of 2024-12-11) [2].\n- **AI21** uses **TPUs** to run their **Mamba** and **Jamba** language models (as of 2024-12-11) [2].\n- **NVIDIA** remains a dominant force in the broader market; for instance, the **Tesla V100** (undated) is a well-known data center GPU used for scaling AI inference and training [3].\n- **Gemma 3** (as of 2025-03-12) is positioned as the most powerful model you can run on a **single GPU** (as of 2025-03-12) [5].",
+ "answer": "I cannot see the response you are referring to, so I cannot judge its quality. My previous answer was thin because it didn't fully explore the scale of the hardware or the specific relationship between the companies involved.\n\nThe most powerful specialized AI hardware currently being used for large-scale training is the **Google Trillium TPU** (as of s2024-12-11) [2].\n\n**Claude** is powered by these **TPU clusters** through a massive deal with Google that provides up to **1 million specialized AI chips** to Anthropic (as of 2025-10-25) [1]. This partnership is worth tens of billions of dollars and ensures Anthropic has the compute needed to scale future Claude models [1].\n\nOther major players and their hardware include:\n- **Google** used **Trillium TPUs** to train its own **Gemini 2.0** model (as of 2024-12-11) [2].\n- **AI21** uses **TPUs** to run their **Mamba** and **Jamba** language models (as of 2024-12-11) [2].\n- **NVIDIA** remains a dominant force in the broader market; for instance, the **Tesla V100** (undated) is a well-known data center GPU used for scaling AI inference and training [3].\n- **Gemma 3** (as of 2025-03-12) is positioned as the most powerful model you can run on a **single GPU** (as of 2025-03-12) [5].",
+ "chars": 1243,
+ "raw_bytes": 3215,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 30.47,
+ "rate_gen_tok_s": 53.49,
+ "id": "q01",
+ "turn": 2,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "I feel like Claude's response beat you. explain more",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:45:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   },
+   {
+    "role": "assistant",
+    "content": "The most powerful specialized AI hardware currently being deployed at scale is the **Google Trillium TPU** (as of 2024-12-11) [2].\n\n**Claude** is using Google's **TPU clusters** through a deal worth tens of billions of dollars to power future models [1].\n\nAs for other users:\n- **Google** used **Trillium TPUs** to train the **Gemini 2.0** model (as of 2024-12-11) [2].\n- **AI21** uses **TPUs** for their **Mamba** and **Jamba** language models (as of 2024-12-11) [2].\n- The **NVIDIA Tesla V100** is an older data center GPU used for AI training and inferencing (undated) [3].\n- **Gemma 3** is described as a model designed to be the most powerful one you can run on a **single GPU** (as of 2025-03-12) [5]."
+   },
+   {
+    "role": "user",
+    "content": "I feel like Claude's response beat you. explain more"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

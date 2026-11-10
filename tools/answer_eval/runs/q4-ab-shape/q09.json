@@ -1,0 +1,383 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.8,\"ftok\":102,\"est\":false}",
+  "X-Hurry": "53107db532dcf118"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 42.73,
+ "elapsed_s": 53.26,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 29 passages"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 images found"
+   }
+  },
+  {
+   "t": 12.63,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.64,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 12.64,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 35.1,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 42.73,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 53.23,
+   "tag": "RATE",
+   "data": {
+    "tps": 35.4,
+    "tok": 372,
+    "s": 10.5
+   }
+  },
+  {
+   "t": 53.25,
+   "tag": "RESET"
+  },
+  {
+   "t": 53.25,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "fixed 1 figure"
+   }
+  },
+  {
+   "t": 53.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1488 chars"
+   }
+  },
+  {
+   "t": 53.25,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 53.25,
+   "tag": "DONE",
+   "data": {
+    "f": 42.72,
+    "t": 53.25,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ],
+  [
+   35.1,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 29 passages",
+   "t_s": 12.63
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.63
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 images found",
+   "t_s": 12.63
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.64
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "fixed 1 figure",
+   "t_s": 53.25
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1488 chars",
+   "t_s": 53.25
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 53.25
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis vs Lisbon: Cost of Living & Immigrant Guide (2026)",
+   "u": "https://onbuju.com/en/compare/florianopolis-vs-lisbon",
+   "d": "2026"
+  },
+  {
+   "t": "Medellín vs Lisbon: cost, climate & safety (2026)",
+   "u": "https://citylivably.com/compare/medellin-vs-lisbon",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: A Full Monthly Breakdown",
+   "u": "https://escapenelevate.com/cost-of-living-in-florianopolis/",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: Rent, Budget & Prices",
+   "u": "https://expatlife.ai/brazil/cities/florianopolis/cost-of-living",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon and Florianopolis",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Cost of Living in Florianópolis (2026): Real USD Numbers",
+   "u": "https://brazil-real-estate.com/guide/cost-of-living-florianopolis/",
+   "d": "2026"
+  },
+  {
+   "t": "Comparativa Florianópolis vs Medellin: Costo de vida y guía... | Onbuju",
+   "u": "https://onbuju.com/es/compare/florianopolis-vs-medellin",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Nov 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-11"
+  }
+ ],
+ "photos": [
+  "https://brazil-real-estate.com/img/og/cost-of-living-florianopolis.webp",
+  "https://www.americanlove.com.br/og-image.jpg",
+  "https://citylivably.com/hero.svg"
+ ],
+ "run_frames": [
+  [
+   12.64,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 249,
+   "o": 28,
+   "d": 630,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5437,
+   "o": 548,
+   "d": 40523,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 35.4,
+  "tok": 372,
+  "s": 10.5
+ },
+ "app_first_s": 42.72,
+ "app_total_s": 53.25,
+ "answer_raw": "**Medellín** is where your $4,000 will stretch the furthest, though **Florianópolis** offers a very strong middle ground for lifestyle balance.\n\n| City | Cost Profile | Typical Rent (1-br/Good Area) |\n| :--- | :--- | :--- |\n| **Medellín** | Lowest cost [2, 7] | ~$1,100 as of 2026 [7] |\n| **Florianópolis** | Moderate cost [1, 6] | €500–€800 [1] or R$2,500–R$3,800 [4] as of 2026 |\n| **Lisbon** | Highest cost [1, 2] | ~$1,401.56 as of 2026 [1] |\n\n## The breakdown\n\n**Medellín**\nMedellín is the most affordable of the three, with a cost rating of 90/100 (where higher is cheaper) [7]. On a $4,000 monthly budget, you would live exceptionally well here, as typical rent averages around $1,100 per month [7]. However, it has the lowest safety score of the group at 55/100 [7].\n\n**Florianópolis**\nYour money goes significantly further in Florianópolis than in Lisbon [1]. For a single person, a realistic monthly budget is roughly $1,500 (R$8,100) [3] or $664 (R$3,384.8) excluding rent [8] (undated). Rent in good areas typically ranges from R$2,500 to R$3,800 [4] or €500–€800 [1] as of 2026. It offers a much higher safety score (82/100) than Medellín [1, 7].\n\n**Lisbon**\nLisbon is the most expensive option, with a cost rating of 65/100 [1]. Rent averages roughly $1,401.56 per month [1] as of s 2026. While it is the safest city listed (85/100) and has the highest livability score (72/100) [1, 2], your $4,000 budget would be most constrained here compared to the other two cities [2].",
+ "answer": "**Medellín** is where your $4,000 will stretch the furthest, though **Florianópolis** offers a very strong middle ground for lifestyle balance.\n\n| City | Cost Profile | Typical Rent (1-br/Good Area) |\n| :--- | :--- | :--- |\n| **Medellín** | Lowest cost [2, 7] | ~$1,100 as of 2026 [7] |\n| **Florianópolis** | Moderate cost [1, 6] | €500–€800 [1] or R$2,500–R$3,800 [4] as of 2026 |\n| **Lisbon** | Highest cost [1, 2] | ~$1,401.56 as of 2026 [1] |\n\n## The breakdown\n\n**Medellín**\nMedellín is the most affordable of the three, with a cost rating of 90/100 (where higher is cheaper) [7]. On a $4,000 monthly budget, you would live exceptionally well here, as typical rent averages around $1,100 per month [7]. However, it has the lowest safety score of the group at 55/100 [7].\n\n**Florianópolis**\nYour money goes significantly further in Florianópolis than in Lisbon [1]. For a single person, a realistic monthly budget is roughly $1,500 (R$8,100) [3] or $664 (R$3,384.8) excluding rent [8] (undated). Rent in good areas typically ranges from R$2,500 to R$3,800 [4] or €500–€800 [1] as of 2026. It offers a much higher safety score (82/100) than Medellín [1, 7].\n\n**Lisbon**\nLisbon is the most expensive option, with a cost rating of 65/100 [1]. Rent averages roughly $1,401.56 per month [1] as of s 2026. While it is the safest city listed (85/100) and has the highest livability score (72/100) [1, 2], your $4,000 budget would be most constrained here compared to the other two cities [2].",
+ "chars": 1488,
+ "raw_bytes": 5676,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.98,
+ "rate_gen_tok_s": 35.33,
+ "id": "q09",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Cost of living comparison",
+ "question": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:18:20",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

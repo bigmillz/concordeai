@@ -1,0 +1,282 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":33.9,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "2d250b91e92f17b8"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 12.34,
+ "elapsed_s": 12.34,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 10.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.13,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.28,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 24 passages"
+   }
+  },
+  {
+   "t": 12.28,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.28,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.28,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.28,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 12.34,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 12.34,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "66 chars"
+   }
+  },
+  {
+   "t": 12.34,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   10.13,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.13
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.13
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 24 passages",
+   "t_s": 12.28
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.28
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.28
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "66 chars",
+   "t_s": 12.34
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 12.34
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone 14 review: Is it worth buying in 2026? - Back Market",
+   "u": "https://www.backmarket.com/en-us/c/iphone/iphone-14-test",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026? - Tech in Deep",
+   "u": "https://www.techindeep.com/is-iphone-14-worth-buying-in-2026-73659",
+   "d": "2026"
+  },
+  {
+   "t": "Is iPhone 14 Worth It In 2026? Assessing Value and Features",
+   "u": "https://www.simplymac.com/iphone/is-iphone-14-worth-it",
+   "d": "2025-12-15"
+  },
+  {
+   "t": "How Much Does Upgrading an iPhone Cost? The 2026 Ultimate ...",
+   "u": "https://techgf.com/how-much-does-upgrading-an-iphone-cost-the-2026-ultimate-guide/",
+   "d": "2026-02-09"
+  },
+  {
+   "t": "Is the iPhone Duo worth $1,999? I used it for a week, and it’s complicated",
+   "u": "https://www.cnn.com/cnn-underscored/reviews/iphone-duo",
+   "d": "2026-10-21"
+  },
+  {
+   "t": "iPhone Archive - Apple",
+   "u": "https://www.apple.com/newsroom/archive/iphone/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone 16 price drops on Amazon: Is it still worth buying after the iPhone 17 la",
+   "u": "https://www.msn.com/en-in/technology/consumer-electronics/iphone-16-price-drops-on-amazon-is-it-still-worth-buying-after-the-iphone-17-launch/ar-AA2elcDu?ocid=BingNewsVerp",
+   "d": "2026-10-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.28,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "answer_raw": "The engine refused the request (HTTP 404). generation thread died",
+ "answer": "The engine refused the request (HTTP 404). generation thread died",
+ "chars": 65,
+ "raw_bytes": 2123,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 1.32,
+ "rate_gen_tok_s": null,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:14:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

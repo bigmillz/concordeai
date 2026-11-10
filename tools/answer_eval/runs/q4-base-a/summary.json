@@ -1,0 +1,235 @@
+{
+ "name": "q4-base-a",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-11-10T04:16:27",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/q4/main-src",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 30.93,
+   "chars": 1879,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 15.87,
+   "chars": 2238,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 26.7,
+   "chars": 1859,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 28.98,
+   "chars": 2287,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 19.79,
+   "chars": 571,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 28.44,
+   "chars": 2044,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 19.47,
+   "chars": 384,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 29.39,
+   "chars": 1919,
+   "error": ""
+  },
+  {
+   "file": "q08.json",
+   "elapsed_s": 28.09,
+   "chars": 1993,
+   "error": ""
+  },
+  {
+   "file": "q09.json",
+   "elapsed_s": 31.4,
+   "chars": 2299,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 27.32,
+   "chars": 1986,
+   "error": ""
+  },
+  {
+   "file": "q11.json",
+   "elapsed_s": 25.59,
+   "chars": 2261,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 25.64,
+   "chars": 2281,
+   "error": ""
+  },
+  {
+   "file": "q12.json",
+   "elapsed_s": 28.75,
+   "chars": 3136,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 24.28,
+   "chars": 1870,
+   "error": ""
+  },
+  {
+   "file": "q14.json",
+   "elapsed_s": 23.09,
+   "chars": 1216,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 34.36,
+   "chars": 2193,
+   "error": ""
+  },
+  {
+   "file": "q16.json",
+   "elapsed_s": 35.72,
+   "chars": 2968,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 31.15,
+   "chars": 2665,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 18.01,
+   "chars": 831,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 61.18,
+   "chars": 2243,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 38.12,
+   "chars": 2672,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 28.0,
+   "chars": 1959,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 26.82,
+   "chars": 2582,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 27.04,
+   "chars": 2724,
+   "error": ""
+  },
+  {
+   "file": "q23.json",
+   "elapsed_s": 25.51,
+   "chars": 2473,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 29.68,
+   "chars": 2011,
+   "error": ""
+  },
+  {
+   "file": "q25.json",
+   "elapsed_s": 21.68,
+   "chars": 2442,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 20.3,
+   "chars": 1397,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 16.07,
+   "chars": 709,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 8.91,
+   "chars": 836,
+   "error": ""
+  },
+  {
+   "file": "q29.json",
+   "elapsed_s": 23.44,
+   "chars": 2073,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 24.06,
+   "chars": 1959,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 32.59,
+  "x_models": "Gemma 4 12B",
+  "drafts": [],
+  "answer": "A heat sink absorbs thermal energy from a component like a CPU or GPU and dissipates it into the surrounding air or a liquid cooling loop. It achieves this through **high thermal conductivity** and a "
+ },
+ "finished": "2026-11-10T04:32:50"
+}

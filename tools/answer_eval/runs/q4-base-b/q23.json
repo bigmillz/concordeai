@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":157,\"est\":false}",
+  "X-Hurry": "26c77aa124ce18d9"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 16.02,
+ "elapsed_s": 22.76,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.09,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 17 passages"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.67,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.02,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.76,
+   "tag": "RATE",
+   "data": {
+    "tps": 81.2,
+    "tok": 547,
+    "s": 6.7
+   }
+  },
+  {
+   "t": 22.76,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2188 chars"
+   }
+  },
+  {
+   "t": 22.76,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.76,
+   "tag": "DONE",
+   "data": {
+    "f": 16.01,
+    "t": 22.75,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   11.09,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.09
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.09
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 17 passages",
+   "t_s": 12.67
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.67
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2188 chars",
+   "t_s": 22.76
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.76
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Admin Roles 2026: AI, Automation, & Future",
+   "u": "https://theeducationecho.com/administrators-news-for-2026-and-beyond/",
+   "d": "2026-03-21"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "AI Replacing Jobs Statistics [Nov 2026 Data] | JobZone Risk",
+   "u": "https://jobzonerisk.com/stats/ai-replacing-jobs-statistics",
+   "d": "2026-11"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist!",
+   "u": "https://www.npr.org/2026/11/04/nx-s1-6028029/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "AI Automation Jobs in 2026: Roles, Skills, and What ... - Upwork",
+   "u": "https://www.upwork.com/resources/ai-automation-jobs-in-2026",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Qantas cuts 850 jobs in Australia and moves work to India under AI overhaul: Tak",
+   "u": "https://www.msn.com/en-in/money/human-resources/qantas-cuts-850-jobs-in-australia-and-moves-work-to-india-under-ai-overhaul-take-a-look-at-the-roles-facing-changes/ar-AA2h64gx?ocid=BingNewsVerp",
+   "d": "2026-11-07"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.67,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 27,
+   "d": 883,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4218,
+   "o": 436,
+   "d": 10035,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 81.2,
+  "tok": 547,
+  "s": 6.7
+ },
+ "app_first_s": 16.01,
+ "app_total_s": 22.75,
+ "answer_raw": "Your job won't disappear, but the nature of your daily tasks will shift from manual execution to oversight and architecture.\n\nThe real displacement risk for IT ops isn't a total loss of employment, but rather the automation of routine administrative and maintenance tasks. For example, the increasing adoption of cloud-based platforms like Salesforce and Microsoft 365 facilitates automation by centralizing data and workflows, which can automate tasks that previously consumed hours of an administrator’s time [1]. \n\nIn the next five years, you should expect a move toward \"augmented\" roles. Automation is intended to free you from mundane tasks to focus on higher-value activities [1]. The risk is highest for those who only perform repetitive, manual configuration or troubleshooting that can be handled by automated software.\n\n## Strategic Pivot for Sysadmins\n\nSince you are in IT ops, your goal is to move from being the person who *performs* the task to the person who *manages the system* that performs the task.\n\n**Focus on Orchestration over Execution**\nAs automation handles the \"on\" and \"off\" switches, your value lies in designing the workflows. Because cloud-based platforms are centralizing processes, your ability to integrate these disparate automated streams will be critical [1]. Technical roles are increasingly being shaped by how well they can manage these automated processes [7].\n\n**Shift to Data-Driven Operations**\nThe job market is seeing a massive impact from AI automation [7]. If you can bridge the gap between traditional sysadmin work and the data-driven needs of your organization, you become harder to replace. While the provided sources don't detail specific hiring trends for sysadmins, they do note that the need for data-related roles is a significant driver in the labor market [2].\n\n**Master the \"Human-in-the-loop\" requirements**\nAs businesses undergo technological changes that can lead to job cuts or shifts in work locations, the ability to manage the intersection of human oversight and automated systems becomes a specialized skill [8]. If you own the relationship between the business logic and the automated infrastructure, you own the role.",
+ "answer": "Your job won't disappear, but the nature of your daily tasks will shift from manual execution to oversight and architecture.\n\nThe real displacement risk for IT ops isn't a total loss of employment, but rather the automation of routine administrative and maintenance tasks. For example, the increasing adoption of cloud-based platforms like Salesforce and Microsoft 365 facilitates automation by centralizing data and workflows, which can automate tasks that previously consumed hours of an administrator’s time [1]. \n\nIn the next five years, you should expect a move toward \"augmented\" roles. Automation is intended to free you from mundane tasks to focus on higher-value activities [1]. The risk is highest for those who only perform repetitive, manual configuration or troubleshooting that can be handled by automated software.\n\n## Strategic Pivot for Sysadmins\n\nSince you are in IT ops, your goal is to move from being the person who *performs* the task to the person who *manages the system* that performs the task.\n\n**Focus on Orchestration over Execution**\nAs automation handles the \"on\" and \"off\" switches, your value lies in designing the workflows. Because cloud-based platforms are centralizing processes, your ability to integrate these disparate automated streams will be critical [1]. Technical roles are increasingly being shaped by how well they can manage these automated processes [7].\n\n**Shift to Data-Driven Operations**\nThe job market is seeing a massive impact from AI automation [7]. If you can bridge the gap between traditional sysadmin work and the data-driven needs of your organization, you become harder to replace. While the provided sources don't detail specific hiring trends for sysadmins, they do note that the need for data-related roles is a significant driver in the labor market [2].\n\n**Master the \"Human-in-the-loop\" requirements**\nAs businesses undergo technological changes that can lead to job cuts or shifts in work locations, the ability to manage the intersection of human oversight and automated systems becomes a specialized skill [8]. If you own the relationship between the business logic and the automated infrastructure, you own the role.",
+ "chars": 2188,
+ "raw_bytes": 4584,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 24.03,
+ "rate_gen_tok_s": 81.16,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:44:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

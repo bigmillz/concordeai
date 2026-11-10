@@ -1,0 +1,235 @@
+{
+ "name": "q4-base-b",
+ "config": "local-fast",
+ "where": "local",
+ "started": "2026-11-10T04:32:50",
+ "repo": "/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad/q4/main-src",
+ "head": [
+  "",
+  ""
+ ],
+ "questions": [
+  {
+   "file": "q01.json",
+   "elapsed_s": 33.54,
+   "chars": 1958,
+   "error": ""
+  },
+  {
+   "file": "q01.t2.json",
+   "elapsed_s": 14.93,
+   "chars": 1884,
+   "error": ""
+  },
+  {
+   "file": "q02.json",
+   "elapsed_s": 23.41,
+   "chars": 1276,
+   "error": ""
+  },
+  {
+   "file": "q03.json",
+   "elapsed_s": 26.62,
+   "chars": 1616,
+   "error": ""
+  },
+  {
+   "file": "q04.json",
+   "elapsed_s": 17.92,
+   "chars": 230,
+   "error": ""
+  },
+  {
+   "file": "q05.json",
+   "elapsed_s": 28.28,
+   "chars": 1762,
+   "error": ""
+  },
+  {
+   "file": "q06.json",
+   "elapsed_s": 19.4,
+   "chars": 197,
+   "error": ""
+  },
+  {
+   "file": "q07.json",
+   "elapsed_s": 29.09,
+   "chars": 2111,
+   "error": ""
+  },
+  {
+   "file": "q08.json",
+   "elapsed_s": 25.45,
+   "chars": 1601,
+   "error": ""
+  },
+  {
+   "file": "q09.json",
+   "elapsed_s": 27.64,
+   "chars": 1470,
+   "error": ""
+  },
+  {
+   "file": "q10.json",
+   "elapsed_s": 29.83,
+   "chars": 1982,
+   "error": ""
+  },
+  {
+   "file": "q11.json",
+   "elapsed_s": 26.46,
+   "chars": 2107,
+   "error": ""
+  },
+  {
+   "file": "q11.t2.json",
+   "elapsed_s": 27.0,
+   "chars": 1699,
+   "error": ""
+  },
+  {
+   "file": "q12.json",
+   "elapsed_s": 28.4,
+   "chars": 2148,
+   "error": ""
+  },
+  {
+   "file": "q13.json",
+   "elapsed_s": 25.57,
+   "chars": 1300,
+   "error": ""
+  },
+  {
+   "file": "q14.json",
+   "elapsed_s": 22.71,
+   "chars": 1643,
+   "error": ""
+  },
+  {
+   "file": "q15.json",
+   "elapsed_s": 29.08,
+   "chars": 2147,
+   "error": ""
+  },
+  {
+   "file": "q16.json",
+   "elapsed_s": 24.54,
+   "chars": 2299,
+   "error": ""
+  },
+  {
+   "file": "q17.json",
+   "elapsed_s": 22.12,
+   "chars": 2047,
+   "error": ""
+  },
+  {
+   "file": "q17.t2.json",
+   "elapsed_s": 20.26,
+   "chars": 876,
+   "error": ""
+  },
+  {
+   "file": "q18.json",
+   "elapsed_s": 32.5,
+   "chars": 1816,
+   "error": ""
+  },
+  {
+   "file": "q19.json",
+   "elapsed_s": 24.16,
+   "chars": 2181,
+   "error": ""
+  },
+  {
+   "file": "q20.json",
+   "elapsed_s": 25.79,
+   "chars": 2136,
+   "error": ""
+  },
+  {
+   "file": "q21.json",
+   "elapsed_s": 23.31,
+   "chars": 1687,
+   "error": ""
+  },
+  {
+   "file": "q22.json",
+   "elapsed_s": 23.01,
+   "chars": 1365,
+   "error": ""
+  },
+  {
+   "file": "q23.json",
+   "elapsed_s": 22.76,
+   "chars": 2188,
+   "error": ""
+  },
+  {
+   "file": "q24.json",
+   "elapsed_s": 31.09,
+   "chars": 2219,
+   "error": ""
+  },
+  {
+   "file": "q25.json",
+   "elapsed_s": 24.12,
+   "chars": 2506,
+   "error": ""
+  },
+  {
+   "file": "q26.json",
+   "elapsed_s": 18.64,
+   "chars": 671,
+   "error": ""
+  },
+  {
+   "file": "q27.json",
+   "elapsed_s": 18.71,
+   "chars": 641,
+   "error": ""
+  },
+  {
+   "file": "q28.json",
+   "elapsed_s": 11.53,
+   "chars": 505,
+   "error": ""
+  },
+  {
+   "file": "q29.json",
+   "elapsed_s": 24.15,
+   "chars": 2688,
+   "error": ""
+  },
+  {
+   "file": "q30.json",
+   "elapsed_s": 24.43,
+   "chars": 1873,
+   "error": ""
+  }
+ ],
+ "server": null,
+ "persona": {
+  "file": "persona.json",
+  "result": {
+   "ok": true,
+   "changed": [
+    "home_area",
+    "length",
+    "persona",
+    "user_name"
+   ],
+   "conflict": {},
+   "ignored": []
+  }
+ },
+ "env": {},
+ "tier": "Fast",
+ "warmup": {
+  "elapsed_s": 15.63,
+  "x_models": "Gemma 4 26B",
+  "drafts": [],
+  "answer": "A heat sink pulls thermal energy away from a sensitive component to prevent overheating. It uses an increased surface area, typically through metal fins, to facilitate efficient heat dissipation into "
+ },
+ "finished": "2026-11-10T04:47:39"
+}

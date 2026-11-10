@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.2,\"ftok\":105,\"est\":false}",
+  "X-Hurry": "5d9510816d2d0d1d"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 14.96,
+ "elapsed_s": 23.63,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.14,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 22 passages"
+   }
+  },
+  {
+   "t": 10.14,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.14,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.14,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.96,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.63,
+   "tag": "RATE",
+   "data": {
+    "tps": 49.3,
+    "tok": 427,
+    "s": 8.7
+   }
+  },
+  {
+   "t": 23.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1709 chars"
+   }
+  },
+  {
+   "t": 23.63,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.63,
+   "tag": "DONE",
+   "data": {
+    "f": 14.96,
+    "t": 23.63,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 22 passages",
+   "t_s": 10.14
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.14
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.14
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1709 chars",
+   "t_s": 23.63
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.63
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis Neighborhood Guide | Where to Live",
+   "u": "https://scbimoveis.com/en/articles/florianopolis-neighborhood-guide-where-to-live-by-lifestyle",
+   "d": "2026-06-07"
+  },
+  {
+   "t": "Is Florianópolis, Brazil Safe? 2026 Tourist Safety Guide",
+   "u": "https://florianopolistours.com/is-florianopolis-safe/",
+   "d": "2026"
+  },
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Best Florianópolis Neighborhoods for Digital Nomads (2026)",
+   "u": "https://floripaguru.com/blog/best-neighborhoods-floripa-digital-nomads",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.14,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 34,
+   "d": 1226,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5329,
+   "o": 393,
+   "d": 13429,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 49.3,
+  "tok": 427,
+  "s": 8.7
+ },
+ "app_first_s": 14.96,
+ "app_total_s": 23.63,
+ "answer_raw": "For a six-month stay that balances safety, beach access, and walkability, **Lagoa da Conceição** is your best option, though **Jurerê Internacional** is the premium alternative if budget is secondary to security.\n\n**Lagoa da Conceição** offers the best balance for your requirements; it serves as the heart of the island with an active lifestyle, full infrastructure (supermarkets and services), and a lively nightlife [4]. While it is a high-priced, coveted area, it is ideal for those seeking a mix of nature and urban convenience [4]. Because it is not a pedestrian-centric city by design, you should note that while the lagoon offers great outdoor activities, you may need a vehicle for certain trips [7].\n\n**Jurerê Internacional** is the high-end choice with a safety score of 78/100 and zero reported robberies as of May 2026 [6]. It is a more expensive, resort-style environment where a one-bedroom might cost roughly €1,200/month as of May 2026 [6].\n\n**Centro** is the only area where you can genuinely live without a car, offering the best walkability on the island, though it lacks direct beach access [7].\n\n**Campeche** and **Ingleses** offer lower rent profiles, with prices starting around R$ 4,500/m² as of June 2026, but they differ significantly in character from the more central or northern districts [4].\n\nRegarding your requirement for fast internet, the effectiveness of your connection will depend heavily on the specific bairro; choosing the wrong one can result in slow Wi-Fi and isolation [7]. While the city has a high density of security cameras, coverage is often concentrated in just three neighborhoods, so you should verify local infrastructure before committing to a lease [6].",
+ "answer": "For a six-month stay that balances safety, beach access, and walkability, **Lagoa da Conceição** is your best option, though **Jurerê Internacional** is the premium alternative if budget is secondary to security.\n\n**Lagoa da Conceição** offers the best balance for your requirements; it serves as the heart of the island with an active lifestyle, full infrastructure (supermarkets and services), and a lively nightlife [4]. While it is a high-priced, coveted area, it is ideal for those seeking a mix of nature and urban convenience [4]. Because it is not a pedestrian-centric city by design, you should note that while the lagoon offers great outdoor activities, you may need a vehicle for certain trips [7].\n\n**Jurerê Internacional** is the high-end choice with a safety score of 78/100 and zero reported robberies as of May 2026 [6]. It is a more expensive, resort-style environment where a one-bedroom might cost roughly €1,200/month as of May 2026 [6].\n\n**Centro** is the only area where you can genuinely live without a car, offering the best walkability on the island, though it lacks direct beach access [7].\n\n**Campeche** and **Ingleses** offer lower rent profiles, with prices starting around R$ 4,500/m² as of June 2026, but they differ significantly in character from the more central or northern districts [4].\n\nRegarding your requirement for fast internet, the effectiveness of your connection will depend heavily on the specific bairro; choosing the wrong one can result in slow Wi-Fi and isolation [7]. While the city has a high density of security cameras, coverage is often concentrated in just three neighborhoods, so you should verify local infrastructure before committing to a lease [6].",
+ "chars": 1709,
+ "raw_bytes": 4001,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.08,
+ "rate_gen_tok_s": 49.28,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:52:46",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

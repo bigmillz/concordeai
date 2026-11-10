@@ -1,0 +1,353 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.3,\"ftok\":146,\"est\":false}",
+  "X-Hurry": "8a1b07bfb76765a4"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.17,
+ "elapsed_s": 20.82,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 9.59,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.59,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.59,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.16,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.16,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.17,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.82,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.9,
+    "tok": 148,
+    "s": 2.7
+   }
+  },
+  {
+   "t": 20.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "593 chars"
+   }
+  },
+  {
+   "t": 20.82,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.82,
+   "tag": "DONE",
+   "data": {
+    "f": 18.17,
+    "t": 20.82,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.59,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.59
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.59
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 14.16
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.16
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.16
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.16
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "593 chars",
+   "t_s": 20.82
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.82
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Walkable to Beach · Fast Wifi · Plush 1BHK · AC... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1047183382474558010",
+   "d": ""
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Furnished apartments for rent Florianópolis | Long & short-term...",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Furnished Monthly Rentals and Extended ...",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays/monthly",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Nov 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-11"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.16,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 21,
+   "d": 595,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4848,
+   "o": 170,
+   "d": 6604,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 55.9,
+  "tok": 148,
+  "s": 2.7
+ },
+ "app_first_s": 18.17,
+ "app_total_s": 20.82,
+ "answer_raw": "Pick **Ingleses** for your six-month stay, as it offers the best balance of walkability, local infrastructure, and beach access [5, undated].\n\nFor a furnished one-bedroom in that area, you should budget approximately **R$ 3,000 – 5,000** per month [1, undated], which converts to roughly **$544 – $907** per month based on the exchange rate of 1 USD = 5.5167 BRL as of November 9, 2026 [5].\n\nNote that because you are looking for a furnished rental for a medium-term stay, prices may lean toward the higher end of that range to account for turnkey amenities and move-in readiness [6, undated].",
+ "answer": "Pick **Ingleses** for your six-month stay, as it offers the best balance of walkability, local infrastructure, and beach access [5, undated].\n\nFor a furnished one-bedroom in that area, you should budget approximately **R$ 3,000 – 5,000** per month [1, undated], which converts to roughly **$544 – $907** per month based on the exchange rate of 1 USD = 5.5167 BRL as of November 9, 2026 [5].\n\nNote that because you are looking for a furnished rental for a medium-term stay, prices may lean toward the higher end of that range to account for turnkey amenities and move-in readiness [6, undated].",
+ "chars": 593,
+ "raw_bytes": 2911,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.12,
+ "rate_gen_tok_s": 55.94,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:38:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay, your best bets depend on whether you want a resort feel or a local, bohemian vibe, but **Jurerê** and **Ingleses** are the most practical matches for your criteria.\n\n## Neighborhood Options\n\n**Jurerê (specifically Jurerê Tradicional)** — This area offers a resort-style atmosphere with stunning sea views and is located near Canasvieiras [5, undated]. It is a prime spot for those looking for upscale amenities and proximity to the coast.\n\n**Ingleses** — For a more walkable, central feel, look at the Ingleses district. Properties here are often situated within a short walk of the beach and local centers, such as near Rua das Gaivotas [5, undated]. This area provides a good balance of beach access and local infrastructure like supermarkets.\n\n## Safety and Logistics\n\n**Safety** — While violent crime is considered relatively rare, the primary concerns for expats are petty crimes like phone snatching in crowded areas or opportunistic theft during the busy summer season [6, 2026]. You should also be mindful of car break-ins at beach parking lots [6, 2026].\n\n**Internet and Work** — The growing tech economy in Florianópolis makes it an attractive destination for remote workers looking for a high quality of life and outdoor lifestyle [6, 2026]. While specific ISP speeds vary by street, the tech-centric population ensures that high-speed connectivity is a standard expectation in many residential pockets [6, 2026].\n\n**Rent Trends** — Be prepared for rising costs; asking rents increased by 9.13% in the 12 months leading to September 2026 [4, 2026]. If you are looking for a one-bedroom unit, these typically provide the best yields in the rental market [4, 2026]."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

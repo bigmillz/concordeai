@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":96,\"est\":false}",
+  "X-Hurry": "ef0cdab947ccee67"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.57,
+ "elapsed_s": 15.1,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.57,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 6.84,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.84,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.84,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 8.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.61,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.61,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.1,
+   "tag": "RATE",
+   "data": {
+    "tps": 34.8,
+    "tok": 52,
+    "s": 1.5
+   }
+  },
+  {
+   "t": 15.1,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "209 chars"
+   }
+  },
+  {
+   "t": 15.1,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.84,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.84
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.84
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 8.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.61
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.61
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "209 chars",
+   "t_s": 15.1
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 15.1
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Federal Reserve: FOMC statement, 2026-10-28",
+   "u": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20261028a.htm",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "New York Fed: effective federal funds rate (EFFR)",
+   "u": "https://www.newyorkfed.org/markets/reference-rates/effr",
+   "d": "2026-11-06"
+  },
+  {
+   "t": "Federal Funds Effective Rate - FRED | St. Louis FedThe Fed - Meeting calendars a",
+   "u": "https://fred.stlouisfed.org/series/RIFSPFFNB",
+   "d": "2026-11-06"
+  },
+  {
+   "t": "Current Federal Funds Rate 2026 — Fed Rate History, FOMC ...",
+   "u": "https://wealthvieu.com/banking/interest-rates/federal-funds-rate/",
+   "d": "2026-10-20"
+  },
+  {
+   "t": "Federal Funds Effective Rate (FEDFUNDS) | FRED | St. Louis Fed",
+   "u": "https://fred.stlouisfed.org/series/FEDFUNDS",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "Federal Reserve Board - Federal Reserve issues FOMC statement",
+   "u": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260916a.htm",
+   "d": "2026-09-16"
+  },
+  {
+   "t": "Fed rate decision September 2026: Rates rise to 3.75%-4%",
+   "u": "https://www.cnbc.com/2026/09/16/fed-rate-decision-september-2026.html",
+   "d": "2026-09-16"
+  },
+  {
+   "t": "Next Fed Meeting & FOMC Meeting Schedule 2026–2027",
+   "u": "https://fedratecalc.com/fomc-meeting-schedule/",
+   "d": "2026-10-29"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.61,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 34.8,
+  "tok": 52,
+  "s": 1.5
+ },
+ "answer_raw": "The current federal funds target range is **3.75% to 4%** [1].\n\nAt its most recent meeting on October 28, 2026, the Committee decided to **maintain** the target range at 3.75% to 4% [1]. The vote was 10–2 [1].",
+ "answer": "The current federal funds target range is **3.75% to 4%** [1].\n\nAt its most recent meeting on October 28, 2026, the Committee decided to **maintain** the target range at 3.75% to 4% [1]. The vote was 10–2 [1].",
+ "chars": 209,
+ "raw_bytes": 2445,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.02,
+ "rate_gen_tok_s": 7.3,
+ "id": "q04",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Fed funds rate",
+ "question": "What's the current federal funds rate and what did the Fed do at its most recent meeting?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:03:51",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the current federal funds rate and what did the Fed do at its most recent meeting?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 13.6,
+ "app_total_s": 15.1,
+ "first_text_s_unreliable": true
+}

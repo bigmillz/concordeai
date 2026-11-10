@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.7,\"ftok\":96,\"est\":false}",
+  "X-Hurry": "9018fd93fccf14ff"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.19,
+ "elapsed_s": 23.26,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 9.0,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.0,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.0,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.95,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.19,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 74.4,
+    "tok": 451,
+    "s": 6.1
+   }
+  },
+  {
+   "t": 23.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1804 chars"
+   }
+  },
+  {
+   "t": 23.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.26,
+   "tag": "DONE",
+   "data": {
+    "f": 17.19,
+    "t": 23.26,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.0,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.0
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.0
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 12.94
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.95
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.95
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1804 chars",
+   "t_s": 23.26
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Nutritional Value Of Pizza: Key Nutrients, Healthier Options, And...",
+   "u": "https://thisnutrition.com/the-nutritional-value-of-pizza-key-nutrients-healthier-options-and-recipes",
+   "d": ""
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "Italian Researchers Find Possible Health Benefits to Eating Pizza",
+   "u": "https://www.mensjournal.com/news/pizza-health-benefits-italian-researchers",
+   "d": ""
+  },
+  {
+   "t": "A Healthy Showdown: Who Wins - Pizza or Pasta? • Edel Alon",
+   "u": "https://www.edelalon.com/blog/a-healthy-showdown-who-wins-pizza-or-pasta/",
+   "d": "2022-12-30"
+  },
+  {
+   "t": "Surprising Health Benefits of Pizza: Enhancing your... | elephant journal",
+   "u": "https://www.elephantjournal.com/2020/07/surprising-health-benefits-of-pizza-enhancing-your-mood-memory-and-mental-health/",
+   "d": "2020-07"
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "6 Reasons Why Pizza Is Bad for You - Biology Insights",
+   "u": "https://biologyinsights.com/6-reasons-why-pizza-is-bad-for-you/",
+   "d": "2026-10-02"
+  },
+  {
+   "t": "Is Pizza Bad For You? - Here Is Your Answer.",
+   "u": "https://www.isitbadforyou.com/questions/is-pizza-bad-for-you",
+   "d": "2015-12-28"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.95,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 21,
+   "d": 645,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5013,
+   "o": 385,
+   "d": 10266,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 74.4,
+  "tok": 451,
+  "s": 6.1
+ },
+ "app_first_s": 17.19,
+ "app_total_s": 23.26,
+ "answer_raw": "Pizza is not inherently bad for you, but its nutritional impact depends entirely on the ingredients used and how it fits into your overall diet.\n\nWhether pizza is healthy or unhealthy hinges on the **toppings** and the **crust**; for instance, opting for thin crust and less cheese can make a version more nutritious [5]. While pizza can be a vehicle for eating more vegetables, it is also typically high in carbohydrates, sodium, and saturated fats [8]. A single serving can deliver a high amount of sodium, and depending on the toppings, it can account for as much as a quarter of your daily energy needs in one sitting [7].\n\n**How often is fine?**\n\nThe frequency depends on your personal health goals and the specific type of pizza you are eating. Because an average slice of cheese pizza contains approximately **26g of carbohydrates** and **10g of fat** (including 4g of saturated fat) [8], eating it in moderation is key to maintaining a balanced diet [8]. You can mitigate health risks by pairing pizza with a side salad or fruit to increase the nutritional value of the meal [1]. \n\nIf you are eating pizza for health-conscious reasons, consider these factors:\n\n*   **Toppings**: Choosing vegetable toppings can increase nutrition, though research suggests that even with vegetable toppings, certain margins of exposure remain within a range of public health concern for cancer-related effects [4][7].\n*   **Homemade vs. Store-bought**: Making pizza at home with wholesome ingredients or selecting alternative healthy brands allows for better control over nutrition [8].\n*   **Food Safety**: If you are eating leftovers, do not eat pizza that has been sitting out for longer than **two hours** or has been left unrefrigerated for two days, as it must be kept below **40 degrees** to stay safe [6].",
+ "answer": "Pizza is not inherently bad for you, but its nutritional impact depends entirely on the ingredients used and how it fits into your overall diet.\n\nWhether pizza is healthy or unhealthy hinges on the **toppings** and the **crust**; for instance, opting for thin crust and less cheese can make a version more nutritious [5]. While pizza can be a vehicle for eating more vegetables, it is also typically high in carbohydrates, sodium, and saturated fats [8]. A single serving can deliver a high amount of sodium, and depending on the toppings, it can account for as much as a quarter of your daily energy needs in one sitting [7].\n\n**How often is fine?**\n\nThe frequency depends on your personal health goals and the specific type of pizza you are eating. Because an average slice of cheese pizza contains approximately **26g of carbohydrates** and **10g of fat** (including 4g of saturated fat) [8], eating it in moderation is key to maintaining a balanced diet [8]. You can mitigate health risks by pairing pizza with a side salad or fruit to increase the nutritional value of the meal [1]. \n\nIf you are eating pizza for health-conscious reasons, consider these factors:\n\n*   **Toppings**: Choosing vegetable toppings can increase nutrition, though research suggests that even with vegetable toppings, certain margins of exposure remain within a range of public health concern for cancer-related effects [4][7].\n*   **Homemade vs. Store-bought**: Making pizza at home with wholesome ingredients or selecting alternative healthy brands allows for better control over nutrition [8].\n*   **Food Safety**: If you are eating leftovers, do not eat pizza that has been sitting out for longer than **two hours** or has been left unrefrigerated for two days, as it must be kept below **40 degrees** to stay safe [6].",
+ "chars": 1804,
+ "raw_bytes": 4127,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.39,
+ "rate_gen_tok_s": 74.3,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:10:59",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

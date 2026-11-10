@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":138,\"est\":false}",
+  "X-Hurry": "9bf5b6c62269e8de"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 21.12,
+ "elapsed_s": 25.57,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.11,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.11,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.11,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 19 passages"
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.7,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.12,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.57,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.0,
+    "tok": 325,
+    "s": 4.4
+   }
+  },
+  {
+   "t": 25.57,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1300 chars"
+   }
+  },
+  {
+   "t": 25.57,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.57,
+   "tag": "DONE",
+   "data": {
+    "f": 21.12,
+    "t": 25.57,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   11.11,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.11
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.11
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 19 passages",
+   "t_s": 17.7
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.7
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.7
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1300 chars",
+   "t_s": 25.57
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.57
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Nutritional Value Of Pizza: Key Nutrients, Healthier Options, And...",
+   "u": "https://thisnutrition.com/the-nutritional-value-of-pizza-key-nutrients-healthier-options-and-recipes",
+   "d": ""
+  },
+  {
+   "t": "How Often Can You Eat Pizza and Be Healthy? A Guide",
+   "u": "https://avzri.com/how-often-can-you-eat-pizza-and-be-healthy",
+   "d": "2025-11-04"
+  },
+  {
+   "t": "How Often Should You Eat Pizza? - Food Blog Alliance",
+   "u": "https://foodblogalliance.com/how-often-should-you-eat-pizza/",
+   "d": "2026-06-20"
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "The picture of health: Pizza is good for you, no matter... - PMQ Pizza",
+   "u": "https://www.pmq.com/why-pizza-is-good-for-you/",
+   "d": "2015-05-01"
+  },
+  {
+   "t": "Keep the Beat: Heart Healthy Recipes - NHLBI, NIH",
+   "u": "https://www.nhlbi.nih.gov/sites/default/files/publications/03-2921.pdf",
+   "d": ""
+  },
+  {
+   "t": "Joey's Pizza | Often imitated, never duplicated!",
+   "u": "https://joeyspizzamarco.com/",
+   "d": ""
+  },
+  {
+   "t": "The Hidden Dangers of Fast and Processed Food - PMC",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6146358/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.7,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 21,
+   "d": 715,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4282,
+   "o": 280,
+   "d": 7805,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 73.0,
+  "tok": 325,
+  "s": 4.4
+ },
+ "app_first_s": 21.12,
+ "app_total_s": 25.57,
+ "answer_raw": "Pizza isn't inherently bad for you, but its nutritional impact depends entirely on your ingredient choices and how much you eat.\n\n## The Nutritional Verdict\nWhether pizza is \"bad\" depends on the specific composition of the pie. Traditional pizza can be high in calories, sodium, and saturated fat [3]. Because it often falls into the category of processed, high-calorie, low-nutrient food, it can become a primary source of calories if eaten frequently [8].\n\nHowever, pizza can be a nutritious part of a balanced diet if you focus on specific variables:\n*   **Ingredient Selection:** Using whole-wheat crust, plenty of vegetables, and lean protein sources can significantly improve the nutritional profile [3].\n*   **Portion Control:** Managing how much you eat is key to maintaining health [1][2].\n*   **Balance:** Pairing pizza with a side salad or fruit can increase the overall nutritional value of the meal [1].\n\n## How Often is Fine?\nThere is no single rule for frequency, as it depends on your overall diet and lifestyle. Experts suggest that pizza can be part of a healthy diet when consumed in **moderation** [2]. \n\nRather than a set number of days per week, the goal is to make mindful choices regarding ingredients and portions so that pizza fits into a broader, balanced lifestyle [2][3].",
+ "answer": "Pizza isn't inherently bad for you, but its nutritional impact depends entirely on your ingredient choices and how much you eat.\n\n## The Nutritional Verdict\nWhether pizza is \"bad\" depends on the specific composition of the pie. Traditional pizza can be high in calories, sodium, and saturated fat [3]. Because it often falls into the category of processed, high-calorie, low-nutrient food, it can become a primary source of calories if eaten frequently [8].\n\nHowever, pizza can be a nutritious part of a balanced diet if you focus on specific variables:\n*   **Ingredient Selection:** Using whole-wheat crust, plenty of vegetables, and lean protein sources can significantly improve the nutritional profile [3].\n*   **Portion Control:** Managing how much you eat is key to maintaining health [1][2].\n*   **Balance:** Pairing pizza with a side salad or fruit can increase the overall nutritional value of the meal [1].\n\n## How Often is Fine?\nThere is no single rule for frequency, as it depends on your overall diet and lifestyle. Experts suggest that pizza can be part of a healthy diet when consumed in **moderation** [2]. \n\nRather than a set number of days per week, the goal is to make mindful choices regarding ingredients and portions so that pizza fits into a broader, balanced lifestyle [2][3].",
+ "chars": 1300,
+ "raw_bytes": 3455,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.71,
+ "rate_gen_tok_s": 73.03,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:39:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":112,\"est\":false}",
+  "X-Hurry": "a57b3f9097a2525e"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.61,
+ "elapsed_s": 29.09,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 7.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.47,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 37 passages"
+   }
+  },
+  {
+   "t": 11.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.63,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.63,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.61,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.09,
+   "tag": "RATE",
+   "data": {
+    "tps": 42.3,
+    "tok": 527,
+    "s": 12.5
+   }
+  },
+  {
+   "t": 29.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2111 chars"
+   }
+  },
+  {
+   "t": 29.09,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 29.09,
+   "tag": "DONE",
+   "data": {
+    "f": 16.61,
+    "t": 29.09,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   7.47,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.47
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.47
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 37 passages",
+   "t_s": 11.63
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.63
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2111 chars",
+   "t_s": 29.09
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 29.09
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Driving vs. Flying Calculator: Compare Cost & Time",
+   "u": "https://smartonlinecalculator.com/driving-vs-flying-calculator.html",
+   "d": ""
+  },
+  {
+   "t": "Flights from New York to Miami: Prices & Best Time (2026)",
+   "u": "https://www.journeyfinder.net/routes/new-york-to-miami-flight",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Driving Vs Flying Calculator - Sage Calculator",
+   "u": "https://sagecalculator.com/driving-vs-flying-calculator/",
+   "d": "2025-07-18"
+  },
+  {
+   "t": "$76 Flights from New York (NYCA) to Miami (MIA) | Skyscanner",
+   "u": "https://www.skyscanner.com/routes/nyca/mia/new-york-to-miami-international.html",
+   "d": ""
+  },
+  {
+   "t": "Cost of Living Comparison",
+   "u": "https://www.numbeo.com/cost-of-living/comparison.jsp",
+   "d": ""
+  },
+  {
+   "t": "Movers from Denver to Phoenix (2026 Rates: $2,923...) - TrueCostLiving",
+   "u": "https://truecostliving.com/moving-cost-from-denver-co-to-phoenix-az/2BR/FullService",
+   "d": "2026"
+  },
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "Book Miami Cheap Flights - Beat Rising Fares! Fly Cheap",
+   "u": "https://www.bing.com/aclick?ld=e81dgheYq-GZ7_MFhLZyBu_jVUCUxW3Xb57tREYCmW5Wdp2q1Zrsb0vP-wDK3GFXR_iOnYpMASf75C-vqSvujAoKNri6mzRtUVkk0AS4oSvEJpwj4u4rfkiHYBkGgG4yS_6A5dlBPr70rpJ0eU6ygEkgTwDUCNVtzXjpzI0Fj0XsZDEmVVHHZAXntYX6LBpHFNLsyUZR8iGkn6NcxO8OPN9Ic-F3c&u=aHR0cHMlM2ElMmYlMmZ3d3cuY2hlYXBvYWlyLmNvbSUyZmZsaWdodHMlMmZib29rbm93JTJmZGVzdGluYXRpb25zJTJmYWlycG9ydCUzZmFpcnBvcnQtY29kZSUzZE1JQSUyNmZwYWZmaWxpYXRlJTNkY29hLWJpbmctZ2xvYmFsJTI2ZnBzdWIlM2QlMjZ1dG1fY2FtcGFpZ24lM2REZXN0aW5hdGlvbi1EZXN0aW5hdGlvbnNfQVRMQVNfR2xvYmFsX1NQJTI2dXRtX3Rlcm0lM2RmbGlnaHQlMjUyMHRvJTI1MjBtaWFtaSUyNnV0bV90ZXJtX2lkJTNka3dkLTc2NzYwMDM1MDk0MzYwJTI2dXRtX3NvdXJjZSUzZCUyNnV0bV9tZWRpdW0lM2QlN2JjcGMlN2QlMjZkZXZpY2UlM2RjJTI2ZnBwcmljZSUzZCUyNmNhbXBhaWduSUQlM2Q1OTAyMjE3NTQlMjZhZGdyb3VwSWQlM2QxMjI4MTU1NTQ1MDAxMDQzJTI2cmVmaWQlM2QlMjZ0dHlwZSUzZCUyNm1zY2xraWQlM2QyMDg2MTcyMTc0OGMxMTU1YmY1YTdkZDNiZGVhYWE1MCUyNnV0bV9jb250ZW50JTNkZGVzdGluYXRpb24lMjUzRG1pYW1pX2ZsX3VzJTI1MjNwcm9kdWN0JTI1M0RmbGlnaHRz&rlid=20861721748c1155bf5a7dd3bdeaaa50",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.63,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 24,
+   "d": 625,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4839,
+   "o": 608,
+   "d": 17401,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 42.3,
+  "tok": 527,
+  "s": 12.5
+ },
+ "app_first_s": 16.61,
+ "app_total_s": 29.09,
+ "answer_raw": "**Flying** is the cheaper option, likely saving you roughly **$400–$500** total for two people compared to driving.\n\nThe cost difference hinges on the fact that flying from New York to Miami is a high-frequency, competitive route, whereas driving roughly 1,300 miles represents a massive fuel and maintenance expense.\n\n## Comparison Breakdown\n\n**Flying**\n*   **Ticket Costs:** Off-peak one-way fares typically run **$60–$150** per person on carriers like Delta, American, JetBlue, and United, with Spirit and Frontier often providing even lower rates (as of 2026-07-03) [2]. For two people round-trip, you could expect to pay between **$240 and $600** total [2].\n*   **Transit Logic:** A flight takes roughly **3 to 3.25 hours** [2]. While airport overhead (security, transit to/from airports) adds time, flying becomes significantly more efficient for trips over 400–500 miles [1].\n*   **Alternative Hubs:** You might find flights to Fort Lauderdale (FLL) are **$30–$80** cheaper than flying into Miami (MIA), which can offset the cost of a shuttle or ride to your final destination [2].\n\n**Driving**\n*   **Estimated Costs:** Using a standardized calculation of **$0.67 per mile** for a 600-mile trip, the cost would be **$402** [1]. Since Brooklyn to Miami is roughly 1,300 miles one way (2,600 miles round-trip), your total mileage-based cost would be approximately **$1,742** [1].\n*   **Time Investment:** Driving 600 miles at 60 mph takes about **10 hours** [1]. A 2,600-mile round trip would require multiple days of travel, whereas flying remains a few hours of flight time [2].\n\n## Comparison Summary\n\n| Category | Flying (Two People) | Driving (Two People) |\n| :--- | :--- | :--- |\n| **Estimated Total Price** | **$240–$600** [2] | **~$1,742** [1] |\n| **Travel Time** | **~3 hours** flight time [2] | **~22+ hours** driving time [1] |\n| **Verdict** | **Winner (Cheaper & Faster)** | **Significantly more expensive** |\n\n*Note: Driving costs are calculated based on the $0.67/mile rate provided in the source [1]. Real-world costs would vary based on your specific vehicle's MPG and current fuel prices.*",
+ "answer": "**Flying** is the cheaper option, likely saving you roughly **$400–$500** total for two people compared to driving.\n\nThe cost difference hinges on the fact that flying from New York to Miami is a high-frequency, competitive route, whereas driving roughly 1,300 miles represents a massive fuel and maintenance expense.\n\n## Comparison Breakdown\n\n**Flying**\n*   **Ticket Costs:** Off-peak one-way fares typically run **$60–$150** per person on carriers like Delta, American, JetBlue, and United, with Spirit and Frontier often providing even lower rates (as of 2026-07-03) [2]. For two people round-trip, you could expect to pay between **$240 and $600** total [2].\n*   **Transit Logic:** A flight takes roughly **3 to 3.25 hours** [2]. While airport overhead (security, transit to/from airports) adds time, flying becomes significantly more efficient for trips over 400–500 miles [1].\n*   **Alternative Hubs:** You might find flights to Fort Lauderdale (FLL) are **$30–$80** cheaper than flying into Miami (MIA), which can offset the cost of a shuttle or ride to your final destination [2].\n\n**Driving**\n*   **Estimated Costs:** Using a standardized calculation of **$0.67 per mile** for a 600-mile trip, the cost would be **$402** [1]. Since Brooklyn to Miami is roughly 1,300 miles one way (2,600 miles round-trip), your total mileage-based cost would be approximately **$1,742** [1].\n*   **Time Investment:** Driving 600 miles at 60 mph takes about **10 hours** [1]. A 2,600-mile round trip would require multiple days of travel, whereas flying remains a few hours of flight time [2].\n\n## Comparison Summary\n\n| Category | Flying (Two People) | Driving (Two People) |\n| :--- | :--- | :--- |\n| **Estimated Total Price** | **$240–$600** [2] | **~$1,742** [1] |\n| **Travel Time** | **~3 hours** flight time [2] | **~22+ hours** driving time [1] |\n| **Verdict** | **Winner (Cheaper & Faster)** | **Significantly more expensive** |\n\n*Note: Driving costs are calculated based on the $0.67/mile rate provided in the source [1]. Real-world costs would vary based on your specific vehicle's MPG and current fuel prices.*",
+ "chars": 2111,
+ "raw_bytes": 5238,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.14,
+ "rate_gen_tok_s": 42.29,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:36:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

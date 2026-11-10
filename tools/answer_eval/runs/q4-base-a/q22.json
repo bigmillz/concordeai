@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":21.5,\"ftok\":297,\"est\":false}",
+  "X-Hurry": "eeb0a6f966a45d15"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 0.66,
+ "elapsed_s": 27.04,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.66,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.94,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 23 passages"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 27.04,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.5,
+    "tok": 626,
+    "s": 9.9
+   }
+  },
+  {
+   "t": 27.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2505 chars"
+   }
+  },
+  {
+   "t": 27.04,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   10.94,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.94
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.94
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 23 passages",
+   "t_s": 13.25
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.25
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.25
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2505 chars",
+   "t_s": 27.04
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.04
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius11 Highest Paying",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Best High-Paying Jobs In USA Without A Degree (2026) – Top...",
+   "u": "https://postingtak.com/best-high-paying-jobs-in-usa-without-a-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Jobs Without Degree 2026 Guide",
+   "u": "https://onegrasp.com/certifications/highest-paying-jobs-without-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "High-Paying Jobs Without a Degree: 2026 Guide - choosefi.com",
+   "u": "https://choosefi.com/article/high-paying-jobs-without-degree",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "11 Highest Paying Jobs Without a College Degree (2026-2027)",
+   "u": "https://coverlettersandresume.com/articles/highest-paying-jobs-without-a-college-degree/",
+   "d": ""
+  },
+  {
+   "t": "10 high-paying jobs that can lead to wealth without a college degree",
+   "u": "https://www.msn.com/en-us/news/other/10-high-paying-jobs-that-can-lead-to-wealth-without-a-college-degree/ar-AA2g6QeP?ocid=BingNewsVerp",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "These jobs pay six figures without a college degree. One has over 18,000 opening",
+   "u": "https://www.msn.com/en-us/news/other/these-jobs-pay-six-figures-without-a-college-degree-one-has-over-18000-openings-a-year-another-just-400/ar-AA2eaRCg?ocid=BingNewsVerp",
+   "d": "2026-10-13"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.25,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 63.5,
+  "tok": 626,
+  "s": 9.9
+ },
+ "answer_raw": "The best high-paying roles without a degree focus on specialized technical skills, safety-critical operations, or trade-based apprenticeships. Because \"well-paying\" is relative, I've focused on roles that exceed the May 2025 U.S. median annual wage of $50,980 [1].\n\nThe following five options represent realistic paths based on current job market data:\n\n| Job Role | Typical Pay Path | Time to Entry |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | High-salary-level, often six figures [2] | Variable; requires FAA commercial license [2] |\n| **Elevator Installer** | High-salary-level through specialized technical work [2] | Apprenticeship-based [2] |\nest. $50k-$100k+ depending on seniority | | |\n| **Warehouse/Supply Chain Manager** | Offers six-figure opportunities [8] | Experience/Internal promotion |\n| **Nuclear Reactor Operator** | High-income/Six-figure potential [8] | Specialized training |\n| **Trade/Vocational Roles** | Variable; often above median [1][7] | Vocational training or apprenticeship [7] |\n\n## Path Breakdown\n\n**Commercial Pilot** — This is one of the most lucrative paths available without a degree [2]. You must obtain an **FAA commercial pilot license** to qualify [2]. The time to entry depends on whether you are flying through a flight school or building hours, but it is a structured, certification-heavy path.\n\n**Elevator Installer** — This role is noted for its impressive salaries and technical requirements [2]. You typically enter through **apprenticeships** that combine on-the-job training with technical learning [2]. This is a highly specialized trade that remains a top-tier option for 2026 [2].\n\n**Warehouse and Supply Chain Management** — A significant number of people find six-figure salaries by managing **warehouses and supply chains** [8]. These roles often prioritize track records of efficiency and management experience over formal degrees [8].\n\n**Nuclear Reactor Operator** — While much more niche, operating a **nuclear reactor** is a recognized high-paying career that does not strictly require a four-year degree [8]. The entry requirements are highly specialized and involve rigorous training.\n\n**Vocational and Trade Occupations** — Many careers in sectors like **utilities, transportation, and public safety** pay well above the U.S. median and are projected to grow through 2034 [1]. These roles typically require high school diplomas plus specific **professional certifications or vocational training** rather than a bachelor's degree [1][7].",
+ "answer": "The best high-paying roles without a degree focus on specialized technical skills, safety-critical operations, or trade-based apprenticeships. Because \"well-paying\" is relative, I've focused on roles that exceed the May 2025 U.S. median annual wage of $50,980 [1].\n\nThe following five options represent realistic paths based on current job market data:\n\n| Job Role | Typical Pay Path | Time to Entry |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | High-salary-level, often six figures [2] | Variable; requires FAA commercial license [2] |\n| **Elevator Installer** | High-salary-level through specialized technical work [2] | Apprenticeship-based [2] |\nest. $50k-$100k+ depending on seniority | | |\n| **Warehouse/Supply Chain Manager** | Offers six-figure opportunities [8] | Experience/Internal promotion |\n| **Nuclear Reactor Operator** | High-income/Six-figure potential [8] | Specialized training |\n| **Trade/Vocational Roles** | Variable; often above median [1][7] | Vocational training or apprenticeship [7] |\n\n## Path Breakdown\n\n**Commercial Pilot** — This is one of the most lucrative paths available without a degree [2]. You must obtain an **FAA commercial pilot license** to qualify [2]. The time to entry depends on whether you are flying through a flight school or building hours, but it is a structured, certification-heavy path.\n\n**Elevator Installer** — This role is noted for its impressive salaries and technical requirements [2]. You typically enter through **apprenticeships** that combine on-the-job training with technical learning [2]. This is a highly specialized trade that remains a top-tier option for 2026 [2].\n\n**Warehouse and Supply Chain Management** — A significant number of people find six-figure salaries by managing **warehouses and supply chains** [8]. These roles often prioritize track records of efficiency and management experience over formal degrees [8].\n\n**Nuclear Reactor Operator** — While much more niche, operating a **nuclear reactor** is a recognized high-paying career that does not strictly require a four-year degree [8]. The entry requirements are highly specialized and involve rigorous training.\n\n**Vocational and Trade Occupations** — Many careers in sectors like **utilities, transportation, and public safety** pay well above the U.S. median and are projected to grow through 2034 [1]. These roles typically require high school diplomas plus specific **professional certifications or vocational training** rather than a bachelor's degree [1][7].",
+ "chars": 2505,
+ "raw_bytes": 5023,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 25.18,
+ "rate_gen_tok_s": 25.82,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:29:42",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 17.17,
+ "app_total_s": 27.04,
+ "first_text_s_unreliable": true
+}

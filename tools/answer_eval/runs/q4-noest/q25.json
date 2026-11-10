@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.1,\"ftok\":248,\"est\":false}",
+  "X-Hurry": "52cd2b610b576b90"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 16.41,
+ "elapsed_s": 20.65,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.41,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.65,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.6,
+    "tok": 312,
+    "s": 4.2
+   }
+  },
+  {
+   "t": 20.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1249 chars"
+   }
+  },
+  {
+   "t": 20.65,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.65,
+   "tag": "DONE",
+   "data": {
+    "f": 16.41,
+    "t": 20.65,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 12.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.23
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.23
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1249 chars",
+   "t_s": 20.65
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.65
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Buying Property in Latin America as a Foreigner (2026)",
+   "u": "https://www.internationalre.org/guide/2026-market-entry-guide.html",
+   "d": "2026-10-19"
+  },
+  {
+   "t": "Latin America City Real Estate Guides 2026 | International RE",
+   "u": "https://www.internationalre.org/cities/",
+   "d": "2026"
+  },
+  {
+   "t": "Buying vs. Renting Trends 2026: What to Expect in the... - Thecosey",
+   "u": "https://thecosey.com/buying-vs-renting-trends-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "How to Move to Latin America from the USA: Step-by-Step",
+   "u": "https://mylatinlife.com/how-to-move-to-latin-america-from-usa/",
+   "d": "2026-06-22"
+  },
+  {
+   "t": "Buying vs. Renting Analysis Trends 2026 - Palmcoastpizza",
+   "u": "https://palmcoastpizza.com/buying-vs-renting-analysis-trends-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Moving to Latin America in 2026: Best Countries for Expats",
+   "u": "https://vidala.co/guides/moving-to-latin-america/",
+   "d": "2026-03-09"
+  },
+  {
+   "t": "Best Long-Term Rental Sites in Latin America: 2026 Guide",
+   "u": "https://simplestay.ai/en/blogs/best-long-term-rental-sites-in-latin-america-2026-guide",
+   "d": "2026-08-23"
+  },
+  {
+   "t": "KasaFinder - Real Estate in Latin America for Americans & Expats",
+   "u": "https://kasafinder.io/en",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 28,
+   "d": 883,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5210,
+   "o": 267,
+   "d": 8375,
+   "c": 2236
+  }
+ ],
+ "rate_writer": {
+  "tps": 73.6,
+  "tok": 312,
+  "s": 4.2
+ },
+ "app_first_s": 16.41,
+ "app_total_s": 20.65,
+ "answer_raw": "Rent where you are now to maintain mobility and liquidity for your move.\n\nBuying property in a two-year window is risky because housing markets vary dramatically by location, and 2026 presents no clear-cut winner for buyers facing high prices and elevated borrowing costs [3][5]. A decision that makes sense in one city may not apply in another, and you face the uncertainty of whether your local market will be stable when you are ready to leave [5].\n\nSince you are planning a relocation, staying liquid is vital. Most expats starting fresh in Latin America take only 2–4 checked bags and ship nothing because furniture is cheap locally and shipping is expensive [4]. Renting keeps you from being tied to a fixed asset and heavy furniture when you decide to move.\n\nYour decision should also account for the financial shift you'll experience once you arrive. In Latin America, local labor, food, and real estate are priced for local economies, meaning your US income will buy far more there [6]. Keeping your capital accessible will allow you to navigate the transition—such as meeting residency thresholds like Ecuador's Rentista Visa, which requires $1,446/month as of March 2026 [6]—without the friction of selling a home in a shifting US market.",
+ "answer": "Rent where you are now to maintain mobility and liquidity for your move.\n\nBuying property in a two-year window is risky because housing markets vary dramatically by location, and 2026 presents no clear-cut winner for buyers facing high prices and elevated borrowing costs [3][5]. A decision that makes sense in one city may not apply in another, and you face the uncertainty of whether your local market will be stable when you are ready to leave [5].\n\nSince you are planning a relocation, staying liquid is vital. Most expats starting fresh in Latin America take only 2–4 checked bags and ship nothing because furniture is cheap locally and shipping is expensive [4]. Renting keeps you from being tied to a fixed asset and heavy furniture when you decide to move.\n\nYour decision should also account for the financial shift you'll experience once you arrive. In Latin America, local labor, food, and real estate are priced for local economies, meaning your US income will buy far more there [6]. Keeping your capital accessible will allow you to navigate the transition—such as meeting residency thresholds like Ecuador's Rentista Visa, which requires $1,446/month as of March 2026 [6]—without the friction of selling a home in a shifting US market.",
+ "chars": 1249,
+ "raw_bytes": 3431,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.12,
+ "rate_gen_tok_s": 73.64,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:16:44",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

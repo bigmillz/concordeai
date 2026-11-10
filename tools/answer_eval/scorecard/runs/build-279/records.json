@@ -1,0 +1,830 @@
+{
+ "label": "build-279",
+ "when": "2026-11-10T05:13:38",
+ "app": {
+  "version": "7.0.0",
+  "build": "279",
+  "beta": "2",
+  "rc": "0"
+ },
+ "head": "d804e0f main",
+ "set_version": 1,
+ "as_of": "2026-11-10",
+ "where": "server",
+ "server": "Ollama1",
+ "tier": "Fast",
+ "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
+ "wall_s": 3227.3,
+ "records": [
+  {
+   "id": "f01",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Roughly what temperature does water boil at on the top of Everest, and why is it lower than at sea level?",
+   "answer": "It's 52°F and Clear right now, wind 6 mph, with a high of 66°F and low of 47°F on Tuesday, a high of 62°F and low of 46°F on Wednesday, and a high of 51°F and low of 37°F on Thursday.\n\nWater boils at approximately **160°F (71°C)** at the summit of Mount Everest.\n\nBoiling occurs when the **vapor pressure** of a liquid equals the surrounding **atmospheric pressure**. At sea level, the atmosphere exerts roughly 14.7 psi, requiring enough thermal energy to push water molecules into a gaseous state at 212°F. \n\nBecause the atmospheric pressure at the top of Everest is only about **one-third** of that at sea level, the molecules require significantly less energy to escape into the air. Consequently, the boiling point drops to that lower temperature.",
+   "first_text_s": 10.49,
+   "elapsed_s": 14.2,
+   "app_first_s": 10.49,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is factually perfect and follows the direct persona, but the irrelevant weather forecast at the start constitutes padding that violates the conciseness constraint."
+   }
+  },
+  {
+   "id": "f02",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Who wrote One Hundred Years of Solitude, and when did it come out?",
+   "answer": "**Gabriel García Márquez** wrote the novel, and it was published on **May 30, 1967** [4].",
+   "first_text_s": 21.2,
+   "elapsed_s": 21.69,
+   "app_first_s": 21.2,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false,
+     false
+    ],
+    "ok": 4,
+    "of": 4
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer provides the exact author and publication year requested, adheres strictly to the user's preference for directness and brevity, and avoids all listed traps."
+   }
+  },
+  {
+   "id": "f03",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "How many time zones does Brazil have?",
+   "answer": "Brazil has **four** official time zones [1][6].\n\nThe distribution of these zones is as follows:\n\n*   **Fernando de Noronha Time (UTC−02:00)** — Used on small offshore Atlantic islands [1].\n*   **Brasília Time (UTC−03:00)** — The main national reference, covering the South, Southeast, Northeast, and the Federal District [1][6]. It is used by approximately 80% of the population [7].\n*   **Amazon Time (UTC−04:00)** — Used in much of western Brazil [1][6].\n*   **Acre Time (UTC−05:00)** — Used in the westernmost parts of the country, such as Acre state [1][6].\n\nBrazil does not currently observe daylight saving time [6][7].",
+   "first_text_s": 11.93,
+   "elapsed_s": 14.96,
+   "app_first_s": 11.93,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "Flawless execution of the reference sheet and user's direct, technical preferences with no extraneous content."
+   }
+  },
+  {
+   "id": "f04",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "What's the US dollar to Brazilian real exchange rate right now?",
+   "answer": "The exchange rate is **1 US dollar = 5.5167 BRL** as of 2026-11-09 [1].\n\nThe current conversion for **200 US Dollars** is **1,102.2206 Brazilian Reals** as of 03:04 AM 11-10-2026 [2].\n\nThe Brazilian real has faced significant recent volatility, reportedly dropping **12 percent** against the US dollar in spot trading following the re-election of President Luiz Inacio Lula da Silva [4].",
+   "first_text_s": 39.37,
+   "elapsed_s": 43.88,
+   "app_first_s": 39.37,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 8,
+    "concise": 8,
+    "fit": 9,
+    "overall": 8,
+    "why": "The answer provides a precise, dated rate within the reference range, adheres strictly to the user's direct style constraints, and includes relevant context without unnecessary fluff."
+   }
+  },
+  {
+   "id": "r01",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "A train is scheduled to leave at 9:40 and the trip takes 2 hours 35 minutes. It leaves 15 minutes late. When does it arrive?",
+   "answer": "The train arrives at **12:30**.\n\nThe scheduled departure is 9:40. Because it leaves 15 minutes late, the actual departure time is 9:55. Adding the 2-hour and 35-minute trip duration to 9:55 results in an arrival time of 12:30.",
+   "first_text_s": 17.15,
+   "elapsed_s": 18.4,
+   "app_first_s": 17.15,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is mathematically correct, follows the requested format of leading with the result, and adheres strictly to the user's preference for directness and brevity."
+   }
+  },
+  {
+   "id": "r02",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "I owe $14,000 on a credit card at 24% APR, compounded monthly. If I pay $700 a month, about how many months until it's paid off, and roughly how much interest will I pay?",
+   "answer": "It will take **25 months** to pay off the balance, and you will pay roughly **$3,930** in total interest.\n\nWith a $700 monthly payment against a $14,000 balance at 24% APR, your first month's interest charge is **$280** (calculated as 2% monthly). This leaves **$420** to go toward the principal.\n\nAs the principal decreases each month, the interest portion of your $700 payment shrinks, causing the principal reduction to accelerate. This \"snowball\" effect is why the total interest paid is significantly less than if you were only paying the minimums.\n\nThe final payment in month 25 will be a partial payment of approximately **$430** to zero out the remaining balance.\n\nDo you want to see how increasing the monthly payment to $1,000 would change the timeline and interest savings?",
+   "first_text_s": 3.39,
+   "elapsed_s": 13.99,
+   "app_first_s": 3.39,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 3,
+    "complete": 8,
+    "concise": 7,
+    "fit": 8,
+    "overall": 6,
+    "why": "The answer incorrectly states 25 months instead of the reference's 26, which is a significant factual error in a math problem, though it correctly identifies the interest amount and follows the user's direct style."
+   }
+  },
+  {
+   "id": "r03",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "Which is bigger, 2^30 or 10^9, and by roughly how much?",
+   "answer": "**2^30 is bigger** than 10^9 by exactly **73,741,824**.\n\nThe values are:\n*   **2^30**: 1,073,741,824\n*   **10^9**: 1,000,000,000\n\nThis makes 2^30 roughly **7.37%** larger than 10^9.\n\nIn computing, this represents the difference between **binary (base-2)** and **decimal (base-10)** systems. Specifically, $2^{30}$ defines a **gibibyte (GiB)**, while $10^9$ defines a **gigabyte (GB)**. Because $2^{10}$ (1,024) is roughly **7.4%** larger than $10^3$ (1,000), the discrepancy compounds as you move up the powers.",
+   "first_text_s": 35.53,
+   "elapsed_s": 36.66,
+   "app_first_s": 35.53,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Accurate and direct, but the explanation of binary vs decimal systems is unnecessary padding given the user's preference for brevity."
+   }
+  },
+  {
+   "id": "r04",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "All bloops are razzies, and some razzies are lazzies. Does it follow that some bloops are lazzies?",
+   "answer": "No, it does not follow that some Bloops are Lazzies.\n\nThe logical conclusion only follows if the second premise were \"all Razzies are Lazzies.\" Several sources, such as **free-iqtest.net [1]** and **proprofs.com [6]**, state that if **all Bloops are Razzies** and **all Razzies are Lazzies**, then the conclusion is **True**.\n\nIn your specific scenario, the \"some\" in the second premise creates a gap in the logical chain. Because **Bloops** are a subset of **Razzies**, and only a portion of **Razzies** are **Lazzies**, there is no requirement for those two specific groups to overlap. The **Lazzies** could exist entirely within the portion of **Razzies** that are not **Bloops**.\n\nFormal logic identifies this as a failure of the **undistributed middle**. For a conclusion to be certain, the middle term (**Razzies**) must be distributed in at least one premise. Since \"some\" does not distribute the term, the link between **Bloops** and **Lazzies** remains unproven.\n\nWhile **Source [8]** identifies your exact phrasing—\"If ALL bloops are razzies, and SOME razzies are lazzies\"—it does not provide a definitive verdict in the snippet.",
+   "first_text_s": 37.5,
+   "elapsed_s": 39.2,
+   "app_first_s": 37.5,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is logically perfect and follows the user's direct persona, but includes unnecessary external source citations that add padding."
+   }
+  },
+  {
+   "id": "c01",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a Python function that returns the n-th Fibonacci number iteratively, and tell me its time complexity.",
+   "answer": "This iterative function calculates the n-th Fibonacci number with **O(n) time complexity** and **O(1) space complexity**.\n\n```python\ndef get_fibonacci(n: int) -> int:\n    if n <= 0:\n        return 0\n    if n == 1:\n        return 1\n    \n    a, b = 0, 1\n    # Iterate from 2 up to n to build the sequence\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n```\n\nThe **time complexity is O(n)** because the function performs a single pass through a loop that executes $n-1$ times for any input $n > 1$.\n\nThe **space complexity is O(1)** because the function only maintains two integer variables (`a` and `b`) regardless of the input size.\n\nGiven your background in IT, it is worth noting that for very large $n$, Python's **arbitrary-precision integers** mean that the cost of the addition operation is not strictly constant. Because the number of bits in the $n$-th Fibonacci number grows linearly with $n$, the bit-complexity of the addition is $O(n)$, which technically makes the total time complexity **O(n²)** in a strict bit-complexity model. However, in standard algorithmic analysis, this is typically treated as **O(n)**.",
+   "first_text_s": 26.09,
+   "elapsed_s": 27.7,
+   "app_first_s": 26.09,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Technically precise and fits the persona perfectly, but the bit-complexity explanation, while correct, adds unnecessary length for a standard coding question."
+   }
+  },
+  {
+   "id": "c02",
+   "category": "code",
+   "tier": "Fast",
+   "q": "In JavaScript, why does [1, 2, 10].sort() give [1, 10, 2], and how do I sort numbers properly?",
+   "answer": "JavaScript's `.sort()` method defaults to **lexicographical (string-based) ordering** because it implicitly converts all elements to **strings** before comparison.\n\nIn a dictionary-style sort, the character '1' precedes '2', which causes '10' to be positioned before '2'. To sort numbers properly, you must provide a **compare function** that defines the numerical difference between elements.\n\nThe provided web evidence does not cover the internal mechanics of the `.sort()` method; I would check the MDN Web Docs for the formal specification.\n\n## Proper Numeric Sorting\nPass a comparison function that calculates the **arithmetic difference** between two values:\n\n```javascript\nconst data = [1, 2, 10];\ndata.sort((a, b) => a - b);\n```\n\nThe engine interprets the return value of the subtraction as follows:\n*   **Negative result**: `a` is placed before `b`.\n*   **Positive result**: `b` is placed before `a`.\n*   **Zero**: The original relative order is maintained.",
+   "first_text_s": 25.23,
+   "elapsed_s": 26.33,
+   "app_first_s": 25.23,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Technically accurate and follows the direct persona, but includes unnecessary bullet points explaining the comparator return values which adds padding."
+   }
+  },
+  {
+   "id": "c03",
+   "category": "code",
+   "tier": "Fast",
+   "q": "What does this command do: find . -name '*.log' -mtime +7 -delete",
+   "answer": "This command recursively searches the current directory and its subdirectories to find and delete files ending in `.log` that were last modified more than 7 days ago.\n\nThe command breaks down as follows:\n\n**`find .`** — Initiates the search starting from the current directory (represented by the dot).\n\n**`-name '*.log'`** — Filters the results to only include files with the `.log` extension [1].\n\n**`-mtime +7`** — Selects files where the last modification time is greater than 7 days. Note that `find` treats time in 24-hour units (86,400 seconds) and uses floor division, meaning it effectively looks for files modified 8 or more days ago [4].\n\n**`-delete`** — Automatically removes the files that match the criteria [1][2].\n\n## Safety and Best Practices\n\nBecause the `-delete` flag is destructive, it is standard practice to perform a \"dry run\" first. You can do this by running the command without the `-delete` flag to see exactly which files will be removed.\n\n**`find . -name '*.log' -mtime +7`**\n\nFor production environments, it is also common to include the `-type f` flag to ensure you are only targeting files and not directories that might happen to end in `.log` [2][5].\n\nIf you are automating this via a cron job, you would typically specify the path (e.g., `/var/log`) rather than using the dot `.` notation to ensure the command targets the correct directory regardless of where the script is executed from [2][3].",
+   "first_text_s": 64.49,
+   "elapsed_s": 76.22,
+   "app_first_s": 64.49,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Technically precise and follows the direct persona, but includes unnecessary formatting and advice that slightly violates the 'short' constraint."
+   }
+  },
+  {
+   "id": "c04",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a SQL query for the top 3 customers by total order amount, from a table orders(customer_id, amount).",
+   "answer": "The following query will return your top three customers based on their total spending:\n\n```sql\nSELECT customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC\nLIMIT 3;\n```\n\nThe **GROUP BY** clause collapses the individual transaction rows into a single sum for each unique `customer_id`. \n\nThe **ORDER BY total_amount DESC** sorts the results so the highest spenders appear first, and **LIMIT 3** ensures you only receive the top three records.",
+   "first_text_s": 8.84,
+   "elapsed_s": 16.24,
+   "app_first_s": 8.84,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The SQL is perfect and follows the direct persona, but the explanatory text violates the 'skip reasoning' preference by adding unnecessary commentary after the code block."
+   }
+  },
+  {
+   "id": "w01",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a two-sentence apology to a client for missing yesterday's call, and offer two new times.",
+   "answer": "Please accept my apologies for missing our scheduled call yesterday. I would like to reschedule and am available to meet at **2:00 PM today** or **10:00 AM tomorrow** if either works for you.",
+   "first_text_s": 0.29,
+   "elapsed_s": 2.6,
+   "app_first_s": 0.29,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer strictly adheres to the two-sentence constraint, provides a direct apology without excuses, offers two concrete times, and respects the user's preference for brevity and directness."
+   }
+  },
+  {
+   "id": "w02",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Rewrite this to sound friendlier, under 40 words: \"Your invoice is overdue. Pay immediately or service will be suspended.\"",
+   "answer": "Just a quick heads-up that your invoice is now overdue. Please submit payment at your earliest convenience to ensure your service continues without interruption.",
+   "first_text_s": 0.31,
+   "elapsed_s": 2.04,
+   "app_first_s": 0.3,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The rewrite is 24 words, retains all critical facts (overdue, payment, service risk), adopts a friendly tone without being groveling, and strictly follows the 'one option' and 'no preamble' constraints."
+   }
+  },
+  {
+   "id": "w03",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a README intro for a command-line tool called tidyup that deletes old files from Downloads: a title and one paragraph.",
+   "answer": "# tidyup\n\nTidyup is a command-line utility designed to automate the cleanup of your **Downloads** directory by purging files based on age or file type. It eliminates manual folder maintenance by providing a clean, predictable way to prune stale data, ensuring your primary storage remains uncluttered.",
+   "first_text_s": 49.11,
+   "elapsed_s": 51.11,
+   "app_first_s": 49.11,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer perfectly matches the reference sheet's requirements for a title and single paragraph, adheres strictly to the user's preference for directness and technical vocabulary, and contains no errors or extraneous content."
+   }
+  },
+  {
+   "id": "w04",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Give me three name ideas for a small coffee shop in Florianópolis, one line each.",
+   "answer": "Since Florianópolis has a heavy coastal/island vibe, these lean into that local identity.\n\n**Ilha Brew** — punchy and highlights the island setting.\n**Manézinho Coffee** — uses the local nickname for people from Floripa for an authentic feel.\n**Cais Café** — evokes the docks and maritime history of the city.\n\nCheck local trademark registries or Instagram handles to ensure these aren't already taken in the region.",
+   "first_text_s": 11.47,
+   "elapsed_s": 12.9,
+   "app_first_s": 11.47,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [],
+    "never_hit": [],
+    "ok": 0,
+    "of": 0
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Perfectly adheres to the 'direct' persona and 'one line each' constraint, but the introductory sentence is unnecessary padding that slightly violates the strict conciseness rule."
+   }
+  },
+  {
+   "id": "h01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "Is it okay to take ibuprofen and acetaminophen together for a headache?",
+   "answer": "Yes, it is generally safe for adults to take ibuprofen and acetaminophen together, provided you stay within the recommended daily limits for each medication [3]. Because they work through different mechanisms—ibuprofen targets inflammation while acetaminophen focuses on pain and fever—they can be taken at the same time or alternated for more consistent relief [4][7].\n\n## Dosage and Safety\n\nWhen combining them, the primary risk is exceeding the maximum daily dose for either drug. For example, a common approach is to take ibuprofen in the morning and acetaminophen several hours later [4].\n\n**Key safety constraints:**\n*   **Acetaminophen limit:** The generally recommended maximum daily dose for a healthy adult is **4000mg (4 grams)** from all sources [6]. \n*   **Avoid doubling up:** Always check the ingredients in other over-the-counter medications (like cold and flu remedies) to ensure you aren't accidentally taking extra acetaminophen or ibuprofen [3].\n*   **Specific Populations:** Doctors may not recommend this combination for people who are pregnant or nursing [3].\n\nIf you are concerned about side effects, be aware that while many experts consider the combination safe for short periods, a 2015 study noted an increased risk of hospitalization for GI adverse events when combining acetaminophen with NSAIDs like ibuprofen [6].\n\nIf you have specific health conditions or are taking other prescription medications, you should consult a medical professional to determine the appropriate dosage for your body.",
+   "first_text_s": 15.69,
+   "elapsed_s": 20.44,
+   "app_first_s": 15.69,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 9,
+    "concise": 7,
+    "fit": 6,
+    "overall": 7,
+    "why": "Accurate and complete, but violates the 'direct/no pleasantries' preference with unnecessary headings and a weak, non-directive conclusion."
+   }
+  },
+  {
+   "id": "m01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "I have $10,000. Should I pay off my 6% car loan early or put it in an index fund? Give me one pick.",
+   "answer": "Pay off the car loan.\n\nSince your interest rate is 6%, paying it down is a guaranteed 6% return on your money. While index funds can yield higher returns over long periods, they come with market volatility and the risk of principal loss, whereas paying down this debt is a risk-free capture of interest savings.\n\nIf you were looking for a purely mathematical \"expected value\" play and could stomach the risk, an index fund might edge out a 6% return over a long enough timeline. However, as a single pick for someone looking to optimize their net worth without gambling, eliminating the 6% liability is the superior move. \n\nIf you had a higher interest rate, the decision would be even more clear. For example, if you were in a subprime tier with a rate of 16.11% as of October 2026 [1], paying that off would be an absolute necessity. Even with a 7% rate on a new car as of August 2026 [2], the \"guaranteed return\" logic holds.",
+   "first_text_s": 13.77,
+   "elapsed_s": 17.35,
+   "app_first_s": 13.77,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 10,
+    "concise": 7,
+    "fit": 9,
+    "overall": 8,
+    "why": "The answer correctly identifies the loan payoff as the superior choice with sound reasoning, but it loses points for including unnecessary, potentially hallucinated specific interest rate examples that violate the 'direct' and 'concise' constraints."
+   }
+  },
+  {
+   "id": "p01",
+   "category": "private",
+   "tier": "Fast",
+   "q": "According to my notes, when does my lease end and how much is my rent?",
+   "answer": "Your lease ends on **2027-03-31** and your monthly rent is **R$4,200** [9].",
+   "first_text_s": 68.57,
+   "elapsed_s": 69.7,
+   "app_first_s": 68.57,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer provides the exact lease end date and rent amount in the first sentence, adhering strictly to the user's preference for directness and brevity while citing the source."
+   }
+  },
+  {
+   "id": "s01",
+   "category": "server",
+   "tier": "srv:5b346919:fast",
+   "q": "In two sentences: what does a GPU's VRAM limit mean for running a 30-billion-parameter model?",
+   "answer": "⚠️ Ollama1 is busy. Try again in a moment.",
+   "first_text_s": 20.08,
+   "elapsed_s": 20.08,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "error answer",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [],
+    "ok": 0,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The response is an error message from Ollama, completely failing to answer the technical question about GPU VRAM limits."
+   }
+  }
+ ]
+}

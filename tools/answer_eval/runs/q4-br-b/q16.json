@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.2,\"ftok\":104,\"est\":false}",
+  "X-Hurry": "6763f52590f6661b"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.43,
+ "elapsed_s": 26.61,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.88,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.88,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.88,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.7,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 29 passages"
+   }
+  },
+  {
+   "t": 11.7,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.7,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.71,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.43,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.6,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.9,
+    "tok": 497,
+    "s": 10.2
+   }
+  },
+  {
+   "t": 26.6,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1989 chars"
+   }
+  },
+  {
+   "t": 26.6,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.6,
+   "tag": "DONE",
+   "data": {
+    "f": 16.43,
+    "t": 26.6,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.88,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.88
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.88
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 29 passages",
+   "t_s": 11.7
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.7
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.71
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1989 chars",
+   "t_s": 26.6
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.6
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Set Boundaries with Family During the Holidays",
+   "u": "https://wellsanfrancisco.com/how-to-set-boundaries-with-family-during-the-holidays/",
+   "d": "2018-12-14"
+  },
+  {
+   "t": "The role of family support in addiction recovery",
+   "u": "https://www.goldstarrehab.com/parent-resources/the-role-of-family-support-in-addiction-recovery",
+   "d": ""
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "A systematic review and narrative summary of family-based ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4921023/",
+   "d": ""
+  },
+  {
+   "t": "Setting Boundaries With Family During the Holidays — BRITTNEY...",
+   "u": "https://www.brittneymscott.com/blog/boundaries-with-families-during-holidays",
+   "d": "2025-10-27"
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Support Someone in Quitting Nicotine Effectively",
+   "u": "https://www.coloradoquits.com/friends-family",
+   "d": ""
+  },
+  {
+   "t": "A Parallel Recovery: Families Healing From AddictionThe role of family support i",
+   "u": "https://www.psychologytoday.com/us/blog/from-addiction-to-recovery/202308/a-parallel-recovery-families-healing-from-addiction",
+   "d": "2023-08-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.71,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 19,
+   "d": 587,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5147,
+   "o": 429,
+   "d": 14840,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 48.9,
+  "tok": 497,
+  "s": 10.2
+ },
+ "app_first_s": 16.43,
+ "app_total_s": 26.6,
+ "answer_raw": "To get support instead of interference, you need to **set clear boundaries** and **define their specific role** before the process becomes a tug-of-war.\n\nThe most effective way to handle family is to **ask how they can help** rather than letting them guess, then follow your own lead [6]. Because family behaviors are directly correlated with your likelihood of achieving abstinence [4], you must transition them from \"supervisors\" to \"stable environments\" [6].\n\n**The Strategy**\n\n*   **Define the role** — Tell them clearly if you need them to be a sounding board, a distraction, or simply to stay out of it. Their role is to provide a stable environment where professional expertise can take hold, not to act as your coach [6].\n*   **Set boundaries** — Decisions regarding quitting are deeply personal [7]. Communicate your limits clearly—for example, stating that you do not want to be asked about cravings or progress—and follow through if they cross those lines [5].\n*   **Use \"soft\" communication** — To prevent them from slipping into nagging, suggest they use supportive language like \"Would it help if I...?\" rather than \"You should quit\" [7].\n*   **Treat slips as data** — If you have a setback, frame it as information rather than a failure to prevent them from adopting a \"failure\" narrative that triggers more nagging [6].\n\n**Addressing the \"Why\"**\n\nIt is common for families to default to either silence or nagging because they don't know how to handle the emotional weight of your transition [6]. They may feel the need to monitor you to manage their own anxiety, but their behavior can either support or undermine your chance of success [4]. \n\nIf they struggle with the shift, remind them that their role is to be the \"stable environment\" and let professional cessation programs handle the technical expertise [6]. In cases where the family is also dealing with their own addiction-related stress, they may need their own space to heal while you focus on your recovery [8].",
+ "answer": "To get support instead of interference, you need to **set clear boundaries** and **define their specific role** before the process becomes a tug-of-war.\n\nThe most effective way to handle family is to **ask how they can help** rather than letting them guess, then follow your own lead [6]. Because family behaviors are directly correlated with your likelihood of achieving abstinence [4], you must transition them from \"supervisors\" to \"stable environments\" [6].\n\n**The Strategy**\n\n*   **Define the role** — Tell them clearly if you need them to be a sounding board, a distraction, or simply to stay out of it. Their role is to provide a stable environment where professional expertise can take hold, not to act as your coach [6].\n*   **Set boundaries** — Decisions regarding quitting are deeply personal [7]. Communicate your limits clearly—for example, stating that you do not want to be asked about cravings or progress—and follow through if they cross those lines [5].\n*   **Use \"soft\" communication** — To prevent them from slipping into nagging, suggest they use supportive language like \"Would it help if I...?\" rather than \"You should quit\" [7].\n*   **Treat slips as data** — If you have a setback, frame it as information rather than a failure to prevent them from adopting a \"failure\" narrative that triggers more nagging [6].\n\n**Addressing the \"Why\"**\n\nIt is common for families to default to either silence or nagging because they don't know how to handle the emotional weight of your transition [6]. They may feel the need to monitor you to manage their own anxiety, but their behavior can either support or undermine your chance of success [4]. \n\nIf they struggle with the shift, remind them that their role is to be the \"stable environment\" and let professional cessation programs handle the technical expertise [6]. In cases where the family is also dealing with their own addiction-related stress, they may need their own space to heal while you focus on your recovery [8].",
+ "chars": 1989,
+ "raw_bytes": 4373,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.69,
+ "rate_gen_tok_s": 48.85,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:55:11",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":158,\"est\":false}",
+  "X-Hurry": "61027cf7c88c955b"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 17.56,
+ "elapsed_s": 28.02,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.35,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 30 passages"
+   }
+  },
+  {
+   "t": 13.35,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.35,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.35,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.35,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.56,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.02,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.3,
+    "tok": 651,
+    "s": 10.5
+   }
+  },
+  {
+   "t": 28.02,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2606 chars"
+   }
+  },
+  {
+   "t": 28.02,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 28.02,
+   "tag": "DONE",
+   "data": {
+    "f": 17.56,
+    "t": 28.02,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 30 passages",
+   "t_s": 13.35
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.35
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.35
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2606 chars",
+   "t_s": 28.02
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 28.02
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Occupancy — September 2026",
+   "u": "https://www.guestfavorites.com/airbnb-occupancy-rates-in-florianopolis-brazil",
+   "d": "2026-09-28"
+  },
+  {
+   "t": "Get Best Airbnb Price Guide - 60k+ Hosts Choose PriceLabs",
+   "u": "https://www.bing.com/aclick?ld=e8CRV6jZwGrshNgPqwYJEMyTVUCUyEHWQaHHFroqWqIJYR2ZC9zBEB96VyKH0AxFmly-2sI9L6MFHDNLrxXk3phJ6pmhJRGEcYKO9svK5kk-g7PouaDPOjrOcIOz2TAT_il6u8eCZSCFLNkncveihBZw-17pFV6gTC7kWZkFA1cLjvb0fhInXQeHfooH-Jonyl64jOXvSkV2yK26vBh-7s9EU0rcw&u=aHR0cHMlM2ElMmYlMmZoZWxsby5wcmljZWxhYnMuY28lMmZhaXJibmItZHluYW1pYy1wcmljaW5nLWF1dG9tYXRpb24lMmYlM2Ztc2Nsa2lkJTNkOGEzNzA0YjE1ZDk1MTk5YTM1OTY2ZTQzODRhYjUyYTM&rlid=8a3704b15d95199a35966e4384ab52a3",
+   "d": ""
+  },
+  {
+   "t": "Devon Airbnb host felt 'violated' after house trashed during stay",
+   "u": "https://www.bbc.co.uk/news/articles/ckr5y99rm75go",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Tri Hotel Florianópolis, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/itaguacu.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Airbnb hosts can no longer make guests strip beds and wash dishes...",
+   "u": "https://bbcbreakingnews.pages.dev/news/articles/c6n049gg75r4o",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis Airbnb Data, Statistics & Market Analysis ...",
+   "u": "https://www.airroi.com/data-portal/markets/florianopolis-brazil",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Are Airbnb rentals in Florianópolis a good idea? – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-airbnb",
+   "d": "2026-10-22"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.35,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 279,
+   "o": 27,
+   "d": 909,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5214,
+   "o": 661,
+   "d": 14620,
+   "c": 2235
+  }
+ ],
+ "rate_writer": {
+  "tps": 62.3,
+  "tok": 651,
+  "s": 10.5
+ },
+ "app_first_s": 17.56,
+ "app_total_s": 28.02,
+ "answer_raw": "Trust the **4.6-star** rating for a more accurate representation of the guest experience.\n\nWhile a 4.9 is objectively higher, it is statistically \"thin\" because it only represents 18 reviews. A rating of 4.6 with 212 reviews is much harder to maintain and suggests a consistent, proven track record across a much larger sample size. The 4.6 rating is more likely to reflect the true average of the property, whereas the 4.9 could easily drop significantly as more guests provide feedback.\n\n## Pricing your 2-bedroom in Florianópolis\n\nSince you are looking at 30+ night stays, you are moving into the monthly/mid-term rental category. Pricing for these stays is typically lower than the nightly rates used for short-term travelers to account for the lower turnover and higher occupancy stability.\n\n**The Baseline**\nBased on data for the year leading to September 2026, a two-bedroom listing in Florianópolis averaged roughly **R$584 per night** [8]. However, this is an average that includes short-stay travelers. For 30+ night stays, you should look at the local rental market to establish a floor. For example, 2-bedroom apartments in certain Florianópolis neighborhoods have been listed for rent via platforms like Rentola (undated) [1].\n\n**Strategic Pricing Factors**\n*   **Seasonality is critical**: Florianópolis's market is heavily driven by summer. In January 2026, listings saw a 55.1% occupancy at **R$746 per night**; by June, occupancy dropped to 28% with a rate of **R$621 per night** [8]. If your 30-night stays occur in the winter, you will likely need to price significantly below the summer peak to maintain occupancy.\n*   **Net Profit vs. Gross Revenue**: Be careful with your margins. An average two-bedroom in the area grossed about **R$43,000** for the year to September 2026, but after expenses like the 15% non-resident tax, condo fees, and co-host fees, the net was approximately **R$6,740** [8].\n*   **Dynamic Pricing**: For 30+ night stays, you might use tools like PriceLabs (undated) to analyze local demand, though these are often optimized for higher-frequency short-term stays [3].\n\n**Recommendation**\nFor 30+ night stays, you should target a price that sits between the \"average\" nightly rate and the local long-term rental rates to attract stable tenants. Given that a two-bedroom averaged **R$584 per night** as of September 2026 [8], a monthly rate for a 30-night stay might reasonably fall between **R$14,000 and R$17,500** depending on the exact neighborhood and quality, though you should adjust this downward if you are booking during the low season (June/winter) [8].",
+ "answer": "Trust the **4.6-star** rating for a more accurate representation of the guest experience.\n\nWhile a 4.9 is objectively higher, it is statistically \"thin\" because it only represents 18 reviews. A rating of 4.6 with 212 reviews is much harder to maintain and suggests a consistent, proven track record across a much larger sample size. The 4.6 rating is more likely to reflect the true average of the property, whereas the 4.9 could easily drop significantly as more guests provide feedback.\n\n## Pricing your 2-bedroom in Florianópolis\n\nSince you are looking at 30+ night stays, you are moving into the monthly/mid-term rental category. Pricing for these stays is typically lower than the nightly rates used for short-term travelers to account for the lower turnover and higher occupancy stability.\n\n**The Baseline**\nBased on data for the year leading to September 2026, a two-bedroom listing in Florianópolis averaged roughly **R$584 per night** [8]. However, this is an average that includes short-stay travelers. For 30+ night stays, you should look at the local rental market to establish a floor. For example, 2-bedroom apartments in certain Florianópolis neighborhoods have been listed for rent via platforms like Rentola (undated) [1].\n\n**Strategic Pricing Factors**\n*   **Seasonality is critical**: Florianópolis's market is heavily driven by summer. In January 2026, listings saw a 55.1% occupancy at **R$746 per night**; by June, occupancy dropped to 28% with a rate of **R$621 per night** [8]. If your 30-night stays occur in the winter, you will likely need to price significantly below the summer peak to maintain occupancy.\n*   **Net Profit vs. Gross Revenue**: Be careful with your margins. An average two-bedroom in the area grossed about **R$43,000** for the year to September 2026, but after expenses like the 15% non-resident tax, condo fees, and co-host fees, the net was approximately **R$6,740** [8].\n*   **Dynamic Pricing**: For 30+ night stays, you might use tools like PriceLabs (undated) to analyze local demand, though these are often optimized for higher-frequency short-term stays [3].\n\n**Recommendation**\nFor 30+ night stays, you should target a price that sits between the \"average\" nightly rate and the local long-term rental rates to attract stable tenants. Given that a two-bedroom averaged **R$584 per night** as of September 2026 [8], a monthly rate for a 30-night stay might reasonably fall between **R$14,000 and R$17,500** depending on the exact neighborhood and quality, though you should adjust this downward if you are booking during the low season (June/winter) [8].",
+ "chars": 2606,
+ "raw_bytes": 5296,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 23.25,
+ "rate_gen_tok_s": 62.28,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:44:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

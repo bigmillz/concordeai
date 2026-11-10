@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.4,\"ftok\":261,\"est\":false}",
+  "X-Hurry": "a2ac7c5e5223bdba"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.97,
+ "elapsed_s": 24.79,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 0.97,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.43,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 33 passages"
+   }
+  },
+  {
+   "t": 11.43,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.43,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.43,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.79,
+   "tag": "RATE",
+   "data": {
+    "tps": 44.5,
+    "tok": 372,
+    "s": 8.4
+   }
+  },
+  {
+   "t": 24.79,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1488 chars"
+   }
+  },
+  {
+   "t": 24.79,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 33 passages",
+   "t_s": 11.43
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.43
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.43
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1488 chars",
+   "t_s": 24.79
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.79
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Airbnb vs Hotel Statistics 2026",
+   "u": "https://oysterlink.com/spotlight/airbnb-vs-hotel-statistics/",
+   "d": "2023"
+  },
+  {
+   "t": "Valerim Florianópolis, Brazil - from 5,405 pyб - Travelated",
+   "u": "https://www.travelated.com/brazil/florianopolis/valerim-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Best 2026 Airbnb Stays in Budapest with Danube River Views",
+   "u": "https://www.tripzilla.com/best-2026-airbnb-stays-in-budapest-with-danube-river-views/27771",
+   "d": "2026"
+  },
+  {
+   "t": "VACATION RENTAL in Florianópolis - TemporadaLivre",
+   "u": "https://www.temporadalivre.com/en/aluguel-temporada/brasil/santa-catarina/florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Tri Hotel Florianópolis, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/itaguacu.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Nowe wytyczne Airbnb. Co się zmieni dla podróżnych?",
+   "u": "https://businessinsider.com.pl/nieruchomosci/nowe-wytyczne-airbnb-co-sie-zmieni-dla-podroznych/pp7l37v",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.43,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 44.5,
+  "tok": 372,
+  "s": 8.4
+ },
+ "answer_raw": "Trust the **4.6-star** rating because it represents a much larger, more stable sample size of guest experiences.\n\nWhile a 4.9 is mathematically higher, it is statistically fragile; eighteen reviews can be skewed by a few friends or an exceptionally lucky streak, whereas 212 reviews provide a much more reliable indicator of consistent quality and how the host handles the \"average\" guest.\n\nFor your 2-bedroom in Florianópolis, price it based on the specific neighborhood and the seasonal nature of the island. Because seasonal demand in areas like Jurerê or beachfront spots can fluctuate wildly, you should first look at local listings for 2-bedroom apartments in your specific zone to establish a baseline.\n\nA 2-bedroom apartment in Florianópolis can be found for approximately **R$1,084 per night** via Valerim (undated) or via rental platforms like Rentola (undated). For 30+ night stays, you should target a monthly rate that reflects the \"mid-term\" nature of the booking—typically a 20-30% discount off the nightly rate to account for the lower turnover costs and the stability of a longer stay. \n\nIf you are in a prime area like Centro/Beira-Mar Norte, you can command higher rates for foreign residents, but if you are in a seasonal beach zone, you might need to adjust for the \"winter wind season\" vs. summer demand [2]. Check local platforms like QuintoAndar, Zap Imóveis, or Facebook groups to see what similar 2-bedroom units are currently yielding for monthly contracts [2].",
+ "answer": "Trust the **4.6-star** rating because it represents a much larger, more stable sample size of guest experiences.\n\nWhile a 4.9 is mathematically higher, it is statistically fragile; eighteen reviews can be skewed by a few friends or an exceptionally lucky streak, whereas 212 reviews provide a much more reliable indicator of consistent quality and how the host handles the \"average\" guest.\n\nFor your 2-bedroom in Florianópolis, price it based on the specific neighborhood and the seasonal nature of the island. Because seasonal demand in areas like Jurerê or beachfront spots can fluctuate wildly, you should first look at local listings for 2-bedroom apartments in your specific zone to establish a baseline.\n\nA 2-bedroom apartment in Florianópolis can be found for approximately **R$1,084 per night** via Valerim (undated) or via rental platforms like Rentola (undated). For 30+ night stays, you should target a monthly rate that reflects the \"mid-term\" nature of the booking—typically a 20-30% discount off the nightly rate to account for the lower turnover costs and the stability of a longer stay. \n\nIf you are in a prime area like Centro/Beira-Mar Norte, you can command higher rates for foreign residents, but if you are in a seasonal beach zone, you might need to adjust for the \"winter wind season\" vs. summer demand [2]. Check local platforms like QuintoAndar, Zap Imóveis, or Facebook groups to see what similar 2-bedroom units are currently yielding for monthly contracts [2].",
+ "chars": 1488,
+ "raw_bytes": 3819,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.19,
+ "rate_gen_tok_s": 17.89,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:15:49",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 16.44,
+ "app_total_s": 24.79,
+ "first_text_s_unreliable": true
+}

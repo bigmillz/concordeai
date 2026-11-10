@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":134,\"est\":false}",
+  "X-Hurry": "7d74cffed9973d8a"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.75,
+ "elapsed_s": 26.46,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.95,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.95,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.68,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 29 passages"
+   }
+  },
+  {
+   "t": 12.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.68,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.68,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.46,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.5,
+    "tok": 526,
+    "s": 8.7
+   }
+  },
+  {
+   "t": 26.46,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2107 chars"
+   }
+  },
+  {
+   "t": 26.46,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.46,
+   "tag": "DONE",
+   "data": {
+    "f": 17.75,
+    "t": 26.45,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.95,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.95
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.95
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 29 passages",
+   "t_s": 12.68
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.68
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.68
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2107 chars",
+   "t_s": 26.46
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.46
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Magnesium Forms: Evidence, Doses and Safety",
+   "u": "https://purecityresearch.org/magnesium/",
+   "d": "2026-07-02"
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "The Effects of Magnesium Supplementation on Subjective Anxiety...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5452159/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium for Anxiety: Which Form Actually Works?",
+   "u": "https://stopanxiety.org/magnesium-for-anxiety/",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Best Magnesium for Anxiety: Forms, Dosage & Protocols That Work",
+   "u": "https://mitohealth.com/guide/best-magnesium-form-for-anxiety",
+   "d": "2026-01-28"
+  },
+  {
+   "t": "Magnesium supplementation for anxiety and depression...",
+   "u": "https://link.springer.com/article/10.1186/s43014-026-00424-6",
+   "d": "2023"
+  },
+  {
+   "t": "Does Magnesium Help with Anxiety? Evidence and Safety Guide...",
+   "u": "https://www.boltpharmacy.co.uk/guide/does-magnesium-help-with-anxiety",
+   "d": "2026-02-06"
+  },
+  {
+   "t": "Magnesium for Anxiety: Does It Work? | Cleveland Clinic",
+   "u": "https://health.clevelandclinic.org/magnesium-for-anxiety",
+   "d": "2023-11-28"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.68,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 230,
+   "o": 20,
+   "d": 523,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4908,
+   "o": 427,
+   "d": 13724,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 60.5,
+  "tok": 526,
+  "s": 8.7
+ },
+ "app_first_s": 17.75,
+ "app_total_s": 26.45,
+ "answer_raw": "There is no universal \"best\" form established by the evidence, but the research suggests a therapeutic window of **200–400mg of elemental magnesium daily** [4], with many studies utilizing approximately **300mg** [5].\n\n## Evidence Quality and Findings\nThe strength of the evidence is currently limited by small sample sizes, short study durations, and inconsistent dosing regimens across clinical trials [2][7]. A systematic review found that magnesium supplementation was associated with reduced subjective anxiety, particularly in individuals facing high stress or inadequate dietary intake [4].\n\nHowever, conclusions remain difficult to draw because of the heterogeneity of the data—meaning the dosages, formulations, and durations used in studies vary too much to establish a single clinical gold standard [2]. While magnesium is essential for neurotransmitter regulation and the HPA axis, much of the research on anxiety and depression remains uncertain or mixed [1][4].\n\n## Dosage and Forms\nIf you are looking for specific protocols, the current research points to these directions:\n\n*   **Therapeutic Dose:** A common target is **200–400mg** of elemental magnesium per day [4]. Some protocols suggest splitting this into morning and evening doses [5].\n*   **Magnesium Taurate:** This form is used for those managing anxiety alongside cardiovascular concerns, as taurine supports both GABA and heart function [4][5].\n*   **Magnesium Threonate:** This is a newer form with preliminary research into neurological effects, though clinical evidence for anxiety specifically remains limited [7].\n*   **Safety Note:** Taking more than the NIH upper limit of **350mg** per day should typically only be done under medical supervision, as excess intake can cause diarrhea or, less commonly, low blood pressure [5].\n\nCorrecting a deficiency in your diet is distinct from using magnesium to treat clinical symptoms [1]. Because many of the studies involve small groups or variable methods, the \"best\" dose often depends on whether you are correcting an existing deficiency or managing sub-clinical stress [1][4].",
+ "answer": "There is no universal \"best\" form established by the evidence, but the research suggests a therapeutic window of **200–400mg of elemental magnesium daily** [4], with many studies utilizing approximately **300mg** [5].\n\n## Evidence Quality and Findings\nThe strength of the evidence is currently limited by small sample sizes, short study durations, and inconsistent dosing regimens across clinical trials [2][7]. A systematic review found that magnesium supplementation was associated with reduced subjective anxiety, particularly in individuals facing high stress or inadequate dietary intake [4].\n\nHowever, conclusions remain difficult to draw because of the heterogeneity of the data—meaning the dosages, formulations, and durations used in studies vary too much to establish a single clinical gold standard [2]. While magnesium is essential for neurotransmitter regulation and the HPA axis, much of the research on anxiety and depression remains uncertain or mixed [1][4].\n\n## Dosage and Forms\nIf you are looking for specific protocols, the current research points to these directions:\n\n*   **Therapeutic Dose:** A common target is **200–400mg** of elemental magnesium per day [4]. Some protocols suggest splitting this into morning and evening doses [5].\n*   **Magnesium Taurate:** This form is used for those managing anxiety alongside cardiovascular concerns, as taurine supports both GABA and heart function [4][5].\n*   **Magnesium Threonate:** This is a newer form with preliminary research into neurological effects, though clinical evidence for anxiety specifically remains limited [7].\n*   **Safety Note:** Taking more than the NIH upper limit of **350mg** per day should typically only be done under medical supervision, as excess intake can cause diarrhea or, less commonly, low blood pressure [5].\n\nCorrecting a deficiency in your diet is distinct from using magnesium to treat clinical symptoms [1]. Because many of the studies involve small groups or variable methods, the \"best\" dose often depends on whether you are correcting an existing deficiency or managing sub-clinical stress [1][4].",
+ "chars": 2107,
+ "raw_bytes": 4268,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.91,
+ "rate_gen_tok_s": 60.48,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:38:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

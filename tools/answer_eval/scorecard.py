@@ -2,6 +2,7 @@
 """The per-build scorecard (6b560): a fixed, small, fast set, scored the same way every build.
 
   scorecard.py run   [--label L] [--where auto|local|server] [--judge mlx|packets] [--gate] [--port 9916]
+  scorecard.py judge <label>                         (re)grade a recorded run with the local judge
   scorecard.py ingest <label> <judgments.jsonl>     scores from a Claude judge (for --judge packets)
   scorecard.py show  [<label>]                       the history, or one entry against the one before it
 
@@ -69,12 +70,18 @@ ANSWER:
 {answer}
 >>>
 
-Score each from 1 (bad) to 10 (excellent):
-- correct: the key facts right, no trap, nothing invented (a wrong central fact caps this at 3)
-- complete: every part of the question answered
-- concise: no padding, no restating the question, no recap, no needless headings or tables
-- fit: does what was asked (format, length, one pick when one is asked) and follows the preferences
-- overall: your overall grade; an answer that is an error message, a refusal or empty scores 1
+Score each from 1 to 10. Use the whole scale and be hard to impress: 10 is flawless and rare, 8 is a
+good answer with one small flaw, 6 is acceptable with clear flaws, 4 is weak, 2 is wrong or useless.
+Take one point off a score for each flaw that score covers; do not round up.
+- correct: the key facts right, no trap, nothing invented (a wrong central fact caps this at 3; a figure
+  or claim the sheet doesn't support and you can't confirm costs 2)
+- complete: every part of the question answered, with the specifics it needs
+- concise: every sentence earns its place; padding, restating the question, a recap, an offer to help,
+  needless headings or tables, or anything off the question each cost a point
+- fit: does exactly what was asked (format, length, number of items, one pick when one is asked) and
+  follows the preferences
+- overall: your overall grade for this person, weighted toward correct and complete; an answer that is an
+  error message, a refusal or empty scores 1
 
 Reply with exactly one JSON object and nothing else:
 {{"correct": n, "complete": n, "concise": n, "fit": n, "overall": n, "why": "one short sentence"}}"""
@@ -367,12 +374,24 @@ def compare(new, old):
             md, se, len(d), old["label"], "FAIL (fell by more than one standard error)" if bad else "ok"))
     else:
         lines.append("quality: fewer than two questions in common with %s; not compared" % old["label"])
-    t0, t1 = (old["summary"] or {}).get("ttfw_median_s"), (new["summary"] or {}).get("ttfw_median_s")
+    # first words, over the questions the SAME model answered in both runs: a mode with a server falls
+    # back to this computer for a minute when the server misses its deadline, and a median over a
+    # different mix of machines measures the mix, not the build
+    fa = {r["id"]: r for r in old["records"] if r.get("first_text_s") is not None}
+    fb = {r["id"]: r for r in new["records"] if r.get("first_text_s") is not None}
+    same = [i for i in sorted(set(fa) & set(fb)) if fa[i].get("x_models") == fb[i].get("x_models")]
+    if len(same) >= 5:
+        t0 = st.median(fa[i]["first_text_s"] for i in same)
+        t1 = st.median(fb[i]["first_text_s"] for i in same)
+        over = "%d questions answered by the same model" % len(same)
+    else:
+        t0, t1 = (old["summary"] or {}).get("ttfw_median_s"), (new["summary"] or {}).get("ttfw_median_s")
+        over = "all questions (fewer than 5 answered by the same model in both)"
     if t0 and t1:
         bad = t1 > t0 * (1 + TTFW_SLACK)
         failed |= bad
-        lines.append("median first words %.1f s vs %.1f s (%+.0f%%): %s" % (
-            t1, t0, (t1 / t0 - 1) * 100, "FAIL (more than 15%% slower)" if bad else "ok"))
+        lines.append("median first words %.1f s vs %.1f s (%+.0f%%) over %s: %s" % (
+            t1, t0, (t1 / t0 - 1) * 100, over, "FAIL (more than 15%% slower)" if bad else "ok"))
     e0, e1 = old["summary"]["errors"], new["summary"]["errors"]
     bad = e1 > e0
     failed |= bad
@@ -413,7 +432,7 @@ def cmd_run(args):
         judge_all(args, s, recs, run_dir)
     finally:
         lock.release()
-    e = {"label": label, "when": time.strftime("%Y-%m-%dT%H:%M:%S"), "app": app, "head": rb.git_head(args.repo),
+    e = {"label": label, "when": time.strftime("%Y-%m-%dT%H:%M:%S"), "app": app, "head": args.head or " ".join(x for x in rb.git_head(args.repo) if x),
          "set_version": s["version"], "as_of": s["as_of"], "where": where,
          "server": (srv or {}).get("name"), "tier": args.tier,
          "judge": "packets" if args.judge == "packets" else "mlx:" + args.judge_model,
@@ -464,6 +483,24 @@ def cmd_ingest(args):
     return finish(e, False)
 
 
+def cmd_judge(args):
+    """(Re)grade a recorded run with the local judge, without asking again."""
+    run_dir = os.path.join(OUT, "runs", re.sub(r"[^\w.-]+", "-", args.label))
+    e = json.load(open(os.path.join(run_dir, "records.json"), encoding="utf-8"))
+    args.judge = "mlx"
+    lock = rb.Lock(os.path.join(args.lock_dir, "engines.lock") if not args.no_lock else "",
+                   "scorecard judge %s pid %d" % (args.label, os.getpid()))
+    try:
+        lock.acquire()
+        judge_all(args, load_set(), e["records"], run_dir)
+    finally:
+        lock.release()
+    e["judge"] = "mlx:" + args.judge_model
+    with open(os.path.join(run_dir, "records.json"), "w", encoding="utf-8") as fh:
+        json.dump(e, fh, ensure_ascii=False, indent=1)
+    return finish(e, args.gate)
+
+
 def cmd_show(args):
     h = load_history()
     if not args.label:
@@ -502,6 +539,15 @@ def main():
     r.add_argument("--idle", type=int, default=300)
     r.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", rb.DEFAULT_LOCK_DIR))
     r.add_argument("--no-lock", action="store_true")
+    r.add_argument("--head", help="the commit the checkout is (for an exported tree without .git)")
+    j = sub.add_parser("judge")
+    j.add_argument("label")
+    j.add_argument("--judge-model", default=JUDGE_MODEL)
+    j.add_argument("--judge-port", type=int, default=9917)
+    j.add_argument("--python", default=rb.DEFAULT_PY if os.path.exists(rb.DEFAULT_PY) else sys.executable)
+    j.add_argument("--gate", action="store_true")
+    j.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", rb.DEFAULT_LOCK_DIR))
+    j.add_argument("--no-lock", action="store_true")
     i = sub.add_parser("ingest")
     i.add_argument("label")
     i.add_argument("jsonl")
@@ -510,7 +556,7 @@ def main():
     w.add_argument("label", nargs="?")
     args = ap.parse_args()
     try:
-        rc = {"run": cmd_run, "ingest": cmd_ingest, "show": cmd_show}[args.cmd](args)
+        rc = {"run": cmd_run, "judge": cmd_judge, "ingest": cmd_ingest, "show": cmd_show}[args.cmd](args)
     except SystemExit as exc:
         if isinstance(exc.code, str):
             print("scorecard: " + exc.code, file=sys.stderr)

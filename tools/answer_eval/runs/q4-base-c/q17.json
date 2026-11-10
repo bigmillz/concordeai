@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.5,\"ftok\":146,\"est\":false}",
+  "X-Hurry": "382dbcf2ff9f83d6"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.37,
+ "elapsed_s": 24.76,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.72,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 20 passages"
+   }
+  },
+  {
+   "t": 14.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.72,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.72,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.37,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.75,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.4,
+    "tok": 424,
+    "s": 6.4
+   }
+  },
+  {
+   "t": 24.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1696 chars"
+   }
+  },
+  {
+   "t": 24.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.75,
+   "tag": "DONE",
+   "data": {
+    "f": 18.36,
+    "t": 24.75,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 20 passages",
+   "t_s": 14.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.72
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1696 chars",
+   "t_s": 24.75
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.75
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Walkable to Beach · Fast Wifi · Plush 1BHK · AC... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1047183382474558010",
+   "d": ""
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Short Term and Weekly Rentals | cozycozy",
+   "u": "https://www.cozycozy.com/gb/florianopolis-short-term-rentals",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis: The Expat Guide Updated (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-expat-guide",
+   "d": "2026"
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Picky mom wants beach, safe walkable town, no cars... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g1-i9658-k11989472-o10-Picky_mom_wants_beach_safe_walkable_town_no_cars_food-Family_Travel.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.72,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 27,
+   "d": 711,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4562,
+   "o": 400,
+   "d": 9985,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 66.4,
+  "tok": 424,
+  "s": 6.4
+ },
+ "app_first_s": 18.36,
+ "app_total_s": 24.75,
+ "answer_raw": "For a six-month stay, your best bets depend on whether you want a resort feel or a local, bohemian vibe, but **Jurerê** and **Ingleses** are the most practical matches for your criteria.\n\n## Neighborhood Options\n\n**Jurerê (specifically Jurerê Tradicional)** — This area offers a resort-style atmosphere with stunning sea views and is located near Canasvieiras [5, undated]. It is a prime spot for those looking for upscale amenities and proximity to the coast.\n\n**Ingleses** — For a more walkable, central feel, look at the Ingleses district. Properties here are often situated within a short walk of the beach and local centers, such as near Rua das Gaivotas [5, undated]. This area provides a good balance of beach access and local infrastructure like supermarkets.\n\n## Safety and Logistics\n\n**Safety** — While violent crime is considered relatively rare, the primary concerns for expats are petty crimes like phone snatching in crowded areas or opportunistic theft during the busy summer season [6, 2026]. You should also be mindful of car break-ins at beach parking lots [6, 2026].\n\n**Internet and Work** — The growing tech economy in Florianópolis makes it an attractive destination for remote workers looking for a high quality of life and outdoor lifestyle [6, 2026]. While specific ISP speeds vary by street, the tech-centric population ensures that high-speed connectivity is a standard expectation in many residential pockets [6, 2026].\n\n**Rent Trends** — Be prepared for rising costs; asking rents increased by 9.13% in the 12 months leading to September 2026 [4, 2026]. If you are looking for a one-bedroom unit, these typically provide the best yields in the rental market [4, 2026].",
+ "answer": "For a six-month stay, your best bets depend on whether you want a resort feel or a local, bohemian vibe, but **Jurerê** and **Ingleses** are the most practical matches for your criteria.\n\n## Neighborhood Options\n\n**Jurerê (specifically Jurerê Tradicional)** — This area offers a resort-style atmosphere with stunning sea views and is located near Canasvieiras [5, undated]. It is a prime spot for those looking for upscale amenities and proximity to the coast.\n\n**Ingleses** — For a more walkable, central feel, look at the Ingleses district. Properties here are often situated within a short walk of the beach and local centers, such as near Rua das Gaivotas [5, undated]. This area provides a good balance of beach access and local infrastructure like supermarkets.\n\n## Safety and Logistics\n\n**Safety** — While violent crime is considered relatively rare, the primary concerns for expats are petty crimes like phone snatching in crowded areas or opportunistic theft during the busy summer season [6, 2026]. You should also be mindful of car break-ins at beach parking lots [6, 2026].\n\n**Internet and Work** — The growing tech economy in Florianópolis makes it an attractive destination for remote workers looking for a high quality of life and outdoor lifestyle [6, 2026]. While specific ISP speeds vary by street, the tech-centric population ensures that high-speed connectivity is a standard expectation in many residential pockets [6, 2026].\n\n**Rent Trends** — Be prepared for rising costs; asking rents increased by 9.13% in the 12 months leading to September 2026 [4, 2026]. If you are looking for a one-bedroom unit, these typically provide the best yields in the rental market [4, 2026].",
+ "chars": 1696,
+ "raw_bytes": 4038,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.12,
+ "rate_gen_tok_s": 66.35,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:38:36",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

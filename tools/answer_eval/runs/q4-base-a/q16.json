@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.5,\"ftok\":156,\"est\":false}",
+  "X-Hurry": "d75c915050f1bfe3"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 1.27,
+ "elapsed_s": 35.72,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 1.27,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.36,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 15.36,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.36,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.36,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 35.72,
+   "tag": "RATE",
+   "data": {
+    "tps": 42.5,
+    "tok": 687,
+    "s": 16.2
+   }
+  },
+  {
+   "t": 35.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2748 chars"
+   }
+  },
+  {
+   "t": 35.72,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 15.36
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.36
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.36
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2748 chars",
+   "t_s": 35.72
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 35.72
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "You are 'here': A smoker's guide to quitting - Mayo Clinic ...How do I tell my f",
+   "u": "https://newsnetwork.mayoclinic.org/discussion/you-are-here-a-smokers-guide-to-quitting/",
+   "d": "2025-12-30"
+  },
+  {
+   "t": "Nicotine replacement therapy versus control for smoking cessation...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6353172/",
+   "d": ""
+  },
+  {
+   "t": "A systematic review and narrative summary of family-based ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4921023/",
+   "d": ""
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "Quitlines and Other Cessation Support Resources",
+   "u": "https://www.cdc.gov/tobacco/hcp/patient-care/quitlines-and-other-resources.html",
+   "d": "2025-01-31"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  },
+  {
+   "t": "Nicotine Dependence: Causes, Symptoms & Treatment",
+   "u": "https://my.clevelandclinic.org/health/diseases/24482-nicotine-dependence",
+   "d": "2022-12-02"
+  },
+  {
+   "t": "What to Say Instead of Nagging. Phrases That Build... — Palme School",
+   "u": "https://www.palmeschool.com/blog/what-to-say-instead-of-nagging/",
+   "d": "2026-09-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.36,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 42.5,
+  "tok": 687,
+  "s": 16.2
+ },
+ "answer_raw": "The shift from being nagged to being supported happens when you move the conversation from \"how to quit\" to \"how we interact during this process.\"\n\nTo get them on your side, you need to define the boundaries of your support system before the withdrawal symptoms hit their peak.\n\n## Establish clear boundaries\nThe decision to quit has to be yours [1]. Because of this, your family needs to understand that their role is to support your decision, not to manage your progress.\n\n**Define the \"Support Contract\"** — Tell them clearly: \"I am quitting. I need you to help me by [specific action, e.g., not keeping cigarettes in the house] rather than [nagging/checking up on me].\" This prevents the \"pricing problem\" where repeated requests lose their value and turn into friction [8].\n\n**Set the check-in protocol** — Nagging often happens because family members feel they need to \"monitor\" you to ensure you're succeeding. Tell them you will provide updates on your own terms (e.g., once a week or only when you initiate it). This gives them a clear lane to help without overstepping.\n\n## Prepare for the physiological reality\nWithdrawal symptoms can be intense, often reaching their peak on the second or third day after quitting [7]. During these windows, your capacity to handle \"helpful\" advice will be at its lowest.\n\n**Communicate the \"Red Zones\"** — Warn them that during the first few days, you may be irritable or less communicative due to withdrawal [7]. Ask them to give you extra space during these specific windows so they don't mistake your withdrawal symptoms for a failure of their support.\n\n**Address the \"why\"** — Remind them that while they might think they are helping, constant checking can feel like a lack of trust. Explain that you need them to be your \"safety net\" (there when you stumble) rather than your \"supervisor\" (watching every move).\n\n## Practical tools for the transition\nSince nicotine affects the brain's reward pathways and can make quitting feel like a constant battle against cravings [1], having external tools can take the pressure off your family to be your only source of accountability.\n\n**Offload the \"monitoring\" to tech** — Using apps like the National Cancer Institute's quitSTART can provide tips and engagement through games, which can act as a primary source of interaction so your family doesn't feel they have to be your only \"coach\" [5].\n\n**Externalize the goals** — If they are worried about the financial or health aspects, remind them that benefits like normalized blood pressure and heart rate happen almost immediately (within 20 minutes of quitting) [7]. Using these objective health wins as milestones can shift the conversation from \"Are you still smoking?\" to \"Look at these improvements.\"",
+ "answer": "The shift from being nagged to being supported happens when you move the conversation from \"how to quit\" to \"how we interact during this process.\"\n\nTo get them on your side, you need to define the boundaries of your support system before the withdrawal symptoms hit their peak.\n\n## Establish clear boundaries\nThe decision to quit has to be yours [1]. Because of this, your family needs to understand that their role is to support your decision, not to manage your progress.\n\n**Define the \"Support Contract\"** — Tell them clearly: \"I am quitting. I need you to help me by [specific action, e.g., not keeping cigarettes in the house] rather than [nagging/checking up on me].\" This prevents the \"pricing problem\" where repeated requests lose their value and turn into friction [8].\n\n**Set the check-in protocol** — Nagging often happens because family members feel they need to \"monitor\" you to ensure you're succeeding. Tell them you will provide updates on your own terms (e.g., once a week or only when you initiate it). This gives them a clear lane to help without overstepping.\n\n## Prepare for the physiological reality\nWithdrawal symptoms can be intense, often reaching their peak on the second or third day after quitting [7]. During these windows, your capacity to handle \"helpful\" advice will be at its lowest.\n\n**Communicate the \"Red Zones\"** — Warn them that during the first few days, you may be irritable or less communicative due to withdrawal [7]. Ask them to give you extra space during these specific windows so they don't mistake your withdrawal symptoms for a failure of their support.\n\n**Address the \"why\"** — Remind them that while they might think they are helping, constant checking can feel like a lack of trust. Explain that you need them to be your \"safety net\" (there when you stumble) rather than your \"supervisor\" (watching every move).\n\n## Practical tools for the transition\nSince nicotine affects the brain's reward pathways and can make quitting feel like a constant battle against cravings [1], having external tools can take the pressure off your family to be your only source of accountability.\n\n**Offload the \"monitoring\" to tech** — Using apps like the National Cancer Institute's quitSTART can provide tips and engagement through games, which can act as a primary source of interaction so your family doesn't feel they have to be your only \"coach\" [5].\n\n**Externalize the goals** — If they are worried about the financial or health aspects, remind them that benefits like normalized blood pressure and heart rate happen almost immediately (within 20 minutes of quitting) [7]. Using these objective health wins as milestones can shift the conversation from \"Are you still smoking?\" to \"Look at these improvements.\"",
+ "chars": 2748,
+ "raw_bytes": 5075,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.77,
+ "rate_gen_tok_s": 21.54,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:25:38",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 19.55,
+ "app_total_s": 35.72,
+ "first_text_s_unreliable": true
+}

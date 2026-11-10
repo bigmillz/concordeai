@@ -1,0 +1,319 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":108,\"est\":false}",
+  "X-Hurry": "5801d560c5976296"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.01,
+ "elapsed_s": 21.84,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.02,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.69,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 20 passages"
+   }
+  },
+  {
+   "t": 12.69,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.69,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.69,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.01,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.84,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.6,
+    "tok": 277,
+    "s": 4.8
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1111 chars"
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "DONE",
+   "data": {
+    "f": 17.01,
+    "t": 21.84,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.02,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.02
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.02
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 20 passages",
+   "t_s": 12.69
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.69
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.69
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1111 chars",
+   "t_s": 21.84
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.84
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Are morning people happier than night people?",
+   "u": "https://www.thehealthyjournal.com/q-and-a/are-morning-people-happier-than-night-people/",
+   "d": ""
+  },
+  {
+   "t": "Morning people really do report being happier than night owls...",
+   "u": "https://siliconcanals.com/t-morning-people-happier-night-owls-social-jet-lag/",
+   "d": "2026-08-15"
+  },
+  {
+   "t": "Morning People Are Actually Happier Than Night Owls | Live Science",
+   "u": "https://www.livescience.com/20880-morning-people-happier.html",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "Morning People Happier Than Night Owls, Study... | HuffPost Life",
+   "u": "https://www.huffpost.com/entry/morning-people-happier-night-owls-sleep_n_1589982",
+   "d": "2012-06-14"
+  },
+  {
+   "t": "16-Port eNVR and APEX Expansion Switch – Night Owl SP, LLC",
+   "u": "https://nightowlsp.com/products/16-port-envr-expansion-switch",
+   "d": ""
+  },
+  {
+   "t": "Night Owl 16-Port PoE Switch for Wired NVR Systems - Amazon.com",
+   "u": "https://www.amazon.com/Night-Owl-16-Port-Switch-Systems/dp/B0GX7W88DT",
+   "d": ""
+  },
+  {
+   "t": "Morning People vs Night Owls: Is One Better Than the Other?",
+   "u": "https://bedthreads.com/blogs/journal/morning-people-vs-night-people",
+   "d": ""
+  },
+  {
+   "t": "Are Morning People Happier and Healthier? – City Mattress",
+   "u": "https://www.citymattress.com/blogs/news/are-morning-people-happier-and-healthier",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.69,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4788,
+   "o": 219,
+   "d": 9094,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 57.6,
+  "tok": 277,
+  "s": 4.8
+ },
+ "app_first_s": 17.01,
+ "app_total_s": 21.84,
+ "answer_raw": "Morning people tend to report higher levels of happiness and life satisfaction than night owls [1][4].\n\nWhile the correlation exists, it is not an absolute rule; morning types often report feeling more **cheerful, lively, and alert**, but they do not necessarily report lower levels of distress or nervousness than night owls [2]. The discrepancy often stems from the conflict between biological clocks and social demands. For a morning type, an early start may align with their natural circadian rhythm, whereas a night owl forced into a 9-5 schedule may struggle with sleep inertia or fatigue, leading to grumpiness [2][8].\n\nRegarding the ability to switch, the evidence suggests a natural shift happens over time. For example, **teenagers' night owl tendencies often fade** as they age, which may explain why older adults—who often lean toward morning schedules—report higher levels of happiness [4]. There is no specific physiological mechanism detailed in the findings to suggest an individual can manually \"switch\" their chronotype, but the natural aging process facilitates a move toward morningness [4].",
+ "answer": "Morning people tend to report higher levels of happiness and life satisfaction than night owls [1][4].\n\nWhile the correlation exists, it is not an absolute rule; morning types often report feeling more **cheerful, lively, and alert**, but they do not necessarily report lower levels of distress or nervousness than night owls [2]. The discrepancy often stems from the conflict between biological clocks and social demands. For a morning type, an early start may align with their natural circadian rhythm, whereas a night owl forced into a 9-5 schedule may struggle with sleep inertia or fatigue, leading to grumpiness [2][8].\n\nRegarding the ability to switch, the evidence suggests a natural shift happens over time. For example, **teenagers' night owl tendencies often fade** as they age, which may explain why older adults—who often lean toward morning schedules—report higher levels of happiness [4]. There is no specific physiological mechanism detailed in the findings to suggest an individual can manually \"switch\" their chronotype, but the natural aging process facilitates a move toward morningness [4].",
+ "chars": 1111,
+ "raw_bytes": 3342,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.72,
+ "rate_gen_tok_s": 57.51,
+ "id": "q14",
+ "turn": 1,
+ "category": "health",
+ "topic": "Morning people and happiness",
+ "question": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:51:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Are morning people really happier, or is that a myth? Can a night owl actually switch?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.0,\"ftok\":138,\"est\":false}",
+  "X-Hurry": "3788c4a71c4a3a74"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 18.36,
+ "elapsed_s": 23.41,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 27 passages"
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.32,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.36,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.41,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.2,
+    "tok": 319,
+    "s": 5.0
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1276 chars"
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "DONE",
+   "data": {
+    "f": 18.36,
+    "t": 23.41,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 27 passages",
+   "t_s": 14.32
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.32
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.32
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1276 chars",
+   "t_s": 23.41
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.41
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Galaxy vs iPhone 2026 Price in Egypt | Current Market Rates",
+   "u": "https://miamicenters.com/galaxy-vs-iphone-2026-price/",
+   "d": "2026"
+  },
+  {
+   "t": "Is the iPhone Duo worth $1,999? I used it for a week, and it’s complicated",
+   "u": "https://www.cnn.com/cnn-underscored/reviews/iphone-duo",
+   "d": "2026-10-21"
+  },
+  {
+   "t": "iPhone 16 price drops on Amazon: Is it still worth buying after the iPhone 17 la",
+   "u": "https://www.msn.com/en-in/technology/consumer-electronics/iphone-16-price-drops-on-amazon-is-it-still-worth-buying-after-the-iphone-17-launch/ar-AA2elcDu?ocid=BingNewsVerp",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "iPhone 14 Pro Max Colors: Which One Suits Your Style? – Fonezone.ae",
+   "u": "https://www.fonezone.ae/blogs/news/iphone-14-pro-max-colors",
+   "d": "2026-02-25"
+  },
+  {
+   "t": "iPhone Duo arrives at Apple Store locations worldwide - Apple",
+   "u": "https://www.apple.com/newsroom/2026/10/iphone-duo-arrives-at-apple-store-locations-worldwide/",
+   "d": "2026-10"
+  },
+  {
+   "t": "Choose an iPhone / IPSW Downloads",
+   "u": "https://ipsw.me/product/iPhone/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.32,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 239,
+   "o": 29,
+   "d": 790,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4710,
+   "o": 304,
+   "d": 9043,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.2,
+  "tok": 319,
+  "s": 5.0
+ },
+ "app_first_s": 18.36,
+ "app_total_s": 23.41,
+ "answer_raw": "The newest model is the **iPhone Duo**, which arrived in Apple Stores worldwide on October 23, 2026 [1][7].\n\n## Pricing and Upgrade Value\n\nThe provided sources do not list the specific MSRP for the iPhone Duo, so you would need to check Apple's official site or a local retail store for the exact breakdown [1]. However, there are several factors to consider for your upgrade path:\n\n**Trade-in potential** — You can get up to $1,200 in credit on a new iPhone after trade-in as of October 2026 [5]. Since older models like the iPhone 14 Pro still hold a solid resale value, your current device should contribute significantly toward the cost of the new lineup [2].\n\n**The Upgrade Verdict** — Moving from an iPhone 14 to the iPhone Duo is a massive architectural jump. While the iPhone 14 remains a capable device, the Duo represents a new category of hardware [1]. Whether it is \"worth it\" depends on your appetite for new form factors and the specific features of the Duo lineup, which the industry is calling revolutionary [1][7].\n\nIf you are looking for a more traditional path, the iPhone 17 family is also currently on sale [4]. You might consider if the \"Air\" or \"Pro\" models of that family fit your needs better if the Duo's unique form factor isn't your preference [2].",
+ "answer": "The newest model is the **iPhone Duo**, which arrived in Apple Stores worldwide on October 23, 2026 [1][7].\n\n## Pricing and Upgrade Value\n\nThe provided sources do not list the specific MSRP for the iPhone Duo, so you would need to check Apple's official site or a local retail store for the exact breakdown [1]. However, there are several factors to consider for your upgrade path:\n\n**Trade-in potential** — You can get up to $1,200 in credit on a new iPhone after trade-in as of October 2026 [5]. Since older models like the iPhone 14 Pro still hold a solid resale value, your current device should contribute significantly toward the cost of the new lineup [2].\n\n**The Upgrade Verdict** — Moving from an iPhone 14 to the iPhone Duo is a massive architectural jump. While the iPhone 14 remains a capable device, the Duo represents a new category of hardware [1]. Whether it is \"worth it\" depends on your appetite for new form factors and the specific features of the Duo lineup, which the industry is calling revolutionary [1][7].\n\nIf you are looking for a more traditional path, the iPhone 17 family is also currently on sale [4]. You might consider if the \"Air\" or \"Pro\" models of that family fit your needs better if the Duo's unique form factor isn't your preference [2].",
+ "chars": 1276,
+ "raw_bytes": 3534,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.63,
+ "rate_gen_tok_s": 63.17,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:34:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

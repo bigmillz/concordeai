@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.4,\"ftok\":156,\"est\":false}",
+  "X-Hurry": "6d6d487dc09db9a2"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.71,
+ "elapsed_s": 28.75,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 0.71,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.84,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.84,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.84,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 23 passages"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.29,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 28.75,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.6,
+    "tok": 729,
+    "s": 12.2
+   }
+  },
+  {
+   "t": 28.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2917 chars"
+   }
+  },
+  {
+   "t": 28.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.84,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.84
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.84
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 23 passages",
+   "t_s": 12.29
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.29
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.29
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2917 chars",
+   "t_s": 28.75
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 28.75
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Get Sweat Smell Out of Clothes: 7 Easy FixesWhy Does My Sweat Smell Worse",
+   "u": "https://ohsospotless.com/remove-sweat-smell-from-clothes/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "What Causes Body Odor? 7 Causes of Bad Sweat Smell",
+   "u": "https://www.ejisinc.com/blogs/news/what-causes-body-odor",
+   "d": "2020-01-15"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Body Odor - Explore Causes, Symptoms, Treatments & more",
+   "u": "https://aumpharmacy.com/diseases/body-odor",
+   "d": ""
+  },
+  {
+   "t": "Vaginal Odor: Types, Causes, Diagnosis & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17905-vaginal-odor",
+   "d": "2023-08-24"
+  },
+  {
+   "t": "Why Stress Sweat Smells Worse: Science Behind the Odor",
+   "u": "https://secret.com/en-us/articles/why-stress-sweat-smells-worse-science-behind-the-odor",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.29,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 59.6,
+  "tok": 729,
+  "s": 12.2
+ },
+ "answer_raw": "The change in your scent is likely due to changes in the bacterial colonies on your skin or shifts in the chemical composition of your sweat, rather than the sweat itself.\n\n## The Biological Cause\nSweat is essentially odorless when it leaves your body [1][5]. The smell is a byproduct of the interaction between your sweat and the bacteria living on your skin [1][2].\n\nYour body uses two different types of glands to manage temperature and secretions:\n*   **Eccrine glands**: These are your thermoregulatory workhorses, producing a thin, watery sweat that is roughly 99% water and trace amounts of salt [8].\n*   **Apocrine glands**: Located in areas like the armpits and groin, these release a thicker secretion loaded with proteins and fats [5].\n\nThe \"stink\" happens during the breakdown process. Bacteria, specifically those in the genus *Corynebacterium* or *Staphylococcus hominis*, feed on the proteins and fatty compounds in apocrine sweat [1][5]. This metabolic process produces two main types of odor: **volatile acids** (which smell sour or vinegary) and **sulfur compounds** (which produce a sharp, onion-like scent) [1][5].\n\n## Why the Change?\nIf your scent has shifted, it is likely due to one of these variables:\n\n**Hormonal Fluctuations**\nChanges in hormones—such as those experienced during menopause, hot flashes, or night sweats—can lead to excessive sweating and changes in body odor [2].\n\n**Lifestyle and Diet**\nChanges in the foods you eat or your hygiene practices can alter the chemical makeup of your sweat or the environment in which bacteria thrive [2].\n\n**Stress Responses**\nSweat produced during high-stress situations (the \"fight or flight\" response) can smell different than sweat produced during physical exercise [8].\n\n**Medical Conditions**\nA sudden change in the amount or smell of your body odor can sometimes indicate an underlying medical condition [2].\n\n## What Fixes It\nBecause the smell is caused by bacteria breaking down organic matter, effective solutions focus on managing the bacterial environment and the \"food\" (sebum/sweat) they consume.\n\n**Hygiene and Bacterial Management**\nSince bacteria are the primary drivers of odor, maintaining regular hygiene to manage bacterial growth is a standard approach [6]. This involves washing the skin to remove the proteins and fats that bacteria feed on.\n\n**Managing Sebum**\nBody sebum is the oily substance your skin produces. It is sticky and can work its way deep into natural fibers in clothing [1]. While hot water can melt sebum out of natural fabrics, synthetic gym clothes (polyester, nylon, spandex) often trap these oils, which can contribute to persistent odors [1].\n\n**Medical Consultation**\nIf the change in odor is sudden, accompanied by unusual symptoms, or seems linked to a health issue, a healthcare provider can perform physical exams or blood/urine tests to determine if an underlying condition is the cause [2].",
+ "answer": "The change in your scent is likely due to changes in the bacterial colonies on your skin or shifts in the chemical composition of your sweat, rather than the sweat itself.\n\n## The Biological Cause\nSweat is essentially odorless when it leaves your body [1][5]. The smell is a byproduct of the interaction between your sweat and the bacteria living on your skin [1][2].\n\nYour body uses two different types of glands to manage temperature and secretions:\n*   **Eccrine glands**: These are your thermoregulatory workhorses, producing a thin, watery sweat that is roughly 99% water and trace amounts of salt [8].\n*   **Apocrine glands**: Located in areas like the armpits and groin, these release a thicker secretion loaded with proteins and fats [5].\n\nThe \"stink\" happens during the breakdown process. Bacteria, specifically those in the genus *Corynebacterium* or *Staphylococcus hominis*, feed on the proteins and fatty compounds in apocrine sweat [1][5]. This metabolic process produces two main types of odor: **volatile acids** (which smell sour or vinegary) and **sulfur compounds** (which produce a sharp, onion-like scent) [1][5].\n\n## Why the Change?\nIf your scent has shifted, it is likely due to one of these variables:\n\n**Hormonal Fluctuations**\nChanges in hormones—such as those experienced during menopause, hot flashes, or night sweats—can lead to excessive sweating and changes in body odor [2].\n\n**Lifestyle and Diet**\nChanges in the foods you eat or your hygiene practices can alter the chemical makeup of your sweat or the environment in which bacteria thrive [2].\n\n**Stress Responses**\nSweat produced during high-stress situations (the \"fight or flight\" response) can smell different than sweat produced during physical exercise [8].\n\n**Medical Conditions**\nA sudden change in the amount or smell of your body odor can sometimes indicate an underlying medical condition [2].\n\n## What Fixes It\nBecause the smell is caused by bacteria breaking down organic matter, effective solutions focus on managing the bacterial environment and the \"food\" (sebum/sweat) they consume.\n\n**Hygiene and Bacterial Management**\nSince bacteria are the primary drivers of odor, maintaining regular hygiene to manage bacterial growth is a standard approach [6]. This involves washing the skin to remove the proteins and fats that bacteria feed on.\n\n**Managing Sebum**\nBody sebum is the oily substance your skin produces. It is sticky and can work its way deep into natural fibers in clothing [1]. While hot water can melt sebum out of natural fabrics, synthetic gym clothes (polyester, nylon, spandex) often trap these oils, which can contribute to persistent odors [1].\n\n**Medical Consultation**\nIf the change in odor is sudden, accompanied by unusual symptoms, or seems linked to a health issue, a healthcare provider can perform physical exams or blood/urine tests to determine if an underlying condition is the cause [2].",
+ "chars": 2917,
+ "raw_bytes": 5196,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 27.27,
+ "rate_gen_tok_s": 27.96,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:23:32",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 16.51,
+ "app_total_s": 28.74,
+ "first_text_s_unreliable": true
+}

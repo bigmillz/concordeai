@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.2,\"ftok\":255,\"est\":false}",
+  "X-Hurry": "b33620458fd4f4c4"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.81,
+ "elapsed_s": 22.74,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 28 passages"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.13,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.81,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.74,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.6,
+    "tok": 323,
+    "s": 4.9
+   }
+  },
+  {
+   "t": 22.74,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1294 chars"
+   }
+  },
+  {
+   "t": 22.74,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.74,
+   "tag": "DONE",
+   "data": {
+    "f": 17.81,
+    "t": 22.74,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 28 passages",
+   "t_s": 13.13
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.13
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.13
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1294 chars",
+   "t_s": 22.74
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.74
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "AI Impact on the Job Market in 2026: What the Data Shows",
+   "u": "https://www.secondtalent.com/resources/ai-impact-job-market-2026/",
+   "d": "2026-10-15"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S. Employment",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist!",
+   "u": "https://www.npr.org/2026/11/04/nx-s1-6028029/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Computer and Information Research Scientists",
+   "u": "https://www.bls.gov/ooh/computer-and-information-technology/computer-and-information-research-scientists.htm",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "Will AI Replace System Administrators? 2026 Risk Analysis",
+   "u": "https://www.replacedbai.com/blog/will-ai-replace-system-administrators",
+   "d": "2026-05-18"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.13,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 27,
+   "d": 618,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5167,
+   "o": 289,
+   "d": 9553,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 65.6,
+  "tok": 323,
+  "s": 4.9
+ },
+ "app_first_s": 17.81,
+ "app_total_s": 22.74,
+ "answer_raw": "Your displacement risk is moderate, with a risk score of **34/100** as of May 2026 [8].\n\nWhile AI is highly effective at automating structured, repeatable tasks—such as summarizing logs, generating scripts, classifying tickets, or writing documentation—the systems you manage remain messy, business-specific, and prone to failure, which protects your role [8]. The real shift won't look like mass layoffs, but rather a slowdown in hiring; for example, from January to September 2026, AI was named in about 21% of announced job cuts, yet there was no evidence of widespread, economy-wide displacement [3].\n\nTo future-proof, you should pivot from being the person who executes manual tasks to the person who manages the AI that performs them. Focus on:\n\n*   **Architectural and complex troubleshooting**: Move toward specialized infrastructure roles, which face higher job security than routine administration [8].\n*   **AI-augmented workflows**: Leverage the 9,000 jobs being added monthly in roles where AI assists workers to increase your own output and value [3].\ns*   **Orchestration and oversight**: Since AI handles the \"text trails\" (logs, tickets, shell history), your value moves to managing the higher-level logic and the physical or cloud-based environments where these tools run [8].",
+ "answer": "Your displacement risk is moderate, with a risk score of **34/100** as of May 2026 [8].\n\nWhile AI is highly effective at automating structured, repeatable tasks—such as summarizing logs, generating scripts, classifying tickets, or writing documentation—the systems you manage remain messy, business-specific, and prone to failure, which protects your role [8]. The real shift won't look like mass layoffs, but rather a slowdown in hiring; for example, from January to September 2026, AI was named in about 21% of announced job cuts, yet there was no evidence of widespread, economy-wide displacement [3].\n\nTo future-proof, you should pivot from being the person who executes manual tasks to the person who manages the AI that performs them. Focus on:\n\n*   **Architectural and complex troubleshooting**: Move toward specialized infrastructure roles, which face higher job security than routine administration [8].\n*   **AI-augmented workflows**: Leverage the 9,000 jobs being added monthly in roles where AI assists workers to increase your own output and value [3].\ns*   **Orchestration and oversight**: Since AI handles the \"text trails\" (logs, tickets, shell history), your value moves to managing the higher-level logic and the physical or cloud-based environments where these tools run [8].",
+ "chars": 1294,
+ "raw_bytes": 3669,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.23,
+ "rate_gen_tok_s": 65.62,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:59:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.7,\"ftok\":229,\"est\":false}",
+  "X-Hurry": "392715445e47f924"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 0.87,
+ "elapsed_s": 26.7,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 0.87,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.56,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 13.56,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.56,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.56,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.56,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 26.7,
+   "tag": "RATE",
+   "data": {
+    "tps": 47.0,
+    "tok": 410,
+    "s": 8.7
+   }
+  },
+  {
+   "t": 26.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1643 chars"
+   }
+  },
+  {
+   "t": 26.7,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 13.56
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.56
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.56
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1643 chars",
+   "t_s": 26.7
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.7
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iphone 17 worth upgrading from iphone 16",
+   "u": "https://smartphoneindia.in/tag/iphone-17-worth-upgrading-from-iphone-16/",
+   "d": "2026-08-12"
+  },
+  {
+   "t": "The History of Every iPhone Model from 2007–2026",
+   "u": "https://www.iphonelife.com/content/evolution-iphone-every-model-2007-2016",
+   "d": "2026"
+  },
+  {
+   "t": "Apple Service and Repair for iPhone",
+   "u": "https://support.apple.com/iphone/repair?services=service",
+   "d": ""
+  },
+  {
+   "t": "Is the iPhone Duo worth $1,999? I used it for a week, and it’s complicated",
+   "u": "https://www.cnn.com/cnn-underscored/reviews/iphone-duo",
+   "d": "2026-10-21"
+  },
+  {
+   "t": "iPhone 16 price drops on Amazon: Is it still worth buying after the iPhone 17 la",
+   "u": "https://www.msn.com/en-in/technology/consumer-electronics/iphone-16-price-drops-on-amazon-is-it-still-worth-buying-after-the-iphone-17-launch/ar-AA2elcDu?ocid=BingNewsVerp",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": ""
+  },
+  {
+   "t": "iPhone Duo arrives at Apple Store locations worldwide - Apple",
+   "u": "https://www.apple.com/newsroom/2026/10/iphone-duo-arrives-at-apple-store-locations-worldwide/",
+   "d": "2026-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.56,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 47.0,
+  "tok": 410,
+  "s": 8.7
+ },
+ "answer_raw": "The newest lineup is the **iPhone Duo**, which arrived at Apple Store locations worldwide on October 23, 2026 [1][8].\n\nThe cost for the iPhone Duo is not specified in the provided documentation, so you would need to check the Apple Store or apple.com for exact pricing [1][8].\n\n## Upgrading from an iPhone 14\n\nWhether it is \"worth it\" depends on how much you value a significant generational leap in hardware. Since your current device is an iPhone 14, you are moving across three generations of hardware (15, 16, and ston own 17/Duo era).\n\n**The Case for Upgrading**\nIf you move to the iPhone 17, you gain several hardware improvements over the iPhone 16, including a 6.3-inch 120Hz ProMotion display, 40W charging, and a base storage of 256GB (as of August 2026) [2]. Moving from an iPhone 14 to the newest iPhone Duo would represent a massive jump in processing power, display technology, and likely camera capabilities.\n\n**The Case for Waiting**\nIf your iPhone 14 is still performing well and you don't need the specific features of the Duo, the cost-to-utility ratio might be low. You could also look at the iPhone 16, which saw price drops on Amazon following the iPhone 17 launch (pertermed as the \"iPhone 17 family\" in October 2026) [6].\n\n**Summary of Differences**\n| Feature | iPhone 14 (Your current) | iPhone 17 (Latest Generation) |\n| :--- | :--- | :--- |\n| **Display** | Standard Refresh | 120Hz ProMotion (as of August 2026) [2] |\n| **Base Storage** | Typically 128GB | 256GB (as of August 2026) [2] |\n| **Charging** | Standard | 40W (as of August 2026) [2] |\n| **Camera** | Previous Gen | Upgraded 18MP (as of August 2026) [2] |",
+ "answer": "The newest lineup is the **iPhone Duo**, which arrived at Apple Store locations worldwide on October 23, 2026 [1][8].\n\nThe cost for the iPhone Duo is not specified in the provided documentation, so you would need to check the Apple Store or apple.com for exact pricing [1][8].\n\n## Upgrading from an iPhone 14\n\nWhether it is \"worth it\" depends on how much you value a significant generational leap in hardware. Since your current device is an iPhone 14, you are moving across three generations of hardware (15, 16, and ston own 17/Duo era).\n\n**The Case for Upgrading**\nIf you move to the iPhone 17, you gain several hardware improvements over the iPhone 16, including a 6.3-inch 120Hz ProMotion display, 40W charging, and a base storage of 256GB (as of August 2026) [2]. Moving from an iPhone 14 to the newest iPhone Duo would represent a massive jump in processing power, display technology, and likely camera capabilities.\n\n**The Case for Waiting**\nIf your iPhone 14 is still performing well and you don't need the specific features of the Duo, the cost-to-utility ratio might be low. You could also look at the iPhone 16, which saw price drops on Amazon following the iPhone 17 launch (pertermed as the \"iPhone 17 family\" in October 2026) [6].\n\n**Summary of Differences**\n| Feature | iPhone 14 (Your current) | iPhone 17 (Latest Generation) |\n| :--- | :--- | :--- |\n| **Display** | Standard Refresh | 120Hz ProMotion (as of August 2026) [2] |\n| **Base Storage** | Typically 128GB | 256GB (as of August 2026) [2] |\n| **Charging** | Standard | 40W (as of August 2026) [2] |\n| **Camera** | Previous Gen | Upgraded 18MP (as of August 2026) [2] |",
+ "chars": 1643,
+ "raw_bytes": 3909,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.41,
+ "rate_gen_tok_s": 17.99,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:18:17",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 17.97,
+ "app_total_s": 26.7,
+ "first_text_s_unreliable": true
+}

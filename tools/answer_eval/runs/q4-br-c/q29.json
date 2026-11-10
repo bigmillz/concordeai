@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.8,\"ftok\":265,\"est\":false}",
+  "X-Hurry": "982169cec291c770"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 15.16,
+ "elapsed_s": 21.85,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 29 passages"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.61,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.16,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.84,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.5,
+    "tok": 424,
+    "s": 6.7
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1697 chars"
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.84,
+   "tag": "DONE",
+   "data": {
+    "f": 15.16,
+    "t": 21.84,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 29 passages",
+   "t_s": 10.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.61
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.61
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1697 chars",
+   "t_s": 21.84
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.84
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "2-bedroom houses for rent in Florianópolis – two-bedroom home...",
+   "u": "https://rentola.com.br/en/for-rent/house/2-bedroom/florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Occupancy — September 2026",
+   "u": "https://www.guestfavorites.com/airbnb-occupancy-rates-in-florianopolis-brazil",
+   "d": "2026-09-28"
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Data 2026: Revenue & Occupancy",
+   "u": "https://www.airroi.com/airbnb-data/brazil/santa-catarina/florianópolis",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Valerim Florianópolis, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/valerim-plaza.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Airbnb Data, Statistics & Market Analysis ...",
+   "u": "https://www.airroi.com/data-portal/markets/florianopolis-brazil",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Florianópolis Airbnb Yield 2026: The Real Numbers",
+   "u": "https://www.internationalre.org/tips/florianopolis-airbnb-yield-brazil.html",
+   "d": "2026-04-28"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.61,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 279,
+   "o": 25,
+   "d": 899,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5414,
+   "o": 417,
+   "d": 11181,
+   "c": 2235
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.5,
+  "tok": 424,
+  "s": 6.7
+ },
+ "app_first_s": 15.16,
+ "app_total_s": 21.84,
+ "answer_raw": "Trust the **4.6-star listing** because the sample size of 212 reviews provides a much more statistically significant and reliable baseline of host performance than 18 reviews. A 4.9 rating with only 18 reviews is often an outlier caused by a small group of friends or early guests, whereas 212 reviews represent a vetted track record of handling diverse guest needs and edge cases.\n\nFor your 2-bedroom in Florianópolis, you should aim for a price point around **R$473 per night** as of September s 2026, but because you are targeting 30+ night stays, you should adjust based on your specific property quality and location.\n\nSince you are looking at monthly stays, you are moving into the territory of furnished long-term rentals. In Florianópolis, short-term yields typically hover around 7% before costs, while long-term yields are reported at 5.42% as of April 2026 [8]. For a 30+ night stay, you can likely target a price between the standard nightly rate and the local monthly lease rates. \n\nTo calculate a competitive monthly rate, start with the current average daily rate of **R$473** as of September 2026 and apply a monthly discount to account for the lower turnover and reduced cleaning costs [3]. A common strategy for 30+ night stays is to take the nightly rate and multiply by 25 or 26 to arrive at a monthly figure (e.g., R$473 * 25 = **R$11,825** per month), then adjust down if you want to aggressively fill the calendar. You should check local rental platforms like QuintoAndar or Zap Imóveis to see what 2-bedroom apartments are actually commanding for monthly leases in your specific neighborhood to ensure your \"mid-term\" price isn't accidentally higher than a local lease [5].",
+ "answer": "Trust the **4.6-star listing** because the sample size of 212 reviews provides a much more statistically significant and reliable baseline of host performance than 18 reviews. A 4.9 rating with only 18 reviews is often an outlier caused by a small group of friends or early guests, whereas 212 reviews represent a vetted track record of handling diverse guest needs and edge cases.\n\nFor your 2-bedroom in Florianópolis, you should aim for a price point around **R$473 per night** as of September s 2026, but because you are targeting 30+ night stays, you should adjust based on your specific property quality and location.\n\nSince you are looking at monthly stays, you are moving into the territory of furnished long-term rentals. In Florianópolis, short-term yields typically hover around 7% before costs, while long-term yields are reported at 5.42% as of April 2026 [8]. For a 30+ night stay, you can likely target a price between the standard nightly rate and the local monthly lease rates. \n\nTo calculate a competitive monthly rate, start with the current average daily rate of **R$473** as of September 2026 and apply a monthly discount to account for the lower turnover and reduced cleaning costs [3]. A common strategy for 30+ night stays is to take the nightly rate and multiply by 25 or 26 to arrive at a monthly figure (e.g., R$473 * 25 = **R$11,825** per month), then adjust down if you want to aggressively fill the calendar. You should check local rental platforms like QuintoAndar or Zap Imóveis to see what 2-bedroom apartments are actually commanding for monthly leases in your specific neighborhood to ensure your \"mid-term\" price isn't accidentally higher than a local lease [5].",
+ "chars": 1697,
+ "raw_bytes": 4045,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.42,
+ "rate_gen_tok_s": 63.42,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:58:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":136,\"est\":false}",
+  "X-Hurry": "7995ec8cec13328a"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 21.15,
+ "elapsed_s": 28.4,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.6,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.6,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.54,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 20 passages"
+   }
+  },
+  {
+   "t": 17.54,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.54,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.55,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.15,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.4,
+   "tag": "RATE",
+   "data": {
+    "tps": 74.0,
+    "tok": 537,
+    "s": 7.3
+   }
+  },
+  {
+   "t": 28.4,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2148 chars"
+   }
+  },
+  {
+   "t": 28.4,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 28.4,
+   "tag": "DONE",
+   "data": {
+    "f": 21.15,
+    "t": 28.4,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   10.6,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.6
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.6
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 20 passages",
+   "t_s": 17.54
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.54
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.55
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2148 chars",
+   "t_s": 28.4
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 28.4
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & TreatmentSudden Change in Body",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "How to Get Sweat Smell Out of Clothes: 7 Easy FixesWhy Does My Sweat Smell Worse",
+   "u": "https://ohsospotless.com/remove-sweat-smell-from-clothes/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "10 Reasons Your Sweat Smells Like Vinegar - HealthlineSweating and body odor - S",
+   "u": "https://www.healthline.com/health/sweat-smells-like-vinegar",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Sweating & Body Odor: Causes & Changes | Dove",
+   "u": "https://www.dove.com/us/en/stories/tips-and-how-to/sweating-tips/what-causes-body-odor.html",
+   "d": ""
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "How to Not Smell Like Sweat: Causes and Real Fixes",
+   "u": "https://scienceinsights.org/how-to-not-smell-like-sweat-causes-and-real-fixes/",
+   "d": "2026-03-20"
+  },
+  {
+   "t": "Sudden Change in Men's Body Odor: Causes & Solutions | AXE",
+   "u": "https://www.axe.com/us/en/inspiration/grooming/sudden-changes-in-body-odor.html",
+   "d": ""
+  },
+  {
+   "t": "Vaginal Odor: Types, Causes, Diagnosis & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17905-vaginal-odor",
+   "d": "2023-08-24"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.55,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 229,
+   "o": 22,
+   "d": 692,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4412,
+   "o": 459,
+   "d": 10799,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 74.0,
+  "tok": 537,
+  "s": 7.3
+ },
+ "app_first_s": 21.15,
+ "app_total_s": 28.4,
+ "answer_raw": "Sweat itself is essentially odorless; the smell is a byproduct of bacteria on your skin breaking down the proteins and oils found in your sweat [1][2].\n\n## Why the smell has changed\nIf your odor has shifted or intensified, it is likely due to changes in how your skin's microbiome interacts with your sweat or changes in your body's chemistry.\n\n*   **Bacterial activity**: Your apocrine glands (found in armpits and groin) produce a thicker sweat rich in proteins and fats [1][6]. Bacteria, such as *Staphylococcus hominis* or those in the genus *Corynebacterium*, feed on these compounds [2][6]. This process produces volatile sulfur compounds (often smelling like onions) or volatile acids (often smelling like vinegar) [2][6].\n*   **Changes in sweat composition**: While sweat is mostly water, it also contains salts, sugars, urea, and ammonia [3]. Changes in these levels can alter the scent.\n*   **Underlying health factors**: A shift toward a vinegar-like scent can sometimes indicate underlying conditions like diabetes or kidney disease [3]. Sudden changes in body odor can also be linked to genetics, diet, or hygiene practices [1].\n\n## How to fix it\nBecause the smell is a biological reaction rather than a flaw in the sweat itself, \"fixing\" it involves managing the bacteria or the substrate they feed on.\n\n**Manage the microbiome**\nSince bacteria are the primary drivers of the smell, using antimicrobial soaps or targeted hygiene can reduce the bacterial load on your skin [1][2]. If the smell is caused by specific bacteria like *Corynebacterium* breaking down proteins, managing the skin's environment is key [6].\n\n**Control sweat composition**\nSince diet and health can alter the chemicals available for bacteria to consume, monitoring your intake and addressing potential medical issues can stabilize your scent [1][3]. If you suspect a medical cause—such as kidney or diabetes-related changes—consulting a healthcare provider is the necessary step [3].\n\n**Hygiene and clothing**\nRegularly washing the areas where apocrine glands are concentrated helps prevent the buildup of the proteins and fats that bacteria use as fuel [1][2].",
+ "answer": "Sweat itself is essentially odorless; the smell is a byproduct of bacteria on your skin breaking down the proteins and oils found in your sweat [1][2].\n\n## Why the smell has changed\nIf your odor has shifted or intensified, it is likely due to changes in how your skin's microbiome interacts with your sweat or changes in your body's chemistry.\n\n*   **Bacterial activity**: Your apocrine glands (found in armpits and groin) produce a thicker sweat rich in proteins and fats [1][6]. Bacteria, such as *Staphylococcus hominis* or those in the genus *Corynebacterium*, feed on these compounds [2][6]. This process produces volatile sulfur compounds (often smelling like onions) or volatile acids (often smelling like vinegar) [2][6].\n*   **Changes in sweat composition**: While sweat is mostly water, it also contains salts, sugars, urea, and ammonia [3]. Changes in these levels can alter the scent.\n*   **Underlying health factors**: A shift toward a vinegar-like scent can sometimes indicate underlying conditions like diabetes or kidney disease [3]. Sudden changes in body odor can also be linked to genetics, diet, or hygiene practices [1].\n\n## How to fix it\nBecause the smell is a biological reaction rather than a flaw in the sweat itself, \"fixing\" it involves managing the bacteria or the substrate they feed on.\n\n**Manage the microbiome**\nSince bacteria are the primary drivers of the smell, using antimicrobial soaps or targeted hygiene can reduce the bacterial load on your skin [1][2]. If the smell is caused by specific bacteria like *Corynebacterium* breaking down proteins, managing the skin's environment is key [6].\n\n**Control sweat composition**\nSince diet and health can alter the chemicals available for bacteria to consume, monitoring your intake and addressing potential medical issues can stabilize your scent [1][3]. If you suspect a medical cause—such as kidney or diabetes-related changes—consulting a healthcare provider is the necessary step [3].\n\n**Hygiene and clothing**\nRegularly washing the areas where apocrine glands are concentrated helps prevent the buildup of the proteins and fats that bacteria use as fuel [1][2].",
+ "chars": 2148,
+ "raw_bytes": 4514,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.91,
+ "rate_gen_tok_s": 74.07,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:39:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

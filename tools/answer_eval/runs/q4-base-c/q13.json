@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":142,\"est\":false}",
+  "X-Hurry": "c616dd2347454ee8"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.54,
+ "elapsed_s": 25.48,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 6.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.63,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 30 passages"
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.64,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.54,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.48,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.9,
+    "tok": 523,
+    "s": 7.9
+   }
+  },
+  {
+   "t": 25.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2094 chars"
+   }
+  },
+  {
+   "t": 25.48,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.48,
+   "tag": "DONE",
+   "data": {
+    "f": 17.54,
+    "t": 25.48,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.63,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.63
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.63
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 30 passages",
+   "t_s": 13.64
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.64
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.64
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2094 chars",
+   "t_s": 25.48
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.48
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Pizza Healthier Breakfast Option Than Cereals, Claims Dietitian",
+   "u": "https://www.india.com/viral/pizza-healthier-breakfast-option-than-cereals-claims-dietitian-2877265/",
+   "d": "2018-02-04"
+  },
+  {
+   "t": "Costco Cheese Pizza: Dietitian’s Nutritional... - Nutrients Pathway",
+   "u": "https://nutrientspathway.com/costco-cheese-pizza-nutrition/",
+   "d": "2025-12-11"
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "Mighty Fine Pizza | Award Winning Pizza from Mighty Fine Pizza in...",
+   "u": "https://mightyfinepizza.com/",
+   "d": ""
+  },
+  {
+   "t": "Keep the Beat: Heart Healthy Recipes - NHLBI, NIH",
+   "u": "https://www.nhlbi.nih.gov/sites/default/files/publications/03-2921.pdf",
+   "d": ""
+  },
+  {
+   "t": "Joey's Pizza | Often imitated, never duplicated!",
+   "u": "https://joeyspizzamarco.com/",
+   "d": ""
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "The Hidden Dangers of Fast and Processed Food - PMC",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6146358/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.64,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 21,
+   "d": 636,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4733,
+   "o": 491,
+   "d": 11785,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 65.9,
+  "tok": 523,
+  "s": 7.9
+ },
+ "app_first_s": 17.54,
+ "app_total_s": 25.48,
+ "answer_raw": "Whether pizza is \"bad\" depends on how you define it—specifically regarding nutrient density versus caloric load—and how it compares to your other dietary choices.\n\n## Nutritional Context\nPizza is often classified as a processed food, which can be a primary source of calories for many people and often results in high-calorie, low-nutrient intake [8]. However, the nutritional profile shifts depending on the specific type of pizza:\n\n*   **The \"Healthy\" Argument:** Some dietitians argue that a greasy slice can be a more balanced breakfast option than certain processed cereals [1]. For example, a single serving of Frosted Flakes contains roughly 10g of sugar and 0g of fat, whereas a pizza slice provides a different macronutrient spread [1].\n*   **The Macro Split:** Using Costco's cheese pizza as a benchmark, the macronutrient distribution is approximately 41% carbohydrates, 18% protein, and 48% fat—notably higher in fat than the standard 40-30-30 guideline often suggested in dietary planning [2, as of 2025-12-11].\n*   **Ingredient Quality:** While warehouse pizzas (like Costco's $1.50 cheese pizza) often rank favorably against delivery chains due to ingredient transparency, they still require context within a total daily diet [2, as of 2025-12-11].\n\n## Safety and Frequency\nThe \"badness\" of pizza can also be a matter of food safety. Eating spoiled pizza can lead to stomach aches, vomiting, or diarrhea [7]. \n\n*   **Storage Rules:** To stay safe, pizza should be kept below 40 degrees, and it is not recommended to eat pizza that has been sitting out for longer than two hours [7, as of 2023-05-25].\n*   **Frequency:** Since pizza is a high-calorie, low-nutrient food, the frequency with which you eat it should be balanced against your total caloric needs and the nutrient density of your other meals [8]. \n\nThe provided evidence does not offer a specific medical consensus on the exact number of times per week or month is \"fine\" for an average healthy adult; you would need to consult a clinical nutritionist or a specific dietary guideline for those personalized parameters.",
+ "answer": "Whether pizza is \"bad\" depends on how you define it—specifically regarding nutrient density versus caloric load—and how it compares to your other dietary choices.\n\n## Nutritional Context\nPizza is often classified as a processed food, which can be a primary source of calories for many people and often results in high-calorie, low-nutrient intake [8]. However, the nutritional profile shifts depending on the specific type of pizza:\n\n*   **The \"Healthy\" Argument:** Some dietitians argue that a greasy slice can be a more balanced breakfast option than certain processed cereals [1]. For example, a single serving of Frosted Flakes contains roughly 10g of sugar and 0g of fat, whereas a pizza slice provides a different macronutrient spread [1].\n*   **The Macro Split:** Using Costco's cheese pizza as a benchmark, the macronutrient distribution is approximately 41% carbohydrates, 18% protein, and 48% fat—notably higher in fat than the standard 40-30-30 guideline often suggested in dietary planning [2, as of 2025-12-11].\n*   **Ingredient Quality:** While warehouse pizzas (like Costco's $1.50 cheese pizza) often rank favorably against delivery chains due to ingredient transparency, they still require context within a total daily diet [2, as of 2025-12-11].\n\n## Safety and Frequency\nThe \"badness\" of pizza can also be a matter of food safety. Eating spoiled pizza can lead to stomach aches, vomiting, or diarrhea [7]. \n\n*   **Storage Rules:** To stay safe, pizza should be kept below 40 degrees, and it is not recommended to eat pizza that has been sitting out for longer than two hours [7, as of 2023-05-25].\n*   **Frequency:** Since pizza is a high-calorie, low-nutrient food, the frequency with which you eat it should be balanced against your total caloric needs and the nutrient density of your other meals [8]. \n\nThe provided evidence does not offer a specific medical consensus on the exact number of times per week or month is \"fine\" for an average healthy adult; you would need to consult a clinical nutritionist or a specific dietary guideline for those personalized parameters.",
+ "chars": 2094,
+ "raw_bytes": 4229,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.55,
+ "rate_gen_tok_s": 65.93,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:36:44",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

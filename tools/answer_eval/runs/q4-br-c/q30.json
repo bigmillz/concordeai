@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":7.4,\"ftok\":268,\"est\":false}",
+  "X-Hurry": "9572549fe5f97f4b"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 3.22,
+ "elapsed_s": 29.45,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.22,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 13.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2742 chars"
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 13.64,
+   "tag": "RESET"
+  },
+  {
+   "t": 29.45,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.6,
+    "tok": 680,
+    "s": 10.5
+   }
+  },
+  {
+   "t": 29.45,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2723 chars"
+   }
+  },
+  {
+   "t": 29.45,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 29.45,
+   "tag": "DONE",
+   "data": {
+    "f": 3.22,
+    "t": 29.45,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   13.64,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.06
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2742 chars",
+   "t_s": 13.64
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 13.64
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2723 chars",
+   "t_s": 29.45
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 29.45
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2230,
+   "o": 674,
+   "d": 13554
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4193,
+   "o": 669,
+   "d": 15758
+  }
+ ],
+ "rate_writer": {
+  "tps": 64.6,
+  "tok": 680,
+  "s": 10.5
+ },
+ "app_first_s": 3.22,
+ "app_total_s": 29.45,
+ "answer_raw": "4-bit quantization compresses the weights of a Large Language Model from their native precision (typically **FP16** or **BF16**) down to a 4-bit integer representation to reduce the memory footprint and increase inference speed.\n\nAt its core, quantization maps a wide range of floating-point values to a much smaller discrete set of values. In a 4-bit setup, you only have **16 possible states** ($2^4$) to represent the weight of a single parameter. Because 16 states cannot capture the nuance of a high-precision distribution, the process involves calculating a **scale factor** (and often a zero-point) for blocks of weights to minimize the rounding error between the original value and the quantized value.\n\n## The Mechanics\n\nThe primary goal is to maximize **information density**. Since weights in a neural network often follow a distribution centered around zero, grouping weights into \"blocks\" (e.g., 32 or 64 weights per scale factor) allows the quantization to maintain the relative shape of the distribution while fitting into a much smaller bit-depth.\n\nModern techniques like **GGUF (K-Quants)** or **EXL2** use sophisticated importance-based rescaling to ensure that the most critical weights—those that impact the output most heavily—suffer less precision loss.\n\n## When It Matters\n\nThe decision to use 4-bit quantization is usually driven by hardware constraints, but the trade-off is always between **VRAM capacity** and **perplexity** (the measure of how well the model predicts the next token).\n\n*   **Hardware constraints:** If you want to run a **70B parameter model** on consumer hardware, 4-bit is the threshold. A 70B model in FP16 requires ~140GB of VRAM; at 4-bit, it fits in ~40GB. This allows you to run massive models on multi-GPU setups (like two RTX 3090/4090s) that would otherwise be impossible.\n*   **Inference Latency:** 4-bit weights are smaller, meaning less data needs to be moved from VRAM to the GPU cores during every calculation cycle. This results in higher **tokens per second (TPS)**.\n*   **The \"Perplexity Wall\":** For models with smaller parameter counts (e.g., under 7B-13B), 4-bit quantization can cause noticeable \"intelligence\" degradation, where the model loses coherence or reasoning ability. For larger models (30B+), the loss in perplexity is often negligible to a human observer, making 4-bit the \"sweet spot\" for local deployment.\n\n| Metric | FP16 (Native) | 4-bit Quantized |\n| :--- | :--- | :--- |\n| **Memory per Billion Params** | ~2.0 GB | ~0.7 GB |\n| **Information Density** | Extremely High | Moderate/High |\n| **Typical Use Case** | Training / Fine-tuning | Local Inference / Edge |\n| **Hardware Requirement** | Enterprise-grade VRAM | Consumer/Prosumer VRAM |",
+ "answer": "4-bit quantization compresses the weights of a Large Language Model from their native precision (typically **FP16** or **BF16**) down to a 4-bit integer representation to reduce the memory footprint and increase inference speed.\n\nAt its core, quantization maps a wide range of floating-point values to a much smaller discrete set of values. In a 4-bit setup, you only have **16 possible states** ($2^4$) to represent the weight of a single parameter. Because 16 states cannot capture the nuance of a high-precision distribution, the process involves calculating a **scale factor** (and often a zero-point) for blocks of weights to minimize the rounding error between the original value and the quantized value.\n\n## The Mechanics\n\nThe primary goal is to maximize **information density**. Since weights in a neural network often follow a distribution centered around zero, grouping weights into \"blocks\" (e.g., 32 or 64 weights per scale factor) allows the quantization to maintain the relative shape of the distribution while fitting into a much smaller bit-depth.\n\nModern techniques like **GGUF (K-Quants)** or **EXL2** use sophisticated importance-based rescaling to ensure that the most critical weights—those that impact the output most heavily—suffer less precision loss.\n\n## When It Matters\n\nThe decision to use 4-bit quantization is usually driven by hardware constraints, but the trade-off is always between **VRAM capacity** and **perplexity** (the measure of how well the model predicts the next token).\n\n*   **Hardware constraints:** If you want to run a **70B parameter model** on consumer hardware, 4-bit is the threshold. A 70B model in FP16 requires ~140GB of VRAM; at 4-bit, it fits in ~40GB. This allows you to run massive models on multi-GPU setups (like two RTX 3090/4090s) that would otherwise be impossible.\n*   **Inference Latency:** 4-bit weights are smaller, meaning less data needs to be moved from VRAM to the GPU cores during every calculation cycle. This results in higher **tokens per second (TPS)**.\n*   **The \"Perplexity Wall\":** For models with smaller parameter counts (e.g., under 7B-13B), 4-bit quantization can cause noticeable \"intelligence\" degradation, where the model loses coherence or reasoning ability. For larger models (30B+), the loss in perplexity is often negligible to a human observer, making 4-bit the \"sweet spot\" for local deployment.\n\n| Metric | FP16 (Native) | 4-bit Quantized |\n| :--- | :--- | :--- |\n| **Memory per Billion Params** | ~2.0 GB | ~0.7 GB |\n| **Information Density** | Extremely High | Moderate/High |\n| **Typical Use Case** | Training / Fine-tuning | Local Inference / Edge |\n| **Hardware Requirement** | Enterprise-grade VRAM | Consumer/Prosumer VRAM |",
+ "chars": 2723,
+ "raw_bytes": 6192,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 23.12,
+ "rate_gen_tok_s": 25.95,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:59:01",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":92,\"est\":false}",
+  "X-Hurry": "808ce09722d89511"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 14.27,
+ "elapsed_s": 19.68,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.1,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.1,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.56,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.27,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.67,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.3,
+    "tok": 315,
+    "s": 5.4
+   }
+  },
+  {
+   "t": 19.67,
+   "tag": "RESET"
+  },
+  {
+   "t": 19.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 19.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1244 chars"
+   }
+  },
+  {
+   "t": 19.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 19.68,
+   "tag": "DONE",
+   "data": {
+    "f": 14.26,
+    "t": 19.67,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.1,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.1
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.1
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 9.56
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.56
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.56
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 19.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1244 chars",
+   "t_s": 19.67
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.68
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "NYC to Boston in 2026: Amtrak, Flight, Bus or Drive? Cost and ...",
+   "u": "https://www.shopback.com/blog/travel/nyc-to-boston-cheapest-way-2026",
+   "d": "2026-07-14"
+  },
+  {
+   "t": "Amtrak Boston to New York (NYC): $22 Tickets & Fast Acela Trains",
+   "u": "https://www.zadrails.com/blog/how-to-travel-from-boston-to-new-york-by-amtrak/",
+   "d": "2026-05-26"
+  },
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Is it better to fly or take a train from Boston to New York?",
+   "u": "https://www.citizendailypost.com/faq/is-it-better-to-fly-or-take-a-train-from-boston-to-new-york",
+   "d": "2026-11-10"
+  },
+  {
+   "t": "2026 Door Installation Costs | New Door Replacement PricesDoor Cost: Typical Pri",
+   "u": "https://homeguide.com/costs/door-installation-cost",
+   "d": "2026-08-01"
+  },
+  {
+   "t": "New York to Boston - 6 ways to travel via train, bus, car ...",
+   "u": "https://www.rome2rio.com/s/New-York/Boston",
+   "d": ""
+  },
+  {
+   "t": "NEW YORK to BOSTON train from £12 with Amtrak - Omio",
+   "u": "https://www.omio.co.uk/trains/new-york-city/boston-ma-inwqz",
+   "d": ""
+  },
+  {
+   "t": "New York to Boston Train — Schedules, Times & Fares",
+   "u": "https://newyorkbostontrains.com/",
+   "d": "2026-08-17"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.56,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 26,
+   "d": 1002,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5326,
+   "o": 328,
+   "d": 10064,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 58.3,
+  "tok": 315,
+  "s": 5.4
+ },
+ "app_first_s": 14.26,
+ "app_total_s": 19.67,
+ "answer_raw": "The **train** is the better option for most travelers because it offers significantly less friction and faster door-to-door travel times.\n\n**Door-to-door time**\nThe train's travel time between New York Penn Station and Boston (South Station or Back Bay) typically runs between **3h 41m and 4h 30m** [8]. When factoring in the commute to the airport, security screening, and transit from airports like JFK or LaGuardia into Manhattan, flying generally takes between **3h 45m and 5h 30m** [3][4]. Because the train connects central city stations and avoids the \"airport process time\" of security and terminal transfers, it remains the more efficient choice for this specific corridor [3][4].\n\n**Typical cost**\nFares are demand-based and rise as departure dates approach [8].\n*   **Train** — If you book in advance, you can find tickets for roughly **£141** (approx. $180) [7]. Buying a ticket on the day of travel can cost around **£252** (approx. $325) [7]. \n*   **Flight** — Specific pricing for 2026 flights isn't in what I found; you should check JetBlue or Delta for current rates [1].\n\n**The Verdict**\nI would pick the **train**. It is simpler, provides more legroom, and avoids the high-friction commutes to and from NYC-area airports [4].",
+ "answer": "The **train** is the better option for most travelers because it offers significantly less friction and faster door-to-door travel times.\n\n**Door-to-door time**\nThe train's travel time between New York Penn Station and Boston (South Station or Back Bay) typically runs between **3h 41m and 4h 30m** [8]. When factoring in the commute to the airport, security screening, and transit from airports like JFK or LaGuardia into Manhattan, flying generally takes between **3h 45m and 5h 30m** [3][4]. Because the train connects central city stations and avoids the \"airport process time\" of security and terminal transfers, it remains the more efficient choice for this specific corridor [3][4].\n\n**Typical cost**\nFares are demand-based and rise as departure dates approach [8].\n*   **Train** — If you book in advance, you can find tickets for roughly **£141** (approx. $180) [7]. Buying a ticket on the day of travel can cost around **£252** (approx. $325) [7]. \n*   **Flight** — Specific pricing for 2026 flights isn't in what I found; you should check JetBlue or Delta for current rates [1].\n\n**The Verdict**\nI would pick the **train**. It is simpler, provides more legroom, and avoids the high-friction commutes to and from NYC-area airports [4].",
+ "chars": 1244,
+ "raw_bytes": 4880,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.8,
+ "rate_gen_tok_s": 57.49,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:51:18",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":107,\"est\":false}",
+  "X-Hurry": "1fa3c489ef9d56cb"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 15.02,
+ "elapsed_s": 24.33,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.02,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.33,
+   "tag": "RATE",
+   "data": {
+    "tps": 37.6,
+    "tok": 350,
+    "s": 9.3
+   }
+  },
+  {
+   "t": 24.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1401 chars"
+   }
+  },
+  {
+   "t": 24.33,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.33,
+   "tag": "DONE",
+   "data": {
+    "f": 15.02,
+    "t": 24.33,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 9.65
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.65
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.65
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1401 chars",
+   "t_s": 24.33
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.33
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis 2026: Where Expats ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-neighborhoods-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis (2026): Lagoa vs Campeche ...",
+   "u": "https://rentihome.com/florianopolis/best-neighborhoods-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Best Areas to Buy Property in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-which-area",
+   "d": "2026"
+  },
+  {
+   "t": "THE BEST Florianopolis Neighborhoods to Visit (2026) - Tripadvisor",
+   "u": "https://www.tripadvisor.com/Attractions-g303576-Activities-c47-t34-Florianopolis_State_of_Santa_Catarina.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.65,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 26,
+   "d": 1240,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5585,
+   "o": 384,
+   "d": 14626,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 37.6,
+  "tok": 350,
+  "s": 9.3
+ },
+ "app_first_s": 15.02,
+ "app_total_s": 24.33,
+ "answer_raw": "For a six-month stay that balances safety, walkability, and beach access, **Lagoa da Conceição** is your best pick for a social, walkable hub, while **Campeche** or **Barra da Lagoa** offer better direct beach/surf lifestyles.\n\n**Lagoa da Conceição** — acts as the island's social engine with a walkable town feel; it is a common choice for digital nomads [6] and is centrally located near the lagoon [2].\n\n**Campeche** — offers flat streets for biking and direct beach access, making it a top choice for surfers [6][7].\n\n**Barra da Lagoa** — a fishing village with a walkable core and surf-school atmosphere, with furnished rentals typically ranging from **$400–700** (undated) [6].\n\n**Jurerê Internacional** — the safest option with a 78/100 safety score and zero reported robberies in 2025, but it is expensive at **€1,200/month** for a one-bedroom (as of May 2026) [3].\n\n**Centro** — a runner-up for those prioritizing errands and connectivity over being right on the sand, with furnished rentals typically **$450–800** (undated) [6].\n\nRegarding internet, the city supports **100Mbps** internet (as of May 2026) [2]. While the city is the safest state capital in Brazil with a homicide rate of **9.7 per 100,000** (as of July 2026) [1], the safety-to-convenience trade-off is real; most security camera coverage is concentrated in just three neighborhoods, leaving others with patchy coverage [3].",
+ "answer": "For a six-month stay that balances safety, walkability, and beach access, **Lagoa da Conceição** is your best pick for a social, walkable hub, while **Campeche** or **Barra da Lagoa** offer better direct beach/surf lifestyles.\n\n**Lagoa da Conceição** — acts as the island's social engine with a walkable town feel; it is a common choice for digital nomads [6] and is centrally located near the lagoon [2].\n\n**Campeche** — offers flat streets for biking and direct beach access, making it a top choice for surfers [6][7].\n\n**Barra da Lagoa** — a fishing village with a walkable core and surf-school atmosphere, with furnished rentals typically ranging from **$400–700** (undated) [6].\n\n**Jurerê Internacional** — the safest option with a 78/100 safety score and zero reported robberies in 2025, but it is expensive at **€1,200/month** for a one-bedroom (as of May 2026) [3].\n\n**Centro** — a runner-up for those prioritizing errands and connectivity over being right on the sand, with furnished rentals typically **$450–800** (undated) [6].\n\nRegarding internet, the city supports **100Mbps** internet (as of May 2026) [2]. While the city is the safest state capital in Brazil with a homicide rate of **9.7 per 100,000** (as of July 2026) [1], the safety-to-convenience trade-off is real; most security camera coverage is concentrated in just three neighborhoods, leaving others with patchy coverage [3].",
+ "chars": 1401,
+ "raw_bytes": 3760,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.4,
+ "rate_gen_tok_s": 37.62,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:55:38",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

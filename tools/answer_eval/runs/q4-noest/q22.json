@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.1,\"ftok\":242,\"est\":false}",
+  "X-Hurry": "b1a79a23705b52c0"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 20.24,
+ "elapsed_s": 24.93,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 8.96,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.96,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.96,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 27 passages"
+   }
+  },
+  {
+   "t": 15.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.82,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.82,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.24,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.93,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.3,
+    "tok": 329,
+    "s": 4.7
+   }
+  },
+  {
+   "t": 24.93,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.93,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 24.93,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1297 chars"
+   }
+  },
+  {
+   "t": 24.93,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.93,
+   "tag": "DONE",
+   "data": {
+    "f": 20.24,
+    "t": 24.93,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   8.96,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.96
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.96
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 27 passages",
+   "t_s": 15.82
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.82
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.82
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 24.93
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1297 chars",
+   "t_s": 24.93
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.93
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "High Paying Jobs Without a Degree (2026 Salary Guide)",
+   "u": "https://www.howmuchcanimake.info/highest-paying-jobs-without-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-08-21"
+  },
+  {
+   "t": "50 Top High-Paying Jobs Without a Degree in 2026",
+   "u": "https://www.apollotechnical.com/top-high-paying-jobs-without-a-degree/",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Highest Paying Jobs Without Degree in Australia 2026 | AUM Global",
+   "u": "https://aumglobal.com.au/blog-content/highest-paying-jobs-without-degree-australia",
+   "d": "2026"
+  },
+  {
+   "t": "12 Highest-Paying Trade Jobs in 2026 (Ranked by Salary) - zengig",
+   "u": "https://www.4cornerresources.com/career-advice/highest-paying-trade-jobs/",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "Hands-On Careers That Pay Well Without a Degree",
+   "u": "https://mycareerdna.org/vocational-careers/",
+   "d": "2025-07-20"
+  },
+  {
+   "t": "High-Paying Careers With an Associate’s Degree: Top 8 Picks",
+   "u": "https://www.investopedia.com/financial-edge/0811/8-high-paying-jobs-that-require-2-year-degrees.aspx",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.82,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 21,
+   "d": 701,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5137,
+   "o": 298,
+   "d": 9062,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 70.3,
+  "tok": 329,
+  "s": 4.7
+ },
+ "app_first_s": 20.24,
+ "app_total_s": 24.93,
+ "answer_raw": "The top five realistic high-paying careers without a degree include construction management, aircraft mechanics, elevator technicians, electricians, and real estate agents.\n\n**Construction Manager** — median pay of **$106,980** as of October 2026 [5]. Entry typically involves gaining construction experience and moving into supervisory roles, often through apprenticeships or vocational training [5].\n\n**Aircraft Mechanic** — ranked as the **#1** high-paying non-degree job in 2026 based on salary, stability, growth, and work-life balance [3]. Entry requires vocational training or certification.\n\n**Elevator Technician** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry typically requires apprenticeship or specialized training.\n\n**Electrician** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry is through apprenticeships or vocational training [6].\n\n**Real Estate Agent** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry requires state licensing and typically involves building a client portfolio.\n\nI didn't find exact timelines for how many months or years it takes to complete training for each specific role; you would need to check individual state licensing boards or trade school catalogs for those durations.",
+ "answer": "The top five realistic high-paying careers without a degree include construction management, aircraft mechanics, elevator technicians, electricians, and real estate agents.\n\n**Construction Manager** — median pay of **$106,980** as of October 2026 [5]. Entry typically involves gaining construction experience and moving into supervisory roles, often through apprenticeships or vocational training [5].\n\n**Aircraft Mechanic** — ranked as the **#1** high-paying non-degree job in 2026 based on salary, stability, growth, and work-life balance [3]. Entry requires vocational training or certification.\n\n**Elevator Technician** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry typically requires apprenticeship or specialized training.\n\n**Electrician** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry is through apprenticeships or vocational training [6].\n\n**Real Estate Agent** — potential earnings exceeding **$100,000** per year as of 2026 [1]. Entry requires state licensing and typically involves building a client portfolio.\n\nI didn't find exact timelines for how many months or years it takes to complete training for each specific role; you would need to check individual state licensing boards or trade school catalogs for those durations.",
+ "chars": 1297,
+ "raw_bytes": 5038,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.01,
+ "rate_gen_tok_s": 69.14,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:15:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

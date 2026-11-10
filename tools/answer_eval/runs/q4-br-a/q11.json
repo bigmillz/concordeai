@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":103,\"est\":false}",
+  "X-Hurry": "52cb1b0ca2e4b325"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 0.81,
+ "elapsed_s": 20.61,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.81,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 8.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.02,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.38,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 9.38,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.38,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.38,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.38,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.61,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.4,
+    "tok": 406,
+    "s": 6.1
+   }
+  },
+  {
+   "t": 20.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1625 chars"
+   }
+  },
+  {
+   "t": 20.61,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   8.02,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.02
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.02
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 9.38
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.38
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.38
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1625 chars",
+   "t_s": 20.61
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.61
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Magnesium Form for Anxiety: Evidence-Based Guide",
+   "u": "https://mitohealth.com/guide/best-magnesium-form-for-anxiety",
+   "d": "2026-01-28"
+  },
+  {
+   "t": "Which Magnesium Is Best for Sleep and Anxiety? Forms, Doses...",
+   "u": "https://zelligcare.com/blog/magnesium-sleep-anxiety/",
+   "d": "2026-09-25"
+  },
+  {
+   "t": "Magnesium Forms: Evidence, Doses and Safety",
+   "u": "https://purecityresearch.org/magnesium/",
+   "d": "2026-07-02"
+  },
+  {
+   "t": "The Effects of Magnesium Supplementation on Subjective Anxiety...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC5452159/",
+   "d": ""
+  },
+  {
+   "t": "Examining the Effects of Supplemental Magnesium on Self-Reported...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11136869/",
+   "d": ""
+  },
+  {
+   "t": "Magnesium for Anxiety: Which Form Actually Works?",
+   "u": "https://stopanxiety.org/magnesium-for-anxiety/",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Magnesium for Anxiety: Best Forms, Dosing, and Evidence (2026)",
+   "u": "https://designednutraceuticals.com/articles/magnesium-anxiety",
+   "d": "2026"
+  },
+  {
+   "t": "Magnesium Supplement UK — Forms & Evidence Guide",
+   "u": "https://www.kojo.life/blogs/journal/magnesium-complete-guide-forms-evidence",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.38,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 66.4,
+  "tok": 406,
+  "s": 6.1
+ },
+ "answer_raw": "For anxiety relief, the most common therapeutic dose is between **200–400 mg** of elemental magnesium daily [6], though trials specifically linked to reduced anxiety scores often utilized **300 mg** per day [1].\n\nThe evidence for magnesium's effectiveness for anxiety is mixed and often limited by study quality. A 2017 systematic review found consistent evidence that supplementation reduced anxiety, particularly in those with inadequate dietary intake or elevated stress [6]. However, other systematic reviews suggest that while a benefit may exist, the existing studies are often poor in quality, with firm conclusions limited by small participant numbers and inconsistent dosages or formulations [2][5].\n\nRegarding the best form to take:\n\n*   **Magnesium glycinate** — This is often recommended for sleep and anxiety because it is well-absorbed and has a minimal laxative effect; the attached glycine also has a calming reputation [2][8].\n*   **Magnesium taurate** — This form is noted as being useful for those with anxiety and cardiovascular concerns, as taurine supports both cardiac function and GABA [1][6].\n*   **Magnesium citrate** — This absorbs better than magnesium oxide in small studies, though it is often used for its laxative effects [3].\n\nIt is important to note that the NIH upper limit for supplemental magnesium is **350 mg** per day; exceeding this should only be done under medical supervision to avoid risks like diarrhea or low blood pressure [1]. Since individual needs vary, you should consult a medical professional to determine if a higher dose is appropriate for your specific health profile.",
+ "answer": "For anxiety relief, the most common therapeutic dose is between **200–400 mg** of elemental magnesium daily [6], though trials specifically linked to reduced anxiety scores often utilized **300 mg** per day [1].\n\nThe evidence for magnesium's effectiveness for anxiety is mixed and often limited by study quality. A 2017 systematic review found consistent evidence that supplementation reduced anxiety, particularly in those with inadequate dietary intake or elevated stress [6]. However, other systematic reviews suggest that while a benefit may exist, the existing studies are often poor in quality, with firm conclusions limited by small participant numbers and inconsistent dosages or formulations [2][5].\n\nRegarding the best form to take:\n\n*   **Magnesium glycinate** — This is often recommended for sleep and anxiety because it is well-absorbed and has a minimal laxative effect; the attached glycine also has a calming reputation [2][8].\n*   **Magnesium taurate** — This form is noted as being useful for those with anxiety and cardiovascular concerns, as taurine supports both cardiac function and GABA [1][6].\n*   **Magnesium citrate** — This absorbs better than magnesium oxide in small studies, though it is often used for its laxative effects [3].\n\nIt is important to note that the NIH upper limit for supplemental magnesium is **350 mg** per day; exceeding this should only be done under medical supervision to avoid risks like diarrhea or low blood pressure [1]. Since individual needs vary, you should consult a medical professional to determine if a higher dose is appropriate for your specific health profile.",
+ "chars": 1625,
+ "raw_bytes": 3774,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.34,
+ "rate_gen_tok_s": 23.26,
+ "id": "q11",
+ "turn": 1,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:06:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 14.49,
+ "app_total_s": 20.61,
+ "first_text_s_unreliable": true
+}

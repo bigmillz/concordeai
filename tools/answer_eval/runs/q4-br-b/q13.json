@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":105,\"est\":false}",
+  "X-Hurry": "5170f01722912380"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.41,
+ "elapsed_s": 22.27,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.6,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "3 pages · 13 passages"
+   }
+  },
+  {
+   "t": 13.6,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.6,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.6,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.6,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.41,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.27,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.3,
+    "tok": 341,
+    "s": 4.9
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "RESET"
+  },
+  {
+   "t": 22.27,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1354 chars"
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "DONE",
+   "data": {
+    "f": 17.41,
+    "t": 22.27,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.39,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.39
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.39
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "3 pages · 13 passages",
+   "t_s": 13.6
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.6
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.6
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 22.27
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1354 chars",
+   "t_s": 22.27
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.27
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Nutritional Value Of Pizza: Key Nutrients, Healthier Options, And...",
+   "u": "https://thisnutrition.com/the-nutritional-value-of-pizza-key-nutrients-healthier-options-and-recipes",
+   "d": ""
+  },
+  {
+   "t": "RFK Jr.’s new dietary guidelines end 'the war on saturated fats... : NPR",
+   "u": "https://www.npr.org/2026/01/07/nx-s1-5667021/dietary-guidelines-rfk-jr-nutrition",
+   "d": "2026-01-07"
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "Keep the Beat: Heart Healthy Recipes - NHLBI, NIH",
+   "u": "https://www.nhlbi.nih.gov/sites/default/files/publications/03-2921.pdf",
+   "d": ""
+  },
+  {
+   "t": "THE NEW DIETARY GUIDELINES FOR AMERICANS",
+   "u": "https://www.anfponline.org/docs/default-source/legacy-docs/docs/ce-articles/nc032026.pdf",
+   "d": ""
+  },
+  {
+   "t": "Italian Researchers Find Possible Health Benefits to Eating Pizza",
+   "u": "https://www.mensjournal.com/news/pizza-health-benefits-italian-researchers",
+   "d": ""
+  },
+  {
+   "t": "Hispanic Community Children s Health/Study of Latino Youth ...",
+   "u": "https://biolincc.nhlbi.nih.gov/media/studies/hchssol/Forms_-_Youth_Ancillary_Study.pdf?link_time=2026-11-08_20:06:49.544690",
+   "d": ""
+  },
+  {
+   "t": "A Healthy Showdown: Who Wins - Pizza or Pasta? • Edel Alon",
+   "u": "https://www.edelalon.com/blog/a-healthy-showdown-who-wins-pizza-or-pasta/",
+   "d": "2022-12-30"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.6,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 19,
+   "d": 757,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4520,
+   "o": 279,
+   "d": 8612,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 70.3,
+  "tok": 341,
+  "s": 4.9
+ },
+ "app_first_s": 17.41,
+ "app_total_s": 22.27,
+ "answer_raw": "Pizza is not inherently bad for you, but its nutritional impact depends entirely on the ingredients and how you balance the meal.\n\nThe healthiness of a pizza depends on the specific toppings and how it is paired with other foods. For instance, pizzas often contain more vegetables than pasta, which can provide more vitamins and minerals [8]. You can increase the nutritional value of a pizza meal by pairing it with a side salad or fruit [1].\n\nAs for how often it is fine, there is no single answer because dietary needs are individual, though the following factors influence the impact:\n\n*   **Toppings and balance** — using more vegetables and managing portion control helps make pizza a more balanced choice [1].\n*   **Nutrient density** — while pizza provides essential vitamins and minerals, the specific nutritional value varies based on the toppings used [8].\n*   **The \"fast food\" factor** — if you are eating pizza from fast food chains like Pizza Hut, it's often categorized differently than a homemade or artisanal pie [7].\n\nWhat I found does not establish a specific frequency (e.g., \"once a week\") for how often eating pizza is healthy, as that depends on your total caloric intake and overall diet. To determine a specific frequency for your own health, you would need to calculate your daily caloric needs and macro-nutrient requirements.",
+ "answer": "Pizza is not inherently bad for you, but its nutritional impact depends entirely on the ingredients and how you balance the meal.\n\nThe healthiness of a pizza depends on the specific toppings and how it is paired with other foods. For instance, pizzas often contain more vegetables than pasta, which can provide more vitamins and minerals [8]. You can increase the nutritional value of a pizza meal by pairing it with a side salad or fruit [1].\n\nAs for how often it is fine, there is no single answer because dietary needs are individual, though the following factors influence the impact:\n\n*   **Toppings and balance** — using more vegetables and managing portion control helps make pizza a more balanced choice [1].\n*   **Nutrient density** — while pizza provides essential vitamins and minerals, the specific nutritional value varies based on the toppings used [8].\n*   **The \"fast food\" factor** — if you are eating pizza from fast food chains like Pizza Hut, it's often categorized differently than a homemade or artisanal pie [7].\n\nWhat I found does not establish a specific frequency (e.g., \"once a week\") for how often eating pizza is healthy, as that depends on your total caloric intake and overall diet. To determine a specific frequency for your own health, you would need to calculate your daily caloric needs and macro-nutrient requirements.",
+ "chars": 1354,
+ "raw_bytes": 5192,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.2,
+ "rate_gen_tok_s": 69.65,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:53:53",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

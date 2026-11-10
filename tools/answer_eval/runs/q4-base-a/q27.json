@@ -1,0 +1,206 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":10.6,\"ftok\":306,\"est\":false}",
+  "X-Hurry": "1921fe54a7164636"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 3.21,
+ "elapsed_s": 16.07,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.21,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 7.12,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "472 chars"
+   }
+  },
+  {
+   "t": 7.12,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 7.12,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 7.12,
+   "tag": "RESET"
+  },
+  {
+   "t": 16.07,
+   "tag": "RATE",
+   "data": {
+    "tps": 39.1,
+    "tok": 146,
+    "s": 3.7
+   }
+  },
+  {
+   "t": 16.07,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "584 chars"
+   }
+  },
+  {
+   "t": 16.07,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   7.12,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "472 chars",
+   "t_s": 7.12
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 7.12
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "584 chars",
+   "t_s": 16.07
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 16.07
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 39.1,
+  "tok": 146,
+  "s": 3.7
+ },
+ "answer_raw": "The package is cheaper by **$5** in the first scenario and by **$120.40** once the tax is added.\n\n**Scenario 1: No tax**\nThe separate booking costs $2,395 ($1,350 for flight + $1,045 for 11 nights at $95). The package price of $2,400 is higher, making the separate booking cheaper by **$5**.\n\n**Scenario 2: With 12% tax**\nAdding a 12% tax to the $95 nightly rate brings the cost to $106.40 per night. \n\nThe total for 11 nights at this new rate is $1,170.40. When added to the $1,350 flight, the separate booking total is $2,520.40. In this case, the package is cheaper by **$120.40**.",
+ "answer": "The package is cheaper by **$5** in the first scenario and by **$120.40** once the tax is added.\n\n**Scenario 1: No tax**\nThe separate booking costs $2,395 ($1,350 for flight + $1,045 for 11 nights at $95). The package price of $2,400 is higher, making the separate booking cheaper by **$5**.\n\n**Scenario 2: With 12% tax**\nAdding a 12% tax to the $95 nightly rate brings the cost to $106.40 per night. \n\nThe total for 11 nights at this new rate is $1,170.40. When added to the $1,350 flight, the separate booking total is $2,520.40. In this case, the package is cheaper by **$120.40**.",
+ "chars": 584,
+ "raw_bytes": 1770,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.03,
+ "rate_gen_tok_s": 13.78,
+ "id": "q27",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Package vs separate booking",
+ "question": "A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:31:45",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 nights. Which is cheaper and by how much? Then redo it if the hotel adds a 12% tax that isn't in the $95."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 3.21,
+ "app_total_s": 16.07,
+ "first_text_s_unreliable": true
+}

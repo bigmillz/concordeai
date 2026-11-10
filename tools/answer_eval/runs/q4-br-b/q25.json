@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.2,\"ftok\":259,\"est\":false}",
+  "X-Hurry": "f6db758cbfd16365"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.61,
+ "elapsed_s": 21.46,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 20 passages"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.55,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.61,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.46,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.8,
+    "tok": 332,
+    "s": 5.9
+   }
+  },
+  {
+   "t": 21.46,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1330 chars"
+   }
+  },
+  {
+   "t": 21.46,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.46,
+   "tag": "DONE",
+   "data": {
+    "f": 15.6,
+    "t": 21.46,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 20 passages",
+   "t_s": 10.55
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.55
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.55
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1330 chars",
+   "t_s": 21.46
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.46
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Latin American Real Estate Market Trends (2026): Top High ...",
+   "u": "https://dwellhack.com/realstate/latin-america-real-estate-trends-2026-high-yield-rental-cities/",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "Latin America Real Estate Investment Report 2026: 11 Markets",
+   "u": "https://www.internationalre.org/reports/2026-global-investment-report.html",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Latin America City Real Estate Guides 2026 | International RE",
+   "u": "https://www.internationalre.org/cities/",
+   "d": "2026"
+  },
+  {
+   "t": "IMF cuts Latin America, Caribbean growth forecasts on energy shock, little AI bo",
+   "u": "https://www.reuters.com/world/asia-pacific/imf-cuts-latin-america-caribbean-growth-forecasts-energy-shock-little-ai-boost-2026-10-13/",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "Renting vs. Buying in Mumbai: A Detailed Financial Analysis",
+   "u": "https://blog.nobrokerage.com/lifestyle/renting-vs-buying-in-mumbai:-a-detailed-financial-analysis-1786532488084",
+   "d": "2026-08-12"
+  },
+  {
+   "t": "Housing Market Predictions For 2026 – Forbes Advisor2026 Housing Market Trends: ",
+   "u": "https://www.forbes.com/advisor/mortgages/real-estate/housing-market-predictions/",
+   "d": "2026-08-04"
+  },
+  {
+   "t": "Renting vs Buying in Gurgaon | Cost Analysis 2026",
+   "u": "https://curatedhomes.in/blog/renting-vs-buying-gurgaon-cost-analysis",
+   "d": "2026-07-22"
+  },
+  {
+   "t": "Escondido real estate market trends (February 2026)",
+   "u": "https://grokipedia.com/page/Escondido_real_estate_market_trends_February_2026",
+   "d": "2026-02"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.55,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 22,
+   "d": 702,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5623,
+   "o": 311,
+   "d": 10844,
+   "c": 2236
+  }
+ ],
+ "rate_writer": {
+  "tps": 56.8,
+  "tok": 332,
+  "s": 5.9
+ },
+ "app_first_s": 15.6,
+ "app_total_s": 21.46,
+ "answer_raw": "**Renting is the better financial move** if you are planning to move within one to two years.\n\nA short holding period is very expensive per year of use; if you buy and sell within three years, you will likely be behind where renting would have left you unless the market moves sharply in your favor [7]. Buying is generally better only if you are confident you will stay put for at least **five to seven years** [7].\n\nBecause you are looking at a one-to-two-year window, the transaction costs of buying and the potential for being locked into a property you need to sell quickly make renting the more logical choice. If you were moving to a market like Mumbai, where the price-to-rent ratio is between 35 and 48 times annual rent (as of August 2026), the capital tied up in a purchase would be substantial [5].\n\nOnce you reach Latin America, you will have access to different investment profiles. For example, Medellín currently offers a high gross rental yield of around **9.17%** (as of October 2026) [1]. Buenos Aires also serves as a top Airbnb market with roughly **73% occupancy** (as of October 2026) [1].\n\nSince I do not know your current city or local market conditions, you should check your local property tax, closing costs, and current mortgage rates to confirm the exact cost of a \"short-term\" ownership vs. renting.",
+ "answer": "**Renting is the better financial move** if you are planning to move within one to two years.\n\nA short holding period is very expensive per year of use; if you buy and sell within three years, you will likely be behind where renting would have left you unless the market moves sharply in your favor [7]. Buying is generally better only if you are confident you will stay put for at least **five to seven years** [7].\n\nBecause you are looking at a one-to-two-year window, the transaction costs of buying and the potential for being locked into a property you need to sell quickly make renting the more logical choice. If you were moving to a market like Mumbai, where the price-to-rent ratio is between 35 and 48 times annual rent (as of August 2026), the capital tied up in a purchase would be substantial [5].\n\nOnce you reach Latin America, you will have access to different investment profiles. For example, Medellín currently offers a high gross rental yield of around **9.17%** (as of October 2026) [1]. Buenos Aires also serves as a top Airbnb market with roughly **73% occupancy** (as of October 2026) [1].\n\nSince I do not know your current city or local market conditions, you should check your local property tax, closing costs, and current mortgage rates to confirm the exact cost of a \"short-term\" ownership vs. renting.",
+ "chars": 1330,
+ "raw_bytes": 3795,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.49,
+ "rate_gen_tok_s": 56.84,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T05:00:05",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

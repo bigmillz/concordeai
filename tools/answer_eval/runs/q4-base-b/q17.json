@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":139,\"est\":false}",
+  "X-Hurry": "fdeca929a9b980e1"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 13.64,
+ "elapsed_s": 22.12,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.09,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 18 passages"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.64,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.12,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.3,
+    "tok": 511,
+    "s": 8.5
+   }
+  },
+  {
+   "t": 22.12,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2047 chars"
+   }
+  },
+  {
+   "t": 22.12,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.12,
+   "tag": "DONE",
+   "data": {
+    "f": 13.64,
+    "t": 22.12,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   8.09,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.09
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.09
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 18 passages",
+   "t_s": 9.87
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.87
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2047 chars",
+   "t_s": 22.12
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.12
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Is Florianópolis, Brazil Safe? 2026 Tourist Safety Guide",
+   "u": "https://florianopolistours.com/is-florianopolis-safe/",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Picky mom wants beach, safe walkable town, no cars... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g1-i9658-k11989472-o10-Picky_mom_wants_beach_safe_walkable_town_no_cars_food-Family_Travel.html",
+   "d": ""
+  },
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 24,
+   "d": 814,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4580,
+   "o": 515,
+   "d": 12199,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 60.3,
+  "tok": 511,
+  "s": 8.5
+ },
+ "app_first_s": 13.64,
+ "app_total_s": 22.12,
+ "answer_raw": "For a six-month stay that balances safety, walkability, and beach access, **Jurerê Internacional** is the best fit for your requirements, though it comes with a significant price premium.\n\n## Neighborhood Options\n\n**Jurerê Internacional**\nIf your priority is high safety and a resort-style atmosphere, this is the top choice. It has a safety score of **78/100** and reported **zero robberies in 2025** [7, as of May 2026]. However, it is expensive; a one-bedroom apartment can cost around **€1,200/month** [7, as of May 2026].\n\n**The North, East, and Central/South Zones**\nThe island's layout offers different lifestyles depending on which zone you choose:\n*   **North**: Known for resort-style beaches [3, undated].\n*   **East**: Offers a bohemian, surfing, and nature-focused vibe [3, undated].\n*   **Central/South**: Features the historic center and calm villages [3, undated].\n\n## Safety and Logistics\n\nFlorianópolis is generally considered a safe destination for tourists, especially in the main beach neighborhoods [2, 2026]. It was ranked as the safest state capital in Brazil in 2024, with a homicide rate of **9.7 per 100,000 residents** compared to the national average of 20.1 [1, as of July 2026].\n\nWhile the city is relatively safe, keep these factors in mind for a six-month stay:\n*   **Granular Safety**: Safety levels vary significantly by street; many security cameras in the city are concentrated in just three specific neighborhoods [7, as of May 2026].\n*   **Nighttime Precautions**: It is best to stay in busy tourist areas and avoid isolated streets or beaches after dark [2, 2026].\n*   **Internet/Work**: While the provided sources do not specify individual neighborhood WiFi speeds, the North/East zones are often preferred for remote work-friendly environments [8, 2026, perlyweg].\n\nThe provided evidence does not contain specific data on fiber optic availability or average WiFi speeds per neighborhood. You should verify local ISP coverage (such as Vivo or Claro) for your specific rental address before signing a lease.",
+ "answer": "For a six-month stay that balances safety, walkability, and beach access, **Jurerê Internacional** is the best fit for your requirements, though it comes with a significant price premium.\n\n## Neighborhood Options\n\n**Jurerê Internacional**\nIf your priority is high safety and a resort-style atmosphere, this is the top choice. It has a safety score of **78/100** and reported **zero robberies in 2025** [7, as of May 2026]. However, it is expensive; a one-bedroom apartment can cost around **€1,200/month** [7, as of May 2026].\n\n**The North, East, and Central/South Zones**\nThe island's layout offers different lifestyles depending on which zone you choose:\n*   **North**: Known for resort-style beaches [3, undated].\n*   **East**: Offers a bohemian, surfing, and nature-focused vibe [3, undated].\n*   **Central/South**: Features the historic center and calm villages [3, undated].\n\n## Safety and Logistics\n\nFlorianópolis is generally considered a safe destination for tourists, especially in the main beach neighborhoods [2, 2026]. It was ranked as the safest state capital in Brazil in 2024, with a homicide rate of **9.7 per 100,000 residents** compared to the national average of 20.1 [1, as of July 2026].\n\nWhile the city is relatively safe, keep these factors in mind for a six-month stay:\n*   **Granular Safety**: Safety levels vary significantly by street; many security cameras in the city are concentrated in just three specific neighborhoods [7, as of May 2026].\n*   **Nighttime Precautions**: It is best to stay in busy tourist areas and avoid isolated streets or beaches after dark [2, 2026].\n*   **Internet/Work**: While the provided sources do not specify individual neighborhood WiFi speeds, the North/East zones are often preferred for remote work-friendly environments [8, 2026, perlyweg].\n\nThe provided evidence does not contain specific data on fiber optic availability or average WiFi speeds per neighborhood. You should verify local ISP coverage (such as Vivo or Claro) for your specific rental address before signing a lease.",
+ "chars": 2047,
+ "raw_bytes": 4349,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 23.14,
+ "rate_gen_tok_s": 60.35,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:41:44",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":104,\"est\":false}",
+  "X-Hurry": "0656810ce01bc490"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 1.35,
+ "elapsed_s": 31.87,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 1.35,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 7.93,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.93,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.93,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.31,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 30 passages"
+   }
+  },
+  {
+   "t": 10.31,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.31,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.31,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.31,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 31.86,
+   "tag": "RATE",
+   "data": {
+    "tps": 36.0,
+    "tok": 578,
+    "s": 16.1
+   }
+  },
+  {
+   "t": 31.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2315 chars"
+   }
+  },
+  {
+   "t": 31.87,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   7.93,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.93
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.93
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 30 passages",
+   "t_s": 10.31
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.31
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.31
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2315 chars",
+   "t_s": 31.87
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 31.87
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis, Brazil Safe? 2026 Tourist Safety Guide",
+   "u": "https://florianopolistours.com/is-florianopolis-safe/",
+   "d": "2026"
+  },
+  {
+   "t": "Safety in Florianópolis: The Honest Neighborhood Guide for ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-safety-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Safest Neighborhoods in Florianópolis: SSP-SC Data Guide",
+   "u": "https://scbimoveis.com/en/articles/florianopolis-safest-neighborhoods-data-russians-2026",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis 2026: Where Expats ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-neighborhoods-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Best Neighborhoods for ...",
+   "u": "https://getnomadbro.com/blog/where-to-stay-in-florianopolis-best-neighborhoods-for-digital-nomads-in-2026",
+   "d": "2026-07-09"
+  },
+  {
+   "t": "Best Areas to Buy Property in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-which-area",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.31,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 36.0,
+  "tok": 578,
+  "s": 16.1
+ },
+ "answer_raw": "For a six-month stay that balances safety, walkability, and beach access, **Jurerê Internacional** is your best bet if budget is secondary, while **Lagoa da Conceição** or **Praia do Campeche** offer better lifestyle variety for digital nomads.\n\n**Jurerê Internacional** offers high safety with a score of 78/100 and zero reported robberies in 2025, but you will pay a premium with one-bedroom apartments costing roughly €1,200/month as of May 2026 [2]. It is a resort-style area, though it is more of a luxury enclave than a traditional walkable coastal village.\n\n**Lagoa da Conceição** is the primary choice for digital nomads, though it lacks direct ocean beach access and can be noisy due to the restaurant strip on Avenida das Rendeiras [3][7]. You would likely need to drive to nearby beaches like Joaquina or Mole, and electricity costs can be high due to AC use [6].\n\n**Praia do Campeche** is a top contender for those wanting to be within the 90% of expat living areas, offering a different vibe from the north [6]. While it provides beach access, you should check specific street-level security and local flooding risks before signing a lease [8].\n\n**Centro / Beira-Mar Norte** is where many foreigners initially land and offers easy access to amenities, but it is not a beachfront living experience [5]. While it has high connectivity, the high \"floating population\" of workers and tourists means it accounts for nearly a third of the city's total crime counts as of September 2026 [4].\n\n**Summary of trade-offs for a 6-month rental**\n\n| Neighborhood | Primary Vibe | Safety/Risk Profile | Budget Impact |\n| :--- | :--- | :--- | :--- |\n| **Jurerê Internacional** | Upscale/Resort | Very high safety (78/100) [2] | High (~€1,200/mo) [2] |\n| **Lagoa da Conceição** | Bohemian/Nomad | Noise/Congestion risks [7] | Mid-range [6] |\n| **Centro** | Urban/Central | Higher crime due to transient population [4] | Variable [5] |\n| **Campeche/Ingleses** | Coastal/Classic | High expat density [6] | Variable [6] |\n\nRegarding internet, most areas reported can support **100Mbps** connections, which is standard for the local tech-heavy environment [6]. For a six-month lease, it is advisable to book a short-term rental for the first week to scout neighborhoods in person before committing to a longer contract [5].",
+ "answer": "For a six-month stay that balances safety, walkability, and beach access, **Jurerê Internacional** is your best bet if budget is secondary, while **Lagoa da Conceição** or **Praia do Campeche** offer better lifestyle variety for digital nomads.\n\n**Jurerê Internacional** offers high safety with a score of 78/100 and zero reported robberies in 2025, but you will pay a premium with one-bedroom apartments costing roughly €1,200/month as of May 2026 [2]. It is a resort-style area, though it is more of a luxury enclave than a traditional walkable coastal village.\n\n**Lagoa da Conceição** is the primary choice for digital nomads, though it lacks direct ocean beach access and can be noisy due to the restaurant strip on Avenida das Rendeiras [3][7]. You would likely need to drive to nearby beaches like Joaquina or Mole, and electricity costs can be high due to AC use [6].\n\n**Praia do Campeche** is a top contender for those wanting to be within the 90% of expat living areas, offering a different vibe from the north [6]. While it provides beach access, you should check specific street-level security and local flooding risks before signing a lease [8].\n\n**Centro / Beira-Mar Norte** is where many foreigners initially land and offers easy access to amenities, but it is not a beachfront living experience [5]. While it has high connectivity, the high \"floating population\" of workers and tourists means it accounts for nearly a third of the city's total crime counts as of September 2026 [4].\n\n**Summary of trade-offs for a 6-month rental**\n\n| Neighborhood | Primary Vibe | Safety/Risk Profile | Budget Impact |\n| :--- | :--- | :--- | :--- |\n| **Jurerê Internacional** | Upscale/Resort | Very high safety (78/100) [2] | High (~€1,200/mo) [2] |\n| **Lagoa da Conceição** | Bohemian/Nomad | Noise/Congestion risks [7] | Mid-range [6] |\n| **Centro** | Urban/Central | Higher crime due to transient population [4] | Variable [5] |\n| **Campeche/Ingleses** | Coastal/Classic | High expat density [6] | Variable [6] |\n\nRegarding internet, most areas reported can support **100Mbps** connections, which is standard for the local tech-heavy environment [6]. For a six-month lease, it is advisable to book a short-term rental for the first week to scout neighborhoods in person before committing to a longer contract [5].",
+ "chars": 2315,
+ "raw_bytes": 4645,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.87,
+ "rate_gen_tok_s": 20.75,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:09:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 15.79,
+ "app_total_s": 31.86,
+ "first_text_s_unreliable": true
+}
