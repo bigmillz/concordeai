@@ -20000,3 +20000,127 @@ main (the home import card's pins, red on main too). Playwright at 1440 and 390,
 pane and the menu open, zero page errors, zero WCAG AA misses over 418 texts (322 at 390; the panel taken at its
 lightest measured pixel); Classic's Settings unchanged. Not seen in WKWebView (the checkbox tick is an `::after`
 on an `appearance:none` input, the switch knob a transform). The full gauntlet was not run.
+
+## 6b552 — slider-port: the effort slider slim and fluid again, the friend page's pill in place of the balance beam (7.0 beta, per Patrick)
+
+*Renumbered 6b549 -> 6b552 at the beta-2 merge (shell-polish 6b548, signing 6b549, dict-hold 6b550,
+settings-look 6b551).*
+
+**The ask** (per Patrick, seeing the app: "Remember how we had it? It looked beautiful when it was very slim
+and very fluid, not just a bunch of dots"). The app still showed 6b542's balance beam: a hairline, five tick
+marks, a diamond thumb and a spaced mono-caps "ULTRA". The friend page (`preview-site/beta`, DESIGN.md "The
+effort slider", commit 52a21a1) had moved on; the app had not. Lesson, again: a design that lands on the
+preview is not done until it is ported.
+
+**The slider now** (the friend page's values). A slim pill: 220 × 16 on the home (radius 4.5), 200 × 12 in a
+conversation's header (radius 4), 88 × 16 under 600 px. A frosted channel and a luminous fill from the left
+round the knob, `#4f8cff → #9b72ff → #f07aa6` fixed to the track (each level its own colour), with a blurred
+copy beneath (the bloom, .32 → .78 by level). The knob is a near-white rounded square (14 px; 11 in a
+conversation) with a halo in the fill's colour where it stands, rising on hover and while held. **No dots
+at rest**: five faint notches (.18, passed .5, no glow) fade in over 200 ms only while the slider is
+hovered, dragged or keyboard-focused. **Fluid**: held, the knob and the fill follow the pointer with no
+transition (`hzS.effDrag`, (x − left − track/2) ÷ (width − track), clamped); the level name changes as each
+stop is crossed; let go, or step with a key, and it snaps in 140 ms on `cubic-bezier(.22,1,.36,1)`, no
+bounce. The native range input still sets the level: its `::-webkit-slider-thumb` is as wide as the pill is
+tall, so its steps fall exactly under the drawn ones. Hit area 36 px (32 on a phone); click anywhere to jump;
+arrows step. The level beside it in normal case, Space Grotesk 13/500, in a box as wide as "Medium" (the
+header's pill used to shift as the name changed). The keyboard ring is a 1 px ember ring 2 px round the pill,
+`:focus-visible` only. Calm and reduced motion: the same look with no transitions (the spec).
+
+**Ultra** (Balanced and Full; the friend page's): the knob folds into a living star (four, six, eight, six
+points, one form every 140 ms, `hzKnobStar`; the forms are made on first use, not at load, so no TDZ), it
+clicks into place on arrival (.45 → 1.12 → 1, 320 ms), seven tiny stars drift through the filled track,
+the fill flows (one 2 × width period per 4 s) and the halo turns to the cool spectrum; "Ultra" wears the
+cool tints (`#9cc0ff → #c4b0ff → #f7a3c3`) with a white-blue highlight gliding across it every 2.5 s. The
+6b544 moment around it is unchanged (the rim's run and still rim, the spark, the aurora's breath, the lit
+label, the drain). Calm, reduced motion and effects off: plain (the rounded-square knob, no drift, no flow,
+the label's gradient still).
+
+**Removed**: the NORTHSTAR slider's glow, dots, thumb wrapper and breathing halo; the old compact geometry;
+the 6b542 beam (ticks, diamond, mono caps); Balanced's still pool under the diamond; the diamond's flow and
+ignition; the spectral ULTRA flow; a dead narrow-window `.hz .hz-sl{width:120px}`. `hzEffortPaint` reads no
+layout now (it measured the slider every paint). The wire is unchanged: Low · Medium · High · Extra · Ultra,
+sent as low/medium/high/max/ultra in the question's `effort`.
+
+**Gauntlet.** The 6b542 Sting check now asserts the beam is gone (its diamond mutant re-adds it); Balanced
+asserts the pool is gone; the 6b544 Ultra check pins the star knob, the drifting stars, the flowing fill and
+the gliding label, its loop count re-reasoned (still four), with new mutants (Calm gliding, Calm's knob a
+star, a pulsing star, a wide halo). New "6b552 the effort slider, slim and fluid", eight mutants: dots at
+rest (the base opacity), passed dots lit at rest, the notches shown always by the back door, a lagging
+drag, a slow bouncing snap, spaced caps back, stepping instead of following, the star's clock restarted on
+every paint. "No dots at rest" is a CSS parse: the base notch rule says `opacity:0`, and any rule that could
+show a notch applies only under `:hover`, `.dragging` or `:focus-visible`. Run against a dev copy: the
+HORIZON, 6b540, 6b542, 6b544 and 6b552 sections (37 checks) all pass; `pincheck.py` shows only three
+pre-existing false hits in the import section's negative helper. The full gauntlet was not run.
+
+**Verified** in a windowless dev copy (headless Chromium, `--use-mock-keychain`, nice 15): stills of the home
+composer and the conversation header at every level, Balanced and Calm, 1440 and 390 wide; the knob is hit
+(`elementFromPoint` at its centre and at the hit area's top and bottom rows is the range input); the
+notches' opacity is 0 at rest at every level and 1 on hover, drag and keyboard focus; held, the thumb's
+transition is 0 s and its `left` moves continuously (29 → 212 px); a click at 74 % lands on Extra; Tab
+then → steps; no page errors. A drag clip, Low to Ultra. **Not verified in WKWebView** (the shipped app):
+`:has()`, `-webkit-background-clip:text` over two backgrounds, `var()` inside `@keyframes` and the styled
+`::-webkit-slider-thumb` are all WebKit features, but nothing here ran in WebKit.
+
+**Second pass, the same night (per Patrick: "too much rainbow; think more what GPT, Astra and Claude do").**
+Low to Extra are silver-white now: the fill is a vertical sheen (white .92 at the top to .62 at the foot) with
+a faint white bloom; the levels differ only in the fill's length and a slight brightening (`--hz-lift` .84 →
+.96, the bloom .12 → .22). The knob keeps its near-white face and gains a .5 px dark edge so it reads on the
+white fill; the halo is white; a passed notch is a faint dark mark on the fill (white would vanish there).
+Colour comes only at Ultra, one cool pair: ice `#8fb7ff` → soft violet `#a58bff` and back, flowing slowly
+(one 2 × width period per 8 s, was 4) under a white top sheen; the halo takes the same pair. The star knob
+and the track's stars are white with a hint of ice (the star's gradient ends at `#d6e4ff`, not violet; its
+glow is white and ice, no blue or violet). "Ultra" is silver (`#d3d9e6`: 9.6:1 on the composer's glass, 14.5:1
+on the night) with a white highlight passing over it every 3 s, no gradient letters, no violet glow. The
+6b544 rim is a 1 px ice-white line (`#dce8ff → #fff → #c4d8ff`; was 1.5 px of ice, violet, rose and ember).
+Elsewhere in the effort code: the byline's Ultra shimmer (Full) is the same cool pair (was the full rainbow),
+Extra's in silver; Extra's rotating ring in Full is silver light (was blue, pink and gold). Ember stays only
+at decisions (the send strike, the focus ring, errors). The greeting's Full-only bloom still carries its
+rainbow: it is not effort code, so it was left for Patrick.
+Gauntlet: the 6b544 pins follow (the rim, the label, the 8 s flow); 6b552 gains `_sl549_calm_colour`: the
+slider's base css may hold no colour at all (chroma under .2), and the Ultra css, the byline's shimmer and
+Extra's ring may hold no rose, pink, red, orange or gold (a coloured hue from 285° round to 60°) and no
+gradient wider than one cool pair (coloured stops within 60°). Six mutants: a rose stop in Ultra's fill, the
+byline's old rainbow, a blue-to-rose fill below Ultra, a rose halo, the old ember rim, a cyan-to-green third
+hue. The five slider sections pass (37 checks) against a dev copy.
+
+**The greeting's glow in Full, the same rule.** Was a rainbow bloom (blue, pink, gold, mint) breathing and
+drifting on an 8 s and a 16 s loop, a sheen sweeping the words every 9 s, and blue text-shadows including an
+offset one (0 12px 90px). Now a warm-white afterglow, still: two zero-offset layers from the one string, a
+close glow hugging the letters (text-shadow 1 / 12 / 24 px, `rgba(255,244,228)`) and a slightly stronger wide
+bloom (the blurred `.bloom` copy, 30 px, .55, behind). The sheen span stays (one string, one box) at opacity 0.
+`_sl549_calm_colour` now also reads the greeting's rules: no colour, no loop, every shadow zero-offset; four
+mutants (the rainbow bloom, a gold glow, a breathing loop, an offset double). The 6b542 gating check pins the
+still bloom. Balanced's settle-in glow (`hzGreetIn`, cool white-blue, 1.5 s, once) is unchanged.
+
+**Ultra, two notes from Patrick ("be careful with the star that doesn't stick"; "more stars above the box versus
+in the box").** The star knob is sized from the track: `calc(var(--hz-ph) * 1.25)` square, tips at the viewBox's
+edge (R 10 in −10…10), so 20 px on the home's 16 px track and 15 px on the conversation's 12 px, its points 2 and
+1.5 px past the track's edges (2.6 px at the arrival's 1.06 overshoot, was 1.12), its centre where the knob stands,
+8 px (6) inside the fill's end, so no gap at any place, held or snapping (measured live at three drag places). Its glow
+is 1.5 and 4 px of white and ice; at Ultra the halo is held at .8 and a 4 px blur on hover and drag too (within 6 px
+of the knob). The seven drifting track stars are gone. In their place, THE STARS ABOVE THE BOX: `#hz-ufield`, inside
+`#hz-sky` (behind everything, no pointer), a field of small white-ice four-point stars between the greeting and the
+composer, 26 in Full and 13 in Balanced; in a conversation a subtler strip (.55) in the 120 px above the composer,
+12 and 6. They fade in over 600 ms, twinkle (3.2–6 s), and one in eight rises 14 px now and then. `hzUFieldPlan` is
+pure: from the greeting's and the composer's rects it keeps every star clear of both by its size plus 6 px;
+`hzUField` builds once per place (home or not, window size, level), on a 60 ms timer. Off in Calm, effects off and
+reduced motion. Gauntlet: `_sl549_star_bounds` (the size multiplier, the drawn radius over the viewBox, the overshoot
+at both track heights, the glow, the Ultra halo) and `_sl549_field` (the plan run in node on stand-in rects: 26 / 13
+/ 12 stars, none touching the greeting or the composer, the home's between them, the conversation's above it; inside
+the sky; Calm and effects off hide it; Balanced half); nine mutants (twice the track, a radius past its box, a 1.4
+overshoot, a 12 px glow, a wide halo, a field reaching into the composer, Balanced at the full count, the field on in
+Calm, the track's stars back), and one more in the Ultra check (track stars back). The five slider sections pass (37).
+
+**The aurora, blue-violet only (the owner's settled rule).** Full's aurora still drew rose, gold and mint bands
+behind the greeting. Retinted at the same intensity and motion: the GL neon's four-stop palette (pink, gold,
+mint) is now ice `(.62,.74,1)`, soft violet `(.76,.66,1)`, ice-white `(.82,.88,1)` and violet-blue `(.68,.68,1)`,
+each about as bright as the stop it replaced, and its fringe base ice `(.72,.84,1)` (was mint); the canvas
+curtain's fringe layer is soft violet `186,176,255` (was mint `150,236,212`), as is the unused
+`--hz-aurora-fringe`; the colour wash beneath it (rose, amber and teal blooms) is violet, ice and blue at the same
+strengths. The greeting's light-trace shares the neon's palette and is retinted with it. Not touched: the NASA
+footage's own colour (the moon's warm reflection on the water in the right foot of the home) and its hour grade.
+Gauntlet: `_sl549_aurora` reads every colour the aurora and the wash are drawn in (both palettes, the fringe,
+the three curtains, the four wash blooms): a blue-to-violet hue (200–285°) or near-white, nothing else; five
+mutants (the neon's rose back, the mint fringe back, the canvas fringe's mint back, the wash's rose back, the
+trace's rose back on its own). The five slider sections pass (37).
