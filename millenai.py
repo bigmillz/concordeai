@@ -52656,21 +52656,21 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    dot-matrix texture (1 px square dots on a 4 px pitch, white at .16) and a slow LED-marquee shimmer: a soft band
    lights the dots left to right every 2.5 s (across in about 1.1 s, then rest), from 600 ms after the arrival, in step
    with the word Ultra's silver sweep. Below Ultra: plain silver, none of this. Calm and reduced motion: the dots, still */
-.hz .hz-sl-dots{position:absolute;left:0;top:calc(50% - var(--hz-ph) / 2);height:var(--hz-ph);border-radius:var(--hz-sr);overflow:hidden;pointer-events:none;z-index:1;
+.hz .hz-sl-led{position:absolute;left:0;top:calc(50% - var(--hz-ph) / 2);height:var(--hz-ph);border-radius:var(--hz-sr);overflow:hidden;pointer-events:none;z-index:1;
   width:calc(var(--hz-ph) + (100% - var(--hz-ph)) * var(--hz-eff-u));transition:width var(--hz-snap)}
-.hz .hz-sl.dragging .hz-sl-dots{transition:none}
-.hz .hz-sl-dots::before,.hz .hz-sl-dots::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .4s var(--hz-ease-out);
+.hz .hz-sl.dragging .hz-sl-led{transition:none}
+.hz .hz-sl-led::before,.hz .hz-sl-led::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .4s var(--hz-ease-out);
   background:linear-gradient(90deg,#fff 1px,transparent 1px) 1px 0/4px 4px;
   -webkit-mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px;mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px}
-.hz.hz-ultra .hz-sl-dots::before{opacity:.16}
-.hz.hz-ultra .hz-sl-dots::after{opacity:.9;
+.hz.hz-ultra .hz-sl-led::before{opacity:.16}
+.hz.hz-ultra .hz-sl-led::after{opacity:.9;
   -webkit-mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px,linear-gradient(90deg,transparent 40%,#000 50%,transparent 60%) 150% 0/250% 100% no-repeat;-webkit-mask-composite:source-in;
   mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px,linear-gradient(90deg,transparent 40%,#000 50%,transparent 60%) 150% 0/250% 100% no-repeat;mask-composite:intersect}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-dots::after{animation:hzMarquee 2.5s cubic-bezier(.45,0,.25,1) .6s infinite}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-led::after{animation:hzMarquee 2.5s cubic-bezier(.45,0,.25,1) .6s infinite}
 @keyframes hzMarquee{0%{-webkit-mask-position:0 1px,150% 0;mask-position:0 1px,150% 0}45%,100%{-webkit-mask-position:0 1px,-50% 0;mask-position:0 1px,-50% 0}}
-.hz.hz-calm.hz-ultra .hz-sl-dots::after,.hz .novideo .hz-sl-dots::after{opacity:0;animation:none}
-.hz.hz-pause .hz-sl-dots::after{animation-play-state:paused}
-@media (prefers-reduced-motion:reduce){.hz.hz-ultra .hz-sl-dots::after{opacity:0;animation:none}}
+.hz.hz-calm.hz-ultra .hz-sl-led::after,.hz .novideo .hz-sl-led::after{opacity:0;animation:none}
+.hz.hz-pause .hz-sl-led::after{animation-play-state:paused}
+@media (prefers-reduced-motion:reduce){.hz.hz-ultra .hz-sl-led::after{opacity:0;animation:none}}
 /* THE GREETING'S RIM LIGHT (6b555, Ultra): a thin ice light along the letters' top edges, laid by a copy of the words
    (the same text, data-g, never offset sideways) beneath the letters (z-index -1 inside the greeting's own stacking
    context), whose 1 px upward ice shadow shows only above each letter. On arrival it rises in 250 ms as the matrix's
@@ -66180,7 +66180,7 @@ function hzUFieldBox(home,g,c,vw){
 function hzUFieldStar(p,b,glint,home,rnd){
   p.x=b.x0+rnd()*(b.x1-b.x0);p.y=b.y0+rnd()*(b.y1-b.y0);p.s=1.5+rnd()*1.7+(rnd()<.12?1.4:0);p.a=(.38+rnd()*.4)*(home?1:.7);
   p.w=2*Math.PI/(2+rnd()*5);p.ph=rnd()*6.28;p.amp=.2+rnd()*.35;p.sh=rnd()<.3;p.col=HZ_UCOL[Math.floor(rnd()*HZ_UCOL.length)];p.up=0;p.big=false;
-  if(rnd()<.4){p.x=b.x0+(Math.floor((p.x-b.x0)/11)+.5)*11;p.y=b.y0+(Math.floor((p.y-b.y0)/11)+.5)*11;}
+  if(rnd()<.4){p.x=b.x0+(Math.floor((p.x-b.x0)/11)+.5)*11;p.y=b.y0+(Math.floor((p.y-b.y0)/11)+.5)*11;if(p.x>b.x1)p.x-=11;if(p.y>b.y1)p.y-=11;}   // on the grid, still inside the band
   if(glint){p.big=true;p.s=5+rnd()*1.5;p.a=.7+rnd()*.2;p.col=[1,1,1];p.amp=.45;p.sh=false;p.w=2*Math.PI/(4+rnd()*3);}
   return p;
 }
@@ -67130,7 +67130,7 @@ function hzModesPaint(){
       // the slim pill (6b552): the channel, the bloom, the silver fill, the notches (shown only on hover, drag and
       // keyboard focus), the spark, and the knob: its halo and the rounded square, the same at every level (6b553: no
       // star at Ultra; no stars in the track either: they live above the box, hzUField)
-      +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i><i class="hz-sl-dots"></i>'
+      +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i><i class="hz-sl-led"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
       +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i></span>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
