@@ -25938,6 +25938,9 @@ def _modes_live39(inst, sid, svn, only=None):
                 and any(f_[0] == "RUN" and '"w": "mix"' in f_[1] for f_ in th["frames"])
                 and any(f_[0] == "STEP" and "Writing the answer" in f_[1] and "\\u00b7 " + th["merged"][0] in f_[1]
                         for f_ in th["frames"]))
+            # this computer's own Pro seats follow its free memory (model_fits_memory), which other work on the machine
+            # moves while Fast and Thinking run: the line-up is held to /api/tiers as it stands now (beta-2, run c)
+            tiers = q("/api/tiers")[1]
             pr = run("Pro", "say hello in one word 339p")
             # (the council puts the merger last, so the line-up is compared by what is the server's)
             got["Pro: all six server models draft"] = (

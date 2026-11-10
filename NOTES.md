@@ -20219,3 +20219,14 @@ in the page, the strike without glow, every hover on the composer's keys an inse
 "6b553 the footage's seam" (no loop attribute; `hzSeam`'s cases and a played-through clip at .6 run in node with a
 stand-in video: one fade, 0.7–1 s before the cut, the seek to 0, the fade back, a hidden page; 7 mutants). The
 HORIZON night check pins the tag without `loop`; the 6b526 asking and 6b542 gating checks pin `hzSendPress`.
+
+**Gauntlet, the beta-2 runs.** Run a was stopped for the owner's calm-send changes (630 checks, no reds). Run b was stopped
+when the footage ease changed under it. Run c: 1494/1496, the two reds both races of the stand-ins and the machine, not
+of beta-2's code. (1) Starter chips, the old v1 file: `suggest_view` starts a pass and then reads the kept file for
+its chips; the `suggest-fake` stand-in answered at once, so under a full run's load its pass could save the new pool
+before the view read, and the view showed that instead of the upgraded v1. A model takes seconds; the stand-in now
+thinks for 0.3 s (`suggest_ask`, hooked only), so the view answers from what was kept, as it does for real (20/20
+over the wire; the race did not reproduce on a quiet machine before the fix either). (2) Modes (live), Pro: this
+computer's own Pro seats follow its free memory (`model_fits_memory`), which other work on the machine moved between
+the check's `/api/tiers` snapshot and the Pro run minutes later (Qwen 3.6 35B MoE admitted at the run, not at the
+snapshot). The check now takes the snapshot just before the Pro run and still holds the line-up to it exactly.

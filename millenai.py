@@ -18190,6 +18190,9 @@ def suggest_ask(ctx, prompt: str):
     st["asks"] = int(st.get("asks", 0)) + 1
     st["prompt"] = prompt
     if _suggest_hooked():
+        # the stand-in thinks for a beat, as a model does (beta-2, gauntlet run c): an instant one could save its
+        # pass before the view that started it read the kept file, and that view then showed the new pool
+        time.sleep(0.3)
         mode = _hook_arg("suggest-fake")
         if mode == "fail":
             return None, ""
