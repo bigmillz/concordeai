@@ -66276,7 +66276,7 @@ function hzSkyBoot(){
   // THE AURORA: level always (a horizontal band, vertical rays, no slant, no turn); its centre wanders 10-25 % either
   // side, its width breathes, its folds roll, the lower edge undulates in long soft waves with each ray ending at its
   // own depth, now and then it splits in two; blue at the lower edge to violet towards the tips (DESIGN "The aurora")
-  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam;uniform vec4 grt,sbr;"
+  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam;uniform vec4 grt;"
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
@@ -66305,11 +66305,11 @@ function hzSkyBoot(){
     +"float lu=dot(col,vec3(.299,.587,.114));col=max(mix(vec3(lu),col,1.+.45*rich),0.);"
     +"vec3 bv=mix(vec3(.56,.72,1.),vec3(.65,.55,1.),clamp(smoothstep(.45,.85,uv.y)+.25*cool,0.,1.));"
     // at resting Ultra the light leans blue-violet and is exactly 20 % stronger (its measured luminance), never more;
-    // behind the greeting it keeps 25 % under its resting strength (AA); behind the open sidebar it dims by 60 %
+    // behind the greeting it keeps 25 % under its resting strength, and there, always, its light rolls off at a soft knee (AA)
     +"vec3 lw=vec3(.2126,.7152,.0722);float l0=dot(col,lw);vec3 lean=mix(col,bv*lu,cool*.7);"
     +"vec2 gq=max(max(grt.xy-uv,uv-grt.zw),0.)/vec2(.07,.1);float gm=grt.z>grt.x?1.-smoothstep(0.,1.,length(gq)):0.,cu=min(cool,1.);"
     +"col=lean*(l0*(1.+.2*cu*(1.-gm)-.25*cu*gm)/max(dot(lean,lw),1e-4));"
-    +"if(sbr.z>sbr.x)col*=1.-.6*(1.-smoothstep(0.,.025,length(max(max(sbr.xy-uv,uv-sbr.zw),0.))));"
+    +"float lk=dot(col,lw)*neon;col*=mix(1.,1./(1.+lk/.06),gm);"
     +"gl_FragColor=vec4(col*neon,1.);}";
   let pF,pS,pA,pB;
   try{pF=hzProgram(gl,FEED);pS=hzProgram(gl,SHOW);pA=hzProgram(gl,AUR);pB=hzProgram(gl,HZ_BLUR_FS);}
@@ -66537,7 +66537,7 @@ function hzSkyBoot(){
   // Balanced 1.6 x slower and half the amplitude; Calm and reduced motion still and centred.
   const arnd=hzRng((Math.random()*4294967296)>>>0);
   const AW={rf:0,rt:0,rT:0,rD:20,rch:0,hb:1,hbT:0,cx:.5,from:.5,to:.5,legT:0,legD:50,w:.3,wf:.3,wt:.3,wT:0,wD:40,tph:0,tT:30,tam:0,lt:0,spl:0,splT:-1,nextSplit:120+arnd()*120};
-  let aurPx=null,aurFlo=.2,aurFloAt=0,aurGr=[0,0,0,0],aurSb=[0,0,0,0];
+  let aurPx=null,aurFlo=.2,aurFloAt=0,aurGr=[0,0,0,0];
   function aurWander(dt){const still=hzS.reduced||skyMode==="calm",k=skyMode==="bal"?1/1.6:1,A=skyMode==="bal"?.5:1;
     if(!still&&fxLive()){const d=dt*k;
       AW.legT+=d;if(AW.legT>=AW.legD){AW.from=AW.to;let n;do{n=.5+(arnd()<.5?-1:1)*(.1+arnd()*.15)*(arnd()<.3?0:1);}while(Math.abs(n-AW.from)<.08);AW.to=n;AW.legD=60+arnd()*60;AW.legT=0;}
@@ -66597,13 +66597,13 @@ function hzSkyBoot(){
     auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);
     if(waveAt){const wp=(nowT-waveAt)/WAVE_MS;if(wp>=1){waveAt=0;waveA=0;}else{const e=wp<.5?2*wp*wp:1-Math.pow(-2*wp+2,2)/2;waveR=waveY+(-40-waveY)*e;waveA=Math.min(1,wp/.3)*Math.pow(1-wp,1.1)*ultraE;   /* the band comes up over 210 ms: no flash (6b555) */}}
     aurWander(dt);
-    if(nowT-aurFloAt>1000){aurFloAt=nowT;const cb=R(cbox()),g=R(greetEl()),sd=side(),box=r=>r?[r.left/innerWidth,1-r.bottom/innerHeight,r.right/innerWidth,1-r.top/innerHeight]:[0,0,0,0];
-      aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);aurSb=box(sd);}   // the edge never comes within 36 px of the composer, never crosses the greeting; dimmed behind the sidebar
+    if(nowT-aurFloAt>1000){aurFloAt=nowT;const cb=R(cbox()),g=R(greetEl()),box=r=>r?[r.left/innerWidth,1-r.bottom/innerHeight,r.right/innerWidth,1-r.top/innerHeight]:[0,0,0,0];
+      aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);}   // the edge never comes within 36 px of the composer, never crosses the greeting
     if(neon>.002||lastAur>.002){gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
       gl.uniform1f(pA.U.time,auT);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,neon);gl.uniform1f(pA.U.c2,Math.max(c2E,skyMode==="bal"?rich:0));gl.uniform1f(pA.U.rich,rich);gl.uniform1f(pA.U.cool,Math.min(1.3,ultraE*(1+.3*surgeNow)));
       gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph);gl.uniform1f(pA.U.tam,AW.tam);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
       gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow));gl.uniform1f(pA.U.rch,AW.rch);gl.uniform1f(pA.U.wam,skyMode==="full"&&!hzS.reduced?1:.5);gl.uniform1f(pA.U.flo,aurFlo);
-      gl.uniform4f(pA.U.grt,aurGr[0],aurGr[1],aurGr[2],aurGr[3]);gl.uniform4f(pA.U.sbr,aurSb[0],aurSb[1],aurSb[2],aurSb[3]);
+      gl.uniform4f(pA.U.grt,aurGr[0],aurGr[1],aurGr[2],aurGr[3]);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
     lastAur=neon;
     gl.useProgram(pS);quad(pS);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,S.W,S.H);

@@ -20246,7 +20246,7 @@ is caught. Follow-up worth doing: a gauntlet check that drives a full streamed a
 ## 6b555 — beta-3: the design preview's whole look in the app (7.0 beta 3, per Patrick: "start beta 3 now")
 
 Source of truth: the friend page (`scratchpad/preview-site/beta/index.html` and `beta/DESIGN.md`, including the
-aurora's final wavy edge, its greeting guard and sidebar dim, taken from the working copy at the cut). Horizon only;
+aurora's final wavy edge and its greeting guard and knee, taken from the working copy at the cut). Horizon only;
 Classic untouched (one shared change: the Space Grotesk link is the variable 300..700, the same file). Two halves: the
 chrome (a helper, branch `beta-3-chrome`, renumbered 6b554 -> 6b555 at the merge since the dripOff hotfix took 6b554)
 and the sky and Ultra.
@@ -20278,7 +20278,7 @@ second the sky keeps the newest frame (`hzS.seamOut`), and on the restart's seek
 over 1.4 s (`S.dissolve`); beta 2's fade through black (`footTo` 0 then 1) is gone. The aurora: level (the CSS curtains
 no longer turn or skew: they slide +-48/44 px, and the sky slides their layer with the wander), wandering 10-25 % on
 60-120 s legs, width .22-.38, folds, the wavy lower edge with each ray at its own depth, a reach that breathes, a smooth
-floor 36 px above the composer, crests rounding off under the greeting, dimmed 60 % behind the open sidebar, a split every
+floor 36 px above the composer, crests rounding off under the greeting and its light rolling off there at a soft knee (luminance l -> l / (1 + l / .06); the preview dropped its sidebar dim, so this does too), a split every
 2-4 minutes, blue at the edge to violet at the tips, at resting Ultra 20 % stronger by measured luminance and leaning
 violet; Balanced 1.6 x slower and half; Calm and reduced motion still and centred.
 
