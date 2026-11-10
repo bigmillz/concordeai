@@ -20448,14 +20448,16 @@ and 1 error, then 6.85 (se 0.74) with 20 of 20 and 3 empty answers an hour later
 errors (its empty-answer fallback at work), first words 26.3 s (the server's own reasoning time, unchanged by
 this branch).
 
-**Gauntlet.** The 6b560 block (12 checks, 9 mutants): the asked-for heading and summary kept, an unasked one
+**Gauntlet.** The 6b560 block (19 checks, 14 mutants): the asked-for heading and summary kept, an unasked one
 dropped, the person's words from the last PROMPT line, the FX range with "and" and the "1 USD =" rate, the
 post-pass defined before the dispatch and run after the server seat and Fast on one server alone, the Code lane
-skipped, the council's final passing the question; the scorecard's set (20 questions, the categories, one private,
-one server-only, every pattern compiling), release.sh running it only under SCORECARD=1 with --gate before the
-version is written and the gauntlet never running it, the gate's three failures and its passes on noise and +10 %,
-and the judge's reply parsed and clamped. Re-pinned at the same strength: the 6b339 seat call and the 6b426
+skipped, the council's final passing the question, think:false only under the dev copy's pilot (and a refusal
+asked again without it), an empty server answer failing over and an empty rewrite leaving the draft; the
+scorecard's set (20 questions, the categories, one private, one server-only, every pattern compiling), release.sh
+running it only under SCORECARD=1 with `--where local --gate` before the version is written and the gauntlet never
+running it, the gate's three failures and its passes on noise and +10 %, the server-only case shown and never
+gated, and the judge's reply parsed and clamped. Re-pinned at the same strength: the 6b339 seat call and the 6b426
 server-alone call (the post-pass lines between), the 6b520 dating rule (the vendor's own site joins it) and its
 shipped-knob check (now read inside `fresh_ablate`, where `quality_ablate`'s same lines had hidden its mutant), the
-6b523 handler slice and mutant anchors, the estimate checks turned into "it is gone", and the 6b516 slice's
-namespace (the shape knob). GAUNTLET_RESULT
+6b523 handler slice and mutant anchors, the estimate checks turned into "it is gone", the 6b516 slice's namespace
+(the shape knob), and 6b537's known-env pin (UPDATE_API is no longer the list's last). GAUNTLET_RESULT

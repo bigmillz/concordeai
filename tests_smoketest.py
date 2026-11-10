@@ -24539,7 +24539,7 @@ _P2_MUT = [
     ("no second pass on the server", '        if draft and not _looks_degenerate(draft):', '        if False:'),
     ("a failing second pass said loudly", '            except ServerError:\n                # the draft stands, and nothing alarming is said',
      '            except ZeroDivisionError:\n                # the draft stands, and nothing alarming is said'),
-    ("a failed second pass leaving its partial", '                if shown[0]:\n                    emit(Ctl(NUL + "RESET" + NUL))\n                memit(draft)', '                memit(draft)'),
+    ("a failed second pass leaving its partial", '                if shown[0]:\n                    emit(Ctl(NUL + "RESET" + NUL))\n                _m(draft)', '                _m(draft)'),
     ("a funnel not refreshing the servers", '        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)', '        srv = server_funnel_pick(bound_ctx(), effort)'),
     ("a funnel's server with no deadline", '            with server_first_deadline(30 if effort == "fast" else 60):\n                run_model(srv["label"]',
      '            if True:\n                run_model(srv["label"]'),

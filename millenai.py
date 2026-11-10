@@ -25574,7 +25574,10 @@ def ground_clip(block: str, cap: int) -> str:
     if len(t) <= cap:
         return t
     i = t.rfind("\n\nToday is ")
-    tail = t[i:] if 0 <= i and len(t) - i <= cap // 2 else t[-min(2000, cap // 3):]
+    # the rules grew with the shape (6b523, ~3.6 KB with the dating rules):
+    # they stay whole up to three quarters of the cap (6b560; half cut them
+    # at 5,000 and kept only the last 1,666 characters)
+    tail = t[i:] if 0 <= i and len(t) - i <= cap * 3 // 4 else t[-min(2000, cap // 3):]
     head = t[:max(0, cap - len(tail) - 3)]
     if "\n" in head:
         head = head.rsplit("\n", 1)[0]
