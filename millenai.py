@@ -51841,7 +51841,7 @@ body.gen #chip-model{color:var(--accent)}
   transition:background var(--hz-t-fast),color var(--hz-t-fast)}
 .hz #newchat svg{width:17px;height:17px}
 .hz #newchat:hover{background:rgba(255,255,255,.06);border-color:transparent;color:var(--hz-ink)}
-.hz #mode-tabs{display:none}   /* ONE lane control (6b554): Chat, Code and Funnels live in the header (#hz-lanes); the sidebar shows the lane's list */
+.hz #mode-tabs{display:none}   /* ONE lane control (6b555): Chat, Code and Funnels live in the header (#hz-lanes); the sidebar shows the lane's list */
 .hz .group-label.chats{display:none}
 .hz #chat-search{margin:4px 0 2px;position:relative}
 .hz #chat-search svg{position:absolute;left:11px;top:50%;width:14px;height:14px;margin-top:-7px;color:var(--hz-ink-3);pointer-events:none}
@@ -52006,7 +52006,7 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
    from below. Motion is transform and opacity only; the GPU does the rest. */
 /* HORIZON TOKENS (6b526) */
 :root{
-  /* beta 3 (6b554, per Patrick: the preview's look in the app): the values below are beta/DESIGN.md's Colour,
+  /* beta 3 (6b555, per Patrick: the preview's look in the app): the values below are beta/DESIGN.md's Colour,
      Glass, Shape and Motion tables (ground #030305, near-black neutrals, champagne hairlines, one easing family,
      no bounce); the names stay, so every Horizon rule reads the new values */
   --hz-night:#030305; --hz-deep:#0a0a0c; --hz-dusk:#10204a;
@@ -52158,7 +52158,7 @@ __HZ_FONTS__
 .hz #main:has(#hero) #chat-scroll{flex:1 1 auto;overflow:visible;min-height:0;display:flex}
 .hz #main:has(#hero) #chat-inner{max-width:none;width:100%;padding:72px 24px 0;margin:0;display:flex;align-items:center;justify-content:center}
 .hz #main:has(#hero) #hero{min-height:0;padding:0;align-items:center;text-align:center;gap:14px;justify-content:center;width:100%}
-/* THE GREETING (6b554, per Patrick: the preview's look in the app; replaces 6b552's three layers): ONE text node in one
+/* THE GREETING (6b555, per Patrick: the preview's look in the app; replaces 6b552's three layers): ONE text node in one
    box at every level, crisp #f8faff, the display voice (Space Grotesk 500, 600 in Full, -0.03em; -0.02em on a phone).
    Balanced and Full trace it in light once (hzHeadlineShow), then its afterglow rises over 2 s on --out and is still:
    two zero-offset layers from that one node, never a copy: a close glow on the letters (16 px and 34 px at .42 of it,
@@ -52179,15 +52179,15 @@ __HZ_FONTS__
 @media (prefers-reduced-motion:reduce){.hz #hero .greet{text-shadow:none!important;transition:none}.hz #hero .greet::before{display:none}}
 @media (max-width:600px){.hz #hero .greet{font-size:clamp(40px,11.5vw,56px);letter-spacing:-.02em}}
 .hz-status{display:none}
-.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:848px;margin:0 auto;width:100%}   /* the home column: 800 (6b554) */
+.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:848px;margin:0 auto;width:100%}   /* the home column: 800 (6b555) */
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
 .hz .novideo #composer-wrap{background:none}
 /* the glass (NORTHSTAR 12): lit from below; its glow a separate breathing layer */
-.hz #composer{position:relative;max-width:none;margin:0}   /* the glass, its size and its states: BETA 3 CHROME (6b554) */
+.hz #composer{position:relative;max-width:none;margin:0}   /* the glass, its size and its states: BETA 3 CHROME (6b555) */
 .hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
   box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
 .hz #hz-cglow[hidden]{display:none}
-.hz #input{font:17px/26px var(--hz-font-ui);color:var(--hz-ink);padding:0 2px;min-height:26px;max-height:156px;overflow-y:auto}   /* one line at rest; typed text grows it to 156 px, then it scrolls (6b554) */
+.hz #input{font:17px/26px var(--hz-font-ui);color:var(--hz-ink);padding:0 2px;min-height:26px;max-height:156px;overflow-y:auto}   /* one line at rest; typed text grows it to 156 px, then it scrolls (6b555) */
 .hz #input::placeholder{color:var(--hz-ink-2);opacity:1}
 .hz #input:focus,.hz #input:focus-visible{outline:0;box-shadow:none}
 .hz #main:not(:has(#hero)) #input{min-height:40px;font-size:16px;padding:9px 6px}
@@ -52500,7 +52500,7 @@ __HZ_FONTS__
 .hz.hz-calmopen #hz-intro-mark line,.hz.hz-calmopen.hz-markin #hz-intro-mark line{animation:none!important;stroke-dasharray:none;stroke-dashoffset:0;opacity:1}
 .hz.hz-calmopen #hz-intro-mark .hz-glint,.hz.hz-calmopen #hz-intro-mark .hz-flare{display:none}
 .hz.hz-calmopen.hz-markout #hz-intro-mark{transition:opacity .5s var(--hz-ease-out),transform .5s var(--hz-ease-out)}
-/* ---- the greeting in Calm: plain white text, one node (hzHeadline), no glow (6b554: Balanced keeps its afterglow) */
+/* ---- the greeting in Calm: plain white text, one node (hzHeadline), no glow (6b555: Balanced keeps its afterglow) */
 /* ---- the composer in Calm: no light ring, no breathing glow, no shimmer at Max or Ultra */
 .hz:not(.hz-full) #composer::before{animation:none;opacity:0!important}
 .hz:not(.hz-full) #hz-cglow{display:none}
@@ -52593,9 +52593,9 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-balopen #hz-intro-mark .hz-glint,.hz.hz-balopen #hz-intro-mark .hz-flare{display:none}   /* traced, no streak, no glint */
 .hz.hz-balopen #hz-intro-mark .vghost svg{filter:drop-shadow(0 0 10px rgba(159,192,255,.45))}
 .hz.hz-balopen.hz-markout #hz-intro-mark{transition:opacity .6s var(--hz-ease-out),transform .6s var(--hz-ease-out)}
-/* the greeting: traced, then its still afterglow, in Balanced as in Full (THE GREETING, 6b554) */
+/* the greeting: traced, then its still afterglow, in Balanced as in Full (THE GREETING, 6b555) */
 /* a faint light along the composer's top edge that warms on focus: the glass's own --hz-spec, brighter on focus, silver
-   (BETA 3 CHROME, 6b554) */
+   (BETA 3 CHROME, 6b555) */
 /* the mode switch: one soft light under the chip as the name rolls */
 .hz .hz-pick{position:relative;overflow:hidden}
 .hz .hz-usweep{position:absolute;left:0;bottom:0;width:40%;height:1px;pointer-events:none;opacity:0;
@@ -52606,7 +52606,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}
 /* hover: the controls lift a pixel and their hairline brightens; no glow, no bloom (6b553, per Patrick: "not tacky") */
 .hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover,.hz.hz-bal .hz-pick:hover,.hz.hz-bal .mab:hover,.hz.hz-bal #newchat:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}   /* a brighter hairline, no glow (6b553) */
-.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}   /* the composer's keys never lift (6b554, No shine on controls) */
+.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}   /* the composer's keys never lift (6b555, No shine on controls) */
 @media (prefers-reduced-motion:reduce){.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}
 /* ---- ULTRA (6b544, per Patrick: "that's where I want to use VFX to have it pull something off to show
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
@@ -52796,7 +52796,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.8),rgba(255,255,255,0))}
 .hz .hz-star::after{transform:rotate(90deg)}
 .hz .msg.ai.live .hz-star,.hz .msg.ai.landing .hz-star{display:block}
-/* the words' reveal is THE INK (6b554, in BETA 3 CHROME): .hz-ink, one word to a box */
+/* the words' reveal is THE INK (6b555, in BETA 3 CHROME): .hz-ink, one word to a box */
 .hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}
 .hz .msg.ai .who .dot.lit{animation:hzDotLit .5s cubic-bezier(.3,0,.2,1) both}
 @keyframes hzDotLit{0%{opacity:1;box-shadow:0 0 12px #fff,0 0 4px #fff}100%{opacity:.55;box-shadow:0 0 10px rgba(159,192,255,.9)}}
@@ -53046,10 +53046,10 @@ html:not(.hz) .sl-sel{display:none}
   .hz #about-veil #about-foot{padding:12px 16px}
   .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row{flex-wrap:wrap;row-gap:8px}
 }
-/* ==== BETA 3 CHROME (6b554, per Patrick: the preview's look in the app) ==== */
+/* ==== BETA 3 CHROME (6b555, per Patrick: the preview's look in the app) ==== */
 /* The chrome of 7.0 beta 3, ported from the preview (beta/DESIGN.md: The composer: flat and low; The lanes; The ink;
    The sidebar's chats; No shine on controls; Subtract and refine; Motion > States). Horizon only: every rule is under
-   .hz, so Classic is untouched. The tokens are the HORIZON TOKENS above; the greeting is THE GREETING (6b554) at the
+   .hz, so Classic is untouched. The tokens are the HORIZON TOKENS above; the greeting is THE GREETING (6b555) at the
    home's rules; the sidebar's rows, labels and glass are restyled in place in the sidebar's rules. */
 /* ---- the composer: flat and low. One line of text and the control row as one unit, centred in the glass: 99 px
    tall at rest on the home (95 on a phone): 13 px above, 12 below, 16 left, 14 right (14 and 12 on a phone); the
@@ -57561,7 +57561,7 @@ function liveLineDone(div,info){
 // own rect: two reads, at the paint, never in the frame loop) and keeps the target; hzStarFrame
 // moves the star toward it with a transform alone; hzStarSweep is the pass down the answer's left
 // edge at the draft-to-polish swap; hzStarLand lifts it to the byline's dot and RETIRES it (the
-// loop stops, the element goes). The reveal (THE INK, 6b554): the words painted in the last 320 ms are
+// loop stops, the element goes). The reveal (THE INK, 6b555): the words painted in the last 320 ms are
 // wrapped one word to a box (.hz-ink) carrying its age as a negative delay, so a repaint never restarts it.
 const hzStar={el:null,div:null,x:NaN,y:NaN,tx:NaN,ty:NaN,raf:0,on:false,marks:[],reads:0,at:0};
 function hzStarOK(){return isHz()&&typeof hzMotionOK==="function"&&hzMotionOK()&&typeof hzFxLevel==="function"&&hzFxLevel()!=="calm";}
@@ -57580,7 +57580,7 @@ function hzStarNodes(body){
   let n,len=0;while((n=w.nextNode())){out.push({n:n,a:len});len+=n.data.length;}
   return {nodes:out,len:len};
 }
-// THE INK (6b554, per Patrick: the preview's look in the app; beta/DESIGN.md "The ink: how an answer streams"):
+// THE INK (6b555, per Patrick: the preview's look in the app; beta/DESIGN.md "The ink: how an answer streams"):
 // the words painted in the last 320 ms (segs, newest first: [a,b) with the age of their paint) are wrapped one
 // word to a box (.hz-ink; a word splits at a hyphen, as the line may break there; a word begun before the window
 // stays plain, so nothing already shown starts over). Each fades in over 300 ms with a 1 px rise and a 2 px blur
@@ -58572,7 +58572,7 @@ async function send(){
         body.classList.remove("swapwait");
         if(fx){body.classList.add("swapout");
           if(globalThis.hzReady&&typeof hzStarSweep==="function")hzStarSweep(body);   // the star's pass down the left edge (6b544)
-          const hzi=typeof isHz==="function"&&isHz();   // Horizon's dissolve: 220 ms to dim, a 620 ms shimmer in (6b554)
+          const hzi=typeof isHz==="function"&&isHz();   // Horizon's dissolve: 220 ms to dim, a 620 ms shimmer in (6b555)
           setTimeout(()=>{body.classList.remove("swapout");body.classList.add("swapin");
             setTimeout(()=>body.classList.remove("swapin"),hzi?640:300);
             dripTick();},hzi?220:170);
@@ -66549,7 +66549,7 @@ function hzGreeting(){
 }
 // ONE GREETING (6b542, per Patrick, from the friend's screen: "UpUptate?", two copies of
 // "Up late?" offset from each other: a trace layer left standing over text that had moved).
-// Since 6b554 (the preview's look in the app) the greeting is ONE text node at every level, never a copy:
+// Since 6b555 (the preview's look in the app) the greeting is ONE text node at every level, never a copy:
 // Calm shows it plainly; Balanced and Full trace it in light once, then it wears its still afterglow (.aglow:
 // the close glow and the ::before bloom, THE GREETING css). Any tracer still running is killed first; a
 // resize, a sidebar toggle or a Look switch kills it too.
@@ -66629,13 +66629,13 @@ function hzMachinesPaint(){
   if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
 }
 function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu:null;hzS.mem=mem;}
-// THE LANES (6b554, per Patrick: the preview's look in the app): Chat · Code · Funnels once, as the header's glass
+// THE LANES (6b555, per Patrick: the preview's look in the app): Chat · Code · Funnels once, as the header's glass
 // segmented control; the lit box (.hz-seg-hi) slides to the chosen lane by the nav's data-m (css, 200 ms on --out)
 function hzLanePaint(){
   $$("#hz-lanes [role=tab]").forEach(b=>{const on=b.dataset.m===uiMode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
   const nav=$("#hz-lanes");if(nav&&nav.dataset.m!==uiMode)nav.dataset.m=uiMode;
 }
-// KEYBOARD-ONLY FOCUS (6b554): the ember hairline shows after a Tab, an arrow, Home, End or a Page key (html.hz-kb)
+// KEYBOARD-ONLY FOCUS (6b555): the ember hairline shows after a Tab, an arrow, Home, End or a Page key (html.hz-kb)
 // and any pointer press clears it, so a click never leaves a ring behind (WKWebView can call a clicked control
 // focus-visible)
 function hzKbWire(){
@@ -67191,7 +67191,7 @@ function hzRenameCheck(){
 }
 // THE SEND KEY'S PRESS (6b553, per Patrick: "clear up ... this shine in the send button ... we want to run VFX hard,
 // but not tacky"): the two expanding rings are gone (no circles); the key presses in and is back in 120 ms, no overshoot.
-// Since 6b554 the press is the preview's crisp 1 px (and .985), the same as the row's :active
+// Since 6b555 the press is the preview's crisp 1 px (and .985), the same as the row's :active
 function hzSendPress(){
   const b=$("#send");if(!b||!b.animate)return;
   b.animate([{transform:"translateY(1px) scale(.985)"},{transform:"none"}],{duration:120,easing:"cubic-bezier(.2,0,0,1)"});
