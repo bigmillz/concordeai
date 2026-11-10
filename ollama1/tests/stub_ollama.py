@@ -239,6 +239,8 @@ class Stub:
                 pieces = [text] + ["t%d" % i for i in range(stub.tokens - 1)]
                 if stub.reply_text:
                     pieces = [stub.reply_text]
+                if getattr(stub, "reply_pieces", None):
+                    pieces = list(stub.reply_pieces)      # a streamed answer, one line a piece
                 final = {"model": name, "done": True, "done_reason": "stop",
                          "eval_count": len(pieces), "eval_duration": len(pieces) * 20_000_000,
                          "prompt_eval_count": 7, "total_duration": 1}

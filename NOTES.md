@@ -20349,3 +20349,137 @@ intersects, nothing clipped or in the light zone, no sideways scroll, the gear h
 a stand-in update check shows no pill, then the pill at 1440 and the gear's mark at 760 and 390; mutants: no fit and
 groups that shrink (17 bad cases), the gear hidden with the badge's wiring cut, a glowing gear, the fit's loop removed,
 the wordmark's no-shrink rule removed. Before: 11 of 65 measured cases bad; after: 0.
+
+## 6b570 — fluent-1: no dead ends, no cut answers, a greeting in a second, one quiet working line (7.0 beta 3, per Patrick)
+
+Patrick, with a screenshot of a conversation on "Ollama1 only" at Ultra (Nightly, beta 3 at b309f88): "Tests like this
+should be much more fluent instead of hitting a breaking point. Claude wouldn't do that." Then, on the same thread:
+"you're doing a poor job at the answers this thing comes up with. Not just the quality of the answer, but how it cranks
+it out. It could be so much cleaner and more beautiful." This entry is the delivery: how an answer arrives and looks.
+(Answer quality, the prompts and the council's scoring, is another branch's, quality-4.) Branch `fluent-1` from beta-3.
+
+**What was wrong, from his Nightly's own ledgers (`usage.jsonl`, `quality.jsonl`, `chats.v2.json`) and a dev copy
+against the real Ollama1.**
+1. **"Hi lol" -> "Ollama1 didn't answer. It may be off or asleep. Nothing was sent anywhere else."** No wake step was
+   saved with the turn, so no wake was attempted. `server_wake_if_down(defer=True)` only queued a wake when
+   `_srv_wake_due` (no wake call in the last five minutes, 6b346/6b369: "a second try inside it sends nothing and
+   reports the server as it stands"). A wake call inside the gap (an earlier question, a Stop or a Skip of a wait)
+   therefore turned the next question into an instant dead end while the server was still booting. The gap is in
+   memory only, so the earlier call isn't in any log; this is the only path in the code to that line with no wake.
+2. **"hi" -> "Done" and "I".** Thinking on Ollama1 alone ran the whole craft for a greeting: a 46 s draft (gemma4:12b
+   reasons by default on Ollama: 1,091 tokens out for a one-line hello), a 10 s review, then the final writer. Its
+   first word was "I" and the request ended right there (no DONE frame, the writer's usage estimated from 1 character,
+   the turn saved with "Writing the answer" still running): the page cut it. Enter while an answer streams was
+   swallowed silently (`send()` returned on `generating`), so a follow-up ("Come on, faster.") went to the send key,
+   which is Stop while an answer runs; the fragment then landed as a finished answer under "Done in 67 s".
+3. **Every long answer of his was cut mid-sentence, too.** "Come on, faster." ends "...for your **7050TX-64** setup:"
+   and "Try now for a llama." ends "...even with hig". Reproduced in a dev copy: a Thinking draft of 4,439 prompt
+   tokens reasoned 3,752 tokens and stopped at 8,191 (the gateway's 8,192 window); the final writer reasoned through
+   what was left and wrote nothing, so the cut draft shipped. gemma4 reasons unasked, and only gpt-oss got room for
+   reasoning (`SRV_THINK_MODELS`, 6b518).
+4. **The labels.** The byline printed the tier key (`signatureHTML` -> `modeName("srv:5b346919:think")`), and the live
+   line read the status "asking Ollama1 · gemma4:12b · 1 of 2" up to its first dot, took "Ollama1" for a model of this
+   Mac and said "Ollama1 drafting on this Mac". The final writer's USAGE frame was tagged "review" (the critic set the
+   thread's role and nothing set it back), so the page found no final call for the pace.
+
+**Now.**
+- **Triage first** (`turn_triage`, beside `_is_substantive`): "chat" (a greeting, thanks, an ack, "you there?"; all its
+  words conversational, never a consent, a doubt, a number or a subject: "yes", "ok", "are you sure?", "how so?",
+  "whats 2+2" are not chat), "short" (a one-liner that is still a question: "why?", "2+2?", "Explain monads"), "full".
+  A chat or short turn in Fast/Thinking/Pro (local or on one server alone) goes to the mode's first seat alone, one
+  pass, streamed; no drafts, review or merge (also after a wake). A chat turn asks a server model not to reason
+  (`_srv_think.brief`: `think: false`, gpt-oss "low"; a server that refuses the field is asked again without it).
+  Pictures, files, agents, Cloud Only, Max and Deep keep their own runs. A misfire costs little: a real question
+  read as "short" is still answered by the mode's strongest seat with its reasoning on.
+- **Reasoning only where it fits** (`SRV_REASONS_RX`, `srv_reason_fits`, `SRV_REASON_ROOM` 4,096): a model of a family
+  that reasons unasked (gemma4, qwen3, qwq, deepseek-r1, magistral, ...) whose prompt leaves less than 4,096 tokens to
+  reason in the gateway's 8,192 (beside the 3,072 for the answer) is asked not to (`think: false`), so the answer comes
+  whole. A larger window was tried first and dropped: on his 16 GB card gemma4:12b was refused it (gpu_fit, back to
+  8,192), and after the attempts the server answered "busy" for minutes (the abandoned drafts were still reasoning).
+  Silent reasoning now ticks its caller once a second (an empty emit), so an abandoned draft closes its line, and a
+  Stop during a server model's reasoning ends the request (the handler checks the page is still there on the tick).
+- **No dead ends.** "<name> Only" on a server found offline that this app can wake always waits for it, inside the
+  gap too: no second call goes out (`server_wake(rewait=True)`), and it waits what is left of the last call's minute,
+  20 s at least (`server_only_wait`, `SRV_WAKE_REWAIT_S`), with the same "Waking Ollama1... N s" step and Skip. When it
+  still can't answer (didn't wake, skipped, off, no models, an error before its first word) the line is followed by
+  the way on: an OFFER frame the page draws as two keys, **Answer on this Mac** and **Try Ollama1 again**
+  (`server_offer`, `offerRow`, `offerClick`). Offered, not automatic: "<name> Only" promises nothing runs elsewhere
+  unless the person says so (6b337). "Answer on this Mac" asks the same question once more with `here: true`: it runs
+  on this computer's strongest model that fits (Fast's pick) with no cloud, and a quiet line above the answer says
+  "Ollama1 was asleep, so this Mac answered." The saved turn keeps the keys; only the chat's last answer shows them.
+- **No cut answers, no debris.** Enter while an answer is on its way queues the follow-up: it stays in the box, "Sends
+  when this answer is done" under it, and it goes the moment the answer lands (or is stopped); clearing the box
+  cancels it. A stopped answer keeps what came and says **Stopped** (live, and saved as `stopped` so a reopened chat
+  says it too), never "Done".
+- **First words fast.** The first draft of a council streams into the answer as it is written, dimmed a little
+  (`RUN {"prov": 1}`, `.body.prov`); the final writer's first word replaces it through the existing draft-to-polish
+  dissolve (a RESET the stage tap sends just before that word); a run with nothing to merge keeps it.
+- **One quiet working line.** While an answer is on its way the byline steps aside and the live line is the one line:
+  the phrase in the silver sweep ("Waking Ollama1", "Asking Ollama1", "Drafting on Ollama1", "Reviewing the draft",
+  "Writing the answer", "Checking the answer"), no machine dies, no colour, a small clock from 3 s; the tokens and pace
+  live in Details. A model is never named there. When it lands the line goes and the byline is back:
+  `signMode` gives "Concorde Thinking · Ollama1", "Concorde · Ollama1" for "<name> Only", "Concorde Thinking · cloud",
+  never a key. The final writer's call is the "final" row again.
+- **The reading, as the preview sets it** (beta/DESIGN.md "Type"): answers 17/1.65 in the 640 column, headings 22/500
+  and 17/600, lists with mono numbers in their own gutter, hairline tables with mono caps heads, inline code at .88em,
+  code cards in dark glass (silver syntax, no green or gold), citations as small silver superscripts, links in ink with
+  a hairline underline; the question a quiet line at 17. One block (THE DELIVERY) before BETA 3 CHROME; the header
+  untouched.
+
+**Copy, old -> new (for Patrick's approval):** byline "Concorde srv:5b346919:think" -> "Concorde Thinking · Ollama1";
+live line "Ollama1 drafting on this Mac" -> "Drafting on Ollama1" / "Asking Ollama1"; the landed live line "Done in
+N s" -> hidden (the byline is back; Details keeps the numbers); a stopped answer "Done in N s" -> "Stopped"; new keys
+"Answer on this Mac" and "Try Ollama1 again"; new line "Ollama1 was asleep, so this Mac answered." (or "didn't answer,
+so"); new hint "Sends when this answer is done".
+
+**Verified** (dev copies on 9941 = fluent-1 and 9943 = b309f88, both with Patrick's servers.json against the real
+Ollama1; headless Chromium via Playwright, captures and clips in the scratchpad's `caps/`):
+| Asked (Thinking · Ollama1 only) | build | first motion | first words | landed | what it said |
+|---|---|---|---|---|---|
+| "hi", Ultra | b309f88 | 33 ms | 15.4 s (12.3 s on a second try) | 16.1 s | "Concorde srv:5b346919:think", "Ollama1 drafting on this Mac" |
+| "hi", Ultra | fluent-1 | 24 ms | 1.4 s | 2.1 s | "Asking Ollama1", then "Concorde Thinking · Ollama1" |
+| TCP vs UDP, High | b309f88 | 28 ms | 30.6 s | 31.2 s | the id, "on this Mac" |
+| TCP vs UDP, High | fluent-1 (before the reasoning fix) | 38 ms | 35.2 s (the live draft) | 58.7 s | landed cut mid-sentence: this capture found cause 3 |
+| Python/Go/Rust with a list, a table and code, High | b309f88 | 16 ms | 287 s | not by 300 s | the id |
+| same | fluent-1 (before the reasoning fix) | 34 ms | 102 s (the live draft) | 144 s | whole; "Concorde Thinking · Ollama1" |
+
+First motion was already immediate before (the page draws the live line at once); the gain is in first words and in
+what the line says. Real questions are bounded by the server model's own reasoning before its first word (10 to 25 s on
+gemma4:12b). The same saved long answer rendered by both builds (`caps/read-before`, `caps/read-after`): 17 px reading,
+the mono-caps table heads, silver citations and code, no box inside the code card. The OFFER keys, captured on a copy
+whose server address is closed (`caps/offer`).
+
+**Tests:** `6b570 fluent (in process)`: the triage corpus; the wait inside the gap (30 s left of a call, no second
+packet, it answers; a 20 s second look); the OFFER after each refusal and error, none after a partial answer or an
+unreadable store, kept in the saved turn, a stop saved as stopped; think false on the wire for a chat turn (gpt-oss
+low), the reasoning-room rule and its tick; the live first draft on stand-ins; the byline and the live line in node; 20 mutations, each caught; the handler's wiring pinned. `6b570 fluent
+(live)`: "hi" on Thinking on the stand-in gateway's server is one request with `think: false`; and through the page
+in a real Chromium (Playwright's, skipped with a note when the machine has none: set `SMOKE_PLAYWRIGHT` and
+`SMOKE_CHROMIUM`): thirty streamed words land whole, a follow-up typed meanwhile waits and then goes, a stop says
+"Stopped", the byline names the server; 4 mutations served to the page by the browser, each caught. The stub Ollama
+takes `/reply {"pieces": [...]}` for a streamed answer. Old pins moved: the live line's words, FRAME_TAGS (+OFFER),
+the spine harness (+signMode), three 6b346 mutation anchors that followed the wake's code.
+
+**Left / worth knowing.** Gauntlet: a full run on ports 9951-9953 (the gauntlet with its ports
+  remapped; 9901-9903 were another run's) came back 1,496 pass, 22 fail, all of them this branch's: unscoped rules,
+  a bare "Concorde" in two comments, pins and mutation anchors that followed the moved code, the live draft changing
+  older council checks (now a switch, `COUNCIL_LIVE_DRAFT`, on in the app and off in a test namespace that predates
+  it), the live block's own fixtures (the stub's spilling model, the mode it reset). Fixed; the in-process sections
+  re-run green (fluent 8/8 with 20 mutations, the answer craft, the server merge, auto sleep). The live sections
+  (fluent live and page, server only) were not re-run on the final tree: the full gauntlet is for integration.
+- **Ollama1's chat stopped answering during this work** (about 05:05 on): whoami, tags and ps answer, every
+  /api/chat gets no headers for ~125 s and then "didn't answer". It began right after the dev copy sent gemma4:12b
+  requests at num_ctx 16,384 and 12,288 (that code is gone); it answered "busy" for ~8 minutes first. Nothing on the
+  server was changed. A restart of Ollama there likely clears it; that is Patrick's call.
+- First words on a real question are bounded by the model's own reasoning: gemma4:12b thinks 10 to 25 s before it
+  writes a word, so the live draft shows its words then, not at once. Asking drafts not to reason would make them
+  instant at some cost to the draft; that is a quality call (quality-4's or Patrick's), not made here.
+- The reasoning guard is by model family; a new family that reasons unasked needs adding to `SRV_REASONS_RX`. A
+  stream that ends with `done_reason: "length"` is still taken as complete. Most searched questions on gemma4:12b
+  now draft without reasoning (their prompt leaves no room): complete answers, a quality trade that quality-4 or
+  Patrick may want to revisit (a bigger card, or a server that takes a larger window).
+- A refused server pick still runs the web search first (the sources are now hidden under the offer, but the time
+  is spent); the search could skip a turn that `_so_fail` already refuses.
+- The ink's per-word dissolve applies to the final writer's words as before; the provisional draft uses the existing
+  swap (hold, dim, shimmer in), not the preview's word-level LCS dissolve (not ported in 6b555 either).
+- Verified in Blink (headless Chromium), not in the app's WKWebView.

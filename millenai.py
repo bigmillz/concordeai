@@ -26605,6 +26605,7 @@ SRV_WAKE_GAP_S = 300            # one wake-up call in five minutes per server (6
                                 # so a server that is simply off costs one wait, not one a question
 SRV_WAKE_WAIT_S = 60            # then up to this long for it to answer
 SRV_WAKE_ASK_S = 10             # (6b461, per Patrick) a question that may go elsewhere waits only this long, with a Skip
+SRV_WAKE_REWAIT_S = 20          # (6b570) inside the gap no call goes out, but "<name> Only" still waits this long at least
 SRV_WAKE_POLL_S = 2
 _SRV_MAC_RX = re.compile(r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}")
 _srv_wake_at = profile_cache("_srv_wake_at", {})
@@ -26678,6 +26679,19 @@ _srv_think = threading.local()
 # it, and that model isn't asked again this run.
 SRV_THINK_MODELS = re.compile(r"^gpt-oss(?::|$)", re.I)
 SRV_THINK_EXTRA = 4096         # room for the longer reasoning in the context
+# models that reason by default on Ollama, unasked (6b570): their hidden reasoning
+# counts against num_ctx, so they reason only where the prompt leaves room for it
+# (srv_reason_fits). By the tag's family; a "chat" turn asks them not to at all
+SRV_REASONS_RX = re.compile(r"^(?:gemma4|qwen3(?!-coder)|qwq|deepseek-r1|magistral|phi4-reasoning|"
+                            r"cogito|exaone-deep)(?::|$|[-.])", re.I)
+SRV_REASON_ROOM = 4096         # what a reasoning model needs at least, beside the prompt and the answer
+
+
+def srv_reason_fits(messages, max_tokens: int = 0) -> bool:
+    """Whether the prompt, room to answer and SRV_REASON_ROOM to reason fit the
+    gateway's own 8,192 (the same cautious 3 characters a token as srv_ctx_for)."""
+    chars = sum(len(str(m.get("content") or "")) for m in messages or [] if isinstance(m, dict))
+    return chars // 3 + (int(max_tokens) if max_tokens else SRV_CTX_REPLY) + SRV_REASON_ROOM + 256 <= SRV_CTX_DEFAULT
 _srv_think_refused = set()
 # THE CONTEXT A MODEL IS LOADED WITH (6b518): Ollama reloads a model whose
 # num_ctx changes, so a short side pass (the query plan) on the model the
@@ -27367,10 +27381,30 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
     if not (_think and SRV_THINK_MODELS.match(str(model or ""))
             and (e.get("id"), model) not in _srv_think_refused):
         _think = None
+    if getattr(_srv_think, "brief", False) and (e.get("id"), model) not in _srv_think_refused:
+        # A GREETING THINKS FOR NOTHING (6b570): "hi" on gemma4:12b spent 5,190
+        # tokens (30 s) reasoning before a one-line hello. A brief turn asks
+        # gpt-oss for its lowest level and any other model for none (think:
+        # false; a server that refuses the field is asked again without it)
+        _think = "low" if SRV_THINK_MODELS.match(str(model or "")) else False
     if _think:
         # the longer reasoning counts against the context (6b518)
         _ctx = max(_ctx, min(SRV_CTX_MAX, -(-(srv_ctx_for(messages, max_tokens) or SRV_CTX_DEFAULT)
                                           // 4096) * 4096 + SRV_THINK_EXTRA))
+    elif (_think is None and SRV_REASONS_RX.match(str(model or ""))
+          and not srv_reason_fits(messages, max_tokens)):
+        # A MODEL THAT REASONS UNASKED REASONS ONLY WHERE IT HAS ROOM (6b570):
+        # gemma4 on Ollama reasons by default, and its reasoning came out of the
+        # gateway's 8,192: a Thinking draft of 4,439 prompt tokens reasoned
+        # 3,752 and its answer stopped mid-sentence at the window's edge ("...
+        # much faster and simpler than", seen in a dev copy; Patrick's "Come on,
+        # faster." and "Try now for a llama." answers end the same way); a
+        # final writer of 5,700 reasoned 2,490 and wrote nothing. A larger
+        # num_ctx is no way out on his card (16 GB): gemma4:12b was refused
+        # (gpu_fit), and the attempt left the server busy reloading. So a prompt
+        # that leaves no SRV_REASON_ROOM in the 8,192 is asked not to reason:
+        # the answer comes whole.
+        _think = False
     _think_box = [_think]
     if getattr(_srv_sticky, "on", False):
         _was = _srv_ctx_seen.get((e.get("id"), model))
@@ -27384,11 +27418,12 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
              "options": dict({"temperature": 0.75},
                              **({"num_predict": int(max_tokens)} if max_tokens else {}),
                              **({"num_ctx": int(ctx)} if ctx else {}))}
-        if _think_box[0]:
+        if _think_box[0] is not None:
             d["think"] = _think_box[0]
         return json.dumps(d, separators=(",", ":")).encode("utf-8")
     body = _body(_ctx)
     t0, sent, last, got_any = time.time(), [0], {}, [False]
+    _tick = [t0]
     # an explicit pick and "<name> Only" wait as long as a model load takes
     # (minutes); a mode's server seat or a funnel asks for a short first-token
     # deadline (server_first_deadline), so a server that is slow to start is
@@ -27419,7 +27454,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                 _srv_ctx_seen[(e.get("id"), model)] = 0
                 body = _body(0)
                 continue
-            if _think_box[0] and resp.status == 400:
+            if _think_box[0] is not None and resp.status == 400:
                 # the server didn't take the reasoning level (6b518): asked
                 # again without it, and not asked again this run
                 _srv_think_refused.add((e.get("id"), model))
@@ -27464,6 +27499,13 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                 if chunk:
                     sent[0] += len(chunk)
                     emit(chunk)
+                elif (obj.get("message") or {}).get("thinking") and time.time() - _tick[0] >= 1.0:
+                    # reasoning sends no words (6b570): an empty one a second
+                    # lets a caller that gave up on this answer (an abandoned
+                    # draft) close the line now, instead of the server
+                    # reasoning on for minutes with its one slot held
+                    _tick[0] = time.time()
+                    emit("")
                 if obj.get("done"):
                     last = obj
                     return last
@@ -27519,6 +27561,22 @@ def server_vision(label: str) -> str:
     return ""
 
 
+def server_offer(emit, name: str, asleep: bool = False) -> None:
+    """NO DEAD ENDS (6b570, per Patrick: "Tests like this should be much more
+    fluent instead of hitting a breaking point. Claude wouldn't do that."): a
+    server pick that couldn't answer ends with the way on, an OFFER frame the
+    page draws as two keys under the line: "Answer on this Mac" (the question
+    asked again here, once) and "Try <name> again". Offered, never automatic:
+    "<name> Only" means nothing runs anywhere else unless the person says so."""
+    try:
+        emit(Ctl(NUL + "OFFER:" + json.dumps(dict({"server": _srv_plain(str(name or ""))[:60]},
+                                                 **({"asleep": 1} if asleep else {}))) + NUL))
+    except (BrokenPipeError, ConnectionResetError):
+        raise
+    except Exception:
+        pass
+
+
 def server_answer(label: str, messages: list, memit, emit, status, step,
                   refuse: str = ""):
     """A chat on one server model (the /api/chat branch): streamed and
@@ -27531,6 +27589,9 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
     if refuse:
         emit(AppText(refuse + ("" if "Nothing was sent" in refuse
                                                  else " Nothing was sent anywhere else.")))
+        if not refuse.startswith("Couldn"):
+            # asleep only when it is known to be: a wake that didn't come up, or a Skip of one
+            server_offer(emit, name, asleep=("wake" in refuse or " is asleep" in refuse))
         return
 
     def _m(chunk):
@@ -27555,6 +27616,8 @@ def server_answer(label: str, messages: list, memit, emit, status, step,
                         "kept the part before it wandered")
     except ServerError as se:
         emit(AppText(("\n\n" if said[0] else "") + "\u26a0\ufe0f " + str(se)))
+        if not said[0] and se.kind in ("offline", "busy", "server", "fit", "missing", "gone"):
+            server_offer(emit, name)
     except StoreReadError:
         emit(AppText("Couldn’t read your servers. Nothing was sent."))
     except (StaleProfile, BrokenPipeError, ConnectionResetError):
@@ -29528,7 +29591,7 @@ def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
     return out
 
 
-def server_wake(e, progress=None, alive=None, wait_s=None, skip=None) -> str:
+def server_wake(e, progress=None, alive=None, wait_s=None, skip=None, rewait=False) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
     "tried" (no answer in wait_s, SRV_WAKE_WAIT_S unless given), "skipped"
     (skip() said the person went on without it, 6b461), "stopped" (alive() said the reader
@@ -29537,22 +29600,33 @@ def server_wake(e, progress=None, alive=None, wait_s=None, skip=None) -> str:
     The packet carries nothing but the card's address, to UDP ports 9 and 7 (the two a
     card listens on) of the whole-network broadcast and of each real network's own
     broadcast address; the answer is waited for with the server's own signed
-    /v1/info. progress(seconds waited) is called as it waits, so a page can say so."""
+    /v1/info. progress(seconds waited) is called as it waits, so a page can say so.
+    rewait (6b570, "<name> Only"): inside the five minutes no call goes out, but
+    the answer is still waited for (a wake already on its way, or a slow boot),
+    instead of reporting the server as it stood: that was the dead end."""
     if not _srv_wakeable(e):
         return ""
     t0 = _srv_wake_clock()
     with _srv_lock:          # two questions at once send one wake-up call, not two
         last = _srv_wake_at.get(e["id"])
-        if last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S:
+        in_gap = last is not None and 0 <= t0 - last < SRV_WAKE_GAP_S
+        if in_gap and not rewait:
             return ""
-        _srv_wake_at[e["id"]] = t0
-    tried_n, failed_n, _first = _srv_wake_send(e)
+        if not in_gap:
+            _srv_wake_at[e["id"]] = t0
+    if in_gap:
+        tried_n = failed_n = 0
+        refused = bool(_srv_wake_blocked.get(e["id"]))
+        relayed = False
+    else:
+        tried_n, failed_n, _first = _srv_wake_send(e)
     # EVERY send refused (6b420, per Patrick: the same packet wakes it from
     # Terminal but not from the app): macOS keeps an app off the local
     # network until it is allowed, and says nothing; the answer below says it
-    refused = bool(tried_n and failed_n == tried_n)
-    relayed = bool((e.get("relay") or {}).get("url") and e.get("relay_token"))
-    _srv_wake_blocked[e["id"]] = refused and not relayed
+    if not in_gap:
+        refused = bool(tried_n and failed_n == tried_n)
+        relayed = bool((e.get("relay") or {}).get("url") and e.get("relay_token"))
+        _srv_wake_blocked[e["id"]] = refused and not relayed
     if relayed:
         # the wake relay (6b431): asked as well, on a thread of its own, so
         # the poll below starts at once; only if it says no too is the
@@ -29610,7 +29684,9 @@ def server_wake_if_down(e, ctx=None, defer=False):
     if s.get("reachable") or s.get("kind") != "offline":
         return
     if defer:
-        if _srv_wake_due(e):
+        # (6b570) "<name> Only" waits for it even inside the five minutes: a
+        # wake already on its way is waited for, not reported as asleep
+        if _srv_wakeable(e):
             _srv_wake_tl.pending = e["id"]
         return
     r = server_wake(e)
@@ -29637,7 +29713,7 @@ def council_merger_last(council: list, req_comp: str = "", mode_pen: str = "") -
     return council
 
 
-def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:
+def server_wake_step(e, status, step, skip, alive, wait_s: int, rewait=False) -> str:
     """The wake of server e the page can see (6b465, one implementation for the
     Code lane, the Chat modes and "<name> Only"): a "wake" step reading
     "Waking <name>" with the seconds left, "Waking <name>... 7 s" as the status
@@ -29653,7 +29729,8 @@ def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:
         left = max(0, int(wait_s - w + 0.5))
         step("wake", lbl, "run", "%d s" % left)
         status("Waking %s... %d s" % (name, left))
-    r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None)
+    r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None,
+                    rewait=rewait)
     if r == "woke":
         step("wake", "Woke %s" % name, "done", "")
     elif r == "skipped":
@@ -29663,6 +29740,18 @@ def server_wake_step(e, status, step, skip, alive, wait_s: int) -> str:
     else:                          # stopped, or nothing was asked
         step("wake", lbl, "done", "")
     return r
+
+
+def server_only_wait(e) -> int:
+    """How long "<name> Only" waits for server e to wake (6b570): the whole
+    SRV_WAKE_WAIT_S when a call goes out now; inside the five-minute gap what is
+    left of the last call's minute, and never less than SRV_WAKE_REWAIT_S (a
+    server that has been asleep through one wait gets a short second look)."""
+    last = _srv_wake_at.get(e["id"])
+    now = _srv_wake_clock()
+    if last is None or not (0 <= now - last < SRV_WAKE_GAP_S):
+        return SRV_WAKE_WAIT_S
+    return int(max(SRV_WAKE_REWAIT_S, SRV_WAKE_WAIT_S - (now - last)) + 0.5)
 
 
 def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
@@ -29680,7 +29769,8 @@ def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
     if e is None:
         return "", SRV_GONE
     name = _srv_plain(e["name"])
-    r = server_wake_step(e, status, step or (lambda *a: None), skip, alive, SRV_WAKE_WAIT_S)
+    wait = server_only_wait(e)
+    r = server_wake_step(e, status, step or (lambda *a: None), skip, alive, wait, rewait=True)
     if r == "stopped":
         return "", ""
     if r == "skipped":
@@ -29688,7 +29778,7 @@ def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
     if r == "tried":
         server_mark_down(ctx, e["name"], "%s didn\u2019t wake." % e["name"])
         return "", ("%s didn’t wake in %d seconds. Nothing was sent anywhere else.%s" % (
-                        name, SRV_WAKE_WAIT_S,
+                        name, wait,
                         SRV_WAKE_BLOCKED if _srv_wake_blocked.get(e["id"]) else ""))
     st = server_only_state(e)
     if r == "woke":
@@ -34563,6 +34653,48 @@ def _is_substantive(prompt: str) -> bool:
     return len(p.split()) >= 3
 
 
+# TRIAGE (6b570, per Patrick: "you're doing a poor job at ... how it cranks it
+# out"). Three kinds of turn, decided from the words alone, before any model:
+#   "chat"  plainly conversational: a greeting, thanks, an ack, a "you there?".
+#           Never a consent or a doubt ("yes", "ok", "sure", "no", "are you
+#           sure?"): those answer the last turn, so they are "short".
+#           The mode's first seat answers alone in one pass, and a server
+#           model is asked not to reason (think: false; gpt-oss "low").
+#   "short" a one-liner that is still a question ("why?", "2+2?", "Explain
+#           monads"): the first seat alone, one pass, its reasoning as the
+#           effort sets it. No drafts to compare, no review, no merge.
+#   "full"  everything else: the mode as chosen, effort and all.
+# A misfire costs little either way: a real question read as "short" is still
+# answered by the mode's strongest seat with its reasoning on, and nothing
+# that names a subject is ever read as "chat" (the words must ALL be
+# conversational ones).
+_CHAT_WORD = (r"(?:hi|hey|hiya|heya|hello|helo|howdy|yo|sup|hola|ciao|morning|evening|"
+              r"thanks|thank|thx|ty|tysm|cheers|ok|okay|k|kk|cool|nice|great|awesome|"
+              r"perfect|lol|lmao|haha|hah|ha|wow|bye|goodbye|gn|gm|good|night|afternoon|"
+              r"you|u|there|again|so|much|very|ok|okay|got|it|"
+              r"sounds|alright|fine|test|testing|ping|concorde|man|dude|mate|all|guys|"
+              r"are|r|still|awake|up|whats|what's|wassup|how|hows|how's|it|going|doing)")
+_CHAT_RE = re.compile(r"^\W*(?:%s\b[\s,.!?~'’:;)(-]*){1,6}\W*$" % _CHAT_WORD, re.I)
+_CHAT_LEAD_RE = re.compile(
+    r"^\W*(?:hi|hey|hiya|hello|howdy|yo|sup|thanks|thank|thx|cool|nice|great|"
+    r"awesome|perfect|lol|haha|bye|test|testing|ping|good|gm|gn|you|are|still|how|hows|how's|"
+    r"whats|what's|wassup|morning|evening|cheers|got|sounds)\b", re.I)
+
+
+_CHAT_NOT_RE = re.compile(r"\b(?:so|sure|really|serious|seriously)\W*\?\W*$|\bwhy\b", re.I)
+
+
+def turn_triage(prompt: str) -> str:
+    """"chat", "short" or "full" for a question's words (see TRIAGE)."""
+    p = (prompt or "").strip()
+    if not p:
+        return "full"
+    if (len(p) <= 48 and _CHAT_LEAD_RE.match(p) and _CHAT_RE.match(p)
+            and not _CHAT_NOT_RE.search(p)):
+        return "chat"
+    return "full" if _is_substantive(p) else "short"
+
+
 PEER_INSTRUCTION = (
     "Below are several draft answers to the same question, plus the "
     "question itself. Write YOUR OWN single best answer: take the "
@@ -34723,6 +34855,9 @@ def _cloud_all_down() -> str:
         out.append("Add a key in Settings > Models > Cloud. Gemini and Groq are free.")
     out.append("Or switch to Fast, Thinking or Pro to answer here.")
     return AppText("\n\n".join(out))
+
+
+COUNCIL_LIVE_DRAFT = True      # (6b570) the first draft streams into the answer, provisional
 
 
 def run_council(labels: list, messages: list, emit, status,
@@ -34968,6 +35103,48 @@ def run_council(labels: list, messages: list, emit, status,
     # the same per-model cap and whole-loop budget, so a slow server is
     # simply absent. This computer's own engines stay sequential as above.
     _started = [0]
+    # THE FIRST DRAFT, LIVE (6b570, per Patrick: "how it cranks it out ... It
+    # could be so much cleaner"). The page saw nothing in the answer until the
+    # final writer's first word (44 s for "hi" on Thinking · Ollama1, 57 s in
+    # his run). Now the first draft to produce words streams into the answer
+    # as it is written, marked provisional (a RUN frame {"prov": 1}: the page
+    # dims it a little); the final writer's first word replaces it (a RESET
+    # the stage tap sends just before it, so the page's draft-to-polish
+    # dissolve takes over). A run with no merge stage after its drafts keeps
+    # the draft as it is.
+    _live = {"owner": None, "sent": "", "on": False}
+    _live_lock = threading.Lock()
+    _live_ok = bool(globals().get("COUNCIL_LIVE_DRAFT", False))
+
+    def _live_draft(label, parts):
+        """Stream the newest words of `label`'s draft if it holds the live slot."""
+        if not _live_ok or cloud_only or _live["owner"] not in (None, label):
+            return
+        raw = "".join(parts)
+        if "<" in raw[-8:]:
+            return                      # a tag may be starting: wait for it to close
+        txt = strip_think(raw)
+        with _live_lock:
+            if _live["owner"] is None:
+                if not txt:
+                    return
+                _live["owner"], _live["on"] = label, True
+                try:
+                    emit(Ctl(NUL + "RUN:" + json.dumps({"prov": 1}) + NUL))
+                except Exception:
+                    pass
+            if _live["owner"] != label or not _live["on"]:
+                return
+            was = _live["sent"]
+            if not txt.startswith(was) or len(txt) == len(was):
+                return
+            _live["sent"] = txt
+        try:
+            emit(txt[len(was):])
+        except (BrokenPipeError, ConnectionResetError):
+            raise
+        except Exception:
+            pass
 
     def _draft_one(i, label, deadline, on_server=False):
         """One model's draft. i counts within its own loop: the first
@@ -35000,10 +35177,11 @@ def run_council(labels: list, messages: list, emit, status,
         # nothing stopped it: its stream stayed open and it generated on,
         # taking the CPU from the drafts after it. Now its next token
         # closes the stream, and Ollama stops.
-        def _collect(chunk, _p=parts, _s=_stop):
+        def _collect(chunk, _p=parts, _s=_stop, _l=label):
             if _s.is_set():
                 raise _DraftAbandoned()
             _p.append(chunk)
+            _live_draft(_l, _p)
 
         def _draft_local(_lbl=label, _c=_collect, _e=_err):
             usage_role("draft")           # the page's ledger row (6b528)
@@ -35142,6 +35320,13 @@ def run_council(labels: list, messages: list, emit, status,
         took_part(_lbl, "(no answer: not asked. Thinking seats one writer and one critic)")
 
     good = [d for d in drafts if not d[1].startswith("(no answer")]
+    if _live["on"] and not good:
+        # the live draft was no answer after all: wiped before the line that says why
+        _live["on"] = False
+        try:
+            emit(Ctl(NUL + "RESET" + NUL))
+        except Exception:
+            pass
     if not good and srv_only:
         # a mode on one server alone (6b426): said, and nothing else is tried
         raise ServerError("council", "None of %s\u2019s models answered. %s" % (
@@ -35162,14 +35347,25 @@ def run_council(labels: list, messages: list, emit, status,
     # council when its seats drafted (above); the checker may use it then.
     _shown = []
     _emit0 = emit
+    with _live_lock:
+        _live_was = _live["sent"] if _live["on"] else ""
+        _live["on"] = False             # no more of the draft from here
     _cloud_open = bool(cloud_only or (max_mode and cloud_plan is not None)
                        or (bool(_bench) and cloud_allowed()))
+
+    # the live draft stays on screen until the final stage's first word, and
+    # that word is preceded by the RESET that hands it the answer (6b570)
+    _pend = [bool(_live_was)]
 
     def emit(c):      # noqa: F811 — the tap; the earlier closures see it too
         if isinstance(c, Ctl):
             if str(c) == NUL + "RESET" + NUL:
                 del _shown[:]
+                _pend[0] = False
         elif c:
+            if _pend[0]:
+                _pend[0] = False
+                _emit0(Ctl(NUL + "RESET" + NUL))
             _shown.append(str(c))
         _emit0(c)
     if report is None:
@@ -35215,7 +35411,14 @@ def run_council(labels: list, messages: list, emit, status,
         return None
     if len(good) == 1 and not craft:
         report.update(writer=good[0][0], merger=good[0][0])   # checked on its own model
-        emit(good[0][1])  # only one survived — nothing to merge
+        if _live_was and good[0][1].startswith(_live_was):
+            # the draft already on screen IS the answer (6b570): only its rest
+            _pend[0] = False
+            _shown.append(_live_was)
+            if good[0][1][len(_live_was):]:
+                emit(good[0][1][len(_live_was):])
+        else:
+            emit(good[0][1])  # only one survived — nothing to merge
         return _done()
 
     # PEER REVIEW (Power mode, per Patrick): every contributor reads ALL
@@ -35445,6 +35648,10 @@ def run_council(labels: list, messages: list, emit, status,
         except Exception:
             notes = ""
 
+    # the final writer's call is the "final" row again (6b570): the review
+    # above named the thread's role, and the writer's USAGE frame went out as
+    # a second review, so the page found no final call for its pace
+    usage_role("final")
     # THE FINAL WRITER'S PROMPT (6b515): the dated system prompt with the
     # answer brief on it, then the question block intact in its own marked
     # section (its evidence and grounding lines included), the drafts as
@@ -41027,6 +41234,7 @@ def run_rubin(question, messages, emit, status, step, stop, ctx=None, ground=Non
 _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
               "|STEP|APPROVE|RATE"      # RATE: the writer's pace (6b515), the page's twin
               "|USAGE|DONE"             # a model call's tokens; the run's clock (6b528)
+              "|OFFER"                  # the way on when a server didn't answer (6b570)
               "|RUBIN")                 # Vera Rubin's console (6b519)
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
@@ -41094,6 +41302,9 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
             got["DONE"] = d
         elif tag == "RATE" and isinstance(d, dict):
             got["RATE"] = d
+        elif tag == "OFFER" and isinstance(d, dict):
+            got["OFFER"] = dict({"server": str(d.get("server") or "")[:60]},
+                                **({"asleep": 1} if d.get("asleep") else {}))
         elif tag == "STEP" and isinstance(d, dict) and d.get("id"):
             st = got.setdefault("STEP", {})
             st[d["id"]] = {k: d[k] for k in ("id", "l", "s", "d") if k in d}
@@ -41146,6 +41357,10 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
         rec["run"] = got["DONE"]
     if got.get("RATE"):
         rec["rate"] = got["RATE"]
+    if got.get("OFFER"):
+        rec["offer"] = got["OFFER"]          # the buttons come back with the chat (6b570)
+    if aborted and full:
+        rec["stopped"] = True                # a Stop keeps what was shown, and says so (6b570)
     if got.get("STEP"):
         rec["steps"] = list(got["STEP"].values())[:24]
     return rec
@@ -44212,6 +44427,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _effort = _effort if _effort in EFFORT_LEVELS else None
         _srv_think.level = effort_think(_effort)
         _srv_think.effort = _effort    # run_council reads it for its reviews
+        _srv_think.brief = False       # a greeting's one pass (6b570), settled with the council
         _t_req = time.time()          # the run's clock starts here (6b528)
         _t_first = [0.0]              # when the first word reached the page
         # the usage tap goes in NOW (6b528), before the search and pre-warm
@@ -44252,6 +44468,17 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if isinstance(tier, str) and tier in MODE_ALIASES \
                 and MODE_ALIASES[tier] in TIERS:
             tier = MODE_ALIASES[tier]
+        # ANSWER ON THIS MAC INSTEAD (6b570): the key under a server pick that
+        # couldn't answer (server_offer) asks the same question once more with
+        # here: true. It runs on this computer's strongest model that fits
+        # (Fast's own pick, resolve_tier) as a hand pick, and with no cloud
+        # (cloud: [], the Advanced "none at all"): the person chose this Mac.
+        if req_json.get("here") is True and srv_only_tier(tier):
+            _here = resolve_tier("Fast")[:1]
+            tier = ""
+            model_name = _here[0] if _here else ""
+            req_json["models"] = list(_here)
+            req_json["cloud"] = []
         # A .MD OR .TXT FILE IS READ ON THIS MAC (6b522, per Patrick): the turn
         # leaves here, after the mode's brand name is read (6b534) and before the tier, the server, the cloud or the web
         # search is looked at, and runs on one local model (_chat_doc)
@@ -44406,6 +44633,29 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # the model.
         model_name = model_name or (council[0] if council[0:] else "")
         prompt = messages[-1]["content"] if messages else ""
+        # TRIAGE FIRST (6b570, per Patrick: "Tests like this should be much more
+        # fluent instead of hitting a breaking point"). "hi" on Thinking · Ollama1
+        # alone ran the full craft: a 30 s draft, a review and a final writer, 44
+        # to 67 s before the first word. A "chat" or "short" turn (turn_triage)
+        # goes to the mode's first seat alone, streamed, with no drafts to
+        # compare, no review and no merge; a "chat" one is also asked not to
+        # reason (_srv_think.brief). Pictures, files, agents, Cloud Only, Max and
+        # Deep keep their own runs.
+        _triage = turn_triage(prompt)
+        _plain_turn = (not images and not req_json.get("docs")
+                       and not str(req_json.get("agent") or ""))
+        _brief_turn = bool(
+            len(council) > 1 and _triage != "full" and _plain_turn
+            and not cloud_only and not _max and not _rubin
+            and (tier in TIERS or (srv_only_tier(tier) and _so_seats)))
+        _srv_think.brief = bool(_triage == "chat" and _plain_turn)
+        if _brief_turn:
+            council = council[:1]
+            model_name = council[0]
+            if _so_seats:
+                _so_seats = list(council)
+                _so_c0 = council[0]
+            _ch_council0 = list(council)
         # A PICTURE, NOT PROSE (6b294): "generate an image of a cat" used
         # to get four paragraphs describing a cat. The intent is settled
         # here, before the web search, and answered below with a real image.
@@ -45664,6 +45914,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if user_base.cancel.is_set():
                 raise StaleProfile("the profile changed")
             if not isinstance(chunk, Ctl):
+                if chunk == "" and _client_gone(self.connection):
+                    # a server model reasoning in silence ticks here once a
+                    # second (6b570): a Stop ends it now, and frees the server
+                    raise BrokenPipeError("the page left")
                 # model text can't open a frame (see Ctl)
                 chunk = strip_special(chunk).replace(NUL, "")
             if not chunk:
@@ -45751,7 +46005,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _w_seats = (server_mode_resolve(_so_wake, _so_mode, self.ctx)
                             if _so_mode else [])
                 if _w_seats:
-                    council = _so_seats = _w_seats[:1] if images else _w_seats
+                    # a picture goes to its reader alone; a greeting to its first seat (6b570)
+                    council = _so_seats = _w_seats[:1] if (images or _brief_turn) else _w_seats
                     _so_c0 = model_name = council[0]
                     _srv_lbl = route_label = council[0] if len(council) == 1 else ""
             elif not _w_why:                 # the reader left
@@ -45814,6 +46069,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _seats = []
                 if _seats:
                     council = council_merger_last([x["label"] for x in _seats], req_comp, mode_pen)
+                    if _brief_turn:
+                        council = council[:1]    # a greeting's one pass (6b570)
                     _seat_fb = {x["label"]: x["fb"] for x in _seats if server_label(x["label"])}
                     model_name = council[0]
                     _srv_lbl = ""            # a mode's seat is never an explicit pick (6b339)
@@ -46654,9 +46911,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             pass  # user hit Stop — browser closed the connection
         except ServerError as exc:
             # a council of your own servers' models that none answered
-            # (6b334): said, and no other model is tried
+            # (6b334): said, and no other model is tried; a server pick says
+            # how to go on (6b570)
             try:
                 emit(AppText("\n\u26a0\ufe0f " + str(exc)))
+                if _srv_only and not _model_said[0]:
+                    server_offer(emit, (_so_c0 or "").split(SERVER_SEP, 1)[0])
             except (BrokenPipeError, ConnectionResetError):
                 pass
         except Exception as exc:
@@ -46698,6 +46958,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if not sent[0]:
                 emit("The engine stopped and the backup didn’t answer. Ask again.")
         finally:
+            _srv_think.brief = False       # (6b570) a greeting's one pass ends with it
             # the effort ends with the answer (6b534): a title or a memory
             # pass after it on this thread reasons at the model's default
             _srv_think.level = _srv_think.effort = None
@@ -53049,6 +53310,84 @@ html:not(.hz) .sl-sel{display:none}
   .hz #about-veil #about-foot{padding:12px 16px}
   .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row{flex-wrap:wrap;row-gap:8px}
 }
+/* ==== THE DELIVERY (6b570, per Patrick: "how it cranks it out ... It could be so much cleaner and more beautiful") ==== */
+/* ---- ONE WORKING LINE: while the answer is on its way the byline steps aside and one quiet line says what is
+   happening ("Waking Ollama1", "Asking Ollama1", "Reviewing the draft", "Writing the answer"), the words in the silver
+   sweep, no colour, no machine dies; a small elapsed clock after 3 s. When the answer lands the line goes and the
+   byline is back: the brand, "Thinking · Ollama1", never an id. A stopped answer keeps a quiet "Stopped". */
+.hz .msg.ai.live>.who{display:none}
+.hz .msg.ai.live>.liveline{margin:0 0 16px;padding-top:22px;border-top:1px solid var(--hz-hair)}
+.hz .msg.ai.live>.liveline .die{display:none}
+.hz .msg.ai.live .liveline .lstep{font-size:14px;color:var(--hz-ink-2)}
+.hz .msg.ai.live .liveline em,.hz:not(.hz-full) .msg.ai.live .liveline em{background:linear-gradient(90deg,var(--hz-ink-3) 0%,var(--hz-ink-3) 35%,#fff 50%,var(--hz-ink-3) 65%,var(--hz-ink-3) 100%);
+  background-size:250% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2.2s linear infinite}
+.hz .msg.ai.live .liveline .lstats{font-size:12px;color:var(--hz-ink-3)}
+.hz .msg.ai>.liveline.done{display:none}
+.hz .msg.ai>.liveline.done.stopped{display:flex;margin:-6px 0 14px}
+.hz .msg.ai>.liveline.done.stopped .lstep{font-size:13px;color:var(--hz-ink-3)}
+@media (prefers-reduced-motion:reduce){.hz .msg.ai.live .liveline em,.hz:not(.hz-full) .msg.ai.live .liveline em{animation:none;background:none;color:var(--hz-ink-2)}}
+.hz.hz-calm .msg.ai.live .liveline em{animation:none;background:none;color:var(--hz-ink-2)}
+/* ---- THE DRAFT, PROVISIONAL: the first draft streams in while the council works, a little dimmed, and the final
+   answer dissolves in over it (the draft-to-polish swap) */
+.hz .msg.ai .body.prov{opacity:.74;transition:opacity .4s var(--hz-ease-out)}
+/* ---- THE WAY ON: under a server pick that couldn't answer, "Answer on this Mac" and "Try <name> again" */
+.hz .offerrow{grid-column:1;display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.hz .msg.ai:not(:last-child)>.offerrow{display:none}   /* only the chat's last answer keeps the way on */
+.hz .offerrow button{font:500 13px/1 var(--hz-font-ui);color:var(--hz-ink);background:rgba(255,255,255,.05);height:32px;padding:0 14px;
+  border:1px solid var(--hz-hair-2);border-radius:8px;cursor:pointer;transition:background .12s var(--hz-ease-out),border-color .12s var(--hz-ease-out)}
+.hz .offerrow button:hover{background:rgba(255,255,255,.08);border-color:var(--hz-line)}
+.hz .offerrow button:active{transform:scale(.97)}
+.hz .offerrow button.sec{color:var(--hz-ink-2);background:none}
+.hz .ghostnote.here{border-left:0;padding-left:0;font-size:12.5px;color:var(--hz-ink-3);margin:0 0 10px}
+/* ---- a follow-up typed while an answer is on its way waits for it: said under the box */
+.hz #composer.queued::after{content:"Sends when this answer is done";position:absolute;left:18px;bottom:-19px;
+  font:12px/1 var(--hz-font-ui);color:var(--hz-ink-3);pointer-events:none}
+/* ---- THE READING, AS THE PREVIEW SETS IT (beta/DESIGN.md "Type"): 17 on 1.65 in a 640 column (about 70
+   characters), paragraphs 16 apart, restrained headings, tidy lists with the numbers in mono in their own gutter,
+   hairline tables with mono caps heads, code in dark glass, citations as small silver superscripts; silver and one
+   hue, so links, citations and code are silver, never the ice */
+.hz .msg.ai .body{font-size:17px;line-height:1.65;letter-spacing:.002em;color:var(--hz-ink-read)}
+.hz .msg.ai .body p{margin:0 0 16px}
+.hz .msg.ai .body h1,.hz .msg.ai .body h2{font-size:22px;font-weight:500;line-height:1.3;letter-spacing:-.012em;color:var(--hz-ink);margin:32px 0 12px}
+.hz .msg.ai .body h3{font-size:17px;font-weight:600;line-height:1.4;letter-spacing:0;color:var(--hz-ink);margin:24px 0 8px}
+.hz .msg.ai .body>h1:first-child,.hz .msg.ai .body>h2:first-child,.hz .msg.ai .body>h3:first-child{margin-top:0}
+.hz .msg.ai .body em{color:inherit;font-style:italic}
+.hz .msg.ai .body ul,.hz .msg.ai .body ol{margin:0 0 16px;padding:0 0 0 24px}
+.hz .msg.ai .body li{margin:0 0 6px;padding-left:4px}
+.hz .msg.ai .body li>ul,.hz .msg.ai .body li>ol{margin:6px 0 0}
+.hz .msg.ai .body ol{list-style:none;counter-reset:hzn;padding-left:28px}
+.hz .msg.ai .body ol>li{counter-increment:hzn;position:relative}
+.hz .msg.ai .body ol>li::before{content:counter(hzn);position:absolute;left:-28px;top:.2em;width:20px;text-align:right;
+  font-family:var(--hz-font-mono);font-size:12px;line-height:1.6;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
+.hz .msg.ai .body blockquote{padding:2px 0 2px 20px;border-left:1px solid var(--hz-line);color:var(--hz-ink-2)}
+.hz .msg.ai .body a{color:var(--hz-ink);text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1px;
+  text-decoration-color:var(--hz-line);border-bottom:0}
+.hz .msg.ai .body a:hover{text-decoration-color:var(--hz-ink)}
+.hz .msg.ai .body table{width:100%;border-collapse:collapse;font-size:15px;line-height:1.5;margin:0 0 16px;
+  border-top:1px solid var(--hz-hair-2);border-bottom:1px solid var(--hz-hair-2)}
+.hz .msg.ai .body th{font-family:var(--hz-font-mono);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--hz-ink-3);text-align:left;padding:10px 12px 8px 0;border-bottom:1px solid var(--hz-hair-2);white-space:nowrap}
+.hz .msg.ai .body td{padding:9px 12px 9px 0;border-bottom:1px solid var(--hz-hair);vertical-align:top;color:var(--hz-ink-read)}
+.hz .msg.ai .body th:first-child,.hz .msg.ai .body td:first-child{padding-left:0}
+.hz .msg.ai .body th:last-child,.hz .msg.ai .body td:last-child{padding-right:0}
+.hz .msg.ai .body td:first-child{color:var(--hz-ink-read)}
+.hz .msg.ai .body code{font-size:.88em;color:var(--hz-ink);background:rgba(255,255,255,.06);border:1px solid var(--hz-hair);
+  border-radius:4px;padding:1px 5px}
+.hz .codecard{margin:0 0 16px;border-radius:8px;background:rgba(4,7,18,.55);border:1px solid var(--hz-hair-2)}
+.hz .codecard pre{padding:14px 16px}
+.hz .codecard pre code,.hz .codecard .gut{font-size:13px;line-height:1.6}
+.hz .msg.ai .body .codecard pre code{color:var(--hz-ink-2);background:none;border:0;padding:0;border-radius:0}   /* no box in the card's box */
+.hz .hkw{color:var(--hz-ink);font-weight:500}
+.hz .hstr{color:#dfe6f5}
+.hz .hnum{color:var(--hz-ink)}
+.hz .hcom{color:var(--hz-ink-3)}
+.hz .msg.ai .body sup.cite{font:500 10px/1 var(--hz-font-mono);color:var(--hz-ink-2);background:none;
+  border:1px solid var(--hz-line);border-radius:4px;padding:2px 4px 1px;font-variant-numeric:tabular-nums}
+.hz .msg.ai .body sup.cite:hover{color:var(--hz-ink);background:rgba(255,255,255,.06);border-color:var(--hz-ink-3)}
+/* the person's words: a simple line in the reading size, quieter than the answer */
+.hz .msg.user{margin:0 0 24px}
+.hz .msg.user .body{font-family:var(--hz-font-read);font-size:17px;line-height:1.5;color:var(--hz-ink-2);max-width:560px;text-wrap:pretty}
+/* ==== the delivery (6b570): end ==== */
 /* ==== BETA 3 CHROME (6b555, per Patrick: the preview's look in the app) ==== */
 /* The chrome of 7.0 beta 3, ported from the preview (beta/DESIGN.md: The composer: flat and low; The lanes; The ink;
    The sidebar's chats; No shine on controls; Subtract and refine; Motion > States). Horizon only: every rule is under
@@ -54669,6 +55008,9 @@ let messages=[], generating=false, abortCtl=null;
 // an Edit & resend pressed while an answer is being written (6b343): the answer
 // is stopped, and the edit opens once the stop has finished and saved
 let pendingEdit=null,genChat=null;  // genChat: the chat whose answer is being written
+// (6b570) a follow-up typed while an answer is on its way is sent when it lands (sendQueued); the
+// "Answer on this Mac" key asks the next send to run here once (hereOnce: the server's name)
+let sendQueued=false,hereOnce=null;
 // (M9) the single-model pick in browser storage is "This computer"'s: an
 // account's page neither reads nor writes it (prefs.json holds each
 // profile's own), so a later root boot can't adopt an account's pick
@@ -57175,6 +57517,7 @@ function msgActions(div,role,text){
     foot.insertBefore(d,bar);
   }
 }
+inner.addEventListener("click",offerClick);   // the way on (6b570)
 inner.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest(".mab[data-act]");
   if(!b)return;
@@ -57307,8 +57650,29 @@ function isCloud(c){const w=(c&&c.w)||"local";return w!=="local"&&w!=="server";}
 // ONE BRAIN SIGNS THE ANSWER (6b526/6b528, per Patrick: "make it sound like, okay,
 // you have it on Thinking right now"): the byline is the brain, a breathing dot
 // while it works, and one plain word for what it is doing
+// THE BYLINE'S WORDS (6b570, per Patrick's screenshot: the brand and "srv:5b346919:think"): a tier key is never shown.
+// A mode is its shown name; a mode on one server alone is the mode and the server's own name ("Thinking · Ollama1");
+// "<name> Only" is "· Ollama1"; a cloud mode or pick says the cloud; anything else unknown is the brand alone
+function signMode(mode){
+  const t=String(mode||"");
+  if(!t)return "";
+  const sm=/^srv:([^:]+)(?::(fast|think|pro|max))?$/.exec(t);
+  if(sm){
+    const MK={fast:"Fast",think:"Thinking",pro:"Pro",max:"Max"};
+    const s=typeof srvList!=="undefined"&&Array.isArray(srvList)?srvList.find(x=>x&&x.id===sm[1]):null;
+    const nm=s&&s.name?String(s.name):"your server";
+    return (sm[2]?modeName(MK[sm[2]])+" ":"")+"\u00b7 "+nm;
+  }
+  const cm=/^cloud:(?:(fast|think|pro)|m:([a-z]+))$/.exec(t);
+  if(cm){
+    const CK={fast:"Fast",think:"Thinking",pro:"Pro"},CP={gemini:"Gemini",groq:"Groq",claude:"Claude",kimi:"Kimi K3"};
+    return cm[1]?modeName(CK[cm[1]])+" \u00b7 cloud":"\u00b7 "+(CP[cm[2]]||"cloud");
+  }
+  if(/[:\/]/.test(t))return "";
+  return modeName(t);
+}
 function signatureHTML(mode,st,eff){
-  const mn=mode?modeName(mode):"";
+  const mn=signMode(mode);
   // the shimmer follows the EFFORT, not the mode (NORTHSTAR OVERRIDE 4): Ultra in full colour, Max softly
   const shim=eff==="ultra"?' class="shim"':(eff==="max"?' class="shim soft"':"");
   return '<i class="dot" aria-hidden="true"></i><b'+shim+'>'+SIGN_BRAND+(mn?" "+esc(mn):"")+'</b><span class="st">'+esc(st||"")+'</span>';
@@ -57563,10 +57927,17 @@ function livePhrase(steps,running,status,drafts,comp,done){
     :{text:"Writing the answer",who:[comp]};
   if(s&&s.id==="places")return {text:"Pinning the places",who:[]};
   if(s&&s.id==="fix")return {text:"Applying corrections",who:[]};
-  if(running&&running.length)return {text:running.length===1?running[0]+" drafting on "+machineName(running[0])
+  // ONE PLAIN PHRASE, THE PLACE BY ITS NAME (6b570): the status "asking Ollama1 · gemma4:12b · 1 of 2" was read up
+  // to its first dot, and "Ollama1" was taken for a model of this Mac ("Ollama1 drafting on this Mac"). A model is
+  // never named here: one model writing alone is "Asking <place>", a council's draft "Drafting on <place>"
+  const alone=!(steps||[]).some(x=>x&&x.id==="council");
+  const drafting=l=>(alone?"Asking ":"Drafting on ")+machineName(l);
+  if(running&&running.length)return {text:running.length===1?drafting(running[0])
       :running.length+" models drafting",who:running.slice()};
-  const m=/^asking (.+?) ·/.exec(String(status||""));
-  if(m)return {text:m[1]+" drafting on "+machineName(m[1]),who:[m[1]]};
+  const m=/^asking (.+?) · (?:\d+ of \d+|cloud)$/.exec(String(status||""));
+  if(m)return {text:drafting(m[1]),who:[m[1]]};
+  const ma=/^asking (.+)$/.exec(String(status||""));
+  if(ma)return {text:"Asking "+ma[1],who:[]};
   if(s&&s.id==="read"){const n=/(\d+)/.exec(String(s.d||""));const sr=byId("search");const ns=sr&&/(\d+) source/.exec(String(sr.d||""));
     return {text:ns?"Reading "+ns[1]+" sources":(n?"Reading "+n[1]+" pages":"Reading the pages"),who:[]};}
   if(s&&s.id==="search")return {text:"Searching the web",who:[]};
@@ -57583,9 +57954,8 @@ function liveLineHTML(ph,stats,done){
 }
 // the figures beside the line: live, the page's own estimate (marked ~) and the clock; done, the real counts
 function liveStats(live){
-  if(live){const a=[];const tk=Math.round(answerChars/4);if(tk>0)a.push("~"+fmtTok(tk)+" tokens");
-    if(stepRate>0)a.push("~"+(stepRate>=100?Math.round(stepRate):stepRate.toFixed(1))+" tok/s");
-    a.push(fmtSecs((performance.now()-runT0)/1000));return a;}
+  // one quiet line (6b570): the clock alone, from 3 s; the tokens and the pace are in Details
+  if(live){const el=(performance.now()-runT0)/1000;return el>=3?[fmtSecs(el)]:[];}
   return [];
 }
 function liveLinePaint(div){
@@ -57609,7 +57979,8 @@ function liveLineDone(div,info){
   if(fin&&fin.o&&!fin.x&&info.rate&&info.rate.s>0){const v=fin.o/info.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
   else if(info.rate&&info.rate.tps>0)st.push("~"+(info.rate.tps>=100?Math.round(info.rate.tps):info.rate.tps.toFixed(1))+" tok/s");
   const who=[...new Set((info.usage||[]).filter(Boolean).map(c=>c.m))];
-  const html=liveLineHTML({text:t>0?"Done in "+fmtSecs(t):"Done",who:who},st,true);
+  let html=liveLineHTML({text:info.stopped?"Stopped":(t>0?"Done in "+fmtSecs(t):"Done"),who:who},st,true);
+  if(info.stopped)html=html.replace('class="liveline done"','class="liveline done stopped"');   // 6b570: a Stop says so
   if(el)el.outerHTML=html;else{const w=div.querySelector(":scope>.who");(w||div).insertAdjacentHTML("afterend",html);}
 }
 // THE WRITING STAR (6b544, per Patrick; the css block of the same name says what it looks like).
@@ -57724,6 +58095,27 @@ function hzStarLand(div){
 }
 // when the answer lands the sky is told; the star's landing is the whole of the show (6b544): no
 // light round the composer, no pass along its edge
+// THE WAY ON (6b570): two keys under a server pick's "didn't answer" line. "Answer on this Mac" asks the same
+// question again, once, here (the request's here: true); "Try <name> again" asks it again as it was. Only the
+// chat's last answer keeps them (css); the click is delegated from the chat, as every answer control is
+function offerRow(div,o){
+  if(!div||!o)return;
+  const old=div.querySelector(":scope>.offerrow");if(old)old.remove();
+  const nm=String(o.server||"")||"your server";
+  const row=document.createElement("div");row.className="offerrow";
+  row.innerHTML='<button type="button" data-offer="here">Answer on '+(IS_PC?"this PC":"this Mac")+'</button>'
+    +'<button type="button" class="sec" data-offer="again">Try '+esc(nm)+' again</button>';
+  row.dataset.server=nm;row.dataset.asleep=o.asleep?"1":"";
+  div.appendChild(row);
+}
+function offerClick(e){
+  const b=e.target.closest&&e.target.closest(".offerrow button[data-offer]");
+  if(!b||generating)return;
+  const row=b.closest(".offerrow");
+  hereOnce=b.dataset.offer==="here"?{name:row.dataset.server,asleep:!!row.dataset.asleep}:null;
+  row.remove();
+  regenerate();
+}
 function answerLanded(){
   try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
 }
@@ -57779,12 +58171,16 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   // the live line of a saved answer: done, with the run's clock and counts (6b528)
   if(role!=="user"&&m.role&&(m.run||(m.usage&&m.usage.length)))
     div.querySelector(":scope>.who").insertAdjacentHTML("afterend",
-      liveLineHTML({text:m.run&&m.run.t>0?"Done in "+fmtSecs(m.run.t):"Done",who:[...new Set((m.usage||[]).filter(Boolean).map(c=>c.m))]},
+      liveLineHTML({text:m.stopped?"Stopped":m.run&&m.run.t>0?"Done in "+fmtSecs(m.run.t):"Done",who:[...new Set((m.usage||[]).filter(Boolean).map(c=>c.m))]},
         (()=>{const tot=usageTotals(m.usage),fin=usageFinal(m.usage),st=[];
           if(tot.n&&tot.i)st.push((tot.est?"~":"")+fmtTok(tot.i)+" in");if(tot.n&&tot.o)st.push((tot.est?"~":"")+fmtTok(tot.o)+" out");
           if(fin&&fin.o&&!fin.x&&m.rate&&m.rate.s>0){const v=fin.o/m.rate.s;st.push((v>=100?Math.round(v):v.toFixed(1))+" tok/s");}
           return st;})(),true));
+  if(role!=="user"&&m.role&&m.stopped&&!m.run&&!(m.usage&&m.usage.length))
+    div.querySelector(":scope>.who").insertAdjacentHTML("afterend",liveLineHTML({text:"Stopped",who:[]},[],true));
+  {const ll=div.querySelector(":scope>.liveline.done");if(ll&&m.stopped)ll.classList.add("stopped");}   // 6b570
   if(form)body.appendChild(formCard(form));
+  if(role!=="user"&&m.role&&m.offer)offerRow(div,m.offer);   // a reopened chat keeps the way on (6b570)
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
   inner.appendChild(div);
@@ -57973,6 +58369,9 @@ function sendSafe(){
 input.addEventListener("keydown",e=>{
   if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendSafe();}
 });
+// a queued follow-up that was cleared is not sent (6b570)
+input.addEventListener("input",()=>{if(sendQueued&&!input.value.trim()){sendQueued=false;
+  const qc=$("#composer");if(qc)qc.classList.remove("queued");}});
 // during a Vera Rubin run the first ■ stops it cleanly, a second cuts the stream (6b519)
 sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()):sendSafe(); });
 
@@ -58337,6 +58736,11 @@ $("#jumpdown").addEventListener("click",()=>chatPin(true));
 let sendAsking=false,regenBusy=false,fnPicking=false;
 async function send(){
   if(sendAsking)return;
+  // A FOLLOW-UP WAITS ITS TURN (6b570): Enter while an answer is on its way was swallowed without a
+  // word, so the next press went to the stop key and the answer was cut ("I", then nothing). The text
+  // stays in the box, a line under it says it will go, and it is sent the moment the answer lands
+  if(generating&&input.value.trim()&&!pendingImages.length&&!pendingDocs.length&&uiMode!=="funnel"){
+    sendQueued=true;const qc=$("#composer");if(qc)qc.classList.add("queued");return;}
   if((!input.value.trim()&&!pendingImages.length&&!pendingDocs.length)||generating)return;
   // A BENCHMARK OWNS THE ENGINES (6b331): asked before anything is
   // cleared (a chat, a funnel's answer or goal), so the text, pictures
@@ -58486,6 +58890,9 @@ async function send(){
   let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
   const seenStatus=[];
   let srvWho="";         // the server that answered, if one did (6b334)
+  let offer=null;        // the way on when a server pick couldn't answer (6b570)
+  const hereFrom=isSrvMode(tier)?hereOnce:null;hereOnce=null;   // this send runs here once (6b570)
+  inner.querySelectorAll(".offerrow").forEach(x=>x.remove());
   lastModels="";
 
   // a hand-picked council loses the picks its server has dropped; a council of
@@ -58541,6 +58948,7 @@ async function send(){
           tier:advGhostOnly?"Fast":tier,messages:askCtx(myMessages),
           auto_web:autoWeb,images:sentImages,docs:sentDocs,agent,
           mode_comp:advGhostOnly?"":modeComp(),    // the mode's own compositor, "" for its default (6b442)
+          here:hereFrom?true:undefined,            // "Answer on this Mac" (6b570)
           // the Remote agent (6b249) carries the autonomy throttle
           autonomy:agent==="Remote"?autonomy:undefined},turn)),
     });
@@ -58666,6 +59074,9 @@ async function send(){
                 try{const d=JSON.parse(j);
                   if(d.w==="cloud"&&!/cloud/.test(lastModels))
                     lastModels=(lastModels+" cloud").trim();
+                  // the first draft, provisional (6b570); the frames are re-read on every chunk, so
+                  // never again once a RESET has handed the answer to the final writer
+                  if(d.prov&&raw.indexOf("\u0000RESET\u0000")<0)body.classList.add("prov");
                   if(d.w==="server"){srvWho=String(d.s||"");
                     if(!srvBoost){srvBoost=true;srvUseKick();}}
                   else if(d.w==="local"||d.w==="mix"){srvWho="";if(d.m)lastModels=String(d.m);}
@@ -58686,6 +59097,7 @@ async function send(){
         RUBIN:j=>{const k=/^\{"k":"(\w+)"/.exec(j);if(k)rbFr[k[1]]=j;},   // Vera Rubin (6b519)
         USAGE:j=>{try{usage.push(JSON.parse(j));}catch(e){}},  // a model call's tokens (6b528)
         DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}},       // the run's clock and mode (6b528)
+        OFFER:j=>{try{offer=JSON.parse(j);}catch(e){}},        // the way on (6b570)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
@@ -58743,7 +59155,7 @@ async function send(){
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
       // cut>=0 on every chunk zeroed the reveal every few hundred ms
-      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;
+      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;body.classList.remove("prov");
         // the old prose holds, at its height, until the new has words (6b539)
         if(body.textContent.trim()&&!swapHold){swapHold=true;swapAt=performance.now();
           const h=body.getBoundingClientRect().height;if(h>0)body.style.minHeight=h+"px";
@@ -58790,7 +59202,7 @@ async function send(){
   {const w=aiDiv.querySelector(".who");
    if(w)w.innerHTML=signatureHTML(runInfo&&runInfo.mode!=null?runInfo.mode:tier,"",(runInfo&&runInfo.effort)||(typeof hzEffortWire==="function"?hzEffortWire():""));}
   // the live line settles on "Done in N s" with the real counts; one light round the composer
-  liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo});
+  liveLineDone(aiDiv,{usage:usage,run:runInfo,secs:secs0,rate:rateInfo,stopped:wasAborted&&!!full});
   if(full&&!wasAborted)answerLanded();
   if(globalThis.hzReady&&typeof hzStarLand==="function")hzStarLand(aiDiv);   // the star becomes the byline's dot (6b544)
   paintDrafts(aiDiv,drafts,false);   // merge done: collapse (or clear bar)
@@ -58820,6 +59232,7 @@ async function send(){
     const uniq=[...new Set(bold)].slice(0,4).map(s=>({n:s,d:"",h:""}));
     if(uniq.length)places=uniq;
   }
+  body.classList.remove("prov");   // the provisional draft's dim goes with the landing (6b570)
   const treeKeep=(body.querySelector(".worktree")||{}).outerHTML||"";
   dripOff=true;                    // from here the prose is the landing's; a late drip frame paints nothing
   // no loose srcRow here any more — collapseSteps() folded the chips
@@ -58827,7 +59240,7 @@ async function send(){
   body.innerHTML=treeKeep
     +annIn(myChat,()=>renderMD(full||(wasAborted?"*(stopped)*":
     "No answer came through. Try again.")))
-    +(full&&!wasAborted?srcRow(sources)+photoRow(photos)
+    +(full&&!wasAborted&&!offer?srcRow(sources)+photoRow(photos)
       +(places&&places.length?placesModule(places,locCtx,mapd):mapCard(mapd)):"");
   const secs=((performance.now()-t0)/1000);
   // remember this tier's pace for the next run's time-left line — an
@@ -58845,6 +59258,11 @@ async function send(){
   // seen or not is decided now, as the answer ends (6b471)
   const goesUnread=unreadDecision(!!full,isErr,wasAborted,myChat,curChat,
     document.visibilityState!=="hidden");
+  // the way on under a server pick that couldn't answer (6b570), and the line when this Mac took it
+  if(offer&&!wasAborted)offerRow(aiDiv,offer);
+  if(hereFrom&&full&&!isErr&&!wasAborted)
+    body.insertAdjacentHTML("beforebegin",'<div class="ghostnote here">'+esc(hereFrom.name)
+      +(hereFrom.asleep?" was asleep, so ":" didn\u2019t answer, so ")+(IS_PC?"this PC":"this Mac")+" answered.</div>");
   if(full&&!isErr&&!aiDiv.querySelector(".mact"))
     msgActions(aiDiv,"assistant",stripTokens(full));
   if(!full&&!wasAborted){
@@ -58885,6 +59303,8 @@ async function send(){
     if(runInfo)rec.run=runInfo;
     if(rateInfo)rec.rate=rateInfo;
     if(steps.length)rec.steps=steps.map(s=>({id:s.id,l:s.l,s:"done",d:s.d}));
+    if(offer)rec.offer=offer;
+    if(wasAborted)rec.stopped=true;      // a Stop keeps what was shown, and says so (6b570)
     myMessages.push(rec);
     sbFootPaint();                   // today's tokens in the sidebar's foot
     // viewing the owning chat but the live bubble was detached by a
@@ -58924,6 +59344,11 @@ async function send(){
   if(pendingEdit!==null){
     const t=pendingEdit;pendingEdit=null;
     if(curChat===myChat&&!generating)editResend(t);
+  }
+  // the follow-up typed meanwhile goes now (6b570)
+  if(sendQueued){
+    sendQueued=false;{const qc=$("#composer");if(qc)qc.classList.remove("queued");}
+    if(input.value.trim()&&!generating)setTimeout(sendSafe,60);
   }
 }
 
@@ -59200,7 +59625,7 @@ function chatHash(msgs,n){
 // page shows, and what the server saves (turn_text() is its twin; 0b
 // L5, R-2-22, one corpus checks both)
 // USAGE: a model call's tokens; DONE: the run's clock and its mode (6b528); RUBIN: Vera Rubin's console (6b519)
-const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN";
+const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER";
 const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
 const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
 function streamText(raw,on){
