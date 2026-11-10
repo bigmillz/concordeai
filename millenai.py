@@ -48143,7 +48143,7 @@ if("__WIN_WIPE__"==="1"&&hzLook==="classic"){
 </script>
 <title>MillenAI __APP_VER__</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 /* dropdown lists draw dark (6b317, from the Windows sweep): WebView2
    paints a <select>'s popup itself, and ours came out near-white text
@@ -51524,7 +51524,6 @@ body.gen #chip-model{color:var(--accent)}
   /* Horizon on a narrow window (6b526): the column fills it, the Moon's
      block and the slider's words step aside, the sidebar is the drawer */
   .hz #hz-top{padding:0 12px;gap:10px}
-  .hz #hz-lanes{gap:16px}
   .hz .hz-rig b{display:none}
   .hz .hz-rig{padding:0 8px}
   .hz #main:has(#hero) #chat-inner{padding-top:120px}
@@ -51829,59 +51828,49 @@ body.gen #chip-model{color:var(--accent)}
 .hz .fopt span{font-family:var(--hz-font-ui);font-size:12.5px;line-height:1.45;color:var(--hz-ink-3)}
 .hz .fimg{border-radius:var(--hz-r-sm)}
 /* ---- the sidebar: a 240px glass column, hairline rows, numbers in mono */
-.hz #sidebar{width:240px;min-width:240px;padding:16px 12px 18px;gap:6px;background:rgba(3,4,10,.42);
-  border-right:1px solid rgba(255,255,255,.08);box-shadow:none;
-  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+.hz #sidebar{width:248px;min-width:248px;padding:16px 8px 16px;gap:8px;background:var(--hz-glass-grad);
+  border-right:1px solid var(--hz-hair-2);box-shadow:none;
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
   transition:width var(--hz-t-mid) var(--hz-ease-in-out),min-width var(--hz-t-mid) var(--hz-ease-in-out),
   padding var(--hz-t-mid) var(--hz-ease-in-out)}
 .hz body.resizing #sidebar{transition:none}
 .hz #brand-wrap{padding:0}
 .hz #brand-row{gap:4px;padding:2px 2px 8px 4px}
-.hz #newchat{width:36px;height:36px;border-radius:10px;border:0;background:transparent;color:var(--hz-ink-2);
+.hz #newchat{width:36px;height:36px;border-radius:8px;border:0;background:transparent;color:var(--hz-ink-2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;flex:none;margin:0;
   transition:background var(--hz-t-fast),color var(--hz-t-fast)}
 .hz #newchat svg{width:17px;height:17px}
-.hz #newchat:hover{background:rgba(255,255,255,.08);border-color:transparent;color:var(--hz-ink)}
-.hz #newchat:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
-.hz #mode-tabs{background:none;border:0;padding:0;margin:2px 0 4px;gap:2px;border-bottom:1px solid var(--hz-hair);border-radius:0}
-.hz #tab-glide{display:none}
-.hz #mode-tabs .ltab{font:13px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--hz-ink-3);padding:9px 0 8px;
-  border-radius:0;border-bottom:1px solid transparent;margin-bottom:-1px;gap:7px;min-height:36px;
-  transition:color var(--hz-t-fast),border-color var(--hz-t-fast)}
-.hz #mode-tabs .ltab svg{width:13px;height:13px}
-.hz #mode-tabs .ltab:hover{color:var(--hz-ink-2)}
-.hz #mode-tabs .ltab.on{color:var(--hz-ink);font-weight:500;background:none;border-bottom-color:var(--hz-accent)}
-.hz #mode-tabs .ltab:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent);border-radius:6px}
+.hz #newchat:hover{background:rgba(255,255,255,.06);border-color:transparent;color:var(--hz-ink)}
+.hz #mode-tabs{display:none}   /* ONE lane control (6b555): Chat, Code and Funnels live in the header (#hz-lanes); the sidebar shows the lane's list */
 .hz .group-label.chats{display:none}
 .hz #chat-search{margin:4px 0 2px;position:relative}
 .hz #chat-search svg{position:absolute;left:11px;top:50%;width:14px;height:14px;margin-top:-7px;color:var(--hz-ink-3);pointer-events:none}
-.hz #chat-search input{height:34px;padding:0 12px 0 32px;background:rgba(255,255,255,.04);border:0;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.08);border-radius:10px;font:13.5px var(--hz-font-ui);color:var(--hz-ink);
+.hz #chat-search input{height:32px;padding:0 12px 0 32px;background:rgba(255,255,255,.03);border:0;
+  box-shadow:inset 0 0 0 1px var(--hz-hair-2);border-radius:8px;font:13px var(--hz-font-ui);color:var(--hz-ink);
   transition:box-shadow var(--hz-t-fast)}
 .hz #chat-search input::placeholder{color:var(--hz-ink-3)}
-.hz #chat-search input:focus{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 0 0 2px var(--hz-night),0 0 0 4px rgba(159,192,255,.55)}
+.hz #chat-search input:focus{box-shadow:inset 0 0 0 1px var(--hz-line)}
 .hz #model-list{margin:0 -4px;padding:0 4px}
 .hz #chat-list{padding:0 0 4px;scrollbar-width:thin}
-.hz .cgroup{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);opacity:1;
-  padding:12px 10px 4px;line-height:1.3}
+.hz .cgroup{font-family:var(--hz-font-mono);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3);opacity:1;
+  padding:16px 8px 6px;line-height:16px;text-shadow:var(--hz-halo-dark)}
 .hz .cgroup .fold{font:inherit;letter-spacing:0;text-transform:none;min-height:24px}
 .hz .cgroup .fold .fchev{border-width:.3em 0 .3em .5em}
 .hz .cgroup .fldn{opacity:.7}
 .hz .cgroup .rbtn{width:24px;height:24px;border-radius:6px}
 .hz .cgroup .rbtn:hover{background:rgba(255,255,255,.06)}
-.hz .cday{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--hz-font-ui);font-size:12px;
-  color:var(--hz-ink-3);padding:14px 10px 4px;user-select:none;line-height:1.3}
+.hz .cday{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-family:var(--hz-font-mono);font-size:11px;font-weight:500;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3);padding:16px 8px 6px;user-select:none;line-height:16px;text-shadow:var(--hz-halo-dark)}
 .hz .cday:first-child,.hz .cgroup+.cday{padding-top:8px}
 .hz .cday .ctot{font-family:var(--hz-font-mono);font-size:11px;font-variant-numeric:tabular-nums}
-.hz .chat-item{padding:0 10px;gap:10px;min-height:34px;border-radius:10px;font-family:var(--hz-font-ui);font-size:14px;
-  color:var(--hz-ink-2);margin-bottom:1px;align-items:center;
+.hz .chat-item{padding:0 8px;gap:8px;min-height:32px;border-radius:8px;font-family:var(--hz-font-ui);font-size:14px;line-height:1.5;
+  color:var(--hz-ink-2);margin-bottom:0;align-items:center;
   transition:background var(--hz-t-fast),color var(--hz-t-fast),opacity var(--hz-t-mid) var(--hz-ease-in-out),
   transform var(--hz-t-mid) var(--hz-ease-in-out),max-height var(--hz-t-mid) var(--hz-ease-in-out),
   padding var(--hz-t-mid) var(--hz-ease-in-out),margin var(--hz-t-mid) var(--hz-ease-in-out)}
 .hz .chat-item.has-snip{padding-top:7px;padding-bottom:7px}
-.hz .chat-item:hover{background:rgba(255,255,255,.05);color:var(--hz-ink)}
-.hz .chat-item:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
-.hz .chat-item.active{background:rgba(255,255,255,.08);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.hz .chat-item:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
+.hz .chat-item.active{background:rgba(255,255,255,.09);color:var(--hz-ink);box-shadow:none}
 .hz .chat-item .ct mark{background:rgba(159,192,255,.3);color:var(--hz-ink);border-radius:2px;padding:0}
 .hz .chat-item .ctok{flex:none;font-family:var(--hz-font-mono);font-size:11.5px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums}
 .hz .chat-item:hover .ctok,.hz .chat-item:focus-within .ctok{display:none}
@@ -51919,25 +51908,23 @@ body.gen #chip-model{color:var(--accent)}
 /* the memory label reads in sentence case like the rest of the column; the chip's name stays its own */
 .hz #telemetry .meter-label span{display:inline-block;text-transform:lowercase;letter-spacing:0;font-family:var(--hz-font-ui);font-size:12.5px}
 .hz #telemetry .meter-label span::first-letter{text-transform:uppercase}
-.hz #sb-foot{margin-top:0;padding:14px 10px 0;border-top:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:10px;
+.hz #sb-foot{margin-top:0;padding:16px 8px 0;border-top:1px solid var(--hz-hair);display:flex;flex-direction:column;gap:10px;
   font:12.5px var(--hz-font-ui);color:var(--hz-ink-3)}
 .hz #sb-foot[hidden]{display:none}
 .hz #sb-today{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
 .hz #sb-today .mono{font-family:var(--hz-font-mono);font-size:11.5px;font-variant-numeric:tabular-nums}
 .hz #sb-today:empty,.hz #sb-where:empty{display:none}
 .hz #sb-foot{position:relative}
-.hz #sb-foot #rail-btn{position:absolute;right:0;bottom:0;width:36px;height:36px;border-radius:10px;border:0;background:transparent;
+.hz #sb-foot #rail-btn{position:absolute;right:0;bottom:0;width:36px;height:36px;border-radius:8px;border:0;background:transparent;
   color:var(--hz-ink-3);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;
   transition:background var(--hz-t-fast),color var(--hz-t-fast)}
 .hz #sb-foot #rail-btn svg{width:16px;height:16px;transition:transform var(--hz-t-mid) var(--hz-ease-in-out)}
 .hz #sb-foot #rail-btn:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
-.hz #sb-foot #rail-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
 .hz #sb-foot #settings-btn{display:flex;align-items:center;gap:9px;width:auto;height:36px;margin:4px 26px 0 -10px;padding:0 10px;
-  border:0;border-radius:10px;background:transparent;font:13.5px var(--hz-font-ui);color:var(--hz-ink-2);cursor:pointer;
+  border:0;border-radius:8px;background:transparent;font:14px var(--hz-font-ui);color:var(--hz-ink-2);cursor:pointer;
   transition:background var(--hz-t-fast),color var(--hz-t-fast)}
 .hz #sb-foot #settings-btn svg{width:16px;height:16px;flex:none}
-.hz #sb-foot #settings-btn:hover{background:rgba(255,255,255,.05);border-color:transparent;color:var(--hz-ink)}
-.hz #sb-foot #settings-btn:focus-visible{outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.hz #sb-foot #settings-btn:hover{background:rgba(255,255,255,.06);border-color:transparent;color:var(--hz-ink)}
 .hz #undobar{background:rgba(6,8,18,.78);border:1px solid var(--hz-glass-line-2);border-radius:999px;padding:8px 8px 8px 16px;
   font:13px var(--hz-font-ui);color:var(--hz-ink);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);gap:10px;
   animation:hzRise var(--hz-t-mid) var(--hz-ease-out) both}
@@ -51945,21 +51932,21 @@ body.gen #chip-model{color:var(--accent)}
   border:1px solid var(--hz-glass-line);border-radius:999px;padding:0 12px;height:28px}
 .hz #undobar button:hover{text-decoration:none;background:rgba(255,255,255,.14)}
 /* the Code lane's sidebar: the agent rows, the folder, the connection */
-.hz #code-wrap .agent{font-family:var(--hz-font-ui);font-size:13.5px;color:var(--hz-ink-2);border-radius:10px;min-height:34px;
-  padding:0 10px;border:1px solid transparent}
-.hz #code-wrap .agent:hover{background:rgba(255,255,255,.05);color:var(--hz-ink)}
-.hz #code-wrap .agent.on{background:rgba(255,255,255,.08);border-color:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);color:var(--hz-ink)}
-.hz #code-wrap .set-h{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3);opacity:1;margin-bottom:8px}
+.hz #code-wrap .agent{font-family:var(--hz-font-ui);font-size:14px;color:var(--hz-ink-2);border-radius:8px;min-height:32px;
+  padding:0 8px;border:1px solid transparent}
+.hz #code-wrap .agent:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
+.hz #code-wrap .agent.on{background:rgba(255,255,255,.09);border-color:transparent;box-shadow:none;color:var(--hz-ink)}
+.hz #code-wrap .set-h{font-family:var(--hz-font-mono);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3);opacity:1;margin-bottom:8px;text-shadow:var(--hz-halo-dark)}
 .hz #ws-bar,.hz #remote-bar{border-radius:var(--hz-r-md);background:rgba(255,255,255,.04);border:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
 .hz #ws-path,.hz #remote-bar input{background:rgba(0,0,0,.28);border:1px solid var(--hz-glass-line);border-radius:var(--hz-r-sm);
   font:12px var(--hz-font-mono);color:var(--hz-ink)}
-.hz #ws-path:focus,.hz #remote-bar input:focus{border-color:var(--hz-glass-line-2);outline:none;box-shadow:0 0 0 2px var(--hz-night),0 0 0 4px var(--hz-accent)}
+.hz #ws-path:focus,.hz #remote-bar input:focus{border-color:var(--hz-line);outline:none;box-shadow:none}
 .hz #ws-note,.hz #rm-note{font-family:var(--hz-font-ui);color:var(--hz-ink-3)}
 .hz .autoseg{border-radius:var(--hz-r-sm);background:rgba(255,255,255,.04);border:1px solid var(--hz-glass-line);color:var(--hz-ink-2)}
 .hz .autoseg b{font-family:var(--hz-font-ui);color:var(--hz-ink)}
 .hz .autoseg .ad{font-family:var(--hz-font-ui);color:var(--hz-ink-3)}
 /* the Funnels lane's sidebar form */
-.hz #funnel-wrap .fq{font-family:var(--hz-font-ui);font-size:12px;letter-spacing:0;text-transform:none;color:var(--hz-ink-3)}
+.hz #funnel-wrap .fq{font-family:var(--hz-font-mono);font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3);text-shadow:var(--hz-halo-dark)}
 .hz #funnel-wrap textarea,.hz #funnel-wrap select,.hz #funnel-wrap input{background:rgba(255,255,255,.04);border:1px solid var(--hz-glass-line);
   border-radius:var(--hz-r-sm);font:13.5px var(--hz-font-ui);color:var(--hz-ink)}
 .hz #funnel-wrap textarea:focus,.hz #funnel-wrap select:focus,.hz #funnel-wrap input:focus{border-color:var(--hz-glass-line-2);
@@ -52019,33 +52006,49 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
    from below. Motion is transform and opacity only; the GPU does the rest. */
 /* HORIZON TOKENS (6b526) */
 :root{
-  --hz-night:#04050a; --hz-deep:#070a16; --hz-dusk:#10204a;
-  --hz-ink:#f1f3fa;            /* primary text on the sky */
-  --hz-ink-2:#c9d0e2;          /* secondary text, AA on glass */
-  --hz-ink-3:#9aa6c6;          /* tertiary, labels; AA at 13px+ on --hz-deep */
-  --hz-accent:#9fc0ff;         /* the ONE accent: ice blue. Use with restraint */
+  /* beta 3 (6b555, per Patrick: the preview's look in the app): the values below are beta/DESIGN.md's Colour,
+     Glass, Shape and Motion tables (ground #030305, near-black neutrals, champagne hairlines, one easing family,
+     no bounce); the names stay, so every Horizon rule reads the new values */
+  --hz-night:#030305; --hz-deep:#0a0a0c; --hz-dusk:#10204a;
+  --hz-ink:#f4f5fa;            /* primary text on the sky (DESIGN --ink, 18.9:1 on --hz-night) */
+  --hz-ink-2:#c6cde0;          /* secondary text, placeholders (--ink2, 13.0:1) */
+  --hz-ink-3:#9aa6c6;          /* tertiary, labels (--ink3, 8.5:1; 6.7 on the lightest glass) */
+  --hz-accent:#9fc0ff;         /* ice: light only (the ember is the one accent at decisions) */
   --hz-good:#6ff0c0; --hz-warn:#f2b33d; --hz-bad:#ff8a7a;
   --hz-glass:rgba(255,255,255,.06); --hz-glass-2:rgba(255,255,255,.09);
-  --hz-glass-line:rgba(255,255,255,.12); --hz-glass-line-2:rgba(170,200,255,.22);
-  --hz-blur:blur(28px) saturate(150%);
+  --hz-glass-line:rgba(241,230,206,.15); --hz-glass-line-2:rgba(243,235,216,.22);
+  --hz-blur:blur(30px) saturate(108%);
   --hz-r-sm:8px; --hz-r-md:12px; --hz-r-lg:20px; --hz-r-xl:28px; --hz-r-pill:999px;
   --hz-s1:4px; --hz-s2:8px; --hz-s3:12px; --hz-s4:16px; --hz-s5:24px; --hz-s6:32px; --hz-s7:48px;
   --hz-ease-out:cubic-bezier(.16,1,.3,1);      /* arrivals */
   --hz-ease-in-out:cubic-bezier(.65,0,.35,1);  /* moves */
-  --hz-ease-spring:cubic-bezier(.34,1.56,.64,1);/* small pops only */
-  --hz-t-fast:140ms; --hz-t-mid:260ms; --hz-t-slow:520ms;
-  --hz-shadow:0 30px 80px rgba(0,0,0,.45);
+  --hz-ease-spring:cubic-bezier(.16,1,.3,1);   /* no bounce anywhere: the arrival curve */
+  --hz-t-fast:120ms; --hz-t-mid:200ms; --hz-t-slow:320ms;
+  --hz-shadow:0 1px 2px rgba(0,0,0,.18),0 12px 32px -8px rgba(0,0,0,.34),0 40px 96px -32px rgba(0,0,0,.55);
   --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
   --hz-font-display:'Space Grotesk',system-ui,sans-serif;
   --hz-font-read:'Space Grotesk',system-ui,sans-serif;
   --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
-  --hz-ink-read:#e6e9f4; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:186,176,255;
-  --hz-hair:rgba(255,255,255,.09); --hz-hair-2:rgba(255,255,255,.14); --hz-glass-lit:rgba(200,222,255,.42);
-  --hz-r-composer:26px; --hz-t-drift:28s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
+  --hz-ink-read:#e8ebf5; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:186,176,255;
+  --hz-hair:rgba(241,230,206,.09); --hz-hair-2:rgba(241,230,206,.15); --hz-glass-lit:rgba(243,235,216,.32);
+  --hz-r-composer:14px; --hz-t-drift:28s; --hz-t-drift-busy:16s; --hz-t-breathe:8s;
+  /* the glass, one material (DESIGN Glass and The beauty pass) */
+  --hz-line:rgba(243,235,216,.32); --hz-spec:rgba(255,250,240,.12);
+  --hz-glass-grad:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));
+  --hz-glass-dense:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03)),rgba(8,8,10,.78);
+  --hz-glass-inner:inset 0 -1px 0 rgba(0,0,0,.28),inset 0 -12px 18px -14px rgba(0,0,0,.45);
+  --hz-shadow-float:0 1px 2px rgba(0,0,0,.22),0 16px 40px -8px rgba(0,0,0,.42),0 48px 120px -32px rgba(0,0,0,.6);
+  /* shape: 14 panels, 8 controls, 6 chips, 4 tags; motion: 120 / 200 / 320 ms */
+  --hz-r-panel:14px; --hz-r-ctl:8px; --hz-r-chip:6px; --hz-r-tag:4px;
+  --hz-t1:120ms; --hz-t2:200ms; --hz-t3:320ms;
+  /* type */
+  --hz-t-micro:11px; --hz-t-label:12px; --hz-t-small:13px; --hz-t-ui:14px; --hz-t-read:17px; --hz-track-label:.12em;
+  /* small labels over the sky: a tight near-black halo (invisible on the black) */
+  --hz-halo-dark:1px 0 1px rgba(3,3,5,.7),-1px 0 1px rgba(3,3,5,.7),0 1px 1px rgba(3,3,5,.7),0 -1px 1px rgba(3,3,5,.7),1px 1px 2px rgba(3,3,5,.5),-1px -1px 2px rgba(3,3,5,.5),0 0 4px rgba(3,3,5,.75),0 0 9px rgba(3,3,5,.45);
 }
 :root{--hz-read-w:640px;--hz-gutter:56px;--hz-marg-w:236px}
 __HZ_FONTS__
-.hz body{background:#03040a;font-family:var(--hz-font-ui);-webkit-font-smoothing:antialiased}
+.hz body{background:#030305;font-family:var(--hz-font-ui);-webkit-font-smoothing:antialiased}
 .hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}
 /* ---- the night: one GPU canvas under everything; the footage plays beneath it
    (and shows plain where there is no WebGL) */
@@ -52099,8 +52102,6 @@ __HZ_FONTS__
 .hz .hz-ib svg{width:18px;height:18px;display:block}
 .hz .hz-ib:hover{background:rgba(255,255,255,.08)}
 .hz .hz-ib:active{transform:scale(.98)}
-.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible{
-  outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz #hz-brand{display:flex;align-items:center;gap:10px;min-width:0}
 /* the wordmark is the app's own lockup, unchanged and STATIC (6b542, per Patrick: the shining
    logo was "kind of tacky"): no glow, no glint, no animation, at any Effects level */
@@ -52110,12 +52111,6 @@ __HZ_FONTS__
 .hz #hz-title{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;display:none}
 .hz #main:not(:has(#hero)) #hz-title{display:block}
 .hz .hz-sp{flex:1}
-.hz #hz-lanes{display:flex;gap:26px}
-.hz #main:not(:has(#hero)) #hz-lanes{display:none}
-.hz #hz-lanes button{height:40px;padding:0 2px;border:0;background:transparent;font:inherit;font-size:14px;color:var(--hz-ink-3);cursor:pointer;
-  border-radius:4px;transition:color var(--hz-t-fast) ease,box-shadow var(--hz-t-mid) ease}
-.hz #hz-lanes button:hover{color:var(--hz-ink-2)}
-.hz #hz-lanes button[aria-selected=true]{color:var(--hz-ink);font-weight:500;box-shadow:inset 0 -1px 0 var(--hz-accent)}
 .hz #hz-right{display:flex;align-items:center;gap:14px}
 /* the machines: a die per machine in its maker's colour; asleep is hollow; the
    one at work pulses and its label shimmers; a card on hover */
@@ -52163,57 +52158,50 @@ __HZ_FONTS__
 .hz #main:has(#hero) #chat-scroll{flex:1 1 auto;overflow:visible;min-height:0;display:flex}
 .hz #main:has(#hero) #chat-inner{max-width:none;width:100%;padding:72px 24px 0;margin:0;display:flex;align-items:center;justify-content:center}
 .hz #main:has(#hero) #hero{min-height:0;padding:0;align-items:center;text-align:center;gap:14px;justify-content:center;width:100%}
-.hz #hero .greet{font-family:var(--hz-font-display);font-weight:600;font-size:clamp(60px,9vw,124px);line-height:.98;letter-spacing:-.055em;color:#f8faff;margin:0;
-  text-wrap:balance;position:relative;display:inline-block;
-  text-shadow:0 0 1px rgba(255,250,242,.6),0 0 12px rgba(255,244,228,.42),0 0 24px rgba(255,240,220,.26)}
-/* THE GREETING'S AFTERGLOW in Full (6b552, per Patrick: silver and one hue, "too much rainbow"): warm white, still,
-   two zero-offset layers from the one string: a close glow hugging the letters (the text-shadow above, 12-24 px) and
-   a slightly stronger wide bloom (the blurred .bloom copy, 30 px, behind); no rainbow, rose or gold, no loop, no
-   sweep, and nothing offset, so it never reads as a second word */
-.hz #hero .greet .fill{position:relative;opacity:0;transition:opacity .55s var(--hz-ease-out)}
-.hz #hero .greet.shown .fill{opacity:1}
-.hz #hero .greet .bloom{position:absolute;inset:0;color:transparent;text-shadow:none;background:linear-gradient(rgba(255,242,224,1),rgba(255,242,224,1));
-  -webkit-background-clip:text;background-clip:text;filter:blur(30px);opacity:0;z-index:-1;transition:opacity 1.4s var(--hz-ease-out)}
-.hz #hero .greet.shown .bloom{opacity:.55}
-.hz #hero .greet .sheen{position:absolute;inset:0;pointer-events:none;color:transparent;text-shadow:none;opacity:0;
-  background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.95) 48%,rgba(190,212,255,.9) 52%,transparent 65%);background-size:250% 100%;background-position:120% 0;
-  -webkit-background-clip:text;background-clip:text}
-.hz #hero .greet.shown .sheen{opacity:0}   /* no sweep over the words: the afterglow is still (6b552) */
+/* THE GREETING (6b555, per Patrick: the preview's look in the app; replaces 6b552's three layers): ONE text node in one
+   box at every level, crisp #f8faff, the display voice (Space Grotesk 500, 600 in Full, -0.03em; -0.02em on a phone).
+   Balanced and Full trace it in light once (hzHeadlineShow), then its afterglow rises over 2 s on --out and is still:
+   two zero-offset layers from that one node, never a copy: a close glow on the letters (16 px and 34 px at .42 of it,
+   a = .30 Balanced / .38 Full) and a wide warm-white radial bloom behind the block (::before, 22 % wider each side, 72 %
+   taller above and below), resting at .66 / .78, touched 22 % by the hour's light (--hz-hour-light, when the sky sets
+   it). No loop. Calm and reduced motion: the plain greeting. */
+.hz #hero .greet{font-family:var(--hz-font-display);font-weight:500;font-size:clamp(44px,6.2vw,96px);line-height:1;letter-spacing:-.03em;color:#f8faff;margin:0;
+  text-wrap:balance;position:relative;display:inline-block;isolation:isolate;font-feature-settings:"kern" 1,"liga" 1;--hz-ag-rest:.66;--hz-ag-close:.3;
+  opacity:0;transition:opacity .6s var(--hz-ease-out),text-shadow 2s var(--hz-ease-out)}
+.hz #hero .greet.shown{opacity:1}
+.hz.hz-full #hero .greet{font-weight:600;--hz-ag-rest:.78;--hz-ag-close:.38}
+.hz:not(.hz-calm) #hero .greet.aglow{text-shadow:0 0 16px rgba(255,246,232,var(--hz-ag-close)),0 0 34px rgba(255,240,222,calc(var(--hz-ag-close) * .42))}
+.hz #hero .greet::before{content:"";position:absolute;left:-22%;right:-22%;top:-72%;bottom:-72%;z-index:-1;pointer-events:none;opacity:0;background:radial-gradient(closest-side,color-mix(in srgb,var(--hz-hour-light,#dfe8ff) 22%,transparent),transparent 72%),radial-gradient(closest-side,rgba(255,244,228,.34),rgba(255,242,224,.27) 22%,rgba(255,239,219,.17) 44%,rgba(255,236,214,.08) 66%,rgba(255,234,210,.02) 86%,rgba(255,234,210,0))}
+.hz:not(.hz-calm) #hero .greet.aglow::before{opacity:var(--hz-ag-rest);animation:hzAfterglow 2s var(--hz-ease-out) both}
+@keyframes hzAfterglow{0%{opacity:0;transform:scale(.9)}20%{opacity:1}100%{opacity:var(--hz-ag-rest);transform:none}}
+.hz .novideo #hero .greet.aglow,.hz.hz-calm #hero .greet{text-shadow:none}
+.hz .novideo #hero .greet::before,.hz.hz-calm #hero .greet::before{display:none}
+@media (prefers-reduced-motion:reduce){.hz #hero .greet{text-shadow:none!important;transition:none}.hz #hero .greet::before{display:none}}
+@media (max-width:600px){.hz #hero .greet{font-size:clamp(40px,11.5vw,56px);letter-spacing:-.02em}}
 .hz-status{display:none}
-.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
+.hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:848px;margin:0 auto;width:100%}   /* the home column: 800 (6b555) */
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}
 .hz .novideo #composer-wrap{background:none}
 /* the glass (NORTHSTAR 12): lit from below; its glow a separate breathing layer */
-.hz #composer{position:relative;max-width:none;margin:0;border-radius:var(--hz-r-composer);padding:18px 16px 12px 22px;gap:12px;
-  background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.045));
-  border:1px solid rgba(255,255,255,.13);border-bottom-color:var(--hz-glass-lit);
-  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.35);
-  transition:border-color var(--hz-t-mid) ease,box-shadow var(--hz-t-mid) ease}
-.hz #composer:focus-within{border-color:rgba(255,255,255,.2);border-bottom-color:rgba(200,222,255,.6);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35),0 0 0 4px rgba(159,192,255,.08)}
-.hz .gen #composer{border-color:rgba(159,192,255,.35);box-shadow:inset 0 1px 0 rgba(255,255,255,.1),inset 0 -18px 40px -24px rgba(159,192,255,.5),0 30px 80px rgba(0,0,0,.35)}
+.hz #composer{position:relative;max-width:none;margin:0}   /* the glass, its size and its states: BETA 3 CHROME (6b555) */
 .hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
   box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
 .hz #hz-cglow[hidden]{display:none}
-.hz #input{font:17px/1.5 var(--hz-font-ui);color:var(--hz-ink);padding:0 2px 4px;min-height:52px}
+.hz #input{font:17px/26px var(--hz-font-ui);color:var(--hz-ink);padding:0 2px;min-height:26px;max-height:156px;overflow-y:auto}   /* one line at rest; typed text grows it to 156 px, then it scrolls (6b555) */
 .hz #input::placeholder{color:var(--hz-ink-2);opacity:1}
 .hz #input:focus,.hz #input:focus-visible{outline:0;box-shadow:none}
 .hz #main:not(:has(#hero)) #input{min-height:40px;font-size:16px;padding:9px 6px}
-.hz #crow{display:flex;align-items:center;gap:12px;margin-top:0;justify-content:flex-start;flex-wrap:wrap}
+.hz #crow{display:flex;align-items:center;gap:8px;margin-top:0;justify-content:flex-start;flex-wrap:wrap}
 .hz #cbtns{display:contents}
 .hz #attach{order:1}.hz #hz-effort{order:2}.hz #model-chip{order:3}.hz #mic{order:6;margin-left:auto}.hz #voicebtn{order:7}.hz #send{order:8}
 .hz #accel-chip,.hz #srv-chips,.hz #cloud-chip{display:none!important}
-.hz .cbtn{width:40px;height:40px;border-radius:999px;color:var(--hz-ink-2);transition:background var(--hz-t-fast) ease,transform var(--hz-t-fast) ease,color var(--hz-t-fast) ease}
-.hz .cbtn:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
-.hz .cbtn:active{transform:scale(.98)}
-.hz .cbtn:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
-.hz #attach{border:1px solid rgba(255,255,255,.16)}
+.hz .cbtn{width:36px;height:36px;border-radius:8px;color:var(--hz-ink-2);transition:background var(--hz-t1) var(--hz-ease-out),box-shadow var(--hz-t1) var(--hz-ease-out),transform var(--hz-t1) var(--hz-ease-out),color var(--hz-t1) var(--hz-ease-out)}
+.hz .cbtn:hover{background:rgba(255,255,255,.06);color:var(--hz-ink)}
 .hz #voicebtn.parked{display:none}
 .hz #send:disabled{background:rgba(255,255,255,.1);color:var(--hz-ink-3);box-shadow:none}
 .hz #send.stop{background:#eef2fc;color:#071026;font-size:12px}
 /* the More-modes button (the engine menu: Max, Cloud only, your servers, Advanced); it never names a model */
-.hz #model-chip{height:40px;width:40px;padding:0;border-radius:999px;border:0;background:transparent;color:var(--hz-ink-2);font-size:0;
+.hz #model-chip{height:36px;width:36px;padding:0;border-radius:999px;border:0;background:transparent;color:var(--hz-ink-2);font-size:0;
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background var(--hz-t-fast) ease}
 .hz #model-chip:hover{background:rgba(255,255,255,.08);color:var(--hz-ink)}
 .hz #model-chip b{display:none}
@@ -52292,7 +52280,6 @@ __HZ_FONTS__
 .hz .hz-pick{display:flex;align-items:center;gap:7px;height:36px;padding:0 11px 0 13px;border-radius:999px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);
   cursor:pointer;color:var(--hz-ink);font:inherit;flex:none;transition:background var(--hz-t-fast) ease}
 .hz .hz-pick:hover{background:rgba(255,255,255,.09)}
-.hz .hz-pick:focus-visible{outline:0;box-shadow:0 0 0 2px #04050a,0 0 0 4px var(--hz-accent)}
 .hz .hz-pick b{font-size:14px;font-weight:500;white-space:nowrap}
 .hz .hz-pick svg{opacity:.7;transform:rotate(180deg);transition:transform .35s var(--hz-ease-out)}
 .hz .hz-pick[aria-expanded=true] svg{transform:none}
@@ -52452,7 +52439,6 @@ __HZ_FONTS__
   .hz #hz-effort,.hz #hz-effort.compact{gap:10px}
   .hz #main:not(:has(#hero)) #hz-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .hz #hz-mark{display:none}
-  .hz #hz-lanes{gap:14px}
   .hz #crow{row-gap:10px}
   .hz #hz-effort:not(.compact){order:9;flex:1 1 100%}
 }
@@ -52514,9 +52500,7 @@ __HZ_FONTS__
 .hz.hz-calmopen #hz-intro-mark line,.hz.hz-calmopen.hz-markin #hz-intro-mark line{animation:none!important;stroke-dasharray:none;stroke-dashoffset:0;opacity:1}
 .hz.hz-calmopen #hz-intro-mark .hz-glint,.hz.hz-calmopen #hz-intro-mark .hz-flare{display:none}
 .hz.hz-calmopen.hz-markout #hz-intro-mark{transition:opacity .5s var(--hz-ease-out),transform .5s var(--hz-ease-out)}
-/* ---- the greeting in Calm: plain white text, one node (hzHeadline), no glow, no layers */
-.hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}
-.hz:not(.hz-full) #hero .greet .bloom,.hz:not(.hz-full) #hero .greet .sheen{display:none}
+/* ---- the greeting in Calm: plain white text, one node (hzHeadline), no glow (6b555: Balanced keeps its afterglow) */
 /* ---- the composer in Calm: no light ring, no breathing glow, no shimmer at Max or Ultra */
 .hz:not(.hz-full) #composer::before{animation:none;opacity:0!important}
 .hz:not(.hz-full) #hz-cglow{display:none}
@@ -52566,28 +52550,26 @@ __HZ_FONTS__
 html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* ---- BALANCE: the 8 px grid on the header and the composer; tight radii; crisp 1.5 px arrows */
 .hz #hz-top{gap:16px;padding:0 24px}
-.hz #hz-lanes{gap:24px}
 .hz #hz-right{gap:16px}
 .hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}
-.hz #composer{padding:16px 16px 16px 24px;gap:8px}
 .hz #main:not(:has(#hero)) #composer,.hz #main:not(:has(#hero)) #composer::before{border-radius:14px}
 .hz #main:has(#hero) #hz-history:not([hidden]){margin-top:32px}
 .hz #hz-menu{border-radius:12px}
 .hz .hz-opt{border-radius:8px}
 .hz .hz-opt[aria-checked=true]>b::after{box-shadow:none}
-.hz .hz-pick{height:40px;border-radius:8px;gap:8px;padding:0 10px 0 12px}
+.hz .hz-pick{height:36px;border-radius:8px;gap:8px;padding:0 10px 0 12px}
 .hz #hz-effort.compact .hz-pick{height:32px;padding:0 8px 0 10px}
 /* ---- the slider: 6b542's balance beam (a hairline, five ticks, a diamond, the level in spaced mono caps) gave way in
    6b552 to the friend page's slim luminous pill, per Patrick ("not just a bunch of dots"); see THE EFFORT SLIDER */
 /* ---- the send key: a crisp square with a 1.5 px arrow; silver outline until there are words,
    ember while there are (#composer.hastext); the stop key is silver */
-.hz #send{width:40px;height:40px;border-radius:8px;background:transparent;color:var(--hz-ink-2);box-shadow:inset 0 0 0 1px var(--hz-hair-3);
-  transition:background var(--hz-t-fast) ease,color var(--hz-t-fast) ease,box-shadow var(--hz-t-fast) ease}
-.hz #send svg{stroke-width:1.5}
-.hz #send:hover{background:rgba(255,255,255,.06);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.4);transform:none}
+.hz #send{width:36px;height:36px;border-radius:8px;background:transparent;color:var(--hz-ink);box-shadow:inset 0 0 0 1px var(--hz-line);
+  transition:background var(--hz-t2) var(--hz-ease-out),color var(--hz-t2) var(--hz-ease-out),box-shadow var(--hz-t2) var(--hz-ease-out),transform var(--hz-t1) var(--hz-ease-out)}
+.hz #send svg{stroke-width:1.5;transform:translateY(-.5px)}
+.hz #send:hover{background:rgba(255,255,255,.04);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.6);transform:none}
 .hz #send:disabled{background:transparent;color:var(--hz-ink-3);box-shadow:inset 0 0 0 1px var(--hz-hair)}
-.hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:#fff;box-shadow:none}
-.hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ef5069;color:#fff}
+.hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:var(--hz-night);box-shadow:none}
+.hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ed5169;color:var(--hz-night)}
 .hz #send.stop,.hz #composer.hastext #send.stop{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 0 0 1px var(--hz-hair-3)}
 /* ---- the sting: on send, one 1 px ember line strikes along the composer's top edge (hzStrike,
    about 300 ms, once); still under reduced motion and with the effects off */
@@ -52596,10 +52578,6 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* ---- the focus hairline: 1 px ember on any control reached by the keyboard, in place of the
    ice ring; on the composer only while it holds words and the focus (the composer has the focus
    from the first frame, so an ember border on focus alone would never be a moment) */
-.hz #composer:focus-within{border-color:rgba(255,255,255,.22);border-bottom-color:rgba(200,222,255,.6);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35)}
-.hz #composer.hastext:focus-within{border-color:var(--hz-ember);border-bottom-color:var(--hz-ember);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 80px rgba(0,0,0,.35)}
 .hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
 .hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
 .hz #newchat:focus-visible,.hz .srcchip:focus-visible,.hz .showm:focus-visible,.hz .retrybtn:focus-visible,.hz #sb-foot #settings-btn:focus-visible,.hz #sb-foot #rail-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
@@ -52615,14 +52593,9 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-balopen #hz-intro-mark .hz-glint,.hz.hz-balopen #hz-intro-mark .hz-flare{display:none}   /* traced, no streak, no glint */
 .hz.hz-balopen #hz-intro-mark .vghost svg{filter:drop-shadow(0 0 10px rgba(159,192,255,.45))}
 .hz.hz-balopen.hz-markout #hz-intro-mark{transition:opacity .6s var(--hz-ease-out),transform .6s var(--hz-ease-out)}
-/* the greeting fades up with a soft glow that settles to plain white in 1.5 s: one node, once */
-.hz.hz-bal #hero .greet.shown{animation:hzGreetIn 1.5s var(--hz-ease-out) both}
-@keyframes hzGreetIn{0%{opacity:0;text-shadow:0 0 18px rgba(205,222,255,.75),0 0 60px rgba(140,175,255,.55)}
-  45%{opacity:1;text-shadow:0 0 18px rgba(205,222,255,.55),0 0 60px rgba(140,175,255,.4)}100%{opacity:1;text-shadow:0 0 0 rgba(205,222,255,0),0 0 0 rgba(140,175,255,0)}}
-.hz .novideo #hero .greet.shown{animation:none}
-/* a faint light along the composer's top edge that warms on focus */
-.hz.hz-bal #composer{box-shadow:inset 0 1px 0 rgba(200,222,255,.22),inset 0 -18px 40px -24px rgba(159,192,255,.35),0 30px 80px rgba(0,0,0,.35)}
-.hz.hz-bal #composer:focus-within{box-shadow:inset 0 1px 0 rgba(200,222,255,.45),inset 0 -18px 40px -24px rgba(159,192,255,.45),0 30px 80px rgba(0,0,0,.35)}
+/* the greeting: traced, then its still afterglow, in Balanced as in Full (THE GREETING, 6b555) */
+/* a faint light along the composer's top edge that warms on focus: the glass's own --hz-spec, brighter on focus, silver
+   (BETA 3 CHROME, 6b555) */
 /* the mode switch: one soft light under the chip as the name rolls */
 .hz .hz-pick{position:relative;overflow:hidden}
 .hz .hz-usweep{position:absolute;left:0;bottom:0;width:40%;height:1px;pointer-events:none;opacity:0;
@@ -52633,8 +52606,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-bal .msg.ai.live .liveline em{animation:hzFadeIn .4s var(--hz-ease-out)}
 /* hover: the controls lift a pixel and their hairline brightens; no glow, no bloom (6b553, per Patrick: "not tacky") */
 .hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover,.hz.hz-bal .hz-pick:hover,.hz.hz-bal .mab:hover,.hz.hz-bal #newchat:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}   /* a brighter hairline, no glow (6b553) */
-.hz.hz-bal .cbtn:hover,.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}
-@media (prefers-reduced-motion:reduce){.hz #hero .greet.shown,.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}
+.hz.hz-bal .hz-ib:hover{transform:translateY(-1px)}   /* the composer's keys never lift (6b555, No shine on controls) */
+@media (prefers-reduced-motion:reduce){.hz .msg.ai.live .liveline em{animation:none}.hz .hz-usweep{display:none}}
 /* ---- ULTRA (6b544, per Patrick: "that's where I want to use VFX to have it pull something off to show
    you're using something special", and "make the Ultra switch rival ... whatever Claude has"). The everyday
    look stays restrained; this is the one place the effects perform. Values and timings are the friend
@@ -52823,10 +52796,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.8),rgba(255,255,255,0))}
 .hz .hz-star::after{transform:rotate(90deg)}
 .hz .msg.ai.live .hz-star,.hz .msg.ai.landing .hz-star{display:block}
-.hz .hz-new{position:relative;animation:hzNew .16s cubic-bezier(.3,0,.2,1) both}
-@keyframes hzNew{from{opacity:0;top:2px}to{opacity:1;top:0}}
-.hz.hz-calm .hz-new{animation-name:hzNewCalm}
-@keyframes hzNewCalm{from{opacity:0}to{opacity:1}}
+/* the words' reveal is THE INK (6b555, in BETA 3 CHROME): .hz-ink, one word to a box */
 .hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}
 .hz .msg.ai .who .dot.lit{animation:hzDotLit .5s cubic-bezier(.3,0,.2,1) both}
 @keyframes hzDotLit{0%{opacity:1;box-shadow:0 0 12px #fff,0 0 4px #fff}100%{opacity:.55;box-shadow:0 0 10px rgba(159,192,255,.9)}}
@@ -52834,7 +52804,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz .msg.ai.landed>.ans-foot .hz-details{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}
 .hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}
 @media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}
-  .hz .hz-new,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
+  .hz .hz-ink,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
 /* ---- SETTINGS LOOK (6b551, per Patrick: "It looks perfect as far as layout, but it doesn't match our
    current look"). The same rail and pane, in the front's language (beta/DESIGN.md): one neutral glass
    over a black scrim, champagne hairlines, Space Grotesk 14 for rows and 13 for notes, mono 11 caps for
@@ -52846,7 +52816,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz{--sl-ink:#f4f5fa;--sl-ink2:#c6cde0;--sl-ink3:#9aa6c6;--sl-hair:rgba(241,230,206,.09);--sl-hair2:rgba(241,230,206,.15);
   --sl-line:rgba(243,235,216,.32);--sl-spec:rgba(255,250,240,.12);--sl-ember:#e8415a;--sl-out:cubic-bezier(.16,1,.3,1);
   --sl-glass:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));
-  --sl-dense:linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,.025)),rgba(8,8,10,.86);
+  --sl-dense:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03)),rgba(8,8,10,.78);
   --sl-shadow:0 1px 2px rgba(0,0,0,.22),0 16px 40px -8px rgba(0,0,0,.42),0 48px 120px -32px rgba(0,0,0,.6);
   --sl-ui:'Space Grotesk',-apple-system,system-ui,sans-serif;--sl-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
 .hz #about-veil{background:rgba(3,3,5,.72);-webkit-backdrop-filter:blur(12px) saturate(40%);backdrop-filter:blur(12px) saturate(40%);
@@ -52854,7 +52824,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   --panel:rgba(255,255,255,.03);--panel2:transparent;--accent:var(--sl-ink);--accent-hot:#fff;--helv:var(--sl-ui);--sans:var(--sl-ui);--disp:var(--sl-ui);--mono:var(--sl-mono)}
 .hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 48px));max-height:none;
   grid-template-columns:216px minmax(0,1fr);border-radius:14px;border:1px solid var(--sl-hair2);background:var(--sl-dense);
-  box-shadow:inset 0 1px 0 var(--sl-spec),var(--sl-shadow);-webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);
+  box-shadow:inset 0 1px 0 var(--sl-spec),inset 0 -1px 0 rgba(0,0,0,.28),inset 0 -12px 18px -14px rgba(0,0,0,.45),var(--sl-shadow);-webkit-backdrop-filter:blur(30px) saturate(108%);backdrop-filter:blur(30px) saturate(108%);
   color:var(--sl-ink);font:400 14px/1.5 var(--sl-ui);-webkit-font-smoothing:antialiased}
 /* the rail: the lockup, the spec, the sections */
 .hz #about-veil #set-rail{background:rgba(0,0,0,.18);border-right:1px solid var(--sl-hair);padding:24px 8px 16px;overflow-y:auto;scrollbar-width:none}
@@ -53050,7 +53020,7 @@ html:not(.hz) .sl-sel{display:none}
 .hz .sl-sel.wide,.hz .sl-sel.wide .sl-menu{width:100%}
 .hz #sl-pop{position:fixed;z-index:90;min-width:160px;max-width:min(320px,calc(100vw - 32px));max-height:min(320px,calc(100vh - 32px));overflow-y:auto;padding:4px;box-sizing:border-box;
   border-radius:12px;border:1px solid var(--sl-hair2);background:var(--sl-dense);box-shadow:inset 0 1px 0 var(--sl-spec),var(--sl-shadow);
-  -webkit-backdrop-filter:blur(24px) saturate(140%);backdrop-filter:blur(24px) saturate(140%);opacity:0;transform:translateY(-4px);
+  -webkit-backdrop-filter:blur(30px) saturate(108%);backdrop-filter:blur(30px) saturate(108%);opacity:0;transform:translateY(-4px);
   transition:opacity .2s var(--sl-out),transform .2s var(--sl-out);scrollbar-width:thin}
 .hz #sl-pop.in{opacity:1;transform:none}
 .hz #sl-pop[hidden]{display:none}
@@ -53076,6 +53046,110 @@ html:not(.hz) .sl-sel{display:none}
   .hz #about-veil #about-foot{padding:12px 16px}
   .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row{flex-wrap:wrap;row-gap:8px}
 }
+/* ==== BETA 3 CHROME (6b555, per Patrick: the preview's look in the app) ==== */
+/* The chrome of 7.0 beta 3, ported from the preview (beta/DESIGN.md: The composer: flat and low; The lanes; The ink;
+   The sidebar's chats; No shine on controls; Subtract and refine; Motion > States). Horizon only: every rule is under
+   .hz, so Classic is untouched. The tokens are the HORIZON TOKENS above; the greeting is THE GREETING (6b555) at the
+   home's rules; the sidebar's rows, labels and glass are restyled in place in the sidebar's rules. */
+/* ---- the composer: flat and low. One line of text and the control row as one unit, centred in the glass: 99 px
+   tall at rest on the home (95 on a phone): 13 px above, 12 below, 16 left, 14 right (14 and 12 on a phone); the
+   textarea one line (26 px), a 10 px gap, the 36 px row (32 on a phone). Only typed text grows it, to 156 px of text,
+   then it scrolls; hzBalance re-seats its centre at the golden point (61.8 %) of the free height below the header
+   whenever it grows (the ResizeObserver on #composer). The glass: the one material, frosted (blur 30, saturate 108),
+   a 1 px top highlight and a whisper of inner shadow at the foot; focus brightens its edge to --hz-line. */
+.hz #composer{border-radius:var(--hz-r-panel);padding:13px 14px 12px 16px;gap:10px;background:var(--hz-glass-grad);border:1px solid var(--hz-hair-2);
+  -webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);box-shadow:inset 0 1px 0 var(--hz-spec),var(--hz-glass-inner),var(--hz-shadow);
+  transition:border-color var(--hz-t2) var(--hz-ease-out),box-shadow var(--hz-t3) var(--hz-ease-out)}
+.hz #composer:focus-within{border-color:var(--hz-line);box-shadow:inset 0 1px 0 rgba(255,250,240,.18),var(--hz-glass-inner),var(--hz-shadow)}
+/* ---- the keys: flat. NO SHINE ON CONTROLS (per Patrick: "maximize and run VFX hard, but not tacky"): send, attach and
+   mic are clean flat keys at every level, Ultra included: no gradient, sheen, glint, glow, outline colour or lift.
+   Send: neutral glass while the box is empty, a solid ember fill while there is text (a flat, slightly lighter ember
+   on hover; the night's arrow on it, 5.2:1). Attach and mic: a hairline, brighter on hover; the mic's listening state
+   a plain brighter fill (no pulse). Every control in the row and the lanes presses in 1 px and to .985 in 80 ms and lets
+   go cleanly; hzSendPress plays the same press on a send in Full (a send by the keyboard has no :active). */
+.hz #attach,.hz #mic{box-sizing:border-box;border:1px solid var(--hz-hair-2);background:transparent}
+.hz #attach:hover,.hz #mic:hover{background:rgba(255,255,255,.06);border-color:var(--hz-line);color:var(--hz-ink)}
+.hz #mic.rec{animation:none;color:var(--hz-ink);background:rgba(255,255,255,.12);border-color:var(--hz-line)}
+.hz #crow .cbtn:active,.hz #crow .hz-pick:active,.hz #crow #model-chip:active,.hz #hz-lanes button:active{transform:translateY(1px) scale(.985);transition-duration:80ms}
+/* ---- the keyboard's ring, keyboard only: a 1 px ember hairline after a Tab, an arrow, Home, End or a Page key (html.hz-kb,
+   hzKbWire); any pointer press clears it, so a click never leaves it behind (WKWebView can report a clicked control as
+   focus-visible). On the filled send key it stands 2 px off; on a lane and a sidebar row it sits inside. */
+.hz:not(.hz-kb) #crow .cbtn:focus-visible,.hz:not(.hz-kb) #crow .hz-pick:focus-visible,.hz:not(.hz-kb) #crow #model-chip:focus-visible,
+.hz:not(.hz-kb) #hz-lanes button:focus-visible,.hz:not(.hz-kb) #sidebar .chat-item:focus-visible,.hz:not(.hz-kb) #sidebar #newchat:focus-visible{outline:0;box-shadow:none}
+.hz:not(.hz-kb) #crow #send:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-line)}
+.hz:not(.hz-kb) .hz-sl:has(input:focus-visible)::after{box-shadow:none}
+.hz.hz-kb #crow #send:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
+.hz.hz-kb #composer.hastext #send:not(:disabled):not(.stop):focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 3px var(--hz-ember)}
+.hz.hz-kb #hz-lanes button:focus-visible,.hz.hz-kb #sidebar .chat-item:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+/* ---- THE LANES: Chat · Code · Funnels exactly once, the header's glass segmented control (the sidebar's #mode-tabs are
+   gone under Horizon). Three equal segments (at least 88 px, 76 on a phone), 32 px tall, radius 6 outside and 4.5 inside,
+   in the header's centre over the column; the lit box slides between them in 200 ms on --out (hzLanePaint sets the nav's
+   data-m) and the labels cross from --hz-ink-3 to --hz-ink. Funnels wears a 9 px four-point star that twinkles once on
+   hover and never turns; its box's edge is a brighter silver. Arrow keys, Home and End move along; the keyboard's ring
+   is an inset ember hairline. On a phone it sits just under the header. */
+.hz #hz-lanes{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:32px;box-sizing:border-box;padding:0;margin:0;border-radius:6px;
+  border:1px solid var(--hz-hair-2);background:var(--hz-glass-grad);-webkit-backdrop-filter:var(--hz-blur);backdrop-filter:var(--hz-blur);box-shadow:inset 0 1px 0 var(--hz-spec)}
+.hz #hz-lanes button{position:relative;z-index:1;min-width:88px;height:30px;padding:0 14px;margin:0;border:0;background:none;border-radius:4.5px;
+  font:400 14px/1 var(--hz-font-ui);letter-spacing:.005em;color:var(--hz-ink-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  transition:color var(--hz-t2) var(--hz-ease-out),transform var(--hz-t1) var(--hz-ease-out)}
+.hz #hz-lanes button:hover{color:var(--hz-ink-2)}
+.hz #hz-lanes button[aria-selected=true]{color:var(--hz-ink)}
+.hz #hz-lanes .hz-fstar{flex:none;opacity:.85}
+.hz:not(.hz-calm) #hz-lanes button:hover .hz-fstar{animation:hzFstar 1.4s ease-in-out}
+@keyframes hzFstar{0%,100%{transform:scale(1);opacity:.85}40%{transform:scale(1.35);opacity:1}70%{transform:scale(.9);opacity:.7}}
+.hz #hz-lanes .hz-seg-hi{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / 3);border-radius:4.5px;pointer-events:none;--hz-i:0;
+  transform:translateX(calc(var(--hz-i) * 100%));background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 0 0 1px rgba(226,230,240,.28),0 0 12px -3px rgba(255,255,255,.22);
+  transition:transform .2s var(--hz-ease-out),box-shadow .2s var(--hz-ease-out)}
+.hz #hz-lanes[data-m=code] .hz-seg-hi{--hz-i:1}
+.hz #hz-lanes[data-m=funnel] .hz-seg-hi{--hz-i:2;box-shadow:inset 0 1px 0 rgba(255,255,255,.26),0 0 0 1px rgba(240,242,248,.46),0 0 14px -3px rgba(255,255,255,.32)}
+/* on the home it sits in the header's centre, over the column; in a conversation it takes its place in the header's row
+   (the effort sits at the right there), between the chat's title and the controls */
+.hz #hz-lanes{flex:none}
+@media (min-width:761px){.hz #main:has(#hero) #hz-lanes{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}}
+@media (prefers-reduced-motion:reduce){.hz #hz-lanes .hz-seg-hi,.hz #hz-lanes button{transition:none}.hz #hz-lanes .hz-fstar{animation:none!important}}
+/* ---- THE INK (hzStarWrap): one word to a box while it lands, at its rest weight's width (zero reflow); it fades in over
+   300 ms with a 1 px rise and a 2 px blur coming sharp, its neutral white light fading (the wet-ink edge on the newest
+   three or four words), and settles from a lighter weight in 280 ms ("wght" 320 > 400; bold and headings 450 > 600;
+   code does not morph). While the answer streams it wraps plainly (text-wrap: wrap, never pretty) and kerning is off,
+   so a settled word unwrapped to plain text sits where its box did. Calm: a plain 220 ms fade. Reduced motion: none. */
+.hz .msg.ai.live .body{text-wrap:wrap;font-kerning:none}
+.hz .hz-ink{display:inline-block;--hz-w0:320;--hz-w1:400}
+.hz .msg.ai .body strong .hz-ink,.hz .msg.ai .body b .hz-ink,.hz .msg.ai .body h1 .hz-ink,.hz .msg.ai .body h2 .hz-ink,.hz .msg.ai .body h3 .hz-ink{--hz-w0:450;--hz-w1:600}
+.hz .msg.ai .body code .hz-ink{--hz-w0:400;--hz-w1:400}
+.hz .hz-ink.go{animation:hzInkIn .3s cubic-bezier(.2,.7,.2,1) both,hzInkWght .28s cubic-bezier(.2,.7,.2,1) both}
+.hz .hz-ink.c{animation:hzInkFade .22s ease both}
+@keyframes hzInkWght{from{font-variation-settings:"wght" var(--hz-w0)}to{font-variation-settings:"wght" var(--hz-w1)}}
+@keyframes hzInkIn{0%{opacity:0;transform:translateY(1px);filter:blur(2px) drop-shadow(0 0 6px rgba(255,255,255,.6))}
+  40%{filter:blur(.8px) drop-shadow(0 0 6px rgba(255,255,255,.38))}
+  73%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,.14))}
+  100%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}
+@keyframes hzInkFade{from{opacity:0}to{opacity:1}}
+/* draft > polish, calmly: the shown draft dims to .12 under a 1.5 px blur in 220 ms, then the polish shimmers in over
+   620 ms (opacity and the blur gone by 55 %, the same neutral light fading out); Calm a plain fade out and a 400 ms fade
+   in; reduced motion none (the polish replaces the draft at once) */
+.hz .msg.ai .body.swapout{opacity:.12;filter:blur(1.5px);transition:opacity .22s ease,filter .22s ease}
+.hz .msg.ai .body.swapin{animation:hzInkShimmer .62s var(--hz-ease-out) both}
+@keyframes hzInkShimmer{0%{opacity:0;filter:blur(1.5px) drop-shadow(0 0 6px rgba(255,255,255,.6))}55%{opacity:1;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,.35))}
+  100%{opacity:1;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}
+.hz.hz-calm .msg.ai .body.swapout{opacity:0;filter:none;transition:opacity .2s ease}
+.hz.hz-calm .msg.ai .body.swapin{animation:hzInkFade .4s ease both}
+@media (prefers-reduced-motion:reduce){.hz .hz-ink{animation:none!important}
+  .hz .msg.ai .body.swapout,.hz .msg.ai .body.swapwait{opacity:1;filter:none;transition:none}.hz .msg.ai .body.swapin{animation:none}}
+/* ---- the sidebar: the glass over the night (a denser near-black where it is a drawer over the page) */
+@media (max-width:760px){.hz #sidebar{background:var(--hz-glass-grad),rgba(6,6,8,.9)}}
+/* ---- a phone: the composer's 95 px (13 / 12 / 14 / 12 and a 32 px row); the lanes just under the header */
+@media (max-width:600px){
+  .hz #composer{padding:13px 12px 12px 14px}
+  .hz #crow .cbtn,.hz #crow #model-chip{width:32px;height:32px}
+  .hz #crow .hz-pick{height:32px}
+  .hz #crow{gap:6px}
+  .hz #hz-lanes{position:absolute;left:50%;top:70px;transform:translateX(-50%);z-index:4}
+  .hz #main:not(:has(#hero)) #hz-lanes{top:54px}
+  .hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
+  .hz #hz-lanes button{min-width:76px;padding:0 10px}
+}
+/* ==== beta 3 chrome end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -53492,10 +53566,10 @@ __CODE_ROWS__
       <span id="hz-title"></span>
     </div>
     <span class="hz-sp" data-tauri-drag-region></span>
-    <nav id="hz-lanes" role="tablist" aria-label="Lane">
+    <nav id="hz-lanes" role="tablist" aria-label="Lane" data-m="ai"><i class="hz-seg-hi" aria-hidden="true"></i>
       <button type="button" role="tab" data-m="ai" aria-selected="true">Chat</button>
       <button type="button" role="tab" data-m="code" aria-selected="false" tabindex="-1">Code</button>
-      <button type="button" role="tab" data-m="funnel" aria-selected="false" tabindex="-1">Funnels</button>
+      <button type="button" role="tab" data-m="funnel" aria-selected="false" tabindex="-1"><svg class="hz-fstar" width="9" height="9" viewBox="-5 -5 10 10" aria-hidden="true"><path d="M0 -5Q.7 -.7 5 0Q.7 .7 0 5Q-.7 .7 -5 0Q-.7 -.7 0 -5Z" fill="currentColor"/></svg>Funnels</button>
     </nav>
     <span class="hz-sp" data-tauri-drag-region></span>
     <div id="hz-right" data-tauri-drag-region>
@@ -57487,8 +57561,8 @@ function liveLineDone(div,info){
 // own rect: two reads, at the paint, never in the frame loop) and keeps the target; hzStarFrame
 // moves the star toward it with a transform alone; hzStarSweep is the pass down the answer's left
 // edge at the draft-to-polish swap; hzStarLand lifts it to the byline's dot and RETIRES it (the
-// loop stops, the element goes). The reveal: the characters painted in the last 200 ms are wrapped
-// in .hz-new spans carrying their age as a negative delay, so a repaint never restarts a fade.
+// loop stops, the element goes). The reveal (THE INK, 6b555): the words painted in the last 320 ms are
+// wrapped one word to a box (.hz-ink) carrying its age as a negative delay, so a repaint never restarts it.
 const hzStar={el:null,div:null,x:NaN,y:NaN,tx:NaN,ty:NaN,raf:0,on:false,marks:[],reads:0,at:0};
 function hzStarOK(){return isHz()&&typeof hzMotionOK==="function"&&hzMotionOK()&&typeof hzFxLevel==="function"&&hzFxLevel()!=="calm";}
 function hzStarStart(div){
@@ -57506,25 +57580,39 @@ function hzStarNodes(body){
   let n,len=0;while((n=w.nextNode())){out.push({n:n,a:len});len+=n.data.length;}
   return {nodes:out,len:len};
 }
-// the soft reveal: wrap [a,b) of the prose's characters, newest segment first (splitting a text node
-// at its tail keeps every earlier offset true)
-function hzStarWrap(nodes,a,b,age){
+// THE INK (6b555, per Patrick: the preview's look in the app; beta/DESIGN.md "The ink: how an answer streams"):
+// the words painted in the last 320 ms (segs, newest first: [a,b) with the age of their paint) are wrapped one
+// word to a box (.hz-ink; a word splits at a hyphen, as the line may break there; a word begun before the window
+// stays plain, so nothing already shown starts over). Each fades in over 300 ms with a 1 px rise and a 2 px blur
+// coming sharp, its neutral white light fading (the wet-ink edge on the newest three or four words), and arrives
+// lighter, settling to its weight in 280 ms ("wght" 320 > 400, bold and headings 450 > 600). Its box is held at
+// the rest weight's width, read as it lands (one layout read per paint, before the weight moves: .go starts it),
+// so no word reflows. Calm: a plain 220 ms fade, no light, no weight. Splitting from the tail keeps offsets true.
+function hzStarWrap(nodes,segs){
+  const ink=[],calm=hzFxLevel()==="calm",A=segs[segs.length-1].a,B=segs[0].b;
+  const ageAt=p=>{for(const g of segs)if(p>=g.a&&p<g.b)return g.age;return segs[segs.length-1].age;};
   for(let k=nodes.length-1;k>=0;k--){
-    const o=nodes[k],n=o.n,L=n.data.length,e=o.a+L;if(e<=a)break;if(o.a>=b)continue;
-    const la=Math.max(a,o.a)-o.a,lb=Math.min(b,e)-o.a;if(lb<=la)continue;
-    if(lb<n.data.length)n.splitText(lb);
-    const mid=la>0?n.splitText(la):n;
-    const sp=document.createElement("span");sp.className="hz-new";sp.style.animationDelay=(-Math.round(age))+"ms";
-    mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);
+    const o=nodes[k],n=o.n,e=o.a+n.data.length;if(e<=A)break;if(o.a>=B)continue;
+    const words=[],rx=/[^\s\u2010-\u2014-]+[\u2010-\u2014-]?|[\u2010-\u2014-]+/g;let w;
+    while((w=rx.exec(n.data))){const ws=o.a+w.index;if(ws>=A&&ws<B)words.push([w.index,w.index+w[0].length,ageAt(ws)]);}
+    for(let i=words.length-1;i>=0;i--){const la=words[i][0],lb=words[i][1];
+      if(lb<n.data.length)n.splitText(lb);
+      const mid=la>0?n.splitText(la):n;
+      const sp=document.createElement("span");sp.className=calm?"hz-ink c":"hz-ink";sp.style.animationDelay=(-Math.round(words[i][2]))+"ms";
+      mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);ink.push(sp);}
   }
+  if(calm||!ink.length)return;
+  const wd=ink.map(x=>x.getBoundingClientRect().width);     // the rest weight's width, before the weight moves
+  ink.forEach((x,i)=>{x.style.width=wd[i]+"px";x.classList.add("go");});   // exact: a rounded width would nudge what follows
 }
 // after a paint of the stream: the reveal, then the aim (one layout read, here and nowhere else)
 function hzStarPaint(body){
   if(!isHz()||!hzMotionOK()||!body)return;
   const now=performance.now(),m=hzStar.marks,t=hzStarNodes(body);
   if(m.length&&m[m.length-1].len>t.len)m.length=0;          // a RESET: the text started over
-  m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();
-  for(let k=m.length-1;k>0;k--){const a=m[k-1].len,b=m[k].len;if(b>a)hzStarWrap(t.nodes,a,b,now-m[k].t);}
+  m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>320)m.shift();
+  const segs=[];for(let k=m.length-1;k>0;k--){const a=m[k-1].len,b=m[k].len;if(b>a)segs.push({a:a,b:b,age:now-m[k].t});}
+  if(segs.length)hzStarWrap(t.nodes,segs);
   hzStarAim(body);          // a fresh walk: the wrap split the tail node, so the list above is stale
 }
 function hzStarAim(body){
@@ -57535,8 +57623,8 @@ function hzStarAim(body){
   const e=last.data.replace(/\s+$/,"").length,r=document.createRange();r.setStart(last,Math.max(0,e-1));r.setEnd(last,e);
   const rr=r.getBoundingClientRect(),mr=s.div.getBoundingClientRect();s.reads++;
   if(!rr.width&&!rr.height)return;
-  // the last character sits in the newest .hz-new span, 2 px into its rise: aim at where it will rest
-  const rise=last.parentElement&&last.parentElement.classList.contains("hz-new")?2:0;
+  // the last character sits in the newest .hz-ink box, 1 px into its rise: aim at where it will rest
+  const rise=last.parentElement&&last.parentElement.classList.contains("hz-ink")?1:0;
   s.tx=rr.right-mr.left+6;s.ty=rr.top-mr.top+rr.height*.52-rise;
   if(isNaN(s.x)){s.x=s.tx;s.y=s.ty;}
 }
@@ -58489,9 +58577,10 @@ async function send(){
         body.classList.remove("swapwait");
         if(fx){body.classList.add("swapout");
           if(globalThis.hzReady&&typeof hzStarSweep==="function")hzStarSweep(body);   // the star's pass down the left edge (6b544)
+          const hzi=typeof isHz==="function"&&isHz();   // Horizon's dissolve: 220 ms to dim, a 620 ms shimmer in (6b555)
           setTimeout(()=>{body.classList.remove("swapout");body.classList.add("swapin");
-            setTimeout(()=>body.classList.remove("swapin"),300);
-            dripTick();},170);
+            setTimeout(()=>body.classList.remove("swapin"),hzi?640:300);
+            dripTick();},hzi?220:170);
           return;}
       }
       if(dripShown>=full.length){dripOn=false;
@@ -66463,32 +66552,28 @@ function hzGreeting(){
   if(h<18)return "Good afternoon"+(nm?", "+nm:"")+".";
   return "Good evening"+(nm?", "+nm:"")+".";
 }
-// the headline: three copies of the same words (a blurred prism copy under it,
-// the white fill, a passing sheen); traced in light the first time it shows
 // ONE GREETING (6b542, per Patrick, from the friend's screen: "UpUptate?", two copies of
 // "Up late?" offset from each other: a trace layer left standing over text that had moved).
-// Calm and Off: the greeting is ONE text node, nothing layered. Full: the three layers are
-// built from the same string in the same box at the same moment, and any tracer still
-// running is killed first; a resize, a sidebar toggle or a Look switch kills it too.
+// Since 6b555 (the preview's look in the app) the greeting is ONE text node at every level, never a copy:
+// Calm shows it plainly; Balanced and Full trace it in light once, then it wears its still afterglow (.aglow:
+// the close glow and the ::before bloom, THE GREETING css). Any tracer still running is killed first; a
+// resize, a sidebar toggle or a Look switch kills it too.
 function hzHeadline(g,text){
   g.setAttribute("aria-label",text);
-  const calm=hzCalm(),mode=calm?"one":"layers";
+  const mode=hzFxLevel()==="calm"?"one":"traced";
   if(g.dataset.hzText===text&&g.dataset.hzMode===mode)return;
   hzTraceKill();
-  g.dataset.hzText=text;g.dataset.hzMode=mode;g.innerHTML="";
-  if(calm){g.classList.remove("shown");void g.offsetWidth;g.textContent=text;g.classList.add("shown");return;}   // the class re-added: Balanced's settle plays once per text
-  const mk=(c,t)=>{const s=document.createElement("span");s.className=c;s.setAttribute("aria-hidden","true");s.textContent=t;return s;};
-  g.appendChild(mk("bloom",text));g.appendChild(mk("fill",text));g.appendChild(mk("sheen",text));
-  g.classList.remove("shown");
+  g.dataset.hzText=text;g.dataset.hzMode=mode;g.classList.remove("shown","aglow");g.textContent=text;
+  if(mode==="one"){void g.offsetWidth;g.classList.add("shown");}   // Calm: one text node, shown plainly
 }
 async function hzHeadlineShow(g){
   if(!g||g.classList.contains("shown")||g.dataset.hzBusy)return;
   g.dataset.hzBusy="1";
-  const fill=g.querySelector(".fill");
-  if(!fill){g.classList.add("shown");delete g.dataset.hzBusy;return;}   // Calm: one text node, shown plainly
-  if(fill&&hzMotionOK()&&!hzS.reduced&&!document.documentElement.classList.contains("hz-intro"))
-    await hzTraceIn(fill,HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9});   // a quick trace after the first launch
-  g.classList.add("shown");delete g.dataset.hzBusy;
+  if(hzMotionOK()&&!hzS.reduced&&!document.documentElement.classList.contains("hz-intro"))
+    await hzTraceIn(g,HZ_SEEN?{margin:48,speed:980,spread:.5}:{margin:56,speed:620,spread:.9});   // a quick trace after the first launch
+  g.classList.add("shown");
+  if(hzFxLevel()!=="calm"&&!hzS.reduced&&!(typeof noVideo!=="undefined"&&noVideo))g.classList.add("aglow");   // the afterglow rises, then is still
+  delete g.dataset.hzBusy;
 }
 function hzHomePaint(){
   if(!hzReady||!document.documentElement.classList.contains("hz"))return;   // Classic keeps its plain greeting (integration)
@@ -66549,8 +66634,19 @@ function hzMachinesPaint(){
   if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
 }
 function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu:null;hzS.mem=mem;}
+// THE LANES (6b555, per Patrick: the preview's look in the app): Chat · Code · Funnels once, as the header's glass
+// segmented control; the lit box (.hz-seg-hi) slides to the chosen lane by the nav's data-m (css, 200 ms on --out)
 function hzLanePaint(){
   $$("#hz-lanes [role=tab]").forEach(b=>{const on=b.dataset.m===uiMode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
+  const nav=$("#hz-lanes");if(nav&&nav.dataset.m!==uiMode)nav.dataset.m=uiMode;
+}
+// KEYBOARD-ONLY FOCUS (6b555): the ember hairline shows after a Tab, an arrow, Home, End or a Page key (html.hz-kb)
+// and any pointer press clears it, so a click never leaves a ring behind (WKWebView can call a clicked control
+// focus-visible)
+function hzKbWire(){
+  const root=document.documentElement;
+  addEventListener("keydown",e=>{if(/^(Tab|Arrow|Home$|End$|Page)/.test(e.key))root.classList.add("hz-kb");},true);
+  addEventListener("pointerdown",()=>root.classList.remove("hz-kb"),true);
 }
 function hzTitlePaint(){
   const t=$("#hz-title");if(!t)return;
@@ -67099,10 +67195,11 @@ function hzRenameCheck(){
     if(was!=null&&was!==t&&hzS.watch.has(id)&&hzMotionOK()){r.classList.remove("hz-renamed");void r.offsetWidth;r.classList.add("hz-renamed");}});
 }
 // THE SEND KEY'S PRESS (6b553, per Patrick: "clear up ... this shine in the send button ... we want to run VFX hard,
-// but not tacky"): the two expanding rings are gone (no circles); the key presses in and is back in 120 ms, no overshoot
+// but not tacky"): the two expanding rings are gone (no circles); the key presses in and is back in 120 ms, no overshoot.
+// Since 6b555 the press is the preview's crisp 1 px (and .985), the same as the row's :active
 function hzSendPress(){
   const b=$("#send");if(!b||!b.animate)return;
-  b.animate([{transform:"scale(.96)"},{transform:"scale(1)"}],{duration:120,easing:"cubic-bezier(.2,0,0,1)"});
+  b.animate([{transform:"translateY(1px) scale(.985)"},{transform:"none"}],{duration:120,easing:"cubic-bezier(.2,0,0,1)"});
 }
 // the stream's frames: who is working (RUN), and the stages (STATUS, STEP, DRAFT)
 function hzTele(kind,v){
@@ -67296,8 +67393,9 @@ function hzInit(){
   $$("#hz-lanes [role=tab]").forEach(b=>b.addEventListener("click",()=>{if(typeof switchLane==="function")switchLane(b.dataset.m);}));
   const lanes=$("#hz-lanes");if(lanes)lanes.addEventListener("keydown",e=>{
     const tabs=[...lanes.querySelectorAll("[role=tab]")],i=tabs.indexOf(document.activeElement);if(i<0)return;
-    const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:-1;
+    const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:e.key==="Home"?0:e.key==="End"?tabs.length-1:-1;
     if(j<0)return;e.preventDefault();tabs[j].focus();tabs[j].click();});
+  hzKbWire();
   const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig,.hz-mdot")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
   const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
   const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{
