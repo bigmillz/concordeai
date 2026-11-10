@@ -41958,7 +41958,7 @@ _gt = open("tests_smoketest.py", encoding="utf-8").read()
 check("6b560 scorecard: release.sh runs it only under SCORECARD=1, gated, before the version is written; "
       "the plain gauntlet never runs it",
       'if [[ "${SCORECARD:-0}" == 1 ]]; then' in _rel
-      and 'tools/answer_eval/scorecard.py run --label "build-$BUILD" --gate' in _rel
+      and 'tools/answer_eval/scorecard.py run --label "build-$BUILD" --where local --gate' in _rel
       and _rel.index('SCORECARD:-0}" == 1') < _rel.index("s = re.sub(r'APP_VERSION = \"[^\"]*\"'")
       and not re.search(r"(subprocess\.\w+|Popen|os\.system)\([^)]*scorecard\.py", _gt), "")
 import importlib.util as _ilu560
@@ -41995,6 +41995,12 @@ check("6b560 scorecard: the gate fails a quality drop beyond one standard error,
       and _sc.compare(_sc_err, _sc_old)[1] and _sc.TTFW_SLACK == 0.15
       and _sc_old["summary"]["quality"] == 6.75 and _sc_old["summary"]["ttfw_median_s"] == 2.0,
       "%r" % ([_sc.compare(x, _sc_old) for x in (_sc_same, _sc_drop, _sc_noise, _sc_slow, _sc_err)],))
+_sc_srv = _sc_entry("srv", [7, 6, 8, 5, 7, 6, 8, 1], [2.0] * 7 + [40.0])
+_sc_srv["records"][-1].update(tier="srv:abc:fast", error="error answer")
+check("6b560 scorecard: the question asked of the server alone is shown but never gated (its state is the server's)",
+      not _sc.compare(_sc_srv, _sc_old)[1] and _sc.compare(_sc_err, _sc_old)[1]
+      and any("server-only case (not gated)" in ln for ln in _sc.compare(_sc_srv, _sc_old)[0]),
+      "%r" % (_sc.compare(_sc_srv, _sc_old),))
 check("6b560 scorecard: the judge's reply is read as the last JSON object with an overall, scores clamped to 1-10",
       _sc.parse_grade('<think>{"overall": 2}</think> ok {"correct": 12, "complete": 7, "concise": 7, "fit": 7, '
                       '"overall": 8.4, "why": "x"}')

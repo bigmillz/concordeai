@@ -20354,3 +20354,108 @@ of the inner `let`. The gauntlet never drove a whole send through the page, whic
 Check: "send: no name declared inside its try is assigned after it" collects every `let`/`const` declared on a 4-space
 line inside send's try and fails if one is assigned on a 2-space line after it closes; its mutant (the old placement)
 is caught. Follow-up worth doing: a gauntlet check that drives a full streamed answer through the real page.
+
+## 6b560 — quality-4: quality-3 on 7.0 beta 2, measured against main, the estimate rule dropped; the per-build scorecard (per Patrick)
+
+**What it is.** The back-end phase's first branch: quality-3 (6b523, never gauntleted or merged) ported onto
+`hotfix-drip` (7.0 beta 2 + 6b554), re-measured against main with the repo's own bench, kept only where it held,
+and a small scorecard that every release can run so quality and speed only go up. Server-side only (the
+post-pass, the grounded turn's rules, the ranking, the bench tools); nothing of the page changed.
+
+**The port.** 6b523's two code commits cherry-picked (conflicts: `_KNOWN_ENV` beside 6b537's `MILLENAI_UPDATE_API`,
+the gauntlet block beside 6b522/6b532's). Its **thinking pilot knob (`MILLENAI_Q3_THINK`) is left out**: unmeasured,
+and since 6b539 the first draft streams live, so the model's reasoning would stream with it. What main gained since
+fresh-1 needed four changes:
+- **The server's answers get the post-pass.** A mode with a paired server answers there first (6b339), and that
+  path returned before `_single_polish` ran, so on the owner's setup the 6b523 fixes reached almost no answer. The
+  closure now sits before the dispatch and runs after a server seat's answer (or its fallback's) and after Fast on
+  one server alone. The council's final already had it (6b523).
+- **What the person asked for stays.** The post-pass drops a leading heading and trims a closing summary because
+  the standing instructions forbid them on a chat answer; asked for a README, a report, an outline or a title, the
+  heading is the thing asked for, and asked for a summary or a TL;DR, the summary is (`_ANS_FORM_ASK_RX`,
+  `_ANS_SUM_ASK_RX`, read from the grounded turn's last `PROMPT:` line or the whole message, `_ans_asked`).
+- **The Code lane is left as written** (`LANE_ROLE[agent] == "code"`): its answers are code.
+- A trailing newline alone no longer counts as a trimmed recap (it re-sent an unchanged answer after a RESET).
+
+**Measured** (`tools/answer_eval/RESULTS-quality-4.md`; this Mac's Fast tier, Gemma 4 26B on all 264 turns, the
+owner's server off when the runs began; blind Opus judges by turn in three waves). Three samples a side, every
+grading pooled: **quality-3's five changes on beta 2 score −0.08 (se 0.16) against main**: not better. What holds
+on every sample is the shape: **concise 5.4 → 6.3 (+0.87, se 0.16), fit +0.31 (se 0.20)**, headings on 22–26
+answers a run → 0–2, tables 9–14 → 2–5, the pipeline's words 8–12 → 0–1, answers ~30 % shorter, total time
+−1.2 s (se 0.5), **first words unchanged** (17.6 → 17.9 s median, +0.13 s se 0.29). Against that, **high-severity
+invented figures rose from 0.17 to 0.28 an answer** (grounded −0.16, se 0.13). Two ablations, each graded beside
+the others: without the shape, estimate and follow-up rules the style goes back (concise 5.0, headings on 24
+answers) and nothing else moves; **without the estimate rule alone the build scores +0.26 (se 0.23) over the build
+with it and +0.17 (se 0.24) over main, with main's rate of high flags** (7 against 10 and 12 in the same grading).
+The flags the rule invited are its own instructions at work: a euro rent relabelled as dollars, a two-week budget
+above the source's monthly one, Medellín's rent in reais, trade wages $20k above the BLS medians. **So
+GROUND_ESTIMATE is gone** (it also contradicted the older "never invent or estimate a price" rule); the shape, the
+follow-up note, the vendor's page and the post-pass stay. One more post-pass gap the judges found: "R$ 4,500 and
+R$ 7,500 per month (roughly $2,500–$4,200 USD, using 1 USD = 5.5167 BRL)", three times off, was missed because
+neither the range's "and" nor the rate's "1 USD =" order was read. Both are now. Verdict: a style step the owner's
+own preferences ask for, at no measured cost; **not a quality release** (overall +0.17, se 0.24, is under one
+standard error), and the low scores are search and model knowledge (q01–q03, q07, q19 at 2–3 of 10).
+
+**A bench fix found on the way.** `run_bench.py` didn't know the USAGE, DONE and RUBIN frames (6b519, 6b528): the
+recorded answers carried them as text and `first_text_s` fired on the first USAGE frame, about 1 s in, before any
+word, so every "first visible text" since 6b528 read ~1 s. The tags follow the page's `FRAME_TAGS`; the app's own
+clock (DONE's `f` and `t`) is recorded as `app_first_s`/`app_total_s`; `refix_frames.py` cleans older runs.
+
+**The server's answers: hidden reasoning, cut and empty answers** (found by the scorecard's first run of
+quality-4, on main too). The owner's server writes Fast with gemma4:12b, which Ollama runs with its hidden
+reasoning on unless `think` says otherwise: 1,200–3,900 output tokens for a one-line answer (USAGE "o" against
+30–80 visible), so the first word comes 25–35 s in, and the 8,192 context can run out mid-answer: "This zone
+dominates" was where one answer stopped, and 5 of 20 scorecard answers had no text at all, shown as nothing,
+with no word of why. **An answer that ends with no text is now a failure before the first word**
+(`server_first_answer`: the server is marked down for a minute and this computer's copy answers, as for a server
+that never started; an empty rewrite leaves the draft). **`think: false` was tried and is a dev copy's pilot
+only** (`srv_nothink`, `MILLENAI_Q4_NOTHINK=1`; a server or model that refuses the field is asked again without
+it, `_srv_nothink_refused`): on the same four questions it cut output to 28–260 tokens, made the answers whole
+and brought first words to 14–18 s; over the scorecard, on the 12 questions gemma4:12b answered in both runs of
+the same build, **first words 31.8 → 10.4 s median, and the local judge's grade 8.2 → 5.9** (the 2^30 question
+led with the wrong answer, a time-zone count was "not found"). Three times quicker and clearly worse is the
+owner's call, not a default. The gateway passes `think` through (ollama1 PROTOCOL.md); the llama.cpp bridge
+(6b531) ignores it.
+
+**Found, not changed (delivery belongs to another branch):** on a server seat, Fast's two-pass writes the draft
+silently and streams only the rewrite (`server_first_answer`), so with polish on, the server's first words wait
+for a whole draft; 6b539's live draft only changed this Mac's path.
+
+**The per-build scorecard** (`tools/answer_eval/scorecard.py`, `scorecard.json`, `SCORECARD.md`). 20 fixed, mostly
+timeless questions: facts 4 (one live exchange rate), reasoning 4, code 4, writing 4 (one asks for a README
+heading, so the 6b560 rule is in it), advice 2, one question about the person's own notes (a small `apartment.md`
+the run adds under Your stuff) and one asked of the paired server alone. A run starts a dev copy of the
+checkout, asks them, stops it, then loads a fixed local judge (`mlx-community/Qwen3.6-35B-A3B-4bit`, mlx_lm on
+9917, temperature 0, thinking off) and appends quality (mean and se), the four parts, first words, total time,
+errors (an empty answer is one) and a regex facts check to `scorecard/history.json`. It compares with the last run
+of the same set version, `where` and judge: **it fails on a quality drop beyond one standard error of the paired
+per-question differences, a median first-words time more than 15 % slower (over questions the same model answered
+in both runs), or more error answers.** The server-only question is shown, never gated: in three runs of main it
+was a busy error, a wrong answer and an empty one, which is the server's state, not the build's.
+`SCORECARD=1 ./release.sh beta` runs it with `--where local --gate` before the version is written and stops the
+cut on a FAIL; the plain gauntlet only reads its files. **Why local:** this Mac's median first words held within
+about 5 % over six bench runs (16.4–18.3 s), while the server's moved by a third between two runs of main an hour
+apart (37.5 and 25.7 s over the 7 questions gemma4:12b answered in both) and it falls back to this Mac for a minute after a missed deadline, so
+a gate on it would flap; `--where server` still measures the owner's setup. `judge <label>` grades a recorded run
+again; `--judge packets` / `ingest` take a Claude judge's grades instead (a separate history line). The judge is
+lenient (most answers 8–10), so the gate catches a real fall, not a tenth.
+
+**The baselines** (2026-11-10, `SCORECARD.md` has the table): **7.0 beta 2 locally (`build-279-local`): quality
+8.15 (se 0.58), first words median 12.6 s, total 14.4 s, 0 errors, facts 38/39**, in 369 s. quality-4 locally
+(`quality-4-local`, 16eab7b): 8.25 (se 0.58), 12.9 s, 15.1 s; against beta 2 **+0.16 (se 0.55) over 19 questions,
+first words +1 %, errors 0 against 0: passes**. On the server: beta 2 8.6 (se 0.47) with 9 of 20 on the server
+and 1 error, then 6.85 (se 0.74) with 20 of 20 and 3 empty answers an hour later; quality-4 8.75 (se 0.48), 0
+errors (its empty-answer fallback at work), first words 26.3 s (the server's own reasoning time, unchanged by
+this branch).
+
+**Gauntlet.** The 6b560 block (12 checks, 9 mutants): the asked-for heading and summary kept, an unasked one
+dropped, the person's words from the last PROMPT line, the FX range with "and" and the "1 USD =" rate, the
+post-pass defined before the dispatch and run after the server seat and Fast on one server alone, the Code lane
+skipped, the council's final passing the question; the scorecard's set (20 questions, the categories, one private,
+one server-only, every pattern compiling), release.sh running it only under SCORECARD=1 with --gate before the
+version is written and the gauntlet never running it, the gate's three failures and its passes on noise and +10 %,
+and the judge's reply parsed and clamped. Re-pinned at the same strength: the 6b339 seat call and the 6b426
+server-alone call (the post-pass lines between), the 6b520 dating rule (the vendor's own site joins it) and its
+shipped-knob check (now read inside `fresh_ablate`, where `quality_ablate`'s same lines had hidden its mutant), the
+6b523 handler slice and mutant anchors, the estimate checks turned into "it is gone", and the 6b516 slice's
+namespace (the shape knob). GAUNTLET_RESULT

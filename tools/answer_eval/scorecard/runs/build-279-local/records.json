@@ -1,0 +1,830 @@
+{
+ "label": "build-279-local",
+ "when": "2026-11-10T08:48:45",
+ "app": {
+  "version": "7.0.0",
+  "build": "279",
+  "beta": "2",
+  "rc": "0"
+ },
+ "head": "d804e0f main",
+ "set_version": 1,
+ "as_of": "2026-11-10",
+ "where": "local",
+ "server": "Ollama1",
+ "tier": "Fast",
+ "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
+ "wall_s": 369.0,
+ "records": [
+  {
+   "id": "f01",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Roughly what temperature does water boil at on the top of Everest, and why is it lower than at sea level?",
+   "answer": "It's 50°F and Clear right now, wind 5 mph, with a high of 66°F and low of 47°F on Tuesday, a high of 62°F and low of 46°F on Wednesday, and a high of 51°F and low of 37°F on Thursday.\n\nWater boils at approximately **160°F** (71°C) at the summit of Mount Everest.\n\nBoiling occurs when the **vapor pressure** of a liquid equals the surrounding **atmospheric pressure**. At sea level, the weight of the atmosphere is much higher, requiring a higher temperature to push the liquid into a gaseous state.\n\nBecause the atmospheric pressure is significantly lower at high altitudes, the molecules require less thermal energy to escape into the air, resulting in a much lower boiling point.",
+   "first_text_s": 5.65,
+   "elapsed_s": 8.38,
+   "app_first_s": 5.65,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searched the web: 1 source",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 681 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is factually perfect and follows the direct persona, but the irrelevant weather forecast at the start constitutes padding that violates the conciseness constraint."
+   }
+  },
+  {
+   "id": "f02",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Who wrote One Hundred Years of Solitude, and when did it come out?",
+   "answer": "**Gabriel García Márquez** wrote *One Hundred Years of Solitude* [1][3]. \n\nThe provided sources do not state the specific publication year of the novel, though they note it was written in the mid-1960s [3].",
+   "first_text_s": 19.78,
+   "elapsed_s": 20.6,
+   "app_first_s": 19.78,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 3 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 6 pages · 15 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 206 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     false
+    ],
+    "never_hit": [
+     false,
+     false
+    ],
+    "ok": 3,
+    "of": 4
+   },
+   "grade": {
+    "correct": 3,
+    "complete": 2,
+    "concise": 8,
+    "fit": 2,
+    "overall": 2,
+    "why": "The answer fails to provide the publication year, directly contradicting the reference sheet's key facts and the user's request for direct, exact information."
+   }
+  },
+  {
+   "id": "f03",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "How many time zones does Brazil have?",
+   "answer": "Brazil has **four** standard time zones [1][2][5][6][8].\n\nThe specific offsets are:\n\n*   **Fernando de Noronha time**: UTC−02:00 [1][2]\n*   **Brasília time**: UTC−03:00 [1][2][5][6]\n*   **Amazon time**: UTC−04:00 [1][2]\n*   **Acre time**: UTC−05:00 [1][2]\n\nThe vast majority of the population lives in the Brasília time zone, which includes the capital and major cities like São Paulo and Rio de Janeiro [5][6]. Daylight saving time was abolished in 2019, so these offsets remain fixed year-round [5][6][8].",
+   "first_text_s": 11.44,
+   "elapsed_s": 14.08,
+   "app_first_s": 11.44,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 33 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 507 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is factually perfect, strictly adheres to the user's preference for directness and technical precision, and follows the requested structure exactly."
+   }
+  },
+  {
+   "id": "f04",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "What's the US dollar to Brazilian real exchange rate right now?",
+   "answer": "The current exchange rate is **1 USD = 5.5167 BRL** [1].\n\nThis rate was the ECB reference rate as of November 9, 2026 [1].",
+   "first_text_s": 12.78,
+   "elapsed_s": 13.47,
+   "app_first_s": 12.78,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 3 pages · 15 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 122 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 9,
+    "complete": 9,
+    "concise": 10,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer provides a precise, dated figure within the reference range and adheres strictly to the user's direct, no-fluff preference, though it omits the inverse rate and live source link mentioned in the reference sheet."
+   }
+  },
+  {
+   "id": "r01",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "A train is scheduled to leave at 9:40 and the trip takes 2 hours 35 minutes. It leaves 15 minutes late. When does it arrive?",
+   "answer": "The train arrives at **12:30**.\n\nThe scheduled departure of 9:40 plus the 2 hour 35 minute travel time would result in a 12:15 arrival. Since the train leaves 15 minutes late, the new departure time is 9:55. Adding the 2 hour 35 minute travel time to 9:55 results in an arrival of 12:30.",
+   "first_text_s": 12.68,
+   "elapsed_s": 14.14,
+   "app_first_s": 12.68,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 4 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 5 pages · 22 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 287 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is mathematically correct, follows the requested format of leading with the result, and adheres strictly to the user's preference for directness and brevity."
+   }
+  },
+  {
+   "id": "r02",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "I owe $14,000 on a credit card at 24% APR, compounded monthly. If I pay $700 a month, about how many months until it's paid off, and roughly how much interest will I pay?",
+   "answer": "It will take **25 months** to clear the balance, and you will pay roughly **$3,845** in total interest.\n\nWith a $700 monthly payment, your first month's interest charge is **$280** ($14,000 × 0.24 / 12), leaving **$420** to hit the principal. As the balance drops, the interest portion shrinks and the principal reduction grows, which is why the payoff accelerates.\n\nBy the 25th month, your final payment will be roughly **$245** to zero out the remaining balance. If you can increase your monthly payment even slightly, you'll see a significant reduction in that $3,845 interest hit.",
+   "first_text_s": 3.3,
+   "elapsed_s": 12.3,
+   "app_first_s": 3.3,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 473 chars",
+    "Polishing: ",
+    "Answer written: 584 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 3,
+    "complete": 8,
+    "concise": 10,
+    "fit": 10,
+    "overall": 4,
+    "why": "The answer fails on correctness by stating 25 months instead of the reference's 26 and providing an unsupported interest figure, despite perfectly matching the requested direct style."
+   }
+  },
+  {
+   "id": "r03",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "Which is bigger, 2^30 or 10^9, and by roughly how much?",
+   "answer": "**2^30** is bigger than 10^9.\n\nIt is larger by approximately **7.3%**.\n\nTo calculate this without a calculator, you can use the relationship between powers of 2 and powers of 10. \n\nA common rule of thumb in computing is that $2^{10}$ is equal to $1,024$. Since $10^3$ is $1,000$, $2^{10}$ is roughly $1.024 \\times 10^3$.\n\nIf you scale that up to the 30th power:\n*   **$2^{30}$** = $(2^{10})^3 \\approx (1,024)^3$\n*   $(1,024)^3 = 1,073,741,824$\n*   **$10^9$** = $1,000,000,000$\n\nThe difference is $73,741,824$, which means $2^{30}$ is about **7.37%** larger than $10^9$.",
+   "first_text_s": 11.91,
+   "elapsed_s": 15.88,
+   "app_first_s": 11.9,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 8 pages · 34 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 569 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Accurate and follows preferences, but includes unnecessary derivation steps that violate the 'direct' constraint."
+   }
+  },
+  {
+   "id": "r04",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "All bloops are razzies, and some razzies are lazzies. Does it follow that some bloops are lazzies?",
+   "answer": "No, it does not follow.\n\nThe relationship between the sets does not guarantee an overlap between Bloops and Lazzies. While we know all Bloops are contained within the Razzies category, the \"some Razzies\" that are Lazzies could consist entirely of Razzies that are not Bloops.\n\nBecause the premises allow for a scenario where the Bloop group and the Lazzie group are entirely separate—even while both reside within or intersect with the Razzies—we cannot logically conclude that any Bloops are Lazzies [3][5].\n\nThe possibility remains that the Bloops could be entirely separate from the Lazzies within the Razzies category [3].",
+   "first_text_s": 12.5,
+   "elapsed_s": 14.74,
+   "app_first_s": 12.5,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 3 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 3 pages · 13 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 626 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is logically perfect and follows all constraints, but the third sentence is redundant padding that slightly violates the strict conciseness preference."
+   }
+  },
+  {
+   "id": "c01",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a Python function that returns the n-th Fibonacci number iteratively, and tell me its time complexity.",
+   "answer": "Use this function to calculate the n-th Fibonacci number with a single loop.\n\n```python\ndef fibonacci(n):\n    if n <= 0:\n        return 0\n    if n == 1:\n        return 1\n    \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n```\n\nThe time complexity is **O(n)** because the loop executes at most $n$ times to reach the target value.\n\nThe space complexity is **O(1)** because the function only maintains two integer variables in memory, regardless of how large $n$ gets.",
+   "first_text_s": 0.82,
+   "elapsed_s": 6.16,
+   "app_first_s": 0.81,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 395 chars",
+    "Polishing: ",
+    "Answer written: 502 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer provides a correct iterative implementation with O(n) time and O(1) space complexity, adhering strictly to the user's preference for directness and technical precision."
+   }
+  },
+  {
+   "id": "c02",
+   "category": "code",
+   "tier": "Fast",
+   "q": "In JavaScript, why does [1, 2, 10].sort() give [1, 10, 2], and how do I sort numbers properly?",
+   "answer": "The default `sort()` behavior happens because JavaScript converts elements to strings before comparing them.\n\nIn the default algorithm, the number `10` comes before `2` because it compares the Unicode code points of the characters; since `\"1\"` comes before `\"2\"`, the string `\"10\"` is sorted as if it were smaller than `\"2\"` [3].\n\n## The Fix\nTo sort numbers correctly, you must provide a **compare function** to the `sort()` method. This function tells JavaScript how to determine the relationship between two elements.\n\n**The correct approach**\n```javascript\nconst numbers = [1, index, 10];\nnumbers.sort((a, b) => a - b);\n// Result: [1, 2, 10]\n```\n\n**How it works**\nThe compare function takes two arguments, `a` and `b`. When you return `a - b`:\n*   If the result is **negative**, `a` is placed before `b`.\n*   If the result is **positive**, `b` is placed before `a`.\n*   If the result is **zero**, the order remains unchanged.\n\nUsing this subtraction logic ensures the engine uses the actual numerical values rather than their string representations [2].\n\n## Comparison: Standard vs. Typed Arrays\nIf you are working with specific numeric types, you might encounter different default behaviors.\n\n| Method | Default Behavior | Numeric Result |\n| :--- | :--- | :--- |\n| `Array.prototype.sort()` | Sorts as **strings** (Unicode order) [3] | `[1, 10, 2]` |\n| `TypedArray.prototype.sort()` | Sorts **numerically** by default [4] | `[1, 2, 10]` |\n\nNote that while `TypedArray` (like `Uint8Array`) handles numbers numerically by default, standard arrays still require the compare function to avoid the string-sorting quirk [4].",
+   "first_text_s": 13.26,
+   "elapsed_s": 19.86,
+   "app_first_s": 13.25,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 4 pages · 23 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 1621 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 10,
+    "concise": 6,
+    "fit": 7,
+    "overall": 7,
+    "why": "Contains a critical typo ('index' instead of '2') in the code example, includes unnecessary padding (table, verbose explanation) violating the 'direct' and 'short' preferences."
+   }
+  },
+  {
+   "id": "c03",
+   "category": "code",
+   "tier": "Fast",
+   "q": "What does this command do: find . -name '*.log' -mtime +7 -delete",
+   "answer": "This command finds and deletes files matching specific criteria within the current directory and its subdirectories.\n\nThe command breaks down as follows:\n\n*   **`find .`** — Starts the search in the current directory (represented by the dot) and walks the directory tree in real time [1].\n*   **`-name '*.log'`** — Filters the search to only include files or folders whose names end in `.log` [1].\n*   **`-mtime +7`** — Filters for files with a modification time older than 7 days [2]. Because the calculation for `mtime` is based on the floor of the difference between now and the file's timestamp (age = floor((now - mtime) / 86400)), `+7` targets files where the age is greater than 7 days [8].\n*   **`-delete`** — Executes the deletion of the matched files [1].\n\n**Warning: Destructive Action**\nThis is a destructive command. In a production environment, it is best practice to perform a \"dry run\" first by running the command without the `-delete` flag to preview exactly which files will be removed [1]. For example, running `find . -name '*.log' -mtime +7` allows you to see the list of matches before you commit to deleting them [1].",
+   "first_text_s": 13.09,
+   "elapsed_s": 17.52,
+   "app_first_s": 13.09,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 41 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 1141 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 8,
+    "concise": 6,
+    "fit": 7,
+    "overall": 7,
+    "why": "The answer is technically accurate and follows the direct persona, but it fails the 'shape' constraint by using verbose bullet points instead of the requested one or two sentences, and it includes unnecessary formatting."
+   }
+  },
+  {
+   "id": "c04",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a SQL query for the top 3 customers by total order amount, from a table orders(customer_id, amount).",
+   "answer": "The query you need is:\n\n```sql\nSELECT customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC\nLIMIT 3;\n```\n\nThis query uses **GROUP BY** to aggregate the sum for every unique `customer_id`, sorts the results by the calculated **total_amount** in descending order, and uses **LIMIT 3** to return only the top three records.\n\nIf you need to handle ties—for instance, if the 3rd and 4th customers have the exact same amount and you want both—you should use **RANK()** or **DENSE_RANK()** instead of `LIMIT`. \n\nDo you need this to handle ties for the third position, or is a strict three-row limit sufficient?",
+   "first_text_s": 2.64,
+   "elapsed_s": 10.63,
+   "app_first_s": 2.64,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 288 chars",
+    "Polishing: ",
+    "Answer written: 650 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 7,
+    "fit": 8,
+    "overall": 8,
+    "why": "The SQL is perfect, but the answer violates the 'direct/skip pleasantries' preference by including unnecessary explanation and a closing question."
+   }
+  },
+  {
+   "id": "w01",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a two-sentence apology to a client for missing yesterday's call, and offer two new times.",
+   "answer": "Please accept my apologies for missing our scheduled call yesterday. Would either **tomorrow at 10:00 AM** or **Wednesday at 2:00 PM** work for you to reschedule?",
+   "first_text_s": 0.35,
+   "elapsed_s": 2.53,
+   "app_first_s": 0.35,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 154 chars",
+    "Polishing: ",
+    "Answer written: 162 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer strictly adheres to the two-sentence constraint, provides a direct apology without excuses, offers two concrete times, and respects the user's preference for directness and brevity."
+   }
+  },
+  {
+   "id": "w02",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Rewrite this to sound friendlier, under 40 words: \"Your invoice is overdue. Pay immediately or service will be suspended.\"",
+   "answer": "Your invoice is currently overdue, so please settle the balance as soon as possible to avoid any interruption to your service.",
+   "first_text_s": 0.35,
+   "elapsed_s": 2.07,
+   "app_first_s": 0.35,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 180 chars",
+    "Polishing: ",
+    "Answer written: 126 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The rewrite is 20 words, retains all critical facts, adopts a friendly tone without being groveling, and strictly follows the 'one option' and 'no preamble' constraints."
+   }
+  },
+  {
+   "id": "w03",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a README intro for a command-line tool called tidyup that deletes old files from Downloads: a title and one paragraph.",
+   "answer": "# tidyup\n\n**tidyup** is a lightweight CLI utility for automating the maintenance of your Downloads folder by pruning aging files. \n\nIt allows you to define granular retention policies—based on **file age**, **extension**, or **size**—to prevent directory bloat while ensuring critical assets aren't purged prematurely.",
+   "first_text_s": 0.79,
+   "elapsed_s": 3.63,
+   "app_first_s": 0.79,
+   "x_models": "Gemma 4 26B",
+   "searched": false,
+   "resets": 1,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Drafting the answer: Gemma 4 26B",
+    "Drafted the answer: 287 chars",
+    "Polishing: ",
+    "Answer written: 318 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer perfectly matches the reference sheet's requirements for a title and single paragraph, adheres strictly to the user's preference for directness and technical vocabulary, and avoids all specified traps."
+   }
+  },
+  {
+   "id": "w04",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Give me three name ideas for a small coffee shop in Florianópolis, one line each.",
+   "answer": "Since your concept likely leans into the local vibe or an artisanal aesthetic, here are three distinct directions:\n\n**Ilha Brew** — a short, punchy name that connects the coffee to the island setting.\n\n**Lagoa Roast** — a nod to the local geography and the craft of coffee making.\n\n**Café Florian** — a classic, sophisticated option that anchors the shop to its location.",
+   "first_text_s": 16.65,
+   "elapsed_s": 17.93,
+   "app_first_s": 16.65,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 33 passages",
+    "Searched the web: 8 sources",
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 371 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [],
+    "never_hit": [],
+    "ok": 0,
+    "of": 0
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 8,
+    "overall": 9,
+    "why": "The answer provides exactly three names on one line each, adhering to the reference sheet, but includes unnecessary preamble text that slightly violates the 'direct' preference and conciseness rule."
+   }
+  },
+  {
+   "id": "h01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "Is it okay to take ibuprofen and acetaminophen together for a headache?",
+   "answer": "Yes, it is generally safe to take ibuprofen and acetaminophen together for a headache if you stay within the recommended 24-hour dosage limits for each medication [5]. Because they work through different mechanisms and are processed by different parts of the body, combining them can be more effective than taking either one alone [4][8].\n\n## Strategies for use\n\nDepending on your needs, you can either take them at the same time or alternate them to manage pain over a longer period.\n\n*   **Simultaneous use** — Taking both at once can provide extra relief, such as after a dental extraction [4].\n*   **Alternating doses** — To get around-the-clock relief, you can stagger the doses. A common method is to take them 3 to 4 hours apart; for example, if you take ibuprofen at 6:00 AM, you could take acetaminophen at 9:00 AM [4]. Another example is taking 400 mg of ibuprofen at 8:00 AM and 500 mg of acetaminophen at noon [8, dated 2024-11-29].\n\n## Safety considerations\n\nWhile the combination is effective, you must adhere to specific safety protocols to avoid side effects.\n\n**Check your other medications**\nAlways check the ingredients of any other over-the-counter or prescription medications you are taking to ensure they don't already contain acetaminophen or ibuprofen [5]. This prevents accidental double-dosing.\n\n**Monitor liver and kidney health**\nBoth medications can affect the liver; combining them may increase the risk of liver damage [2]. Because of this, you should talk to a doctor before using them together, especially if you have existing risk factors for liver problems [2].\n\n**Avoid alcohol**\nYou should consult a doctor before using ibuprofen if you consume alcohol [2]. Chronic alcohol users may face an increased risk of hepatotoxicity (liver toxicity) when using acetaminophen [2].",
+   "first_text_s": 15.86,
+   "elapsed_s": 22.16,
+   "app_first_s": 15.85,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 6 pages · 32 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 1808 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 9,
+    "concise": 7,
+    "fit": 8,
+    "overall": 8,
+    "why": "Accurate and complete with appropriate caveats, but violates the 'direct/skip pleasantries' preference by using unnecessary headings and verbose explanations for simple concepts."
+   }
+  },
+  {
+   "id": "m01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "I have $10,000. Should I pay off my 6% car loan early or put it in an index fund? Give me one pick.",
+   "answer": "**Pay off the car loan.**\n\nMathematically, paying off a 6% loan is equivalent to earning a **guaranteed, tax-free 6% return** on that $10,000 because you are preventing that interest from accruing [1]. Since you are looking for a single pick, this is the superior move for three reasons:\n\n*   **Risk-adjusted returns**: A 6% return via debt avoidance is \"guaranteed\" [1]. While index funds historically aim for higher returns, they come with market volatility and potential for loss, whereas the 6% savings is captured the moment you own that equity [2].\n*   **The \"Spread\" reality**: You should only prioritize investing if your projected after-tax return beats your loan's APR [2]. If your index fund returns are, for example, 7% before taxes, your actual realized gain might be lower than the 6% you'd \"earn\" by wiping out the debt [1][2].\n*   **Cash flow and peace of mind**: Paying down the principal can shorten your loan term or lower your monthly obligations, providing more breathing room in your budget [2].\n\nBefore pulling the trigger, ensure you have no prepayment penalties on your specific loan agreement and that you have an intact emergency fund remaining after the $10,000 is applied [2].",
+   "first_text_s": 12.64,
+   "elapsed_s": 17.11,
+   "app_first_s": 12.64,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 6 pages · 25 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 1205 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "Flawless execution: direct pick, accurate risk-free return logic, strict adherence to persona constraints, and no fluff."
+   }
+  },
+  {
+   "id": "p01",
+   "category": "private",
+   "tier": "Fast",
+   "q": "According to my notes, when does my lease end and how much is my rent?",
+   "answer": "Your lease ends on **2027-03-31** [9].\n\nYour rent is **R$4,200** a month, due on the 5th via Pix [9].",
+   "first_text_s": 17.47,
+   "elapsed_s": 18.18,
+   "app_first_s": 17.46,
+   "x_models": "Gemma 4 26B",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 21 passages",
+    "Searched the web: 8 sources",
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Gemma 4 26B",
+    "Answer written: 101 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer provides the exact lease end date and rent amount from the notes in the first sentence, adhering strictly to the user's preference for directness and technical precision without any fluff."
+   }
+  },
+  {
+   "id": "s01",
+   "category": "server",
+   "tier": "srv:5b346919:fast",
+   "q": "In two sentences: what does a GPU's VRAM limit mean for running a 30-billion-parameter model?",
+   "answer": "A GPU's VRAM limit is the binding constraint for model deployment because weights must fit entirely in memory to avoid a performance collapse when the system falls back to host RAM over the PCIe bus [5, 8]. For a **30-billion-parameter model**, you typically need **16–24 GB of VRAM** (as of September 2026) to accommodate 4-bit (Q4)",
+   "first_text_s": 28.04,
+   "elapsed_s": 28.43,
+   "app_first_s": 28.04,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 8 pages · 29 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 333 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 2,
+    "complete": 4,
+    "concise": 8,
+    "fit": 2,
+    "overall": 2,
+    "why": "The answer is factually incorrect regarding 4-bit VRAM requirements (claiming 16-24GB instead of 17-20GB+), violates the two-sentence constraint by cutting off mid-sentence, and fails to address the 'limit' implication fully."
+   }
+  }
+ ]
+}

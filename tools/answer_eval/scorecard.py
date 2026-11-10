@@ -142,6 +142,27 @@ def seed_notes(copy, folder, notes):
     return k
 
 
+def _ask_one(copy, q, tier, args):
+    body = {"model": "", "models": [], "tier": tier, "auto_web": True, "images": [], "docs": [],
+            "agent": "", "mode_comp": "", "messages": [{"role": "user", "content": q["q"]}]}
+    r = rb.chat(copy, body, args.max_wait, args.idle)
+    rec = {"id": q["id"], "category": q["category"], "tier": tier, "q": q["q"],
+           "answer": r.get("answer") or "", "first_text_s": r.get("first_text_s"),
+           "elapsed_s": r.get("elapsed_s"), "app_first_s": r.get("app_first_s"),
+           "x_models": r.get("x_models"), "searched": r.get("searched"),
+           "resets": r.get("resets"),
+           "steps": ["%s: %s" % (x.get("l"), x.get("d")) for x in r.get("steps") or [] if isinstance(x, dict)][:30],
+           # an empty answer is an error too (6b560: the server's empty replies scored as errors 0)
+           "error": r.get("error") or ("error answer" if r.get("is_error_answer") else "")
+           or ("empty answer" if not (r.get("answer") or "").strip() else ""),
+           "facts": facts_check(q, r.get("answer") or "")}
+    log("%s: %ss (first words %ss), %d chars, %s%s" % (
+        q["id"], rec["elapsed_s"], rec["first_text_s"], len(rec["answer"]), rec["x_models"],
+        (" ERROR " + rec["error"][:80]) if rec["error"] else ""))
+    time.sleep(1.0)
+    return rec
+
+
 def ask_all(args, s, run_dir):
     home = os.path.expanduser("~/Library/Application Support/MillenAI-scorecard-%d" % args.port)
     notes_dir = home + "-notes"
@@ -187,25 +208,25 @@ def ask_all(args, s, run_dir):
                 recs.append({"id": q["id"], "skipped": "no paired server reachable"})
                 log("%s: skipped (no server)" % q["id"])
                 continue
-            tier = ("srv:%s:fast" % srv["id"]) if q.get("server_only") else args.tier
-            body = {"model": "", "models": [], "tier": tier, "auto_web": True, "images": [], "docs": [],
-                    "agent": "", "mode_comp": "", "messages": [{"role": "user", "content": q["q"]}]}
-            r = rb.chat(copy, body, args.max_wait, args.idle)
-            rec = {"id": q["id"], "category": q["category"], "tier": tier, "q": q["q"],
-                   "answer": r.get("answer") or "", "first_text_s": r.get("first_text_s"),
-                   "elapsed_s": r.get("elapsed_s"), "app_first_s": r.get("app_first_s"),
-                   "x_models": r.get("x_models"), "searched": r.get("searched"),
-                   "resets": r.get("resets"),
-                   "steps": ["%s: %s" % (x.get("l"), x.get("d")) for x in r.get("steps") or [] if isinstance(x, dict)][:30],
-                   # an empty answer is an error too (6b560: the server's empty replies scored as errors 0)
-                   "error": r.get("error") or ("error answer" if r.get("is_error_answer") else "")
-                   or ("empty answer" if not (r.get("answer") or "").strip() else ""),
-                   "facts": facts_check(q, r.get("answer") or "")}
-            recs.append(rec)
-            log("%s: %ss (first words %ss), %d chars, %s%s" % (
-                q["id"], rec["elapsed_s"], rec["first_text_s"], len(rec["answer"]), rec["x_models"],
-                (" ERROR " + rec["error"][:80]) if rec["error"] else ""))
-            time.sleep(1.0)
+            recs.append(_ask_one(copy, q, ("srv:%s:fast" % srv["id"]) if q.get("server_only") else args.tier, args))
+        if where == "local" and args.where == "local" and not args.no_server_case:
+            # THE SERVER-ONLY CASE ON A LOCAL RUN: the modes answered on this computer (a server's first
+            # words moved by a third between two runs of main, too much for the gate), and the questions that ask the
+            # server alone get a second copy with the real pairing, when a paired server answers
+            copy.stop()
+            if not rb.pair_server(home):
+                paired = True
+                copy = rb.DevCopy(args.repo, args.python, home, args.port, os.path.join(run_dir, "devcopy.log"))
+                copy.start()
+                _st, view = copy.api("/api/servers?refresh=1", timeout=120)
+                ok = [e for e in view.get("servers") or [] if e.get("paired")
+                      and (e.get("status") or {}).get("reachable")]
+                if ok:
+                    srv = ok[0]
+                    for i, q in enumerate(s["questions"]):
+                        if q.get("server_only"):
+                            recs = [x for x in recs if x["id"] != q["id"]]
+                            recs.insert(i, _ask_one(copy, q, "srv:%s:fast" % srv["id"], args))
     finally:
         copy.stop()
         if paired:
@@ -361,10 +382,17 @@ def previous(h, e):
     return None
 
 
+def _gated(r):
+    """The gate reads the questions the build answers in its modes; the one asked of the server alone
+    (tier srv:...) is recorded and shown but not gated: its state is the server's, not the build's
+    (6b560: the same question was a busy error, a wrong answer and an empty one in three runs of main)."""
+    return not str(r.get("tier") or "").startswith("srv:")
+
+
 def compare(new, old):
     """(verdict lines, failed)"""
-    a = {r["id"]: r["grade"]["overall"] for r in old["records"] if (r.get("grade") or {}).get("overall")}
-    b = {r["id"]: r["grade"]["overall"] for r in new["records"] if (r.get("grade") or {}).get("overall")}
+    a = {r["id"]: r["grade"]["overall"] for r in old["records"] if (r.get("grade") or {}).get("overall") and _gated(r)}
+    b = {r["id"]: r["grade"]["overall"] for r in new["records"] if (r.get("grade") or {}).get("overall") and _gated(r)}
     common = sorted(set(a) & set(b))
     lines, failed = [], False
     if len(common) >= 2:
@@ -379,8 +407,8 @@ def compare(new, old):
     # first words, over the questions the SAME model answered in both runs: a mode with a server falls
     # back to this computer for a minute when the server misses its deadline, and a median over a
     # different mix of machines measures the mix, not the build
-    fa = {r["id"]: r for r in old["records"] if r.get("first_text_s") is not None}
-    fb = {r["id"]: r for r in new["records"] if r.get("first_text_s") is not None}
+    fa = {r["id"]: r for r in old["records"] if r.get("first_text_s") is not None and _gated(r)}
+    fb = {r["id"]: r for r in new["records"] if r.get("first_text_s") is not None and _gated(r)}
     same = [i for i in sorted(set(fa) & set(fb)) if fa[i].get("x_models") == fb[i].get("x_models")]
     if len(same) >= 5:
         t0 = st.median(fa[i]["first_text_s"] for i in same)
@@ -393,11 +421,17 @@ def compare(new, old):
         bad = t1 > t0 * (1 + TTFW_SLACK)
         failed |= bad
         lines.append("median first words %.1f s vs %.1f s (%+.0f%%) over %s: %s" % (
-            t1, t0, (t1 / t0 - 1) * 100, over, "FAIL (more than 15%% slower)" if bad else "ok"))
-    e0, e1 = old["summary"]["errors"], new["summary"]["errors"]
+            t1, t0, (t1 / t0 - 1) * 100, over, "FAIL (more than 15% slower)" if bad else "ok"))
+    e0 = sum(1 for r in old["records"] if r.get("error") and _gated(r))
+    e1 = sum(1 for r in new["records"] if r.get("error") and _gated(r))
     bad = e1 > e0
     failed |= bad
     lines.append("error answers %d vs %d: %s" % (e1, e0, "FAIL" if bad else "ok"))
+    sv = [r for r in new["records"] if not _gated(r) and not r.get("skipped")]
+    if sv:
+        lines.append("the server-only case (not gated): " + "; ".join(
+            "%s %s%s" % (r["id"], (r.get("grade") or {}).get("overall"), " (" + r["error"] + ")" if r.get("error") else "")
+            for r in sv))
     lines.append("total time median %.1f s vs %.1f s (not gated)" % (
         new["summary"].get("total_median_s") or 0, old["summary"].get("total_median_s") or 0))
     return lines, failed
@@ -531,6 +565,8 @@ def main():
     r.add_argument("--label")
     r.add_argument("--where", choices=("auto", "local", "server"), default="auto")
     r.add_argument("--tier", default="Fast")
+    r.add_argument("--no-server-case", action="store_true",
+                   help="a local run skips the server-only question even when a server is paired")
     r.add_argument("--judge", choices=("mlx", "packets"), default="mlx")
     r.add_argument("--judge-model", default=JUDGE_MODEL)
     r.add_argument("--judge-port", type=int, default=9917)

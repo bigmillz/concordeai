@@ -120,17 +120,19 @@ PY
 
 # THE SCORECARD, WHEN ASKED (6b560): SCORECARD=1 ./release.sh beta asks the
 # fixed 20-question set of tools/answer_eval/scorecard.json on a dev copy of
-# this checkout (the paired server first, as the app does), has a local judge
+# this checkout (the modes on this Mac, whose first words hold within ~5 % run
+# to run where a thinking server model's moved by a third; the server-only question
+# on the paired server when it answers), has a local judge
 # score it, appends it to tools/answer_eval/scorecard/history.json (which the
 # release commit carries) and stops the cut when quality fell by more than one
 # standard error, the median time to first words grew by more than 15 %, or
 # there are more error answers than last time. Off unless asked: it loads real
-# models for about ten minutes (11 for beta 2). Never part of the plain gauntlet.
+# models for about six minutes. Never part of the plain gauntlet.
 if [[ "${SCORECARD:-0}" == 1 ]]; then
   SC_PY="$HOME/Library/Application Support/MillenAI/venv/bin/python3"
   [[ -x "$SC_PY" ]] || SC_PY=python3
   echo "→ scorecard (build $BUILD)"
-  if ! "$SC_PY" tools/answer_eval/scorecard.py run --label "build-$BUILD" --gate; then
+  if ! "$SC_PY" tools/answer_eval/scorecard.py run --label "build-$BUILD" --where local --gate; then
     echo "✗ the scorecard failed (see above); nothing was cut. Rerun without SCORECARD=1 to cut anyway."
     exit 1
   fi
