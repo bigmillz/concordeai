@@ -125,7 +125,7 @@ PY
 # release commit carries) and stops the cut when quality fell by more than one
 # standard error, the median time to first words grew by more than 15 %, or
 # there are more error answers than last time. Off unless asked: it loads real
-# models for 15-30 minutes. Never part of the plain gauntlet.
+# models for about ten minutes (11 for beta 2). Never part of the plain gauntlet.
 if [[ "${SCORECARD:-0}" == 1 ]]; then
   SC_PY="$HOME/Library/Application Support/MillenAI/venv/bin/python3"
   [[ -x "$SC_PY" ]] || SC_PY=python3

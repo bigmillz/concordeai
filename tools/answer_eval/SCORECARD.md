@@ -48,7 +48,7 @@ VENV="$HOME/Library/Application Support/MillenAI/venv/bin/python3"
 SCORECARD=1 ./release.sh beta                                     # the release step: stops the cut on a FAIL
 ```
 
-A run takes about 15–30 minutes* on this Mac (one dev copy on port 9916, the judge on 9917; it waits for the
+A run took 11 minutes for beta 2's baseline, the judge included, plus any wait for another run's engines (one dev copy on port 9916, the judge on 9917; it waits for the
 bench's `engines.lock`). It starts a dev copy of this checkout with no cloud keys and spends nothing.
 `--where local` keeps the server out; `--where server` insists on it. `--judge packets` writes blind
 packets for a Claude judge in a development session instead, and `scorecard.py ingest <label> <jsonl>` adds
@@ -59,9 +59,10 @@ temperature 0, with thinking off. Keep it fixed: a new judge model starts a new 
 
 It is never part of the plain gauntlet, which stays offline-safe; the gauntlet only reads these files.
 
-\* Estimated from the beta 2 baseline's wall time on this Mac; a server run or a cold model load moves it.
-
 ## Baseline
 
-7.0 beta 2 (build 279), this Mac, Fast (Gemma 4 26B), the owner's server off: see `scorecard/history.json`
-(`build-279`) and NOTES 6b560.
+7.0 beta 2 (build 279, main d804e0f), 2026-11-10, `where=server`: the server (Ollama1, gemma4:12b) answered 9 of
+the 20 and this Mac's Gemma 4 26B the rest, after the server missed its deadline; the server-only question got
+"Ollama1 is busy". Quality **8.6 (se 0.47)**, correct 8.9, complete 9.3, concise 8.15, fit 9.15; first words median
+**18.6 s**; total median 20.3 s; **1 error answer**; facts 37/39. `scorecard.py show build-279` has it all, and
+NOTES 6b560 has quality-4's run against it.

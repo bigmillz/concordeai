@@ -14,7 +14,7 @@
  "server": "Ollama1",
  "tier": "Fast",
  "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
- "wall_s": 3227.3,
+ "wall_s": 660.0,
  "records": [
   {
    "id": "f01",
@@ -826,5 +826,6 @@
     "why": "The response is an error message from Ollama, completely failing to answer the technical question about GPU VRAM limits."
    }
   }
- ]
+ ],
+ "wall_note": "05:02:21 lock taken to 05:13:38 judge stopped; the 3227 s first recorded included 40 min waiting for the bench's lock"
 }

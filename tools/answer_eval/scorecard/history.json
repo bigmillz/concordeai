@@ -16,7 +16,7 @@
    "server": "Ollama1",
    "tier": "Fast",
    "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
-   "wall_s": 3227.3,
+   "wall_s": 660.0,
    "records": [
     {
      "id": "f01",
@@ -854,7 +854,8 @@
      "private": 10,
      "server": 1
     }
-   }
+   },
+   "wall_note": "05:02:21 lock taken to 05:13:38 judge stopped; the 3227 s first recorded included 40 min waiting for the bench's lock"
   }
  ]
 }

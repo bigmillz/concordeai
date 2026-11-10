@@ -26,7 +26,11 @@ Files:
 - `blind_batches.py` — (6b520) blind batches by turn: every run's answer to one turn in front of one judge,
   run names replaced by codes; `split` writes the judgments back per run. `paired.py` — the paired table.
 - `run_bench.py --env MILLENAI_FRESH_OFF=tl,news` — a dev copy's measuring knob (one fix left out).
-- `run_bench.py --env MILLENAI_Q3_OFF=polish` — (6b523) the round-3 knob: shape, estimate, followup, vendor, polish.
+- `run_bench.py --env MILLENAI_Q3_OFF=polish` — (6b523) the round-3 knob: shape, followup, vendor, polish (estimate is gone, 6b560).
+- `refix_frames.py <run>` — (6b560) cleans runs recorded before run_bench.py knew the USAGE/DONE/RUBIN frames;
+  timings since then read the app's own first-word clock, `app_first_s`.
+- `scorecard.py` — (6b560) the per-build scorecard: 20 fixed questions, a fixed local judge, a JSON history and
+  a gate (`SCORECARD.md`).
 - `runs/<run>/` — one JSON record per turn, `summary.json`, `answers.md`,
   `devcopy.log`, `scores.md`.
 

@@ -428,6 +428,7 @@ def cmd_run(args):
     t0 = time.time()
     try:
         lock.acquire()
+        t0 = time.time()            # the run's own time, not the wait for the lock
         recs, where, srv = ask_all(args, s, run_dir)
         judge_all(args, s, recs, run_dir)
     finally:
