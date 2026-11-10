@@ -66595,7 +66595,7 @@ function hzSkyBoot(){
     const fx_=surgeAt?Math.max(0,(nowT-surgeAt)/1000-.2)/.35:9,flare=fx_<6?fx_*Math.exp(1-fx_):0;flareNow=flare;
     rich=Math.min(1,.55*ultraE+.6*surge);starB=1+.3*ultraE+.3*surge+.9*flare*ultraE;vg=(.2*surge+.04)*ultraE;
     auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);
-    if(waveAt){const wp=(nowT-waveAt)/WAVE_MS;if(wp>=1){waveAt=0;waveA=0;}else{const e=wp<.5?2*wp*wp:1-Math.pow(-2*wp+2,2)/2;waveR=waveY+(-40-waveY)*e;waveA=Math.min(1,wp/.08)*Math.pow(1-wp,1.1)*ultraE;}}
+    if(waveAt){const wp=(nowT-waveAt)/WAVE_MS;if(wp>=1){waveAt=0;waveA=0;}else{const e=wp<.5?2*wp*wp:1-Math.pow(-2*wp+2,2)/2;waveR=waveY+(-40-waveY)*e;waveA=Math.min(1,wp/.3)*Math.pow(1-wp,1.1)*ultraE;   /* the band comes up over 210 ms: no flash (6b555) */}}
     aurWander(dt);
     if(nowT-aurFloAt>1000){aurFloAt=nowT;const cb=R(cbox()),g=R(greetEl()),sd=side(),box=r=>r?[r.left/innerWidth,1-r.bottom/innerHeight,r.right/innerWidth,1-r.top/innerHeight]:[0,0,0,0];
       aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);aurSb=box(sd);}   // the edge never comes within 36 px of the composer, never crosses the greeting; dimmed behind the sidebar
