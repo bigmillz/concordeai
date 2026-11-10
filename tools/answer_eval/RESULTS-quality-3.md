@@ -23,16 +23,15 @@ worth, tables in 10 → 3 answers, the machinery's words ("the provided data doe
   codes, three turns per judge. Wave 1 graded base a/b and branch a/b together (`judgments/<run>/opus-blind-w1.jsonl`).
   Wave 2a graded branch run c with `q3-base-a` and `q3-br-a` graded again as anchors (`opus-blind-w2a.jsonl`);
   the anchors moved +0.09 (se 0.11) and −0.12 (se 0.09) between waves, so the two waves read alike.
-  WAVE2B_NOTE
+  A third base run, the three ablations and the thinking pilot were queued and then stopped: the owner's 7.0 beta
+  took the engines (the coordinator's call, 2026-11-08 night). They run when the round is requeued.
 - **Runs** (`runs/<name>/`):
 
   | run | code | what differs |
   |---|---|---|
-  | `q3-base-a`, `-b`, `-c` | 686e70a | fresh-1, three samples |
-  | `q3-br-a`, `-b`, `-c` | 2fd493c | all five fixes |
-  | `q3-ab-polish` | 2fd493c, `MILLENAI_Q3_OFF=polish` | no post-pass |
-  | `q3-ab-shape` | `…=shape,estimate,followup` | no shape, estimate or follow-up rules |
-  | `q3-ab-vendor` | `…=vendor` | the old ranking (no vendor mark, listings and threads kept) |
+  | `q3-base-a`, `-b` | 686e70a | fresh-1, two samples |
+  | `q3-br-a`, `-b`, `-c` | 2fd493c | all five fixes (the later commits change only the council path, a dev knob and the tests) |
+  | *queued, not run*: `q3-base-c`; `q3-ab-polish` (`MILLENAI_Q3_OFF=polish`), `q3-ab-shape` (`…=shape,estimate,followup`), `q3-ab-vendor` (`…=vendor`); `q3-think-on` (`MILLENAI_Q3_THINK=hard`, the hard turns) | | the third base sample, one ablation per kept fix, the thinking pilot |
 
 ### A caveat on the fresh category
 
@@ -98,7 +97,6 @@ q27 3,8/8,7 · q28 9,9/9,8 · q29 3,5/5,4 · q30 5,7/6,6.
 - **Two base runs (wave 1) → three branch runs (a, b in wave 1, c in wave 2a): +0.15 (se 0.14)**, better/worse/same
   18/11/4, high flags per answer −0.06.
 
-WAVE2B_SECTION
 
 ### What the answers look like (counted over the 33 answers of each run)
 
@@ -121,14 +119,13 @@ WAVE2B_SECTION
 | q3-br-a | 21 s (21) | 27 s (27) | 0 |
 | q3-br-b | 15 s (16) | 21 s (22) | 0 |
 | q3-br-c | 16 s (16) | 22 s (22) | 0 |
-WAVE2B_TIMING
 
 The post-pass runs after the stream (under a millisecond) and re-sends a changed answer after a RESET, so it
 costs no first-text time. The shorter answers are where the wall time went.
 
 ## The candidates, one by one
 
-### 1. The writer's own errors: a deterministic post-pass. KEPT (ablation: ABL_POLISH)
+### 1. The writer's own errors: a deterministic post-pass. KEPT (ablation queued, not run)
 
 - **What**: `answer_polish`, after the single writer's stream. Every `A op B [op C] = D` the answer states is
   re-computed from its own figures and the result replaced when it is off by more than the figures' own rounding
@@ -148,7 +145,7 @@ costs no first-text time. The shorter answers are where the wall time went.
 - The critic's "mandatory corrections" don't apply here: this config has no critic. A different local final
   writer wasn't tried: the mandate fixes Fast = Gemma 4 26B, and no evidence from this round points at the model.
 
-### 2. Source ranking: the vendor's own page, listings and threads. KEPT (ablation: ABL_VENDOR)
+### 2. Source ranking: the vendor's own page, listings and threads. KEPT (ablation queued, not run)
 
 - **What**: the maker's or seller's own page on the question is flagged (the host's own label is the name, or
   the name sits in a primary host the hints named), seated ahead of the fill, marked "THE VENDOR'S OWN SITE" in
@@ -172,7 +169,7 @@ costs no first-text time. The shorter answers are where the wall time went.
 The plan landed on **26 of 28** grounded searches in the base run, in 0.5–1.6 s: with `--warmup` the local engine
 is up and idle, so the local planner runs at once. Nothing to fix here; the half-landing was the server's seat.
 
-### 4. Depth and fit: the shape rides the grounded turn. KEPT (ablation: ABL_SHAPE)
+### 4. Depth and fit: the shape rides the grounded turn. KEPT (ablation queued, not run)
 
 - **What**: on this config the single writer never saw the answer brief (it rides the revise and final passes),
   so the grounded turn carries `GROUND_SHAPE` after the dating rules: the first sentence settles the question;
@@ -230,7 +227,25 @@ answers on the fresh and travel questions.
    may do what the rule alone doesn't.
 4. Health turns don't search for the specific fix the person asked for; `ground_hints` could route "what fixes
    it" to a clinical source.
-5. A second writer for Thinking on this Mac (Qwen3.8-27B or Ministral-3-14B are cached) is untried; the
+5. **The ablations and the third base run** (queued, stopped for the beta): one run each is inside noise (±0.45),
+   so each kept fix's own effect is argued from the counts above, not from a paired score, until they run.
+6. **Odyssey-lite** (the coordinator's extra candidate: on hard questions, a critic plus a fact-check against the
+   evidence, a revision only when it fixes something concrete, the arithmetic check on every answer). The
+   arithmetic check is done here, on every single-writer answer and every council final. The rest is a
+   follow-up on top of this branch, not this round: it is a new model pass (~10–15 s for the critic on Gemma,
+   another ~15 s for a revision) on the single-writer path, which `_single_polish` already sits on, so the hook
+   is in place: critic (`critic_prompt`, `critic_filter`, `critic_corrections` from 6b518) → a revise under
+   `final_prompt` only when a correction is backed → RESET re-send. Hard signal: `quality_think`'s rule (three
+   figures and an ask) or a grounded turn whose pack disagrees on a figure. First text is untouched (the first
+   answer streams, the refinement replaces it); wall time roughly doubles on those turns. Needs two paired runs.
+7. **The model's own reasoning on hard questions** (`MILLENAI_Q3_THINK=hard`, a dev knob in this branch, off in
+   the shipped app; the Muse blind test found Gemma 4 26B losing q27/q28 to arithmetic slips and visible "Wait,
+   recalculating" text). The plumbing exists (`enable_thinking` through `run_model`; the stream parser drops
+   reasoning deltas and `strip_think` the inline kind, so the thinking text never reaches the answer). The
+   pilot run on q27, q28, q29, q07, q09, q22, q24 was queued and stopped; it measures first text, convergence
+   (6b-era note: Gemma's reasoning didn't converge on a taco question, 77 s and no answer) and the judges'
+   scores against the three branch runs. Combining it with Odyssey-lite is a third run.
+8. A second writer for Thinking on this Mac (Qwen3.8-27B or Ministral-3-14B are cached) is untried; the
    candidate list's "different local final writer" needs its own two paired runs.
 
 ## Reproduce

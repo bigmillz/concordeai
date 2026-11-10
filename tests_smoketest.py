@@ -40052,7 +40052,7 @@ def _c520_all(src):
     gt_tl = g["grounded_turn"]("How does a heat pump work?", old, _T520)
     out["every current figure is dated from its own source; newer beats older; official beats an article"] = (
         "DATE EVERY CURRENT FIGURE" in gt_new and "taken from ITS OWN source's date" in gt_new
-        and "give the one with the later date" in gt_new and "OFFICIAL DATA or THE VENDOR'S OWN FEED" in gt_new
+        and "give the one with the later date" in gt_new and "OFFICIAL DATA, THE VENDOR'S OWN FEED or THE VENDOR'S OWN SITE" in gt_new
         and "SNIPPET ONLY" in gt_new
         and gt_new.index("DATE EVERY CURRENT FIGURE") < gt_new.index("PROMPT: What is the newest iPhone"))
     out["nothing from the last 12 months on a question about now: the answer is told to say so"] = (
@@ -41731,7 +41731,7 @@ def _c523_all(src):
     out["the single writer's answer goes through the post-pass on both paths, and a changed one is re-sent after a RESET"] = (
         hs.count("\n                    _single_polish()\n") == 2 and "_shown = shown_answer(answer_buf)" in hs
         and "_new, _notes = answer_polish(_shown, _pk)" in hs
-        and 'memit(Ctl(NUL + "RESET" + NUL))\n                            memit(_new)' in hs
+        and 'memit(Ctl(NUL + "RESET" + NUL))\n                    memit(_new)' in hs
         and 'step("polish", "Sharpened", "done",' in hs
         and hs.index("_stream_guarded(lbl, full_messages,\n                                    memit, status, None,") < hs.rindex("_single_polish()"))
     rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]

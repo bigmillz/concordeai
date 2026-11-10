@@ -35328,7 +35328,8 @@ def run_council(labels: list, messages: list, emit, status,
         # conversions re-computed, the leaks reworded); a change rides the
         # fact-check's RESET
         try:
-            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "")
+            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "",
+                                                    report.get("question") or "")
         except Exception:
             report["polish"] = []
         try:
@@ -36561,16 +36562,40 @@ def answer_scrub(text: str) -> tuple:
     return t, n
 
 
-def answer_polish(text: str, pack: str = "") -> tuple:
+# WHAT THE PERSON ASKED FOR STAYS (6b560): a heading is dropped and a
+# closing summary trimmed because the standing instructions forbid them on a
+# chat answer; asked for a README, a post, a report or an outline, the
+# heading is the thing asked for, and asked for a summary or a TL;DR at the
+# end, the closing summary is. The person's own words decide (the grounded
+# turn's last "PROMPT: " line, or the whole message).
+_ANS_FORM_ASK_RX = re.compile(
+    r"\b(?:readme|markdown|document|outline|headings?|title|headline|blog|"
+    r"article|essay|report|newsletter|template|spec|specification|proposal|"
+    r"memo|agenda|cheat ?sheet|resume|cv|cover letter|press release|slides?)\b",
+    re.I)
+_ANS_SUM_ASK_RX = re.compile(
+    r"\b(?:summar\w*|tl;?dr|bottom line|recap|takeaways?|in short|key points)\b", re.I)
+
+
+def _ans_asked(question: str) -> str:
+    q = str(question or "")
+    i = q.rfind("PROMPT: ")
+    return q[i + 8:] if i >= 0 else q
+
+
+def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
     """(text, notes) for a finished single-writer answer (6b523): its
     arithmetic re-computed, its reais-to-dollar figures checked against the
     rate it or the evidence states, the pipeline's words reworded, a
     leading markdown heading dropped, a closing recap trimmed. `notes`
-    says what changed, for the step card and the dev log; [] when nothing."""
+    says what changed, for the step card and the dev log; [] when nothing.
+    `question` (6b560): the person's words; a heading or a summary they
+    asked for stays."""
     t = str(text or "")
     notes = []
     if "polish" in quality_ablate():
         return t, notes
+    asked = _ans_asked(question)
     fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))
     fixes.sort(key=lambda f: f[0])
     kept, end = [], -1
@@ -36584,11 +36609,11 @@ def answer_polish(text: str, pack: str = "") -> tuple:
     t, n = answer_scrub(t)
     if n:
         notes.append("%d leak%s reworded" % (n, "" if n == 1 else "s"))
-    m = re.match(r"\s*#{1,4} [^\n]{1,100}\n+", t)
+    m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(r"\s*#{1,4} [^\n]{1,100}\n+", t)
     if m:
         t = t[m.end():]
         notes.append("heading dropped")
-    t2 = trim_recap(t)
+    t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)
     if t2 != t:
         t = t2
         notes.append("recap trimmed")
@@ -46805,6 +46830,34 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 pass
             hb_stop.set()
             return
+        def _single_polish():
+            """THE POST-PASS (6b523): the single writer's finished
+            answer, its arithmetic re-computed, its conversions
+            checked, the machinery's words reworded, a heading
+            and a recap dropped; a changed answer is re-sent after
+            a RESET as the fact-check's is (verify_pass). Never
+            breaks an answer."""
+            try:
+                _shown = shown_answer(answer_buf)
+                if len(_shown.strip()) < 40:
+                    return
+                if LANE_ROLE.get(agent_name, "") == "code":
+                    return         # the Code lane's answers are code, left as written (6b560)
+                _pk = (full_messages[-1].get("content") or "") if (query or docs) else ""
+                _new, _notes = answer_polish(_shown, _pk, prompt)
+                if _notes and _new.strip() and _new != _shown:
+                    memit(Ctl(NUL + "RESET" + NUL))
+                    memit(_new)
+                    _nf = sum(1 for n_ in _notes if "\u2192" in n_)
+                    step("polish", "Sharpened", "done",
+                         ("fixed %d figure%s" % (_nf, "" if _nf == 1 else "s")) if _nf
+                         else "; ".join(_notes)[:70])
+                    if DEV_HOME:
+                        print("polish: %s" % " | ".join(_notes), file=sys.stderr, flush=True)
+            except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                raise
+            except Exception:
+                pass
         try:
             if images and _vis_cloud and _cloud_vision():
                 pass          # a cloud model read the picture (6b308)
@@ -46895,12 +46948,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             {"role": "user", "content":
                              REVISE_INSTRUCTION + "QUESTION: " + _sq
                              + "\n\nFIRST DRAFT:\n" + _d[:6000]}]
-                server_first_answer(
+                _so_res = server_first_answer(
                     _srv_lbl, "", full_messages, memit, emit, status, step,
                     first_s=None,
                     polish=(_so_revise if (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                                            and (not query or bookish)
                                            and _is_substantive(prompt)) else None))
+                if _so_res == "server":
+                    _single_polish()      # the post-pass (6b560)
             elif _srv_lbl:
                 server_answer(_srv_lbl, full_messages, memit, emit, status,
                               step, refuse=_so_fail)
@@ -47025,6 +47080,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         status, step,
                         first_s=30.0 if tier == "Fast" else 60.0,
                         polish=_revise if _pol else None)
+                    # the server's answer gets the same post-pass (6b560):
+                    # a mode with a paired server answers there first, so
+                    # the 6b523 fixes reached almost no answer without it
+                    if _seat_res[0] in ("server", "fallback"):
+                        _single_polish()
                     hb_stop.set()
                     return
                 _run_lbl([lbl])
@@ -47040,32 +47100,6 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and not _links          # (6b423) see _pol
                           and _is_substantive(prompt)
                           and not slow_giant(lbl))
-                def _single_polish():
-                    """THE POST-PASS (6b523): the single writer's finished
-                    answer, its arithmetic re-computed, its conversions
-                    checked, the machinery's words reworded, a heading
-                    and a recap dropped; a changed answer is re-sent after
-                    a RESET as the fact-check's is (verify_pass). Never
-                    breaks an answer."""
-                    try:
-                        _shown = shown_answer(answer_buf)
-                        if len(_shown.strip()) < 40:
-                            return
-                        _pk = (full_messages[-1].get("content") or "") if (query or docs) else ""
-                        _new, _notes = answer_polish(_shown, _pk)
-                        if _notes and _new.strip() and _new != _shown:
-                            memit(Ctl(NUL + "RESET" + NUL))
-                            memit(_new)
-                            _nf = sum(1 for n_ in _notes if "\u2192" in n_)
-                            step("polish", "Sharpened", "done",
-                                 ("fixed %d figure%s" % (_nf, "" if _nf == 1 else "s")) if _nf
-                                 else "; ".join(_notes)[:70])
-                            if DEV_HOME:
-                                print("polish: %s" % " | ".join(_notes), file=sys.stderr, flush=True)
-                    except (StaleProfile, BrokenPipeError, ConnectionResetError):
-                        raise
-                    except Exception:
-                        pass
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
                     # TWO PASS, BOTH ON SCREEN (6b539, per Patrick: "faster
