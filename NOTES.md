@@ -20325,3 +20325,27 @@ with the aurora's reach held low (`?hz=time=...,aurlow=1`, over the hour's grade
 (per-region luma, 8 x 5 regions, 60 fps screen recording of the WKWebView window): at rest under Ultra 1.0/255 within
 200 ms; during the arrival 21.8/255 round the composer's top edge (the edge bloom and the burst: the preview's designed
 smash). Known: on a phone the composer is 133 px (the effort wraps to its own row; 95 needs one row control fewer).
+
+**The header, one row (per Patrick on the b309f88 Nightly: "Fix this, man. It looks rough").** In a conversation the
+title ran over the wordmark and the lanes over its end: `.vghost` lets the wordmark shrink (`min-width:0`) while
+`#hz-mark` overflows visibly, so a squeezed brand drew the title on top of a zero-width wordmark; the lanes (shown in a
+conversation since the chrome half) and the effort controls also pushed the row past the window between 700 and 1000 px
+(85-273 px of sideways scroll). Now: three groups in one row, the lanes between two flexible spacers (the free space's
+centre; the home's absolute centring went); nothing shrinks but the title, which truncates behind a hairline;
+`hzHeaderFit` takes the least of seven steps at which nothing overlaps, clips, spills or sits in the Mac shell's
+traffic-light zone (recomputed from zero on every resize, sidebar move, title or right-group change, so it cannot
+oscillate): 1 hide the title (kept only while 96 px of it show), 2 the wordmark to the wing, 3 compact lanes, 4 the right
+group compact, 5 the lanes on their own row under the header, 6 the effort pill at phone width and the machines out,
+7 the effort's word out. The conversation starts 32 px below the header. The shell's window is never under 940 px
+(`min_inner_size`), so the traffic-light cases run at 1440/1100/940. **Settings and updates in the header** (per
+Patrick: "Where are the settings and updates, buddy?"): the sun-like icon was Settings; it is a 32 px glass gear now,
+"Settings (⌘,)" ("Ctrl+," on a PC), on every screen. "Update ready" is a quiet pill left of it, mirroring the app's own
+check (`#update-flag`, set by `checkUpdate` and About's Check now; no new call), "Updating…" while the update dialog's key
+is busy; its click opens Settings > About with the update key in focus; at the compact steps a small square mark on the
+gear instead; hidden in the Nightly (updater off). The status dot's card opens with "Your machines". Gauntlet: "6b555
+the header, one row, with Settings and updates in it": a CDP driver at 1440, 1100, 900, 760, 600 and 390 (and the shell
+at 1440, 1100, 940), home and a conversation with a long title, the sidebar open and closed (36 cases): no box
+intersects, nothing clipped or in the light zone, no sideways scroll, the gear hittable (`elementFromPoint`) everywhere;
+a stand-in update check shows no pill, then the pill at 1440 and the gear's mark at 760 and 390; mutants: no fit and
+groups that shrink (17 bad cases), the gear hidden with the badge's wiring cut, a glowing gear, the fit's loop removed,
+the wordmark's no-shrink rule removed. Before: 11 of 65 measured cases bad; after: 0.
