@@ -41419,6 +41419,76 @@ check("the shell's menu bar is the curated one: ConcordeAI (About, Settings… �
 check("the shell's probe hook (CONCORDE_SHELL_PROBE) is compiled into debug builds only",
       _rs_main.count("#[cfg(debug_assertions)]\nfn probe_hook") == 1
       and "#[cfg(debug_assertions)]\n            probe_hook(" in _rs_main, "")
+# SHELL-POLISH (7.0 beta 1, per Patrick: "do better on the Rust version"): the page
+# fades in over the night (no blank or white frame; main frame, the app's origin
+# only, revealed by 2.5 s whatever happens, the style removed after); a sidecar
+# that stops on its own (not the updater's 0, not 2, 3 or 4) is
+# started again behind a "Reconnecting…" veil, at most MAX_RESTARTS = 3 times in a
+# row, a run steady for 60 s clearing the tally, then the plain error page; Quit
+# sets QUITTING first so nothing restarts it; the sidecar starts before the window
+# is built; the window's place is kept in the data folder and put back only on a
+# screen that is there; closing hides the window on a Mac and a Dock click or a
+# second launch brings it back
+def _sp_rules(rs):
+    fade = rs[rs.index("const FADE_IN"):rs.index('})();"#;', rs.index("const FADE_IN"))] if "const FADE_IN" in rs else ""
+    setup = rs[rs.index(".setup(|app| {"):] if ".setup(|app| {" in rs else ""
+    return {
+        "fade script": ".initialization_script(FADE_IN)" in rs and "initialization_script_for_all_frames" not in rs
+                       and 'location.hostname !== "127.0.0.1"' in fade and "setTimeout(reveal, 2500)" in fade
+                       and "st.remove()" in fade and "prefers-reduced-motion" in fade and "token" not in fade,
+        "restart only what may start": "fn restartable(code: Option<i32>) -> bool {\n    !matches!(code, Some(0) | Some(2) | Some(3) | Some(4))\n}" in rs,
+        "one window per folder": "    if dev_copy() {" in rs and "data_home().hash(&mut h);" in rs
+                                 and "ctx.config_mut().identifier = id;" in rs
+                                 and rs.index("ctx.config_mut().identifier = id;") < rs.index("tauri_plugin_single_instance::init(")
+                                 and 'std::env::var("MILLENAI_DEV").ok().as_deref() == Some("1")' in rs,
+        "capped": "const MAX_RESTARTS: u32 = 3;" in rs and "n > MAX_RESTARTS" in rs
+                  and "RESTARTS.store(0, Ordering::SeqCst);" in rs and "since.elapsed() > STEADY" in rs,
+        "veil, then a new sidecar": "let _ = w.eval(RECONNECTING);" in rs and "Reconnecting…" in rs
+                                    and rs.index("let _ = w.eval(RECONNECTING);") < rs.index("start_sidecar(app);\n}"),
+        "watcher recovers": "            recover(app, status.code(), &log_path);" in rs[rs.index("fn watch_sidecar("):rs.index("fn start_sidecar(")],
+        "quit stops restarts": "fn stop_sidecar(app: &AppHandle) {\n    QUITTING.store(true, Ordering::SeqCst);" in rs,
+        "sidecar before window": 0 < setup.find("start_sidecar(handle.clone());") < setup.find("open_window(&handle)?;"),
+        "place kept and checked": 'data_home().join("shell-window.json")' in rs and "app.available_monitors()" in rs
+                                  and "ow >= 160.0 && oh >= 120.0" in rs and "save_window_state(app);" in rs,
+        "close hides, dock reopens": "api.prevent_close();" in rs and "RunEvent::Reopen { .. } => show_main(app)," in rs
+                                     and "show_main(app);\n        }))" in rs,
+    }
+_sp = _sp_rules(_rs_main)
+_sp_mut = [("restart on 2", "Some(0) | Some(2) | Some(3) | Some(4)", "Some(0) | Some(3) | Some(4)", "restart only what may start"),
+           ("dev copies on the bundle's socket", "        ctx.config_mut().identifier = id;\n", "", "one window per folder"),
+           ("no cap", "n > MAX_RESTARTS", "n > u32::MAX", "capped"),
+           ("quit without the flag", "    QUITTING.store(true, Ordering::SeqCst);\n    let Some(sc)", "    let Some(sc)", "quit stops restarts"),
+           ("a fade that never ends", "setTimeout(reveal, 2500)", "void 0", "fade script"),
+           ("window first", "start_sidecar(handle.clone());\n            open_window(&handle)?;", "open_window(&handle)?;\n            start_sidecar(handle.clone());", "sidecar before window")]
+_sp_missed = [n for n, a, b, k in _sp_mut if a not in _rs_main or _sp_rules(_rs_main.replace(a, b, 1))[k]]
+check("shell-polish: the page fades in over the night; a stopped sidecar restarts behind a Reconnecting veil at most 3 times in a row, then the plain error; Quit stops restarts; Python starts before the window; the window's place is restored on a screen that is there; close hides, the Dock reopens; mutants caught",
+      all(_sp.values()) and not _sp_missed, "%r" % ([[k for k, v in _sp.items() if not v], _sp_missed],))
+# THE SIDECAR'S BYTECODE, CACHED (shell-polish): the shell runs millenai.py through
+# BOOT_PY, which takes the code object through SourceFileLoader under
+# CONCORDE_PYCACHE (0.29 s of compile at every launch, gone). Run here for real on a
+# stand-in script: it is __main__ with its path as __file__ and argv[0], its folder
+# first on sys.path, the knob not passed on, its exit code kept; the second run
+# loads the cache, which lands under the prefix and never beside the source
+_cb_src = re.search(r'const BOOT_PY: &str = r#"(.*?)"#;', _rs_main, re.S)
+_cb_dir = _tf20.mkdtemp()
+_cb_py = os.path.join(_cb_dir, "srv", "stand_in.py")
+os.makedirs(os.path.dirname(_cb_py))
+open(_cb_py, "w").write("import os, sys\nprint(repr((__name__, __file__, sys.argv, sys.path[0], os.environ.get('CONCORDE_PYCACHE'))))\n"
+                        "raise SystemExit(5)\n")
+_cb_runs = []
+for _i in range(2):
+    _r = subprocess.run([sys.executable, "-c", _cb_src.group(1) if _cb_src else "raise SystemExit(9)", _cb_py, "--x"],
+                        env=dict(os.environ, CONCORDE_PYCACHE=os.path.join(_cb_dir, "pyc")),
+                        capture_output=True, text=True, timeout=60, cwd=_cb_dir)
+    _cb_runs.append((_r.returncode, _r.stdout.strip()))
+_cb_pyc = [f for _r_, _d_, _fs in os.walk(os.path.join(_cb_dir, "pyc")) for f in _fs]
+_cb_want = repr(("__main__", _cb_py, [_cb_py, "--x"], os.path.dirname(_cb_py), None))
+check("shell-polish: the shell runs millenai.py through its bytecode cache: __main__, its own path as __file__ and argv[0], its folder on sys.path, the exit code kept, the cache under CONCORDE_PYCACHE and nowhere beside the source",
+      bool(_cb_src) and '.arg("-c")\n            .arg(BOOT_PY)\n            .arg(&script)\n            .env("CONCORDE_PYCACHE", pycache_dir(&home))' in _rs_main
+      and _cb_runs == [(5, _cb_want)] * 2 and _cb_pyc == ["stand_in.cpython-%d%d.pyc" % sys.version_info[:2]]
+      and not os.path.exists(os.path.join(os.path.dirname(_cb_py), "__pycache__")),
+      "%r" % ([_cb_runs, _cb_pyc],))
+shutil.rmtree(_cb_dir, ignore_errors=True)
 # ==== native shell (6b532): end ====
 
 # counted HERE, after every check: a count taken mid-file left the checks

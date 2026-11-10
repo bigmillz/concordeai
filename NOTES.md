@@ -19672,3 +19672,112 @@ re-pinned at the same strength; the KEEP_LS pin reads the list. New checks: the 
 mutant), the corner's full-screen rule, the home pill's absence, the menu's Import Chats, the drop's
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
+
+## 6b548 — shell-polish: no blank window, a crashed server comes back, the window remembers its place, close keeps the app (7.0 beta 1, per Patrick: "do better on the Rust version")
+
+On `shell-polish`, from `beta-1` (437bc3f). The shell only (`shell/src-tauri/src/main.rs`); the page is
+untouched. The id is the next free one after beta-1's 6b547 at the time; the release owner may renumber.
+
+**Launch, measured before and after** (release bundles, universal, ad hoc signed, a test copy with its own
+bundle id so WebKit's storage is the test's; a dev copy on 9892 in its own primed folder; four warm rounds
+each, niced, the same session; the window list polled and the window captured about every 130 ms;
+scratchpad `sp/launch_bench.py`). Window on screen 0.20–0.24 s before, 0.22–0.25 s after. First captured
+frame: the night in every round of both builds, and **no white frame in any capture**. **Page painted
+1.10–1.20 s before, 0.88–0.96 s after** (about −0.23 s, a fifth of the launch). The shell's own clock
+(`CONCORDE_SHELL_TIMING=1` prints each milestone to stderr): process start → setup 110–140 ms → sidecar
+spawned +5 ms → window built ~75 ms later → the sidecar's notes read at **275–315 ms (was 515–535 ms)** →
+page loaded 545–605 ms (was 805–835 ms).
+
+- **The server's bytecode is cached** (`BOOT_PY`). `python3 millenai.py` compiled the whole 3.4 MB file
+  at every launch, because a script run as `__main__` never uses a .pyc: **0.29 s of the sidecar's ~0.4 s
+  boot**, measured (compile 0.29–0.30 s; the marshalled code loads in 6 ms). The shell now runs
+  `python3 -c BOOT_PY <path to millenai.py>`, which takes the code object through `SourceFileLoader` with
+  `sys.pycache_prefix` pointed at `CONCORDE_PYCACHE` (`~/Library/Caches/MillenAI/pyc` for the app, a dev
+  copy's own `cache/pyc`), outside the signed bundle, and runs it as `__main__` with its path as `__file__`
+  and `argv[0]` and its folder first on `sys.path`, so the server and everything that relaunches it
+  (`--pdf-text`, the swap's pgrep, `_other_instances`' `pgrep -f millenai.py`) see what they saw. It is
+  recompiled when the source's mtime or size or the Python changes; any trouble with the cache falls back
+  to compiling; the knob is popped from the environment before the server runs, and
+  `dont_write_bytecode` (a `PYTHONDONTWRITEBYTECODE` in the environment, as on this Mac) is lifted for
+  that one write only. A side win: **the sidecar's idle RSS fell from 542 MB to 406 MB**, the compiler's
+  AST for a 3.4 MB file no longer left in the heap.
+- **The sidecar starts before the window is built**, so Python boots while WebKit builds the window
+  (about −90 ms, measured on its own before the cache). `show_error` and the navigation wait up to 3 s for the window (`main_window`).
+- **The page fades in over the night** (`FADE_IN`, a second document-start script, main frame only, on
+  `http://127.0.0.1` only, no secret): the body is held at opacity 0 until DOMContentLoaded and two frames
+  (a timer beside each `rAF`, the hidden-document trap), then fades in over 240 ms (none under reduced
+  motion); revealed after 2.5 s whatever happens; its style element is removed after, no class or
+  attribute left on the page. The window and webview were already the night (6b532); this closes the gap
+  between the page's first paint and its laid-out look.
+
+**A crashed server comes back.** Any stop of the sidecar that is not the updater's clean exit (0, still
+quits the shell, 6b537) and not a refused setting (2), another copy on the folder (3) or a launch that wanted its own window (4) — those
+stop the same way every time — puts a calm veil over the window ("Reconnecting…", the night at .78 with a
+blur; the veil drags the window like the header it covers) and starts a new sidecar after 1 s, 2 s, 4 s;
+the new boot code is loaded and the page comes back. After three restarts in a row, the next stop shows
+the plain error page ("It kept stopping, even after 3 restarts … Quit ConcordeAI and open it again; the
+log below says why." with the log's tail). A run that stays up 60 s clears the tally. A stop before the
+server was ready is retried the same way (a port still held by the copy that just died). Quit sets `QUITTING` before it stops the sidecar, so neither the watcher nor a start under way
+brings it back. Proven on the release bundle (`sp/restart_test.py`): SIGKILL of the sidecar → veil
+captured → new sidecar → page back 1.3 s after the kill; three more kills in a row → restarts 2 and 3,
+then the error page, no sidecar left, the shell alive; Quit then exits 0.
+
+**Native feel.**
+- **The window's place** (outer position and inner size in points, and whether it was zoomed) is kept
+  in the data folder's `shell-window.json` (a dev copy's in its own folder) and restored at launch when
+  at least 160 × 120 pt of it lands on a screen that is there now; otherwise centred as before. Full
+  screen and a minimised window are never recorded. Written at close and at quit — a Quit Apple event
+  ends the loop with `RunEvent::Exit` alone, so it is written at either (found by the test: the first
+  build saved only on ExitRequested and lost a move). Proven: a window moved and resized through
+  System Events to 300,200 1100×760, quit, relaunched at 300,200 1100×760.
+- **Closing hides the window on a Mac** (it used to quit): the app stays in the Dock with its server
+  and the page as they were (an answer still streaming goes on); a Dock click (`RunEvent::Reopen`) or a
+  second launch (the single-instance plugin, which already focused it) brings it back. Quit is Cmd+Q. A
+  full-screen window leaves full screen first, so no empty Space is left. Proven: the AXCloseButton
+  pressed → window off screen, shell and sidecar alive; LaunchServices' reopen event (`open` of the
+  running bundle, what a Dock click sends) → window back; a second launch of the binary exits 0 and the
+  first window stays.
+- **About shows the version, not the build**: About is the page's own (no native panel, by 6b547's rule),
+  and its spec cell reads `7.0 beta 1`; adding the build is a page change, left for Patrick to decide.
+- The curated menu, the hidden title bar and the traffic lights' place are unchanged (their checks pass).
+
+**Size and memory.** DMG 5,739,347 → 5,757,338 bytes (+18 KB); `.app` 12.6 MB both; binary 8.7 MB
+universal. Idle RSS 20 s after launch: shell 115 → 112 MB (noise), **sidecar 542 → 406 MB** (the cache,
+above). Nothing was trimmed: the one candidate seen, tauri's `devtools` feature in a release (the web inspector), is a
+behaviour someone may rely on in a beta, so it stays for Patrick to decide.
+
+**Intel.** The universal bundle's x86_64 slice run under Rosetta (`arch -x86_64`) as a dev copy: first
+launch (translation) window 1.35 s, page 2.04 s; second launch window 0.30 s, page 0.98 s; shell RSS 51 MB;
+no white frame; restart, close and reopen were not repeated under Rosetta. The sidecar is the venv's arm64 Python either way. Not run on a real Intel Mac.
+
+**Gauntlet.** Two new checks. One runs `BOOT_PY` for real with the gauntlet's Python on a stand-in
+script, twice (`__main__`, `__file__` and `argv[0]` its path, its folder on `sys.path`, the knob not passed
+on, its exit code kept, the cache written under the prefix and nothing beside the source). One over `main.rs` (the fade script's rules, the restart rule and cap, the veil
+before the new sidecar, the watcher recovering, Quit's flag, Python before the window, the saved place and
+its screen test, close hides and the Dock reopens) with five mutants (restart on exit 2, no cap, Quit
+without the flag, a fade that never ends, window first), each caught; it fails against beta-1's source.
+Every existing check that reads the shell's files was run standalone against the new source: all pass
+(one command, the origin check, `about:blank`, the night, the shim, SIGTERM and the exit arm, the 6b537
+updater rules, the corner, the menu, the probe hook, the capability). Full gauntlet: the release owner's run.
+
+**The updater's relaunch, and one window per folder (follow-up).** The release owner's updater proof
+(`scratchpad/updproof2/proof.py`: a 277 dev copy offered 278 by a stand-in feed, installs, quits, the helper
+swaps the bundle and `open -n`s it) failed once on e8051bb: no relaunched shell, the old server's pid left in
+the note. Rerun here on the same build it passed 9/9 three times (relaunch 3.1–5.1 s after the install), with a
+watcher on the single-instance socket showing the relaunch claim it cleanly. The likely cause is the plugin
+itself: it keys its socket on the bundle id alone (`/tmp/com_millen_millenai_si.sock`), so any other shell
+with that id that is up at that moment, a dev copy or a test build of another folder (several sessions test
+shells on this Mac), answers the relaunch, and the new process hands off to it and exits 0, which looks
+exactly like that failure. Now a dev copy's identifier, as the process knows it, carries a hash of its data
+folder (`<id>.dev<16 hex>`, set on the context before the plugins load): a second launch on the same folder
+still focuses its window, and nothing else answers it. The identifier feeds only Tauri's own app-data paths,
+which the shell never uses; the bundle's own id (Info.plist, WebKit's storage) is unchanged, and the real app
+keeps the plain id. Proven: the proof passes 9/9 with beta-1's shell running all the while as a dev copy of
+another folder, holding the plain socket (on beta-1 or e8051bb, that squatter would have taken the
+launch); a second launch of the same folder still exits 0 with the window kept. Also: exit 3 (another copy
+holds this folder) no longer restarts. The shell restarts only after the old process is gone, so a 3 is a real
+second copy and goes straight to the error page.
+
+**Not done, for beta 2.** The build in About (a page change, Patrick's call); a real Intel Mac; a cold
+first launch after an update recompiles once (0.3 s, then cached). All proofs ran the release bundle
+re-signed with a test bundle id; the shipped id was not launched.
