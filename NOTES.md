@@ -20350,6 +20350,15 @@ a stand-in update check shows no pill, then the pill at 1440 and the gear's mark
 groups that shrink (17 bad cases), the gear hidden with the badge's wiring cut, a glowing gear, the fit's loop removed,
 the wordmark's no-shrink rule removed. Before: 11 of 65 measured cases bad; after: 0.
 
+**The home, bare (per Patrick: "we need to fix these suggestions too. I think we just get rid of them. They look
+tacky.").** The three recent-chat rows under the home composer are gone, code and all: `#hz-history`, `hzHistoryPaint`,
+`hzWhen`, `hzK`, the `.hz-row` rules, their click and their repaint calls (they read the page's own chat list; there was no
+fetch behind them). Recent chats stay in the sidebar. Horizon already hid Classic's starter chips (`#suggest`); the
+/api/suggest feature stays for Classic and the Code lane. `hzBalanceFor(H, compH)` no longer reserves room for rows: the
+composer's centre measures -0.2 px off the golden point at 1440 and 390. Gauntlet: the 6b542 balance check re-pinned
+(at rest and grown); the header check now also requires, with chats saved, no recent-chat rows or suggestion chips on the
+home and the golden point within 0.5 px, and its second mutant puts the old list back.
+
 ## 6b570 — fluent-1: no dead ends, no cut answers, a greeting in a second, one quiet working line (7.0 beta 3, per Patrick)
 
 Patrick, with a screenshot of a conversation on "Ollama1 only" at Ultra (Nightly, beta 3 at b309f88): "Tests like this

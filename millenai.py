@@ -52598,18 +52598,6 @@ __HZ_FONTS__
 .hz .hz-sweep{position:absolute;left:0;top:-1px;width:200px;height:2px;border-radius:1px;pointer-events:none;opacity:0;
   background:linear-gradient(90deg,rgba(207,224,255,0),rgba(207,224,255,.95) 50%,rgba(207,224,255,0));box-shadow:0 0 10px rgba(159,192,255,.7)}
 .hz .hz-sweep[hidden]{display:none}
-/* ---- history rows under the composer */
-#hz-history{display:none}
-.hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;margin-top:34px;pointer-events:auto}
-.hz .hz-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:baseline;gap:24px;padding:13px 8px;
-  border:0;border-top:1px solid var(--hz-hair);border-radius:6px;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;
-  transition:background var(--hz-t-fast) ease}
-.hz .hz-row:last-child{border-bottom:1px solid var(--hz-hair)}
-.hz .hz-row:hover{background:rgba(255,255,255,.04)}
-.hz .hz-row .t{font-size:15px;color:var(--hz-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hz .hz-row .w{font-size:13px;color:var(--hz-ink-3)}
-.hz .hz-row .k{font-family:var(--hz-font-mono);font-size:12px;color:var(--hz-ink-3);font-variant-numeric:tabular-nums;min-width:64px;text-align:right}
-.hz .hz-row .k:empty{min-width:0}
 /* ---- the conversation: the reply bar at the foot, the reading column's width and edge */
 .hz #main:not(:has(#hero)) #chat-inner{padding-top:72px}
 /* what scrolls up fades under the 56px header instead of meeting it; at rest nothing is dimmed (integration) */
@@ -52659,11 +52647,11 @@ __HZ_FONTS__
 .hz.hz-markin #hz-intro-mark{opacity:1}
 .hz.hz-markout #hz-intro-mark{opacity:0;transform:translateY(-24px);transition:opacity 1.2s var(--hz-ease-out),transform 1.2s var(--hz-ease-out)}
 /* the chrome waits for the home; the night itself is there from the first frame */
-.hz.hz-intro #sidebar,.hz.hz-intro #hz-top,.hz.hz-intro #hero,.hz.hz-intro #composer,.hz.hz-intro #hz-cglow,.hz.hz-intro #hz-history{opacity:0;transition:opacity 1.2s var(--hz-ease-out)}
+.hz.hz-intro #sidebar,.hz.hz-intro #hz-top,.hz.hz-intro #hero,.hz.hz-intro #composer,.hz.hz-intro #hz-cglow{opacity:0;transition:opacity 1.2s var(--hz-ease-out)}
 .hz.hz-intro #hz-aurw{opacity:0}
 .hz.hz-intro:not(.hz-home) #hz-cglow{animation:none}   /* its breathing would override the hidden glow */
 .hz.hz-intro.hz-markin #hz-aurw{opacity:.42}
-.hz.hz-home #sidebar,.hz.hz-home #hz-top,.hz.hz-home #hero,.hz.hz-home #composer,.hz.hz-home #hz-cglow,.hz.hz-home #hz-history{opacity:1;transition:opacity 1.2s var(--hz-ease-out)}
+.hz.hz-home #sidebar,.hz.hz-home #hz-top,.hz.hz-home #hero,.hz.hz-home #composer,.hz.hz-home #hz-cglow{opacity:1;transition:opacity 1.2s var(--hz-ease-out)}
 /* ---- asking, from the home: the question arcs into the top of the chats; its row keeps a
    live die (the working machine's colour) until the answer lands, and renames itself */
 .hz-ghost{position:fixed;left:0;top:0;z-index:30;pointer-events:none;font-size:17px;color:#fff;white-space:nowrap;transform-origin:0 50%;
@@ -52816,7 +52804,6 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #hz-right{gap:16px}
 .hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}
 .hz #main:not(:has(#hero)) #composer,.hz #main:not(:has(#hero)) #composer::before{border-radius:14px}
-.hz #main:has(#hero) #hz-history:not([hidden]){margin-top:32px}
 .hz #hz-menu{border-radius:12px}
 .hz .hz-opt{border-radius:8px}
 .hz .hz-opt[aria-checked=true]>b::after{box-shadow:none}
@@ -52841,7 +52828,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 /* ---- the focus hairline: 1 px ember on any control reached by the keyboard, in place of the
    ice ring; on the composer only while it holds words and the focus (the composer has the focus
    from the first frame, so an ember border on focus alone would never be a moment) */
-.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-row:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
+.hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
 .hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
 .hz #newchat:focus-visible,.hz .srcchip:focus-visible,.hz .showm:focus-visible,.hz .retrybtn:focus-visible,.hz #sb-foot #settings-btn:focus-visible,.hz #sb-foot #rail-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
 /* ---- an error: a small ember rule at its left, nothing else */
@@ -54105,8 +54092,8 @@ __CODE_ROWS__
       </div>
       </div>
     </div>
-    <!-- Horizon (6b526): recent chats as hairline rows under the composer -->
-    <nav id="hz-history" aria-label="Recent chats" hidden></nav>
+    <!-- (6b555, per Patrick: "we need to fix these suggestions too. I think we just get rid of them. They look tacky.")
+         the home is the greeting, the composer and the sky; recent chats live in the sidebar -->
   </div>
 </main>
 
@@ -55920,7 +55907,7 @@ function modeShow(which){
   setTimeout(renderChats,0);
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
-  if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes and rows (6b526)
+  if(globalThis.hzReady)hzLanePaint();   // Horizon's lanes (6b526)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -60270,7 +60257,6 @@ function dayRows(rows,row,now){
     +'</div>'+g.rows.map(row).join("")).join("");
 }
 function renderChats(flip){
-  if(globalThis.hzReady)setTimeout(hzHistoryPaint,0);   // Horizon's home rows (6b526)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -67486,27 +67472,7 @@ function hzHomePaint(){
   if(!hzReady||!document.documentElement.classList.contains("hz"))return;   // Classic keeps its plain greeting (integration)
   const g=$("#hero .greet");
   if(g){hzHeadline(g,hzGreeting());if(!document.documentElement.classList.contains("hz-intro"))hzHeadlineShow(g);}
-  hzHistoryPaint();hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();hzGlowFit();
-}
-function hzWhen(ts){
-  if(!(ts>0))return "";
-  const d=new Date(ts),now=new Date(hzNow()),day=x=>Math.floor((x.getTime()-x.getTimezoneOffset()*60000)/86400000);
-  const dd=day(now)-day(d);
-  if(dd<=0)return "Today";if(dd===1)return "Yesterday";
-  if(dd<7)return d.toLocaleDateString(undefined,{weekday:"long"});
-  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
-}
-function hzK(n){return n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e4?Math.round(n/1e3)+"K":n>=1e3?(n/1e3).toFixed(1)+"K":String(n);}
-function hzHistoryPaint(){
-  const box=$("#hz-history");if(!box)return;
-  if(!$("#hero")){box.hidden=true;return;}
-  const esc_=typeof esc==="function"?esc:(s=>String(s));
-  const laneOK=c=>(uiMode==="code"||uiMode==="funnel")?(c.lane||"ai")===uiMode:((c.lane||"ai")!=="code"&&(c.lane||"ai")!=="funnel");
-  const mine=(typeof chats!=="undefined"?chats:[]).filter(c=>c.id!==curChat&&laneOK(c)&&(c.title||"").trim()&&c.ts>0)
-    .sort((a,b)=>(+b.ts||0)-(+a.ts||0)).slice(0,3);
-  box.hidden=!mine.length;
-  box.innerHTML=mine.map(c=>'<button type="button" class="hz-row" data-id="'+esc_(c.id)+'"><span class="t">'+esc_(c.title)+'</span>'
-    +'<span class="w">'+esc_(hzWhen(c.ts))+'</span><span class="k">'+(typeof c.tokens==="number"&&c.tokens>0?hzK(c.tokens):"")+'</span></button>').join("");
+  hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();hzGlowFit();
 }
 // ---- the machines as dies in their makers' colours (this Mac, each paired
 // server by ITS name, never an assumed one; a server whose maker isn't known is
@@ -67996,15 +67962,14 @@ function hzGlowFit(){
 // room above it. Measured, not guessed: the wrap's bottom padding is set from the real
 // heights, and only on the home.
 const HZ_PHI=0.618,HZ_HEAD=72;
-function hzBalanceFor(H,compH,histH,gap){
+function hzBalanceFor(H,compH){
   const room=H-HZ_HEAD,cy=HZ_HEAD+room*HZ_PHI;
-  return Math.max(16,Math.round(H-cy-compH/2-(histH>0?histH+gap:0)));
+  return Math.max(16,Math.round(H-cy-compH/2));
 }
 function hzBalance(){
   const w=$("#composer-wrap"),c=$("#composer");if(!w||!c)return;
   if(!$("#hero")||!document.documentElement.classList.contains("hz")){w.style.paddingBottom="";return;}
-  const h=$("#hz-history"),hr=h&&!h.hidden?h.getBoundingClientRect().height:0;
-  const pb=hzBalanceFor(innerHeight,c.getBoundingClientRect().height,hr,32);
+  const pb=hzBalanceFor(innerHeight,c.getBoundingClientRect().height);
   if(w.style.paddingBottom!==pb+"px")w.style.paddingBottom=pb+"px";
 }
 // ---- the send: two ice rings from the button; the night brightens while it
@@ -68310,8 +68275,6 @@ function hzInit(){
   hzKbWire();
   const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig,.hz-mdot")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
   const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
-  const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{
-    const row=e.target.closest(".hz-row");if(row&&row.dataset.id&&typeof loadChat==="function")loadChat(row.dataset.id);});
   const sel=$("#look-sel");
   if(sel){try{sel.value=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
     sel.addEventListener("change",()=>setLook(sel.value));}
@@ -68336,7 +68299,7 @@ function hzInit(){
   if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{if(root.classList.contains("hz"))hzGlowFit();});
   const inner=$("#chat-inner");
   if(inner&&window.MutationObserver)new MutationObserver(()=>{if(!root.classList.contains("hz"))return;
-    hzPlaceEffort();hzHistoryPaint();hzTitlePaint();hzSidebarLabel();setTimeout(hzGlowFit,80);
+    hzPlaceEffort();hzTitlePaint();hzSidebarLabel();setTimeout(hzGlowFit,80);
     const home=!!$("#hero");if(home&&!hzS.home){hzWashBloom();hzHomePaint();}hzS.home=home;}).observe(inner,{childList:true});
   hzS.home=!!$("#hero");
   if(root.classList.contains("hz")){

@@ -43411,13 +43411,13 @@ check("6b542 Details: the marginalia folds behind one small link under the answe
       and not _c542_details(_hz_css.replace(".hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}", ".hz:not(.hz-full) .msg.ai>aside.behind{display:flex}"), page, _hz_js)
       and not _c542_details(_hz_css, page, _hz_js.replace('m.classList.toggle("details",open);', "")), "")
 # BALANCE: the golden-ratio placement, run in node (the pure rule the page sets the wrap's padding from)
-_c542_bal_js = _jsfn(_hz_js, "function hzBalanceFor(H,compH,histH,gap){")
+_c542_bal_js = _jsfn(_hz_js, "function hzBalanceFor(H,compH){")   # (6b555) nothing under the composer any more
 def _c542_balance(src):
     js = "const HZ_PHI=0.618,HZ_HEAD=72;\n" + src + r"""
 const cy=(H,pb,c)=>H-pb-c/2,o={};
-o.a=cy(900,hzBalanceFor(900,134,0,32),134);o.at=72+(900-72)*0.618;
-o.b=cy(1100,hzBalanceFor(1100,134,150,32)+150+32,134);o.bt=72+(1100-72)*0.618;   // the history rows sit under the composer, inside the band
-o.c=hzBalanceFor(500,134,300,32);
+o.a=cy(900,hzBalanceFor(900,99),99);o.at=72+(900-72)*0.618;
+o.b=cy(1100,hzBalanceFor(1100,229),229);o.bt=72+(1100-72)*0.618;   // grown by typing: still centred
+o.c=hzBalanceFor(200,134);
 process.stdout.write(JSON.stringify(o));
 """
     try:
@@ -43425,7 +43425,7 @@ process.stdout.write(JSON.stringify(o));
     except Exception:
         return False
     return abs(o["a"] - o["at"]) < 1 and abs(o["b"] - o["bt"]) < 1 and o["c"] == 16
-check("6b542 Balance: the composer's centre lands at the golden point of the room under the header (61.8%), with and without history rows, never under a 16 px floor; the mutant is caught",
+check("6b542 Balance: the composer's centre lands at the golden point of the room under the header (61.8%), at rest and grown, never under a 16 px floor (6b555: no rows under it any more); the mutant is caught",
       _c542_balance(_c542_bal_js) and not _c542_balance(_c542_bal_js.replace("room*HZ_PHI", "room*.5"))
       and "function hzBalance(){" in _hz_js and 'w.style.paddingBottom=pb+"px";' in _hz_js and "function hzGlowFit(){\n  hzBalance();" in _hz_js, "")
 # STING: the ember, its contrast on the night and on the glass, where it appears and where it never does
@@ -44802,8 +44802,11 @@ check("6b555 a whole streamed answer through the real page (headless Chromium, a
 # intersect, nothing is clipped, nothing sits in the traffic-light zone, nothing scrolls sideways, and the Settings gear
 # is there and hittable (elementFromPoint) in every case, its tooltip naming the shortcut. With a stand-in update check:
 # no pill while nothing is pending; "Update ready" beside the gear once the app's own check finds one; at 760 and 390 a
-# mark on the gear instead. Two mutants, served in place of the page: the fit and the groups' no-shrink rules removed
-# (a collision), and the gear hidden with the badge's wiring cut (no gear, no badge).
+# mark on the gear instead. THE HOME, BARE (per Patrick: "we need to fix these suggestions too. I think we just get rid
+# of them. They look tacky."): with chats saved, the Horizon home shows no recent-chat rows and no suggestion chips, and
+# the composer sits at the golden point (within 0.5 px) at 1440 and 390. Two mutants, served in place of the page: the
+# fit and the groups' no-shrink rules removed (a collision); the gear hidden, the badge's wiring cut and the old list
+# back under the composer (no gear, no badge, rows on the home).
 _B3_HDR = r'''// THE HEADER, ONE ROW, MEASURED (6b555): headless Chromium over the DevTools protocol (node's own WebSocket), the copy's
 // own page, at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell, html.tl, at 1440, 1100 and 940: its window is never
 // narrower), on the home and in a conversation with a long title, the sidebar open and closed. Prints one row per case:
@@ -44898,6 +44901,14 @@ ch.stderr.on("data", async d => {
   await size(1440); out.badge.none = await ev(MEASURE);
   await ev(`(async()=>{window.__upd=true;await checkUpdate();})()`); await sleep(400);
   for (const w of [1440, 760, 390]) { await size(w); out.badge["w" + w] = await ev(MEASURE); }
+  // THE HOME, BARE (per Patrick: the recent chats under the composer "look tacky"): with chats saved, back on the home
+  // there are no recent-chat rows and no suggestion chips, and the composer sits at the golden point
+  out.home = {};
+  for (const w of [1440, 390]) { await size(w); await ev(`document.querySelector("#newchat").click()`); await sleep(900);
+    out.home["w" + w] = await ev(`(()=>{const v=e=>{const r=e.getBoundingClientRect(),c=getComputedStyle(e);return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"&&+c.opacity>0;};
+      const rows=[...document.querySelectorAll('#main [aria-label="Recent chats"],#main .hz-row,#suggest button,#suggest .chip,#suggest a')].filter(v).length;
+      const n=typeof chats!=="undefined"?chats.length:0,c=document.querySelector("#composer").getBoundingClientRect(),cy=(c.top+c.bottom)/2,gold=72+(innerHeight-72)*0.618;
+      return {rows,hero:!!document.querySelector("#hero"),chats:n,off:+(cy-gold).toFixed(2)};})()`); }
   done();
 });
 ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
@@ -44926,6 +44937,9 @@ def _b3_hdr_badge_ok(r):
     return (clean and not b_["none"]["badge"] and not b_["none"]["gearMark"]
             and b_["w1440"]["badge"] and b_["w1440"]["badgeText"] == "Update ready" and not b_["w1440"]["gearMark"]
             and not b_["w760"]["badge"] and b_["w760"]["gearMark"] and not b_["w390"]["badge"] and b_["w390"]["gearMark"])
+def _b3_home_ok(r):
+    h_ = r.get("home") or {}
+    return set(h_) == {"w1440", "w390"} and all(v["hero"] and v["chats"] >= 1 and v["rows"] == 0 and abs(v["off"]) <= .5 for v in h_.values())
 def _b3_hdr_static(css, js, pg):
     fit = _jsfn(js, "function hzHeaderFit(){"); upd = _jsfn(js, "function hzUpdateBadge(){")
     return (".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}" in css and ".hz #hz-top>.hz-sp{flex:1 1 0;min-width:12px}" in css
@@ -44942,23 +44956,29 @@ def _b3_hdr_static(css, js, pg):
             and ".hz #hz-settings{width:32px;height:32px;border-radius:8px;" in css and 'b.textContent=busy?"Updating…":"Update ready";' in upd
             and "const on=!f.hidden" in upd and "api(" not in upd and 'g.title="Settings ("+(hzIsPC()?"Ctrl+,":"⌘,")+")";' in js
             and ".hz #hz-top.hz-hd4 #hz-update{display:none}" in css and ".hz #hz-top.hz-hd4 #hz-settings.hz-upd::after{display:block}" in css
-            and not re.search(r"#hz-(settings|update)[^{}]*\{[^{}]*(text-shadow|filter:|animation:)", css))     # no shine, no glow
+            and not re.search(r"#hz-(settings|update)[^{}]*\{[^{}]*(text-shadow|filter:|animation:)", css)     # no shine, no glow
+            # the home's recent-chat list is gone, code and all; Classic's chips stay hidden under Horizon
+            and 'id="hz-history"' not in pg and "hzHistoryPaint" not in js and "hz-row" not in css + js
+            and ".hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}" in css
+            and "function hzBalanceFor(H,compH){" in js)
 _b3_h_ok = _b3_hdr_run()
 _b3_h_mut = _b3_hdr_run([["try{top.classList.remove(...HZ_HD);for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);}", "try{top.classList.remove(...HZ_HD);}"],
                          [".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}\n", ""], [".hz #hz-mark{min-width:max-content}\n", ""]])
 _b3_h_mut2 = _b3_hdr_run([['<button id="hz-settings" type="button" class="hz-ib"', '<button id="hz-settings" type="button" class="hz-ib" style="display:none"'],
-                          ['["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});', ""]])
-check("6b555 the header, one row, with Settings and updates in it: at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
+                          ['["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});', ""],
+                          ['    <!-- (6b555, per Patrick: "we need to fix these suggestions too.', '    <nav id="hz-history" aria-label="Recent chats"><button type="button" class="hz-row">Simple hello message \u00b7 Today</button></nav>\n    <!-- (6b555, per Patrick: "we need to fix these suggestions too.']])
+check("6b555 the header, one row, with Settings and updates in it, over a bare home (no recent-chat rows or suggestion chips under the composer, which sits at the golden point): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
       _b3_hdr_static(_hz_css, _hz_js, page) and not _b3_hdr_static(_hz_css.replace(".hz #hz-mark{min-width:max-content}", ""), _hz_js, page)
       and not _b3_hdr_static(_hz_css, _hz_js.replace("for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);", ""), page)
       and not _b3_hdr_static(_hz_css.replace(".hz #hz-settings{width:32px;height:32px;border-radius:8px;", ".hz #hz-settings{width:32px;height:32px;border-radius:8px;filter:drop-shadow(0 0 6px #fff);"), _hz_js, page)   # a glowing gear
       and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 36 and not _b3_hdr_bad(_b3_h_ok)
       and all(c["gear"] and c["gearTitle"] == "Settings (⌘,)" for c in _b3_h_ok["cases"])
       and any(c["where"] == "chat" and c["title"] >= 96 for c in _b3_h_ok["cases"])                              # the title still shows where there is room
-      and _b3_hdr_badge_ok(_b3_h_ok)
+      and _b3_hdr_badge_ok(_b3_h_ok) and _b3_home_ok(_b3_h_ok)
       and _b3_h_mut.get("mutated", 0) >= 1 and len(_b3_hdr_bad(_b3_h_mut)) >= 1
-      and _b3_h_mut2.get("mutated", 0) >= 1 and not all(c["gear"] for c in _b3_h_mut2.get("cases", [])) and not _b3_hdr_badge_ok(_b3_h_mut2),
-      json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "mut_bad": len(_b3_hdr_bad(_b3_h_mut))})[:900])
+      and _b3_h_mut2.get("mutated", 0) >= 1 and not all(c["gear"] for c in _b3_h_mut2.get("cases", [])) and not _b3_hdr_badge_ok(_b3_h_mut2)
+      and any(v.get("rows", 0) > 0 for v in (_b3_h_mut2.get("home") or {}).values()),
+      json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "home": _b3_h_ok.get("home"), "mut_bad": len(_b3_hdr_bad(_b3_h_mut))})[:900])
 # ==== beta-3 the sky and Ultra (6b555): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
