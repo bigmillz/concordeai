@@ -28347,7 +28347,7 @@ check("dictation instant: the helper is found beside millenai.py or in shell/dic
       and "return _dict_helper_path() is not None or (_whisper_libs() and _whisper_weights())" in _MILLENAI_SRC
       and "atexit.register(_dict_helper.stop)" in _MILLENAI_SRC
       and "./shell/dictate/build.sh" in open("build_shell_dmg.sh").read()
-      and 'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())
+      and 'codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())   # 6b549: the signing mode's arguments
 # ==== 6b543 dictation instant: end ====
 
 
@@ -40972,8 +40972,8 @@ def _c546_build():
     return {"release builds compile the helper, put it in Resources, sign it on its own, and check it is there": (
         "./shell/pdftext/build.sh\n[[ -x shell/pdftext/concorde-pdftext ]]" in sh
         and 'ditto shell/pdftext/concorde-pdftext "$BUNDLE/Contents/Resources/concorde-pdftext"\n'
-            'codesign --force --sign "$IDENTITY" "$BUNDLE/Contents/Resources/concorde-pdftext"' in sh
-        and sh.index("Resources/concorde-pdftext\"\ncodesign") < sh.index('codesign --force --sign "$IDENTITY" "$BUNDLE"\n')
+            'codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-pdftext"' in sh       # 6b549: the signing mode's arguments
+        and sh.index("Resources/concorde-pdftext\"\ncodesign") < sh.index('codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\n')
         and "concorde-dictate concorde-pdftext; do" in sh and "shell/pdftext/concorde-pdftext\n" in gi
         and "-target arm64-apple-macos11" in bs and "-target x86_64-apple-macos11" in bs and "lipo -create" in bs)}
 
@@ -42140,9 +42140,11 @@ def _c36_bundle(f):
                                     and "re.search(r\"<<'LAUNCH'\\n(.*?)\\nLAUNCH\\n\", bm, re.S)" in st
                                     and "crypto_reqs.py" in st,
         "CFBundleVersion = APP_BUILD, then signed": '/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD" "$PLIST"' in b
-                                                   and 'codesign --force --sign "$IDENTITY" "$BUNDLE"' in b
+                                                   # (6b549: the signing mode's arguments, ad hoc or with the entitlements)
+                                                   and 'codesign "${SIGN[@]}" "$BUNDLE"\n' in b
+                                                   and 'codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\n' in b
                                                    and 'codesign --verify --strict "$BUNDLE"' in b
-                                                   and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign --force --sign'),
+                                                   and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign "${SIGN[@]}"'),
         "read back": '[[ "$GOT_BUILD" == "$BUILD" ]] ||' in b and '[[ "$GOT_VER" == "$VER" ]] ||' in b
                      and '[[ "$GOT_ID" == "com.millen.millenai" ]]' in b and '[[ "$GOT_EXE" == "ConcordeAI" ]]' in b
                      and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do" in b   # the two helpers (6b543, 6b546)
@@ -42248,8 +42250,9 @@ _C36_MUT = [
     ("rel", "a dry run that stamps millenai.py", 'if [[ "$DRY_RUN" == 1 ]]; then\n  if [[ -n "$ARG" ]]; then', 'if false; then\n  if [[ -n "$ARG" ]]; then', [0]),
     ("bsd", "CFBundleVersion from the version", 'Set :CFBundleVersion $BUILD', 'Set :CFBundleVersion $VER', [1]),
     ("bsd", "one arch only", 'TARGET="universal-apple-darwin"', 'TARGET=""', [1]),
-    ("bsd", "signed before the plist is patched", 'codesign --force --sign "$IDENTITY" "$BUNDLE"\ncodesign --verify --strict "$BUNDLE"\n',
-     "", [1]),
+    ("bsd", "signed before the plist is patched",
+     'if [[ "$SIGN_MODE" == "adhoc" ]]; then\n  codesign "${SIGN[@]}" "$BUNDLE"\nelse\n'
+     '  codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\nfi\ncodesign --verify --strict "$BUNDLE"\n', "", [1]),
     ("bdm", "build_dmg.sh never builds the Python app", 'if [[ -n "$DMG_APP_READY" ]]; then', "if true; then", [1]),
     ("conf", "the first-run script left out of the bundle", '      "sidecar/launch.sh": "launch.sh",\n', "", [1]),
     ("src", "the helper waits for the Python launcher only", 'pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break',
@@ -42277,6 +42280,274 @@ for _mf, _mn, _ma, _mb, _mw in _C36_MUT:
 check("6b537's rules each break a check when broken (%d mutants)" % len(_C36_MUT), not _c36_caught,
       "%r" % _c36_caught)
 # ==== the shell is the app, 7.0 beta (6b537): end ====
+
+# ==== signing and notarization (6b549): begin ====
+print("== signing and notarization (6b549) ==")
+# MACOS SIGNS ITSELF ONCE THE CERTIFICATE IS THERE (6b549, per Patrick: his
+# mom was stopped by "can't check this app" on the ad-hoc 7.0 beta 1).
+# build_shell_dmg.sh picks a mode before it builds: a Developer ID (named,
+# or the keychain's first) signs inside out with the hardened runtime and a
+# timestamp, the bundle with the entitlements; a notary profile notarizes
+# and staples the app and then the DMG, Gatekeeper is asked, and any
+# refusal stops the build with Apple's log. With neither it is ad hoc as
+# before. The mode detection is RUN here (zsh, stub security and xcrun),
+# not only read; the rest is read off the scripts.
+import plistlib as _pl548
+_F48 = {k: open(v, encoding="utf-8").read() for k, v in {
+    "bsd": "build_shell_dmg.sh", "bdm": "build_dmg.sh", "rel": "release.sh",
+    "ent": os.path.join("shell", "src-tauri", "entitlements.plist"),
+    "ipl": os.path.join("shell", "src-tauri", "Info.plist"),
+    "nv": os.path.join("packaging", "notary_verdict.py"),
+    "doc": os.path.join("docs", "SIGNING.md")}.items()}
+
+_S48_FAKES = {
+    # security: FAKE_IDS lines, as find-identity -v prints them
+    "security": '#!/bin/sh\n[ "$1" = find-identity ] || exit 1\nprintf "%b" "$FAKE_IDS"\n'
+                'echo "     $(printf "%b" "$FAKE_IDS" | grep -c . ) valid identities found"\n',
+    # xcrun notarytool history: none (never stored), ok, broken
+    "xcrun": '#!/bin/sh\n[ "$1 $2" = "notarytool history" ] || exit 1\ncase "$FAKE_NOTARY" in\n'
+             '  ok) echo "No submission history."; exit 0;;\n'
+             '  none) echo "Error: No Keychain password item found for profile: $4" >&2; exit 69;;\n'
+             '  *) echo "Error: HTTP status code: 401. Invalid credentials." >&2; exit 1;;\nesac\n',
+}
+_S48_DEV = '  1) 0123456789ABCDEF0123456789ABCDEF01234567 "Developer ID Application: Patrick Miller (ABCDE12345)"\\n'
+_S48_APPDEV = '  1) 89ABCDEF0123456789ABCDEF0123456789ABCDEF "Apple Development: Patrick Miller (ZZZZZ99999)"\\n'
+
+
+def _s48_run(bsd, ids="", notary="none", env=None):
+    """The mode block of build_shell_dmg.sh, run in zsh with stub security
+    and xcrun: (exit code, {MODE, SIGN, NOTARY})."""
+    a = bsd.find('ENTITLEMENTS="shell/src-tauri/entitlements.plist"')
+    b = bsd.find("# notarytool's verdict on one file")
+    if a < 0 or b < a:
+        return 99, {}
+    d = tempfile.mkdtemp(prefix="s548-")
+    try:
+        os.makedirs(os.path.join(d, "bin"))
+        os.makedirs(os.path.join(d, "shell", "src-tauri"))
+        open(os.path.join(d, "shell", "src-tauri", "entitlements.plist"), "w").write("<plist/>")
+        for n, body in _S48_FAKES.items():
+            p = os.path.join(d, "bin", n)
+            open(p, "w").write(body)
+            os.chmod(p, 0o755)
+        script = ("set -e\ncd %s\n" % json.dumps(d) + bsd[a:b]
+                  + '\nprint -r -- "MODE=$SIGN_MODE|SIGN=${SIGN[*]}|NOTARY=$NOTARY"\n')
+        e = {"PATH": os.path.join(d, "bin") + ":/usr/bin:/bin", "HOME": d,
+             "FAKE_IDS": ids, "FAKE_NOTARY": notary}
+        e.update(env or {})
+        r = subprocess.run(["/bin/zsh", "-f", "-c", script], env=e, capture_output=True, text=True, timeout=30)
+        line = (r.stdout.strip().splitlines() or [""])[-1]
+        out = dict(kv.split("=", 1) for kv in line.split("|") if "=" in kv) if line.startswith("MODE=") else {}
+        out["_out"] = r.stdout + r.stderr
+        return r.returncode, out
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def _c49_modes(f):
+    """No identity: ad hoc exactly as before (--force --sign -) and one line says so; a Developer ID in the
+    keychain signs by its hash with the hardened runtime and a timestamp; the notary profile is used when it
+    works, skipped quietly only when it was never stored, and a broken or a named-but-missing one stops the
+    build; CONCORDE_SIGN_ID names one (and - forces ad hoc); an Apple Development identity is not taken; the
+    rehearsal is ad hoc with the runtime and no timestamp."""
+    b = f["bsd"]
+    H = "0123456789ABCDEF0123456789ABCDEF01234567"
+    out = {}
+    rc, o = _s48_run(b)
+    out["none: ad hoc as before, said once"] = (rc == 0 and o.get("MODE") == "adhoc" and o.get("SIGN") == "--force --sign -"
+                                               and o.get("NOTARY") == "" and o["_out"].count("ad hoc") == 1)
+    rc, o = _s48_run(b, ids=_S48_APPDEV)
+    out["an Apple Development identity is not a Developer ID"] = rc == 0 and o.get("MODE") == "adhoc"
+    rc, o = _s48_run(b, ids=_S48_APPDEV + _S48_DEV, notary="none")
+    out["keychain's Developer ID by hash, runtime + timestamp, no profile: not notarized"] = (
+        rc == 0 and o.get("MODE") == "developer-id" and o.get("SIGN") == "--force --options runtime --timestamp --sign " + H
+        and o.get("NOTARY") == "" and "won't be notarized" in o["_out"])
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="ok")
+    out["the concorde-notary profile, when it works"] = rc == 0 and o.get("NOTARY") == "concorde-notary"
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="broken")
+    out["a stored profile that fails stops the build"] = rc != 0 and "can't use it" in o.get("_out", "")
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="none", env={"CONCORDE_NOTARY_PROFILE": "other"})
+    out["a named profile that isn't there stops the build"] = rc != 0
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="ok", env={"CONCORDE_SIGN_ID": "-"})
+    out["CONCORDE_SIGN_ID=- is ad hoc whatever the keychain holds"] = rc == 0 and o.get("MODE") == "adhoc"
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="ok", env={"CONCORDE_SIGN_ID": "Developer ID Application: Patrick Miller (ABCDE12345)"})
+    out["CONCORDE_SIGN_ID names one"] = (rc == 0 and o.get("MODE") == "developer-id"
+                                         and o.get("SIGN", "").endswith("--sign Developer ID Application: Patrick Miller (ABCDE12345)"))
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="ok", env={"CONCORDE_SIGN_IDENTITY": H})
+    out["the old CONCORDE_SIGN_IDENTITY still names one"] = rc == 0 and o.get("SIGN", "").endswith("--sign " + H)
+    rc, o = _s48_run(b, ids=_S48_DEV, notary="ok", env={"CONCORDE_SIGN_ID": "FFFF"})
+    out["a named identity the keychain lacks stops the build"] = rc != 0
+    rc, o = _s48_run(b, env={"CONCORDE_SIGN_HARDENED": "1"})
+    out["rehearsal: ad hoc, hardened runtime, no timestamp"] = (rc == 0 and o.get("MODE") == "rehearsal"
+                                                               and o.get("SIGN") == "--force --options runtime --sign -")
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c49_sign(f):
+    """Inside out after the plist is patched: both helpers with the mode's arguments and no entitlements, then
+    the bundle (its main binary) with the entitlements under the hardened runtime; read back: every Mach-O
+    under the runtime, a Developer ID's authority and timestamp on each, audio-input on the bundle, none on the
+    helpers, the two usage strings in the built Info.plist."""
+    b = f["bsd"]
+    i_plist = b.find('"Set :CFBundleVersion $BUILD"')
+    i_d = b.find('codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-dictate"')
+    i_p = b.find('codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-pdftext"')
+    i_b = b.find('codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"')
+    if b.count('"$ENTITLEMENTS" "$BUNDLE"') != 1:
+        i_b = -1                                  # the bundle is signed once, after the helpers
+    i_v = b.find('codesign --verify --strict --deep "$BUNDLE"')
+    loop = b[b.find('for f in "$BUNDLE"/Contents/**/*(.); do'):b.find("(( NMACHO >= 3 ))")]
+    out = {
+        "inside out, after the plist": 0 < i_plist < i_d < i_b and i_plist < i_p < i_b < i_v,
+        "ad hoc bundle without entitlements, otherwise with": 'if [[ "$SIGN_MODE" == "adhoc" ]]; then\n  codesign "${SIGN[@]}" "$BUNDLE"\nelse\n' in b,
+        "no old fixed --sign": 'codesign --force --sign "$IDENTITY"' not in b,
+        "every Mach-O under the runtime": '[[ "$(file -b "$f")" == Mach-O* ]] || continue' in loop
+                                          and '[[ "$CS" == *"flags="*"runtime)"* ]] ||' in loop
+                                          and "(( NMACHO >= 3 ))" in b,
+        "a Developer ID's authority and timestamp on each": '[[ "$CS" == *"Authority=Developer ID Application: "* ]] ||' in loop
+                                                            and '[[ "$CS" == *"Timestamp="* ]] ||' in loop,
+        "audio-input on the bundle, none on the helpers": 'codesign -d --entitlements - --xml "$BUNDLE" 2>/dev/null | grep -q "com.apple.security.device.audio-input"' in b
+                                                         and 'for h in concorde-dictate concorde-pdftext; do\n    [[ -z "$(codesign -d --entitlements - --xml "$BUNDLE/Contents/Resources/$h"' in b,
+        "the usage strings read back": "for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription; do" in b,
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c49_notary(f):
+    """The app is zipped, notarized and stapled before the image is made; the image is signed (timestamped),
+    notarized and stapled; Gatekeeper is asked about the image (open, primary signature) and the app inside
+    it, and both must say Notarized Developer ID; a submission that isn't Accepted prints Apple's log and
+    stops; the verdict reader takes the id and status from any shape of notarytool's JSON."""
+    b, nv = f["bsd"], f["nv"]
+    fn = b[b.find("notarize() {"):b.find("\n}\n", b.find("notarize() {"))]
+    i_app = b.find('notarize "$NZ/ConcordeAI.zip" "the app"')
+    i_st = b.find("xcrun stapler staple -q ConcordeAI.app")
+    i_img = b.find("DMG_APP_READY=1 ./build_dmg.sh")
+    i_ds = b.find('codesign --force --timestamp --sign "$SIGN_ID" "$DMG"')
+    i_dn = b.find('notarize "$DMG" "the disk image"')
+    i_dst = b.find('xcrun stapler staple -q "$DMG"')
+    i_gk = b.find('spctl -a -t open --context context:primary-signature -v "$DMG"')
+    out = {
+        "submit, wait, the verdict, the log, a stop": (
+            'xcrun notarytool submit "$1" --keychain-profile "$NOTARY" --wait --output-format json' in fn
+            and "python3 packaging/notary_verdict.py" in fn and 'if [[ "$st" != "Accepted" ]]; then' in fn
+            and 'xcrun notarytool log "$id" --keychain-profile "$NOTARY" >&2' in fn and "exit 1" in fn),
+        "the app first, stapled, then the image": 0 < i_app < i_st < i_img < i_ds < i_dn < i_dst < i_gk
+                                                  and 'ditto -c -k --keepParent ConcordeAI.app "$NZ/ConcordeAI.zip"' in b,
+        "Gatekeeper on both": b.count('"source=Notarized Developer ID"') == 2 and 'spctl -a -vv "$MP/ConcordeAI.app"' in b
+                              and 'xcrun stapler validate -q "$MP/ConcordeAI.app" && SA=1' in b,
+    }
+    ns = {"__name__": "nv548"}
+    exec(nv, ns)
+    v = ns["verdict"]
+    U = "2efe2717-52ef-43a5-96dc-0797e4ca1041"
+    out["the verdict reader"] = (
+        v('{"id":"%s","message":"Processing complete","status":"Accepted"}' % U) == (U, "Accepted")
+        and v('Conducting pre-submission checks...\n{"id":"%s","status":"Invalid"}\n' % U) == (U, "Invalid")
+        and v('{\n  "status" : "In Progress",\n  "id" : "%s"\n}' % U) == (U, "In_Progress")
+        and v("Error: HTTP status code: 401") == ("-", "none")
+        and v('{"id":"not-a-uuid","status":"Accepted"}') == ("-", "Accepted"))
+    return all(out.values()), {k: v_ for k, v_ in out.items() if not v_}
+
+
+def _c49_plists(f):
+    """The entitlements are exactly audio-input (no JIT, no library validation off: WebKit's JIT is its own
+    process's, and nothing foreign loads into the shell); the Info.plist asks for the microphone and speech
+    recognition in short words that say the voice stays on the computer."""
+    ent = _pl548.loads(f["ent"].encode())
+    ipl = _pl548.loads(f["ipl"].encode())
+    mic, sp = ipl.get("NSMicrophoneUsageDescription", ""), ipl.get("NSSpeechRecognitionUsageDescription", "")
+    out = {
+        "exactly audio-input": ent == {"com.apple.security.device.audio-input": True},
+        "both usage strings, short, on your computer": (0 < len(mic) <= 90 and 0 < len(sp) <= 90
+                                                        and "your computer" in mic and "your computer" in sp
+                                                        and "Mac" not in mic + sp and "NSLocalNetworkUsageDescription" in ipl),
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _c49_ship(f):
+    """release.sh says how the Mac build was signed, read off the bundle and the two tickets, on every path;
+    the DMG's first-open help drops Open Anyway only for a stapled app; docs/SIGNING.md has the owner's steps."""
+    r, d, doc = f["rel"], f["bdm"], f["doc"]
+    out = {
+        "read off the build": "codesign -dvv ConcordeAI.app 2>&1 | sed -n 's/^Authority=\\(Developer ID Application: .*\\)$/\\1/p'" in r
+                              and "xcrun stapler validate -q ConcordeAI.app" in r and 'xcrun stapler validate -q "$DMG"' in r,
+        "said on every path": r.count("$MAC_SIGNING") >= 3 and r.index('echo "  macOS signing: $MAC_SIGNING"') < r.index('echo "→ building Windows"')
+                              and 'echo "  shipped macOS: $MAC_SIGNING"' in r,
+        "the DMG's help follows the ticket": "xcrun stapler validate -q ConcordeAI.app >/dev/null 2>&1 && NOTARIZED=1" in d
+                                             and '"$SHOW_VER" "$NOTARIZED" <<\'PYEOF\'' in d and 'if sys.argv[3] == "1":' in d
+                                             and d.index('if sys.argv[3] == "1":') < d.index('centered(740, "3. System Settings'),
+        "the owner's steps": all(s in doc for s in ("developer.apple.com/programs", "Developer ID Application",
+                                                     "xcrun notarytool store-credentials concorde-notary",
+                                                     '"signing is set up"', "Artifact Signing")),
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_C49_CHECKS = [("6b549 signing modes, run: ad hoc as before with no identity, a keychain Developer ID with the "
+                "hardened runtime and a timestamp, the notary profile used or skipped or a stop, the overrides", _c49_modes),
+               ("6b549 signed inside out after the plist, entitlements on the bundle only, every Mach-O read back "
+                "under the runtime, the usage strings", _c49_sign),
+               ("6b549 notarized and stapled twice (the app, then the image), Gatekeeper asked about both, a refusal "
+                "stops with Apple's log, the verdict reader", _c49_notary),
+               ("6b549 entitlements exactly audio-input; microphone and speech usage strings", _c49_plists),
+               ("6b549 release.sh says how it was signed, the DMG's first-open help follows the ticket, the owner's steps", _c49_ship)]
+
+
+def _c49_run(f, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_C49_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(f)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _i48, _n48, _o48, _d48 in _c49_run(_F48):
+    check(_n48, _o48, "%r" % (_d48,))
+_C49_MUT = [
+    ("bsd", "ad hoc signing with the runtime", 'SIGN=(--force --sign -)', 'SIGN=(--force --options runtime --sign -)', [0]),
+    ("bsd", "no timestamp on a Developer ID", 'SIGN=(--force --options runtime --timestamp --sign "$SIGN_ID")',
+     'SIGN=(--force --options runtime --sign "$SIGN_ID")', [0]),
+    ("bsd", "any codesigning identity taken", '/"Developer ID Application: /{split', '/"/{split', [0]),
+    ("bsd", "a broken notary profile skipped quietly", '&& "$NOUT" == *"No Keychain password item found"* ]]', "]]", [0]),
+    ("bsd", "the - override ignored", 'if [[ -n "$SIGN_ID" && "$SIGN_ID" != "-" ]]; then', 'if [[ -n "$SIGN_ID" ]]; then', [0]),
+    ("bsd", "the bundle signed before the helpers",
+     'ditto shell/dictate/concorde-dictate "$BUNDLE/Contents/Resources/concorde-dictate"\n',
+     'codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\nditto shell/dictate/concorde-dictate "$BUNDLE/Contents/Resources/concorde-dictate"\n', [1]),
+    ("bsd", "no entitlements under the hardened runtime", '  codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\n',
+     '  codesign "${SIGN[@]}" "$BUNDLE"\n', [1]),
+    ("bsd", "the timestamp not read back", '      [[ "$CS" == *"Timestamp="* ]] ||', '      true ||', [1]),
+    ("bsd", "the image notarized without the app", 'notarize "$NZ/ConcordeAI.zip" "the app"\n', "", [2]),
+    ("bsd", "a rejected submission carries on", '    exit 1\n  fi\n  echo "  notarized $2', '  fi\n  echo "  notarized $2', [2]),
+    ("bsd", "Gatekeeper's verdict on the image not asked", 'spctl -a -t open --context context:primary-signature -v "$DMG"',
+     'spctl --version "$DMG"', [2]),
+    ("nv", "the verdict reader trusts any status", 'status = d["status"].strip()', 'status = "Accepted"', [2]),
+    ("ent", "JIT allowed", "  <key>com.apple.security.device.audio-input</key>",
+     "  <key>com.apple.security.cs.allow-jit</key>\n  <true/>\n  <key>com.apple.security.device.audio-input</key>", [3]),
+    ("ent", "library validation off", "  <key>com.apple.security.device.audio-input</key>",
+     "  <key>com.apple.security.cs.disable-library-validation</key>\n  <true/>\n  <key>com.apple.security.device.audio-input</key>", [3]),
+    ("ipl", "no speech usage string", "  <key>NSSpeechRecognitionUsageDescription</key>", "  <key>NSSpeechRecognitionUsageDescriptionX</key>", [3]),
+    ("rel", "the signing not said before Windows", 'echo "  macOS signing: $MAC_SIGNING"\n', "", [4]),
+    ("bdm", "Open Anyway on a notarized image", 'if sys.argv[3] == "1":', 'if False:', [4]),
+]
+_c49_caught = []
+for _mf, _mn, _ma, _mb, _mw in _C49_MUT:
+    _mut = dict(_F48)
+    _mut[_mf] = _F48[_mf].replace(_ma, _mb, 1)
+    if _mut[_mf] == _F48[_mf]:
+        _c49_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _c49_run(_mut, _mw)):
+        _c49_caught.append((_mn, "not caught"))
+check("6b549's rules each break a check when broken (%d mutants)" % len(_C49_MUT), not _c49_caught,
+      "%r" % _c49_caught)
+# ==== signing and notarization (6b549): end ====
 
 # THE DRAFT STREAMS, THEN THE POLISH REPLACES IT (6b539, per Patrick: "faster
 # feels smarter"). Fast's first pass used to be silent; it now shows as it

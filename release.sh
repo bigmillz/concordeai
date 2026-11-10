@@ -176,6 +176,19 @@ GOT_VER="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PL")
 [[ "$GOT_BUILD" == "$BUILD" ]] || { echo "the bundle's CFBundleVersion is $GOT_BUILD, not $BUILD"; exit 1; }
 [[ "$GOT_VER" == "$VERSION" ]] || { echo "the bundle's CFBundleShortVersionString is $GOT_VER, not $VERSION"; exit 1; }
 echo "  $DMG — CFBundleVersion $GOT_BUILD, CFBundleShortVersionString $GOT_VER"
+# HOW THE MAC BUILD IS SIGNED, SAID OUT LOUD (6b549), read off what was
+# built (the bundle's authority, the tickets stapled to the app and the
+# image), not off the settings that fed it. docs/SIGNING.md sets it up.
+SIGNED_BY="$(codesign -dvv ConcordeAI.app 2>&1 | sed -n 's/^Authority=\(Developer ID Application: .*\)$/\1/p' | head -1)"
+if [[ -n "$SIGNED_BY" ]] && xcrun stapler validate -q ConcordeAI.app >/dev/null 2>&1 \
+   && xcrun stapler validate -q "$DMG" >/dev/null 2>&1; then
+  MAC_SIGNING="notarized and stapled ($SIGNED_BY)"
+elif [[ -n "$SIGNED_BY" ]]; then
+  MAC_SIGNING="Developer ID but NOT notarized ($SIGNED_BY): macOS still warns on first open"
+else
+  MAC_SIGNING="ad hoc (no Developer ID): macOS warns on first open"
+fi
+echo "  macOS signing: $MAC_SIGNING"
 
 echo "→ building Windows"
 ./build_windows.sh >/dev/null
@@ -186,6 +199,7 @@ if [[ "$DRY_RUN" == 1 ]]; then
   echo ""
   echo "✓ dry run: built, verified, published nothing"
   ls -la "$DMG" "$ZIP" | awk '{printf "  %s  %.1f MB\n", $NF, $5/1e6}'
+  echo "  macOS signing: $MAC_SIGNING"
   echo "  a real run would: commit, push, gh release create v$BUILD $DMG $ZIP${PRE:+ --prerelease}"
   exit 0
 fi
@@ -269,6 +283,7 @@ fi
 
 echo ""
 echo "✓ published $SHOW — installs on the right channel will offer it within the hour."
+echo "  shipped macOS: $MAC_SIGNING"
 if [[ -n "$SITE_OK" ]]; then
   echo "  the website is up to date"
 elif [[ -n "$SITE" ]]; then

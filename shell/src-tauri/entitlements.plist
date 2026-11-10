@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The shell's hardened-runtime entitlements (6b549). build_shell_dmg.sh signs
+  ConcordeAI.app with these whenever it signs with the hardened runtime
+  (a Developer ID, or the ad-hoc rehearsal). The helpers in Resources
+  (concorde-dictate, concorde-pdftext) get none.
+
+  ONE ENTITLEMENT, ON PURPOSE. Each one below was weighed, and tested on a
+  hardened build where it could be (NOTES 6b549):
+    * audio-input: the page's microphone (getUserMedia in WKWebView) is
+      this process's to TCC; under the hardened runtime macOS refuses the
+      microphone without this key, at once and with no prompt.
+    * no allow-jit / allow-unsigned-executable-memory: WebKit's JIT runs in
+      Apple's own WebContent process, not in this one.
+    * no disable-library-validation: nothing is loaded into this process
+      that isn't Apple's. The Python sidecar is a separate process (the
+      venv in Application Support) with its own signature, so launching it
+      needs nothing here.
+    * no speech-recognition key: there isn't one under the hardened
+      runtime; the usage string in Info.plist is what TCC asks for.
+-->
+<plist version="1.0">
+<dict>
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>
