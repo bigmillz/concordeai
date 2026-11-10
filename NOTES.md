@@ -20208,7 +20208,12 @@ loop attribute: `hzSeam` (pure) says "out" once the clip's real time left, count
 `HZ_SEAM_S` (1 s), and `hzSeamWire` (assigned handlers, so a reload never stacks them) eases the footage out through
 the sky's own `footTo` (the path a clip change takes), seeks to 0 at `ended` (playing only if the page is live),
 and eases back in on `seeked`, hidden or not. `hzClipLoad` clears the seam state, so a clip change never inherits a
-fade. The sky's ease is per frame (.045), so a second ahead is about 92 % out by the cut at 60 Hz, all of it at 120.
+fade. The sky's footage ease was per frame (.045 a frame: twice as fast at 120 Hz); it goes by time now
+(`1-exp(-dn/.36)`, the neon's way), the 60 Hz pace at any refresh, so a second ahead is about 94 % out by the cut.
+Composited, in WKWebView (the clip pinned with `?hz=clip=N`, seeked to 2.4 s before its end, snapshots every ~45 ms,
+the bottom-right quadrant's mean luma), the biggest rise within 100 ms: Tahiti waves 15.2 % (the cut) → 3.9 % (the
+start of the fade back in); Alaskan jellyfish 4.1 % (a cut) → 4.3 % (a fade over about a second); Mexico City to New
+York 0.8 → 0.6 % (its footage is faint there). Each wrap now lands on the near-black base (luma 37.0 → 37.0).
 Gauntlet: "6b553 the calm send" (the press, no overshoot anywhere on the send key, no element made on send, no ring
 in the page, the strike without glow, every hover on the composer's keys an inset hairline at most; 9 mutants) and
 "6b553 the footage's seam" (no loop attribute; `hzSeam`'s cases and a played-through clip at .6 run in node with a

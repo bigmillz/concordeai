@@ -66156,7 +66156,7 @@ function hzSkyBoot(){
     gl.uniform1f(pS.U.gt,full?t:0);gl.uniform1f(pS.U.twk,bal?1:0);   // the grain moves in Full alone; the stars twinkle faintly in Balanced (6b542)
     const mg=hzMoonGeom(),hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255),lit=hzS.moon?hzS.moon.lit:.5;
     gl.uniform2f(pS.U.mpos,mg.x,mg.y);gl.uniform1f(pS.U.mrad,mg.r);gl.uniform1f(pS.U.moon,.08+.62*lit);gl.uniform1f(pS.U.dscale,S.W/innerWidth);
-    S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;   // Balanced: the footage at half (6b542)
+    S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*(1-Math.exp(-dn/.36));   // Balanced: the footage at half (6b542); by time, not by frame: the 60 Hz pace at 120 too (6b553)
     gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);gl.uniform1f(pS.U.rise,hzS.clip?hzS.clip.rise:.56);gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);
     gl.uniform3f(pS.U.skyTop,SK[1],SK[2],SK[3]);gl.uniform3f(pS.U.skyMid,SK[4],SK[5],SK[6]);gl.uniform3f(pS.U.skyLow,SK[7],SK[8],SK[9]);
     gl.uniform1f(pS.U.boost,S.boost);gl.uniform1f(pS.U.expo,G[4]*(.92+.16*lit));gl.uniform1f(pS.U.warm,G[5]);gl.uniform3f(pS.U.tint,G[1],G[2],G[3]);

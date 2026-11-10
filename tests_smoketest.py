@@ -42811,7 +42811,7 @@ def _c542_sky(js, css):
             and 'if(full){gl.useProgram(pF);quad(pF);gl.bindFramebuffer(gl.FRAMEBUFFER,S.B.f);' in js
             and 'hzBlur(gl,pB,quad,S.v2.t,S.v2.w,S.v2.h,S.sk,7,0);}     // Full alone keeps the trails and the bloom (6b542)' in js
             and 'gl.uniform1f(pA.U.time,bal?t*.4:t);' in js and 'gl.uniform1f(pS.U.gt,full?t:0);gl.uniform1f(pS.U.twk,bal?1:0);' in js
-            and 'S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;' in js
+            and 'S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*(1-Math.exp(-dn/.36));' in js   # by time since 6b553
             and '*(1.-twk*.35*(.5+.5*sin(time*2.3+hash(floor(pc/3.))*50.)));"' in js and 'fract(gt*7.)*91.' in js
             and ".hz.hz-bal #hz-aurw{opacity:.3;--hz-t-drift:72s}" in css
             and 'S.free=function(){["A","B","h1","v1","h2","v2","sk","au"].forEach(k=>{const T=S[k];if(T){gl.deleteTexture(T.t);gl.deleteFramebuffer(T.f);S[k]=null;}});};' in js
@@ -43763,7 +43763,8 @@ def _cs553_seam(js, pg):
             and sim["fires"] == 1 and sim["firedLeft"] is not None and .7 <= sim["firedLeft"] <= 1.0   # the fade starts 0.7-1 s before the cut
             and sim["foot"] == [0, 1] and sim["reset"] == 0
             and sim["plays_hidden"] == 0 and sim["foot_hidden"] == 1 and sim["out_after"] is False
-            and "S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*.045;" in js)                       # the sky's own fade carries it
+            and "S.footMul+=(S.footTo*(bal?.5:1)-S.footMul)*(1-Math.exp(-dn/.36));" in js           # the sky's own fade carries it, by time: the same at 60 and 120 Hz
+            and js.index("const dn=Math.min(.1,(nowT-(S.lastN||nowT))/1000);") < js.index("S.footMul+=(S.footTo"))
 check("6b553 the calm send: the send key presses .96 > 1 in 120 ms with no overshoot and draws no rings or circles (none in the page at all), the strike stays a 1 px line with no glow; hover on the composer's keys is a brighter hairline at every level, never a glow; the dead send glow is gone; the mutants are caught",
       _cs553_send(_hz_css, _hz_js, page) and _cs553_hover(_hz_css)
       and not _cs553_send(_hz_css, _hz_js.replace('easing:"cubic-bezier(.2,0,0,1)"});\n}', 'easing:"cubic-bezier(.34,1.56,.64,1)"});\n}'), page)      # the overshoot back
@@ -43783,7 +43784,8 @@ check("6b553 the footage's seam: no native loop on the clip; a second before the
       and not _cs553_seam(_hz_js.replace("hzS.seamOut=false;if(hzS.sky)hzS.sky.footTo=1;};", "hzS.seamOut=false;};"), page)                        # never fading back in
       and not _cs553_seam(_hz_js.replace("hzS.seamOut=false;if(hzS.sky)hzS.sky.footTo=1;};", "hzS.seamOut=false;if(hzS.sky&&hzS.mediaOn)hzS.sky.footTo=1;};"), page)   # dark for good if hidden at the seam
       and not _cs553_seam(_hz_js.replace("v.onended=()=>{v.currentTime=0;", "v.onended=()=>{"), page)                                             # stuck on the last frame
-      and not _cs553_seam(_hz_js.replace("v.loop=false;hzS.seamOut=false;hzSeamWire(v);", "v.loop=false;hzSeamWire(v);"), page), "")               # a stale fade across a clip change
+      and not _cs553_seam(_hz_js.replace("v.loop=false;hzS.seamOut=false;hzSeamWire(v);", "v.loop=false;hzSeamWire(v);"), page)                  # a stale fade across a clip change
+      and not _cs553_seam(_hz_js.replace("-S.footMul)*(1-Math.exp(-dn/.36));", "-S.footMul)*.045;"), page), "")                                   # the ease by frame again (twice as fast at 120 Hz)
 # ==== the calm send and the footage's seam (6b553): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
