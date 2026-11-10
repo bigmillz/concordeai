@@ -27163,7 +27163,7 @@ o.modedge=eq(run([[D(),0],[U({mod:true}),499]]),["start",""])&&dictSt.mode==="to
         &&eq(run([[D(),0],[U(),450]]),["start","stop"]);
 // repeats seen before the release: a hold whatever the time
 o.repeats=eq(run([[D(),0],[R,100],[U({mod:true}),150]]),["start","","stop"]);
-// 6b549: how long the key was down is the whole test. A 1 s hold released
+// 6b550: how long the key was down is the whole test. A 1 s hold released
 // before any audio came in (the start still in flight, so the page would
 // have said 0 s) STOPS, on either keyup; it used to become a toggle and
 // keep listening. A 150 ms tap still stays on
@@ -27227,7 +27227,7 @@ check("dictation hotkey: hold then release; repeats ignored; 300 ms on the D key
       _dk_ok("hold", "edge", "modedge", "repeats") and "const DICT_HOLD_MS=300;" in _MILLENAI_SRC
       and "const DICT_HOLD_MOD_MS=500;" in _MILLENAI_SRC, "%r" % _DK_BASE)
 check("dictation hotkey: a quick tap stays on, the second press stops, its keyup is ignored, "
-      "the mic button ends it cleanly; a 1 s hold with no audio yet stops (6b549) (node)",
+      "the mic button ends it cleanly; a 1 s hold with no audio yet stops (6b550) (node)",
       _dk_ok("tap", "tapmic", "earlyhold") and 'if(held){idle();return "stop";}' in _MILLENAI_SRC
       and "ev.secs" not in _MILLENAI_SRC and "const DICT_MIN_HOLD_S" not in _MILLENAI_SRC,
       "%r" % _DK_BASE)
@@ -27250,7 +27250,7 @@ _DK_MUT = [
     ("modedge", "(ev.mod?DICT_HOLD_MOD_MS:DICT_HOLD_MS)", "DICT_HOLD_MS"),
     ("repeats", "const held=s.rep||", "const held="),
     ("repeats", 'if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}', 'if(ev.repeat)return "";'),
-    # 6b549: the audio-seconds condition back (the bug): a hold with no audio yet keeps listening
+    # 6b550: the audio-seconds condition back (the bug): a hold with no audio yet keeps listening
     ("earlyhold", 'if(held){idle();return "stop";}', 'if(held&&(ev.secs||0)>=0.4){idle();return "stop";}'),
     ("tap", 's.mode="toggle";s.rep=false;return "";', 's.mode="";return "";'),
     ("hold", 'if(ev.repeat){if(s.mode==="hold")s.rep=true;return "";}', ""),
@@ -27752,7 +27752,7 @@ await sec("slip",async()=>{
   calls.length=0;await dictStart();feed(1);await stopRec();
   o.slip=sl&&ended()&&sent===1;
 });
-// 6b549, the bug: a 1 s hold released while the session is still being
+// 6b550, the bug: a 1 s hold released while the session is still being
 // asked for (recording false). It stops as soon as the start lands, and the
 // words said meanwhile (the pre-roll) are transcribed; with nothing said it
 // is a slip, dropped. It used to become a toggle and keep listening
@@ -27818,7 +27818,7 @@ check("dictation hotkey: every failed start resets it (server gone, not ready, n
       _fs_ok("gone", "gonepend", "notready", "nomic", "prompt", "buttonblur", "taptap"),
       "%r" % _FS_BASE)
 check("dictation hotkey: under 0.3 s is never transcribed or sent; a 1 s hold released while "
-      "the start is in flight stops once it lands, a 150 ms tap keeps listening (6b549) (node)",
+      "the start is in flight stops once it lands, a 150 ms tap keeps listening (6b550) (node)",
       _fs_ok("slip", "earlyhold", "earlytap") and "const DICT_MIN_CLIP_S=0.3;" in _MILLENAI_SRC
       and "function recSecs" not in _MILLENAI_SRC, "%r" % _FS_BASE)
 _FS_MUT = [
@@ -27863,7 +27863,7 @@ _FS_MUT = [
     ("nomic", "micDetach(false);dictDrop();dictLit(false);input.placeholder=micMsg(e);", "input.placeholder=micMsg(e);"),
     ("taptap", "else if(dictStarting)dictPend=true;}", "}"),
     ("slip", "if(clip.secs<DICT_MIN_CLIP_S||!sid){", "if(!sid){"),
-    # 6b549: the old rule back (a hold needs 0.4 s of audio, and the start in flight counts 0): the bug
+    # 6b550: the old rule back (a hold needs 0.4 s of audio, and the start in flight counts 0): the bug
     ("earlyhold", 'if(held){idle();return "stop";}', 'if(held&&(ev.secs||0)>=0.4){idle();return "stop";}'),
     ("earlyhold", "if(dictPend){dictPend=false;stopRec();}", ""),          # the stop in flight lost
     ("earlyhold", "else if(dictStarting)dictPend=true;}", "}"),

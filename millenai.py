@@ -60755,7 +60755,7 @@ async function ensureVoice(){
      Command last, so that release gets the longer DICT_HOLD_MOD_MS. It is
      a hold past the threshold, or once repeats were seen, and a hold
      stops; anything shorter was a tap and dictation stays on. HOW LONG
-     THE KEY WAS DOWN is the whole test (6b549, per Patrick: "it just
+     THE KEY WAS DOWN is the whole test (6b550, per Patrick: "it just
      permanently turns on"). It used to need DICT_MIN_HOLD_S of audio as
      well, but since 6b543 the audio clock starts late: recording only
      counts once the session (a round trip) and the microphone are both
@@ -60844,7 +60844,7 @@ function audioSecs(bufs,sr){
      under way: that is not the warm window's to cut.
    - "listening" is said when the first audio chunk arrives (recHeard),
      "getting the microphone" until then. The tap and hold rules of 6b338
-     go by the key alone (6b549), so a start in flight doesn't change them. */
+     go by the key alone (6b550), so a start in flight doesn't change them. */
 const MIC_WARM_S=15;
 const MIC_CONSTRAINTS={audio:{echoCancellation:false,noiseSuppression:false,
   autoGainControl:false}};

@@ -19673,10 +19673,9 @@ mutant), the corner's full-screen rule, the home pill's absence, the menu's Impo
 decision over six kinds in node (a mutant asking for any file), a cancelled run's copy gone (live), the
 row mark, the storage sweep.
 
-## 6b549 — dict-hold: a ⌘D hold stops at the release again, however late the microphone comes in (7.0 beta, per Patrick)
+## 6b550 — dict-hold: a ⌘D hold stops at the release again, however late the microphone comes in (7.0 beta, per Patrick)
 
-*Numbered after main's 6b547; shell-polish and signing both hold 6b548, so this may be renumbered when
-they land.*
+*Renumbered 6b549 -> 6b550 at the beta-2 merge (shell-polish 6b548, signing 6b549).*
 
 **The bug** (per Patrick, 7.0 beta 1: ⌘D dictation "just permanently turns on"). He holds the key, talks,
 lets go, and it keeps listening. 6b338's rule is hold-then-release stops, a quick tap toggles. `dictKey`'s
