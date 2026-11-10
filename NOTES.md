@@ -19876,3 +19876,46 @@ the plist is patched" mutant now removes the whole bundle-signing block).
 
 **Also.** The first test launch's server reaped an orphan mlx_lm engine (pid 69166, ppid 1) on 8884. That is
 the server's boot reaper doing its job on a corpse, but it is shared machine state.
+
+## 6b550 — dict-hold: a ⌘D hold stops at the release again, however late the microphone comes in (7.0 beta, per Patrick)
+
+*Renumbered 6b549 -> 6b550 at the beta-2 merge (shell-polish 6b548, signing 6b549).*
+
+**The bug** (per Patrick, 7.0 beta 1: ⌘D dictation "just permanently turns on"). He holds the key, talks,
+lets go, and it keeps listening. 6b338's rule is hold-then-release stops, a quick tap toggles. `dictKey`'s
+keyup stopped only when the key was down past the threshold **and** `ev.secs`, the audio heard, was at
+least `DICT_MIN_HOLD_S` (0.4 s); otherwise the "hold" was taken for a tap and became a toggle. `ev.secs`
+came from `recSecs()`, which is `recording?dictSecs:0`. Since 6b543, `recording` turns true only once the
+session (`dictOpen`, a round trip) **and** getUserMedia are both in, while the indicator lights at the
+keydown (`dictLit`), so people let go sooner. A real 0.5–1.5 s hold released before the start landed read
+0 s, turned into a toggle, and dictation stayed on.
+
+**The fix.** Tap or hold is decided by how long the key was down, and nothing else:
+`held = s.rep || now - s.t >= (ev.mod ? DICT_HOLD_MOD_MS : DICT_HOLD_MS)`; a hold stops, anything shorter
+toggles. `DICT_MIN_HOLD_S` and `recSecs` are gone (nothing else used them) and the keyup no longer sends
+`secs`. What makes that safe was already there: a stop that lands while the start is in flight waits in
+`dictPend` and runs `stopRec` as soon as the start does, so the pre-roll said during the wait is
+transcribed; a clip under `DICT_MIN_CLIP_S` (0.3 s) is still dropped as a slip, never transcribed. The
+other rules stand: the ⌘ (Ctrl) keyup counts as the release with the longer 500 ms threshold (WebKit
+withholds the D keyup while ⌘ is down), repeats make a hold, a blur during the macOS microphone prompt
+turns a hold into a toggle, no start from inside a dialog, the mic button, Dvorak and Cyrillic in
+`dictIsD`. The trade: a "tap" that keeps ⌘ down past 500 ms now stops (and is dropped as a slip) where it
+used to stay on; that is what a hold means.
+
+**Gauntlet.** 6b338's `shortaudio` scenario (which pinned the bug: a 1 s hold with 0 s of audio stayed
+on) is now `earlyhold`: a 1 s hold with no audio yet stops on the D keyup and on the ⌘ keyup, a 150 ms tap
+still toggles; its mutant puts the audio condition back. 6b345's glue scenario `shorthold` is now
+`earlyhold` (a 1 s ⌘ hold released while a held-back `/api/dictate/start` is in flight: `dictPend` is
+set, it stops once the start lands and the pre-roll is transcribed; with nothing said it is a slip) and
+`earlytap` (a 150 ms tap in the same window stays on until the next press), with mutants for the audio
+condition, a lost `dictPend` run, a lost `dictPend` set, and every release a hold. The keyup source pin
+reads `{type:"up",mod:modUp}`. Against main's code the new `earlyhold` cases go red and `earlytap` stays
+green. Run: the dictation sections only (6b338, 6b345 to the timing line, 6b543 to the live session), 27
+checks green; not the full gauntlet.
+
+**Live.** A dev copy on 9905 (`dict-fake` hook) in headless Chromium (fake microphone), the page's
+`/api/dictate/start` held back 2 s, synthetic ⌘D events: a 1 s hold released on the ⌘ keyup set
+`dictPend` and stopped once the start landed (one `/api/dictate/end`); a 150 ms tap stayed on as a toggle
+until the next press; a 3 s hold stopped at the release. The same script against main's code on 9907
+reproduced the bug: the hold became a toggle and was still recording 2.5 s after the release. Blink, not
+WKWebView: the real ⌘ keyup delivery in the app is unverified here.
