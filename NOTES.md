@@ -17547,6 +17547,118 @@ adjusted). The doc block alone also ran 30/30 with `SMOKE_LONG_DOC` on the priva
 sees is the Greek names since 6b534 (Alpha, Gamma, Sigma, Omega). The keys are untouched; the words were updated on
 merge where they reach the page.
 
+## 6b523 — quality-3: the writer's own slips fixed without a model, the shape of a grounded answer, the vendor's own page (per Patrick)
+
+Round 3 of the answer push, on `quality-3` from `fresh-1` (686e70a = main 672d6f1 + the free fresh-facts fixes).
+The owner's server is down, so everything was measured on this Mac's Fast tier: one Gemma 4 26B writer (MLX),
+one pass on a searched question, no critic and no fact-check (the craft machinery of 6b515/6b518 is Thinking's).
+Round 3's candidates came from the earlier rounds' judges; each was measured and kept or dropped on the bench
+(`tools/answer_eval/RESULTS-quality-3.md` has every number). Two of the six candidates don't apply to this
+config at all, measured: **the query plan lands 26 of 28 times here** (0.5–1.6 s; the local engine is up and
+idle after the warm-up, so the 8 s deadline never bites), and the critic's corrections never run (no critic).
+
+**1. The deterministic post-pass** (`answer_polish`, `_single_polish` in the handler; `answer_arith_fixes`,
+`answer_fx_fixes`, `answer_fx_rate`, `answer_scrub`, `shown_answer`). The judges' three recurring writer slips
+are strings the finished answer itself holds, so they are fixed without a model, in under a millisecond, and a
+changed answer is re-sent after a RESET as the fact-check's is (6b515); the step card says "Sharpened · fixed n
+figures". Nothing here invents:
+- **Arithmetic**: every `A op B [op C] = D` the answer states (×, x, ·, +, −, ÷, /, with `=`, `≈`, `~`,
+  "equals", "comes to", "totals") is re-computed from its own figures. The result is replaced only when it
+  is off by more than the figures' own rounding (`_ans_eval`: each figure was rounded to its last written digit,
+  an integer under 100 is a count and exact, and what each rounding moves the result by is summed; "583 gallons
+  × $3.40 = $1,983" stands, from 583.33) plus 5% for an approximation. A chain ("$1,350 + 11 × $106.40 = $1,350
+  + $1,169.40 = $2,519.40", gpt-oss's q27 in round 2) is judged first against last, and the middle sum's one
+  figure the first expression doesn't state is re-derived ($1,170.40). Left alone: a year, a percentage
+  result (too many readings), fenced code, a sign flip (a version number), a result ten times off (a unit
+  misread), and a **partial equation** whose tail or head alone gives the stated result ("(flight $1,350 + 11
+  × $95 = $1,045)" states the hotel's product with the flight as context: the first draft of this rule
+  "corrected" it to $2,395).
+- **Conversions**: each dollar figure beside a reais figure (a single or a range, either order) is checked
+  against the ONE rate the answer states, or failing that the evidence's FX block ("1 US dollar = 5.0465 BRL",
+  6b520), and replaced by the quotient when more than 6% off. Round 2's q17.t2 had "R$3,500–5,500
+  ($1,700–$2,700)" at a stated 5.05: 2.5× off; it becomes $693–$1,089. Two differing rates in one text mean no
+  rate, and nothing is checked.
+- **The leaks**: "the provided data does not list", "are not listed in the available data", "based on the
+  evidence", "the sources above", "I can't pull live data" are reworded in place with the sentence's grammar
+  kept ("I didn't find", "aren't in what I found", "based on what I found"); a sentence that now opens with
+  "what I found" is capitalised. "The data center" is untouched. Over the recorded bench answers of every
+  round, 54 of 33×16 answers carried one.
+- A leading markdown heading goes; a closing recap goes (`trim_recap`, 6b518, which only the craft path ran).
+- Measured over every recorded bench answer of rounds 0–3 (16 runs): the arithmetic rule fires on 2 (both
+  real errors, gpt-oss's), the conversion rule on 2 (q17.t2, both real), never on a right figure. On this
+  config Gemma's sums were right in every base answer, so only the leak rewrite fired: 12, 7 and 9 answers
+  re-sent in the three branch runs. The judges' "garbled" lines ("R$ 4,400–$800", "With sceanrio 2 tax") are in
+  answers the post-pass never touched (0 RESETs): the writer's own.
+- The council's final (Thinking, Pro, Max) goes through the same pass before the fact-check's re-send
+  (`run_council._done`), unmeasured here: this config never runs a council.
+
+**2. The shape and the estimate rule ride the grounded turn** (`GROUND_SHAPE`, `GROUND_ESTIMATE`, after the
+dating rules, before the note and the question). On this config the single writer never saw the answer brief
+(it rides the revise and final passes, 6b515), so the grounded turn carries the shape: the first sentence
+settles the question; every part answered, with the evidence's specifics in full (every price, not one); one
+pick when asked which; a list written out when asked (what to pack); prose, bold, no headings or tables on a
+chat answer, no recap; the leak phrases banned. And ESTIMATE WHEN ASKED: a figure the person asked for and no
+source states is built from the evidence's rate or unit price and known typical ranges, shown in one line,
+dated, with where to confirm; "I cannot give an exact figure" alone is never acceptable (q17.t2 refused a rent
+with the rate and the price per m² in hand, three runs of four).
+
+**3. A follow-up with nothing new to look up** (`GROUND_FOLLOWUP`): 6b518 reuses the earlier evidence; the
+turn now says not to restate the earlier answer but to add what it lacked and correct what was wrong (q01.t2
+restated turn 1 in two runs of four).
+
+**4. The vendor's own page, and the junk around it** (`rank_sources`, `_src_quality`, `_src_junk`,
+`evidence_pack`, `GROUND_DATING`):
+- The maker's or seller's own page on the question is flagged `vendor` when the host's own label is the
+  asked-about name (digitalocean.com, apple.com) or the name sits in a primary host the hints named
+  (voegol.com.br for GOL); a name merely inside a label (llm-stats.com for "LLM", spanish-fluency-club.com for
+  "Spanish") is not, which the first cut got wrong. It takes a seat ahead of the fill, the pack marks it
+  "(THE VENDOR'S OWN SITE: the maker's or seller's own page)", and the dating rule puts it with official data:
+  its price beats any reseller's "$2.50/hr" (q03).
+- A listing's page (airbnb., vrbo., cozycozy., hostelworld.) is junk, like a video: one unit's advert chose
+  the neighbourhood in q17. An engine's paid link (`/aclick`, `/aclk`, `/pagead`) is junk. Booking and price
+  aggregators (`_SRC_LISTING_HOSTS`), a forum thread (`_SRC_FORUM_RX`, not on a good host: stackoverflow's
+  /questions/ stays) and a site's front page (Delta's, Kayak's, Omio's) rank down 2, as a content farm does.
+- A query's seat goes only to a hit worth half the best: "clear accents cheap classes tourist bubble" had
+  seated an accent-reduction school and a glass tumbler (9 and 6 against 22).
+- In `plan_queries`, the lead's names always ride a nameless part, however long: "safe walkable near beach
+  fast internet" (six words, no name) searched the world and seated a Da Nang listing and a speed test; it now
+  carries Florianópolis.
+- Measured at the evidence level (no models, the harness in the session scratchpad: the grounded search on
+  q01–q03, q17–q21): the junk is gone from the packs (no listing, thread, front page, tumbler, speed test,
+  Da Nang) and the vendor flag lands only on the vendor (digitalocean.com; not llm-router, numbeo,
+  spanish-fluency-club, threeweektraveller). Key facts found in the pack: 8–9 of 90–102 both before and after;
+  the engines decide that, not the ranking.
+
+**Measured** (33 turns, local Fast, blind Opus judges by turn; `RESULTS-quality-3.md`): two base runs against three
+branch runs, paired, **+0.15 (se 0.14)**; wave 1 alone (two against two in one grading) **+0.23 (se 0.14)**: one
+standard error, **not clearly beyond noise**. The two base runs differ by 0.54 (3.64, 4.18), the three branch runs
+sit at 4.18, 4.09, 3.91. What moved on every run: structure 5.4 → 5.9, concise 5.4 → 6.3, fit 4.4 → 4.8; markdown
+headings 52 → 4 per run, tables 10 → 3 answers, the pipeline's words 6–9 → 0; high-severity flags 38 → 30 over
+66 answers in wave 1 (br-c carried 21 in wave 2a). Travel +0.5, money +0.6, reasoning +0.7, follow-ups +0.5;
+fresh −0.3, where q04 and q05 are a date artefact (the sheets are dated 2026-10-24 and the live search now returns
+the 28 October FOMC statement and a 26 October OpenAI model, which the rubric scores as wrong); health flat. First
+visible text median 20–21 s base, 15–21 s branch; no error answer in 165 turns. Verdict: merge as a step, not a
+quality release; q01–q03 are still 2–3 and that is the engines' results, not the writing. A third base run, one ablation per kept fix and the thinking pilot were queued and stopped for the 7.0 beta's
+gauntlet; they run when the round is requeued.
+
+**The knob.** `MILLENAI_Q3_OFF` (shape, estimate, followup, vendor, polish), a dev copy's only
+(`quality_ablate`), in `_KNOWN_ENV`; `run_bench.py --env` passes it.
+
+**Gauntlet.** 20 checks + a 28-mutant check (`# ==== quality-3 (6b523)`): the arithmetic (a wrong product, a
+chain's two fixes, right and rounded and approximate figures untouched, a partial equation, a year, a share, a
+sign flip, fenced code), the conversions (a range at the answer's rate, the evidence's rate, a reversed pair,
+two rates = none), the leaks (grammar and case, "the data center" untouched), the heading and the recap, the
+knob in a dev copy and the shipped app, the text after the last RESET, the grounded turn's rules in order and
+the knob taking them out, the dating rule, the ranking (listing junk, the paid link, the forum thread, the front
+page, the seat floor, the vendor flagged and seated and a reseller's not), the pack's mark, the handler's wiring
+on both single-writer paths and the follow-up note. The 6b518 pin of the grounded turn's call follows the code.
+**A dev copy's pilot knob** (`MILLENAI_Q3_THINK=hard|all`, `quality_think`; left out of quality-4, 6b560): the model's own reasoning mode,
+which the app keeps off, on a question with three or more figures and an arithmetic or judgement ask; the stream
+parser and `strip_think` keep the thinking text out of the answer. Unmeasured yet (the pilot run was stopped).
+The council's final (`run_council._done`) goes through `answer_polish` before the fact-check's re-send.
+The 6b523 block ran green standalone against the branch source (22 of 22, with the 30 mutants); the full
+gauntlet was queued behind the beta's and is pending the requeue.
+
 ## 6b524 — The server kit brings itself back: a watchdog doctor, panic-reboot with a boot-loop guard, and a network watch (per Patrick)
 
 - Why: the server (Ubuntu 26.04, Ryzen 5950X, RTX 5070 Ti, AMD chipset, Wi-Fi only at home, owner abroad for months,

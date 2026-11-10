@@ -186,7 +186,8 @@ def ask_all(args, s, run_dir):
             r = rb.chat(copy, body, args.max_wait, args.idle)
             rec = {"id": q["id"], "category": q["category"], "tier": tier, "q": q["q"],
                    "answer": r.get("answer") or "", "first_text_s": r.get("first_text_s"),
-                   "elapsed_s": r.get("elapsed_s"), "x_models": r.get("x_models"), "searched": r.get("searched"),
+                   "elapsed_s": r.get("elapsed_s"), "app_first_s": r.get("app_first_s"),
+                   "x_models": r.get("x_models"), "searched": r.get("searched"),
                    "resets": r.get("resets"), "steps": [x.get("label") or x.get("t") for x in r.get("steps") or []
                                                         if isinstance(x, dict)][:30],
                    "error": r.get("error") or ("error answer" if r.get("is_error_answer") else ""),
