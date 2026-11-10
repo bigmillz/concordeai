@@ -52641,8 +52641,13 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    settled within 2 s); "Ultra" is lit (a white glow that settles over 900 ms).
    AT ULTRA (html.hz-ultra), the friend page's slider (6b549, per Patrick: keep its Ultra): the knob is a LIVING
    STAR (crisp vector, white with a hint of ice) stepping through four, six, eight and six points, one form every
-   140 ms (hzKnobStar); seven tiny white four-point stars drift left to right through the filled track (3.2-5 s
-   each, twinkling, clipped to it); the fill turns to Ultra's one cool pair, ice #8fb7ff > soft violet #a58bff,
+   140 ms (hzKnobStar), ANCHORED to the track (per Patrick: "be careful with the star that doesn't stick"): 1.25 x the
+   track's height, centred where the knob stands inside the fill's end, its points at most 2-3 px past the track's
+   edges, its glow and halo within 6 px; THE STARS ABOVE THE BOX (per Patrick: "more stars above the box versus in the
+   box"): no stars in the track; a gentle field of small white-ice stars in the sky between the greeting and the
+   composer (26 in Full, 13 in Balanced; in a conversation a subtler strip above the composer, 12 and 6), fading in
+   over 600 ms, twinkling slowly, one in eight rarely drifting up; behind everything (inside the sky), never over the
+   greeting or the composer (hzUFieldPlan); the fill turns to Ultra's one cool pair, ice #8fb7ff > soft violet #a58bff,
    flowing slowly (one 2 x width period per 8 s), the halo with it; the label "Ultra" is silver with a highlight
    passing over it once every 3 s (the one loop on text; no gradient letters). Nothing rose, pink or red anywhere in
    the effort or Ultra; ember stays at decisions (the send strike, the focus ring, errors). The rim stays still. LEAVING (html.hz-ultra-out) folds the star back into the
@@ -52665,20 +52670,30 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-ultra-out #composer::after{animation:hzUltraDrain .3s cubic-bezier(.65,0,.35,1) both}
 @keyframes hzUltraDrain{from{--hz-rev:360deg}to{--hz-rev:0deg}}
 /* the knob becomes the star (Balanced and Full); the rounded square folds away */
-.hz .hz-sl-star{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px;overflow:visible;pointer-events:none;opacity:0;transform:scale(.45) rotate(-35deg);
-  filter:drop-shadow(0 0 2px rgba(255,255,255,.95)) drop-shadow(0 0 6px rgba(200,220,255,.7));transition:opacity .2s var(--hz-ease-out),transform .2s var(--hz-ease-out)}
-.hz #hz-effort.compact .hz-sl-star{width:18px;height:18px;margin:-9px 0 0 -9px}
+.hz .hz-sl-star{position:absolute;left:50%;top:50%;width:calc(var(--hz-ph) * 1.25);height:calc(var(--hz-ph) * 1.25);margin:calc(var(--hz-ph) * -.625) 0 0 calc(var(--hz-ph) * -.625);overflow:visible;pointer-events:none;opacity:0;transform:scale(.45) rotate(-35deg);
+  filter:drop-shadow(0 0 1.5px rgba(255,255,255,.95)) drop-shadow(0 0 4px rgba(200,220,255,.6));transition:opacity .2s var(--hz-ease-out),transform .2s var(--hz-ease-out)}
 .hz.hz-ultra:not(.hz-calm) .hz-sl-star{opacity:1;transform:none}
 .hz.hz-ultra:not(.hz-calm) .hz-sl-core{opacity:0;transform:scale(.55) rotate(45deg)}
 .hz.hz-ultra .hz-sl-halo{background:linear-gradient(135deg,#8fb7ff,#a58bff)}
 .hz.hz-ignite:not(.hz-calm) .hz-sl-star{animation:hzKnobClick .32s cubic-bezier(.2,.8,.2,1) both}
-@keyframes hzKnobClick{0%{opacity:0;transform:scale(.45) rotate(-35deg)}60%{opacity:1;transform:scale(1.12)}100%{opacity:1;transform:none}}
-/* the stars in the track: seven, drifting left to right through the fill, twinkling, clipped to it */
-.hz .hz-sl-tst{position:absolute;z-index:1;left:0;top:var(--y);width:7px;height:7px;margin:-3.5px 0 0 -3.5px;opacity:0;pointer-events:none;
-  background:radial-gradient(circle,#fff 0 1px,rgba(255,255,255,0) 1.6px),linear-gradient(90deg,transparent,rgba(236,243,255,.95),transparent) center/100% 1px no-repeat,linear-gradient(0deg,transparent,rgba(236,243,255,.95),transparent) center/1px 100% no-repeat}
-.hz #hz-effort.compact .hz-sl-tst{width:5px;height:5px;margin:-2.5px 0 0 -2.5px}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-tst{animation:hzTDrift var(--du) linear var(--dl) infinite}
-@keyframes hzTDrift{0%{transform:translateX(-8px) scale(.6);opacity:0}12%{opacity:.95}35%{opacity:.4;transform:translateX(calc(var(--hz-sw) * .3)) scale(1)}55%{opacity:.9}80%{opacity:.35}100%{transform:translateX(var(--hz-sw)) scale(.7);opacity:0}}
+@keyframes hzKnobClick{0%{opacity:0;transform:scale(.45) rotate(-35deg)}60%{opacity:1;transform:scale(1.06)}100%{opacity:1;transform:none}}
+/* at Ultra the halo stays tight, whatever the hand does: within 6 px of the knob */
+.hz.hz-ultra .hz-sl-halo,.hz.hz-ultra .hz-sl:hover .hz-sl-halo,.hz.hz-ultra .hz-sl.dragging .hz-sl-halo{transform:scale(.8);filter:blur(4px)}
+/* THE STARS ABOVE THE BOX: a field in the sky between the greeting and the composer (a strip above it in a
+   conversation), inside #hz-sky so it sits behind everything; placed by hzUFieldPlan, never over the greeting or the
+   composer; fades in over 600 ms, each star twinkling slowly (3.2-6 s), one in eight drifting up now and then */
+#hz-ufield{display:none}
+.hz #hz-ufield{display:block;position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;opacity:0;transition:opacity .6s var(--hz-ease-out)}
+.hz #hz-ufield.on{opacity:1}
+.hz #hz-ufield.chat.on{opacity:.55}
+.hz #hz-ufield i{position:absolute;left:var(--x);top:var(--y);width:var(--s);height:var(--s);margin:calc(var(--s) / -2) 0 0 calc(var(--s) / -2);opacity:.6;
+  background:radial-gradient(circle,#fff 0 18%,rgba(255,255,255,0) 30%),linear-gradient(90deg,transparent,rgba(236,243,255,.9),transparent) center/100% 1px no-repeat,linear-gradient(0deg,transparent,rgba(236,243,255,.9),transparent) center/1px 100% no-repeat;
+  animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite}
+.hz #hz-ufield i.up{animation:hzUTwinkle var(--du) ease-in-out var(--dl) infinite,hzURise 14s ease-in-out var(--dl) infinite}
+@keyframes hzUTwinkle{0%,100%{opacity:.28}50%{opacity:.9}}
+@keyframes hzURise{0%,70%{transform:none}85%{transform:translateY(-14px)}86%,100%{transform:translateY(-14px) scale(0)}}
+.hz.hz-calm #hz-ufield,.hz .novideo #hz-ufield{display:none}
+.hz.hz-pause #hz-ufield i{animation-play-state:paused}
 /* the fill at Ultra: the one cool pair, ice > soft violet and back, with the sheen on top; it flows slowly (one 2 x
    width period every 8 s), the bloom with it; still in Calm */
 .hz .hz-sl-fill::after,.hz .hz-sl-bloom::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s var(--hz-ease-in-out);
@@ -52715,12 +52730,12 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 @keyframes hzRimIn{from{opacity:0}to{opacity:.9}}
 @keyframes hzRimOut{from{opacity:.9}to{opacity:0}}
 .hz.hz-calm .hz-sl-spark,.hz .novideo .hz-sl-spark,.hz .novideo .hz-sl-star{display:none!important}
-.hz .novideo .hz-sl-tst,.hz .novideo .hz-sl-fill::after,.hz .novideo .hz-sl-bloom::after,.hz .novideo .hz-elevel.lum{animation:none!important}
+.hz .novideo .hz-sl-fill::after,.hz .novideo .hz-sl-bloom::after,.hz .novideo .hz-elevel.lum{animation:none!important}
 .hz.hz-ultra .novideo .hz-sl-core{opacity:1;transform:none}
-.hz.hz-pause .hz-sl-tst,.hz.hz-pause .hz-sl-fill::after,.hz.hz-pause .hz-sl-bloom::after,.hz.hz-pause .hz-elevel.lum{animation-play-state:paused}
+.hz.hz-pause .hz-sl-fill::after,.hz.hz-pause .hz-sl-bloom::after,.hz.hz-pause .hz-elevel.lum{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){
-  .hz #composer::after,.hz .hz-sl-tst,.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after,.hz .hz-elevel.lum,.hz.hz-ignite #hz-aurw{animation:none!important}
-  .hz .hz-sl-spark,.hz .hz-sl-star{display:none!important}
+  .hz #composer::after,.hz .hz-sl-fill::after,.hz .hz-sl-bloom::after,.hz .hz-elevel.lum,.hz.hz-ignite #hz-aurw{animation:none!important}
+  .hz .hz-sl-spark,.hz .hz-sl-star,.hz #hz-ufield{display:none!important}
   .hz.hz-ultra .hz-sl-core{opacity:1;transform:none}
 }
 /* ---- the focus ring on the slider (6b544; round the pill since 6b549): keyboard-only (:focus-visible on the range,
@@ -53156,6 +53171,7 @@ __CODE_ROWS__
       <div class="hz-aur" id="hz-aur2"><canvas></canvas></div>
     </div>
     <div id="hz-scrim"></div>
+    <div id="hz-ufield"></div>
   </div>
   <!-- THE HEADER (6b526): the chats button and the lockup (static since 6b542, per Patrick: the shining logo was "kind of tacky");
        the chat's title in a conversation; the lanes as text on the home; the
@@ -66245,13 +66261,13 @@ function hzModesPaint(){
   if(!host.querySelector(".hz-pick")){
     host.innerHTML='<button type="button" class="hz-pick" aria-haspopup="menu" aria-expanded="false" aria-controls="hz-menu"><b></b>'
       +'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>'
-      // the slim pill (6b549): the channel, the bloom, the silver fill (Ultra's seven drifting stars inside it), the
-      // notches (shown only on hover and drag), the spark, and the knob: its halo, the rounded square, Ultra's star
-      +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill">'
-      +[[32,0,3.6],[66,-.7,4.4],[48,-1.5,3.2],[24,-2.2,4.8],[72,-2.9,3.9],[40,-3.4,4.2],[58,-1.1,5]].map(([y,dl,du])=>'<i class="hz-sl-tst" style="--y:'+y+'%;--dl:'+dl+'s;--du:'+du+'s"></i>').join("")+'</i>'
+      // the slim pill (6b549): the channel, the bloom, the silver fill, the notches (shown only on hover, drag and
+      // keyboard focus), the spark, and the knob: its halo, the rounded square, Ultra's star (no stars in the track:
+      // they live above the box, hzUField)
+      +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
       +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i>'
-      +'<svg class="hz-sl-star" viewBox="-11 -11 22 22" aria-hidden="true"><defs><radialGradient id="hz-ksg"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#f2f6ff"/><stop offset="1" stop-color="#d6e4ff"/></radialGradient></defs><path fill="url(#hz-ksg)" d="'+hzKForms()[0]+'"/></svg></span>'
+      +'<svg class="hz-sl-star" viewBox="-10 -10 20 20" aria-hidden="true"><defs><radialGradient id="hz-ksg"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#f2f6ff"/><stop offset="1" stop-color="#d6e4ff"/></radialGradient></defs><path fill="url(#hz-ksg)" d="'+hzKForms()[0]+'"/></svg></span>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
@@ -66274,7 +66290,7 @@ function hzEffortPaint(){
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
   // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b549)
   const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);
-  hzKnobStar(i===4);
+  hzKnobStar(i===4);hzUField(i===4);
   const root=document.documentElement,was=hzS.effI;hzS.effI=i;
   root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
   // arriving at Ultra ignites it once; leaving drains it (a page that opens at Ultra just rests there)
@@ -66291,7 +66307,38 @@ function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
 // and six points, one form every 140 ms, like Claude Code's thinking glyph; it rests while the window is hidden, in
 // Calm and under reduced motion (the css shows the plain knob there). The forms are made on first use, never at load.
 function hzStarPath(n,R){const r=R*(n===4?.34:n===6?.44:.5);let d="";for(let k=0;k<n*2;k++){const a=-Math.PI/2+k*Math.PI/n,rr=k%2?r:R;d+=(k?"L":"M")+(Math.cos(a)*rr).toFixed(2)+" "+(Math.sin(a)*rr).toFixed(2);}return d+"Z";}
-function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,9.5)));}
+function hzKForms(){return hzS.kforms||(hzS.kforms=[4,6,8,6].map(n=>hzStarPath(n,10)));}   // tips at the viewBox's edge: the star is exactly its box, 1.25 x the track
+// THE STARS ABOVE THE BOX (6b549, per Patrick: "more stars above the box versus in the box"). hzUFieldPlan is
+// pure: from the greeting's and the composer's rects it places n stars in the open sky between them (home), or in a
+// strip above the composer (a conversation), each kept clear of both boxes by its own size plus 6 px. hzUField builds
+// the field inside the sky once per place (home or not, the window's size, the level) and fades it in or out.
+function hzUFieldPlan(home,g,c,vw,n,rnd){
+  const pad=6,top=home?(g?g.bottom+16:c.top-120):Math.max(64,c.top-120),bot=c.top-14;
+  const left=Math.max(16,c.left-40),right=Math.min(vw-16,c.right+40),out=[];
+  if(bot-top<12||right-left<40)return out;
+  const clear=(x,y,r,b)=>!b||x<b.left-r-pad||x>b.right+r||y<b.top-r-pad||y>b.bottom+r+pad;
+  for(let k=0,tries=0;k<n&&tries<n*20;tries++){
+    const s=+(3+rnd()*4).toFixed(1),x=left+rnd()*(right-left),y=top+s+rnd()*Math.max(0,bot-top-2*s);
+    if(!clear(x,y,s/2,c)||!clear(x,y,s/2,g))continue;
+    out.push({x:+x.toFixed(1),y:+y.toFixed(1),s,du:+(3.2+rnd()*2.8).toFixed(2),dl:+(-rnd()*6).toFixed(2),up:k%8===3});k++;}
+  return out;
+}
+function hzUField(on){
+  const f=$("#hz-ufield");if(!f)return;
+  const lv=typeof hzFxLevel==="function"?hzFxLevel():"balanced";
+  if(!on||lv==="calm"||hzS.reduced||(typeof noVideo!=="undefined"&&noVideo)){f.classList.remove("on");hzS.ufKey="";return;}
+  const home=!!$("#hero"),key=(home?"h":"c")+innerWidth+"x"+innerHeight+lv;
+  if(hzS.ufKey===key){f.classList.add("on");return;}
+  hzS.ufKey=key;f.classList.remove("on");
+  clearTimeout(hzS.ufT);hzS.ufT=setTimeout(()=>{      // a beat for the page to settle (a timer, not a frame: a hidden page still places it)
+    const cb=$("#composer"),gr=$("#hero .greet");if(!cb||hzS.ufKey!==key)return;
+    const n=(home?26:12)*(lv==="full"?1:.5);
+    const stars=hzUFieldPlan(home,gr?gr.getBoundingClientRect():null,cb.getBoundingClientRect(),innerWidth,Math.round(n),Math.random);
+    f.className=home?"":"chat";
+    f.innerHTML=stars.map(p=>'<i'+(p.up?' class="up"':'')+' style="--x:'+p.x+'px;--y:'+p.y+'px;--s:'+p.s+'px;--du:'+p.du+'s;--dl:'+p.dl+'s"></i>').join("");
+    void f.offsetWidth;if(hzS.ufKey===key)f.classList.add("on");
+  },60);
+}
 function hzKnobStar(on){
   if(on&&hzS.kT)return;
   clearInterval(hzS.kT);hzS.kT=0;hzS.kI=0;

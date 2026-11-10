@@ -19764,3 +19764,22 @@ bloom (the blurred `.bloom` copy, 30 px, .55, behind). The sheen span stays (one
 `_sl549_calm_colour` now also reads the greeting's rules: no colour, no loop, every shadow zero-offset; four
 mutants (the rainbow bloom, a gold glow, a breathing loop, an offset double). The 6b542 gating check pins the
 still bloom. Balanced's settle-in glow (`hzGreetIn`, cool white-blue, 1.5 s, once) is unchanged.
+
+**Ultra, two notes from Patrick ("be careful with the star that doesn't stick"; "more stars above the box versus
+in the box").** The star knob is sized from the track: `calc(var(--hz-ph) * 1.25)` square, tips at the viewBox's
+edge (R 10 in −10…10), so 20 px on the home's 16 px track and 15 px on the conversation's 12 px, its points 2 and
+1.5 px past the track's edges (2.6 px at the arrival's 1.06 overshoot, was 1.12), its centre where the knob stands,
+8 px (6) inside the fill's end, so no gap at any place, held or snapping (measured live at three drag places). Its glow
+is 1.5 and 4 px of white and ice; at Ultra the halo is held at .8 and a 4 px blur on hover and drag too (within 6 px
+of the knob). The seven drifting track stars are gone. In their place, THE STARS ABOVE THE BOX: `#hz-ufield`, inside
+`#hz-sky` (behind everything, no pointer), a field of small white-ice four-point stars between the greeting and the
+composer, 26 in Full and 13 in Balanced; in a conversation a subtler strip (.55) in the 120 px above the composer,
+12 and 6. They fade in over 600 ms, twinkle (3.2–6 s), and one in eight rises 14 px now and then. `hzUFieldPlan` is
+pure: from the greeting's and the composer's rects it keeps every star clear of both by its size plus 6 px;
+`hzUField` builds once per place (home or not, window size, level), on a 60 ms timer. Off in Calm, effects off and
+reduced motion. Gauntlet: `_sl549_star_bounds` (the size multiplier, the drawn radius over the viewBox, the overshoot
+at both track heights, the glow, the Ultra halo) and `_sl549_field` (the plan run in node on stand-in rects: 26 / 13
+/ 12 stars, none touching the greeting or the composer, the home's between them, the conversation's above it; inside
+the sky; Calm and effects off hide it; Balanced half); nine mutants (twice the track, a radius past its box, a 1.4
+overshoot, a 12 px glow, a wide halo, a field reaching into the composer, Balanced at the full count, the field on in
+Calm, the track's stars back), and one more in the Ultra check (track stars back). The five slider sections pass (37).
