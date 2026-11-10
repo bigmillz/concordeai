@@ -1,0 +1,66 @@
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52994)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 496, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 484, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41808, in do_GET
+    self._run(self._do_GET)
+    ~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41786, in _run
+    fn()
+    ~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 42164, in _do_GET
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+  ConcordeAI 7.0 beta 2
+  running on http://127.0.0.1:9916
+
+  no window — serving. ctrl-c to stop.
+
+Fetching 15 files:   0%|          | 0/15 [00:00<?, ?it/s]Fetching 15 files: 100%|██████████| 15/15 [00:00<00:00, 2509.56it/s]
+polish: 1 leak reworded
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.42 out=''
+ground: who wrote one hundred years of solitude, and when did it com | queries=['wrote One Hundred Years Solitude', 'out One Hundred Years Solitude', 'wrote One Hundred Years Solitude out'] model=[] | official=[] | hits=40 kept=8 read=4 passages=16 pack=6245 | plan=3.56 search=8.01 read=1.71 total=9.77 | per-query out One Hundred Years Solitude: 16 hits 4.1s; wrote One Hundred Years Solitude out: 16 hits 9.4s; wrote One Hundred Years Solitude: 16 hits 7.7s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.37 out=''
+ground: how many time zones does brazil have? | queries=['time zones Brazil'] model=[] | official=[] | hits=8 kept=7 read=6 passages=30 pack=4847 | plan=2.69 search=8.01 read=3.35 total=11.37 | per-query time zones Brazil: 16 hits 11.1s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.48 out=''
+ground: what's the us dollar to brazilian real exchange rate right n | queries=['US dollar Brazilian real exchange rate 2026'] model=[] | official=['frankfurter.app'] | hits=16 kept=8 read=6 passages=29 pack=5973 | plan=3.69 search=8.01 read=2.18 total=10.21 | per-query news: US dollar Brazilian real exchange : 8 hits 5.0s; US dollar Brazilian real exchange rate 2: 8 hits 7.0s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.59 out=''
+ground: a train is scheduled to leave at 9:40 and the trip takes 2 h | queries=['train scheduled leave 40 trip takes hours 35 minutes', 'leaves 15 minutes late', 'arrive train scheduled leave 40', 'train scheduled leave 40 trip takes hours 35'] model=[] | official=[] | hits=40 kept=8 read=4 passages=20 pack=5793 | plan=3.46 search=8.0 read=1.88 total=9.94 | per-query arrive train scheduled leave 40: 16 hits 3.0s; train scheduled leave 40 trip takes hour: 8 hits 3.8s; leaves 15 minutes late: 16 hits 9.0s; train scheduled leave 40 trip takes hour: 8 hits 5.9s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=7.43 out=''
+ground: which is bigger, 2^30 or 10^9, and by roughly how much? | queries=['bigger 30 10'] model=[] | official=[] | hits=8 kept=1 read=1 passages=4 pack=985 | plan=8.01 search=9.01 read=0.31 total=9.33 | per-query bigger 30 10: 8 hits 2.4s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.28 out=''
+ground: all bloops are razzies, and some razzies are lazzies. does i | queries=['bloops razzies lazzies', 'follow bloops lazzies', 'bloops razzies lazzies follow'] model=[] | official=[] | hits=48 kept=8 read=3 passages=13 pack=4949 | plan=4.13 search=7.9 read=3.02 total=10.93 | per-query follow bloops lazzies: 16 hits 4.4s; bloops razzies lazzies: 16 hits 6.0s; bloops razzies lazzies follow: 16 hits 7.9s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.63 out=''
+ground: in javascript, why does [1, 2, 10].sort() give [1, 10, 2], a | queries=['JavaScript 10', 'numbers properly JavaScript 10'] model=[] | official=[] | hits=8 kept=5 read=3 passages=14 pack=3246 | plan=3.63 search=8.01 read=1.79 total=9.83 | per-query JavaScript 10: 16 hits 8.5s; numbers properly JavaScript 10: 8 hits 8.8s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.32 out=''
+ground: what does this command do: find . -name '*.log' -mtime +7 -d | queries=['command name log mtime delete'] model=[] | official=[] | hits=0 kept=0 read=0 passages=0 pack=0 | plan=3.07 search=8.01 read=0.0 total=8.01 | per-query 
+ground-plan: seat='Ollama1 · gemma4:12b' secs=3.39 out=''
+ground: give me three name ideas for a small coffee shop in florianó | queries=['three name ideas small coffee shop Florianópolis one line'] model=[] | official=[] | hits=16 kept=7 read=7 passages=36 pack=5713 | plan=4.51 search=7.6 read=3.4 total=11.03 | per-query three name ideas small coffee shop Flori: 16 hits 7.6s
+ground: is it okay to take ibuprofen and acetaminophen together for  | queries=['take ibuprofen acetaminophen together headache'] model=[] | official=[] | hits=16 kept=7 read=4 passages=26 pack=5835 | plan=8.0 search=8.76 read=1.56 total=10.34 | per-query take ibuprofen acetaminophen together he: 16 hits 8.8s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=12.17 out='' err=ServerSlow('Ollama1 didn’t start answering within 12 seconds.')
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.72 out=''
+ground: i have $10,000. should i pay off my 6% car loan early or put | queries=['$10 000', 'one pick $10 000'] model=[] | official=[] | hits=24 kept=8 read=5 passages=25 pack=5423 | plan=4.15 search=8.01 read=2.96 total=11.0 | per-query $10 000: 16 hits 7.0s; one pick $10 000: 16 hits 10.0s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=2.12 out=''
+ground: according to my notes, when does my lease end and how much i | queries=['According notes lease end', 'rent According notes lease end'] model=[] | official=[] | hits=32 kept=8 read=6 passages=17 pack=5628 | plan=3.26 search=3.26 read=2.66 total=5.98 | per-query According notes lease end: 16 hits 2.0s; rent According notes lease end: 16 hits 3.1s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=3.18 out=''
+ground: in two sentences: what does a gpu's vram limit mean for runn | queries=["two sentences GPU's VRAM limit running 30-billion-parameter model", 'NVIDIA data center GPU 2026 site:nvidianews.nvidia.com'] model=[] | official=[] | hits=16 kept=8 read=7 passages=26 pack=7234 | plan=4.4 search=11.01 read=3.16 total=14.24 | per-query two sentences GPU's VRAM limit running 3: 16 hits 4.1s; NVIDIA data center GPU 2026 site:nvidian: 6 hits 11.3s

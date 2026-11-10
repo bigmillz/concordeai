@@ -135,6 +135,8 @@ MACHINE_STATE = frozenset((
     # model) pairs that refused one, the context each server model was last
     # loaded with and the thread's "reuse it" flag: engine facts, nothing personal
     "_srv_think", "_srv_think_refused", "_srv_ctx_seen", "_srv_sticky",
+    # (6b560) the (server, model) pairs that refused think:false
+    "_srv_nothink_refused",
     # (6b522) the tokenizers loaded for documents and each model's context and
     # KV size: engine facts, nothing personal
     "_doc_toks", "_doc_ctx_seen",
@@ -26798,6 +26800,15 @@ _srv_think = threading.local()
 SRV_THINK_MODELS = re.compile(r"^gpt-oss(?::|$)", re.I)
 SRV_THINK_EXTRA = 4096         # room for the longer reasoning in the context
 _srv_think_refused = set()
+# A MODEL THAT REASONS BY DEFAULT IS TOLD NOT TO (6b560): Ollama runs a
+# thinking model's hidden reasoning unless `think` says otherwise, and the
+# server's gemma4:12b spent 1,200-3,900 hidden tokens on a one-line answer
+# (USAGE "o" against ~30-80 visible), so its first word came 25-35 s in and
+# an 8,192 context ran out mid-answer: answers cut at "This zone dominates",
+# and 5 of 20 scorecard answers empty. Every server answer that asks for no
+# reasoning level now sends think:false; a server or model that refuses the
+# field (a 400) is asked again without it, and not asked again this run.
+_srv_nothink_refused = set()
 # THE CONTEXT A MODEL IS LOADED WITH (6b518): Ollama reloads a model whose
 # num_ctx changes, so a short side pass (the query plan) on the model the
 # last fact-check left on the card reloaded it (7.5 s, past the plan's 5 s)
@@ -27491,6 +27502,7 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
         _ctx = max(_ctx, min(SRV_CTX_MAX, -(-(srv_ctx_for(messages, max_tokens) or SRV_CTX_DEFAULT)
                                           // 4096) * 4096 + SRV_THINK_EXTRA))
     _think_box = [_think]
+    _off_box = [not _think and (e.get("id"), model) not in _srv_nothink_refused]
     if getattr(_srv_sticky, "on", False):
         _was = _srv_ctx_seen.get((e.get("id"), model))
         if _was is not None and (_was or SRV_CTX_DEFAULT) >= (_ctx or SRV_CTX_DEFAULT):
@@ -27505,6 +27517,8 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                              **({"num_ctx": int(ctx)} if ctx else {}))}
         if _think_box[0]:
             d["think"] = _think_box[0]
+        elif _off_box[0]:
+            d["think"] = False      # no hidden reasoning (6b560)
         return json.dumps(d, separators=(",", ":")).encode("utf-8")
     body = _body(_ctx)
     t0, sent, last, got_any = time.time(), [0], {}, [False]
@@ -27543,6 +27557,13 @@ def server_stream(label: str, messages: list, emit, max_tokens: int = 0) -> dict
                 # again without it, and not asked again this run
                 _srv_think_refused.add((e.get("id"), model))
                 _think_box[0] = None
+                body = _body(_ctx)
+                continue
+            if _off_box[0] and resp.status == 400:
+                # the server or model didn't take think:false (6b560): asked
+                # again without it, and not asked again this run
+                _srv_nothink_refused.add((e.get("id"), model))
+                _off_box[0] = False
                 body = _body(_ctx)
                 continue
             raise _srv_fail(e, resp.status, js, model)
@@ -28492,11 +28513,20 @@ def server_first_answer(label: str, fallback: str, messages: list, memit, emit,
                 # the draft stands, and nothing alarming is said
                 if shown[0]:
                     emit(Ctl(NUL + "RESET" + NUL))
-                memit(draft)
+                _m(draft)
+            if not shown[0]:
+                _m(draft)      # a rewrite that came back empty (6b560): the draft is the answer
             return "server"
         with server_first_deadline(first_s):
             _stream_guarded(label, messages, _m, status, None,
                             "kept the part before it wandered")
+        if not shown[0]:
+            # AN EMPTY ANSWER IS A FAILURE BEFORE THE FIRST WORD (6b560): the
+            # server's model can end its stream with no text at all (5 of 20
+            # scorecard answers from gemma4:12b on 2026-11-10, on main too), and
+            # the page was left with nothing and no word of why; now this
+            # computer's copy answers, as for a server that never started
+            raise ServerError("server", "%s sent back an empty answer." % name)
         return "server"
     except ServerError as se:
         why = str(se)

@@ -195,9 +195,11 @@ def ask_all(args, s, run_dir):
                    "answer": r.get("answer") or "", "first_text_s": r.get("first_text_s"),
                    "elapsed_s": r.get("elapsed_s"), "app_first_s": r.get("app_first_s"),
                    "x_models": r.get("x_models"), "searched": r.get("searched"),
-                   "resets": r.get("resets"), "steps": [x.get("label") or x.get("t") for x in r.get("steps") or []
-                                                        if isinstance(x, dict)][:30],
-                   "error": r.get("error") or ("error answer" if r.get("is_error_answer") else ""),
+                   "resets": r.get("resets"),
+                   "steps": ["%s: %s" % (x.get("l"), x.get("d")) for x in r.get("steps") or [] if isinstance(x, dict)][:30],
+                   # an empty answer is an error too (6b560: the server's empty replies scored as errors 0)
+                   "error": r.get("error") or ("error answer" if r.get("is_error_answer") else "")
+                   or ("empty answer" if not (r.get("answer") or "").strip() else ""),
                    "facts": facts_check(q, r.get("answer") or "")}
             recs.append(rec)
             log("%s: %ss (first words %ss), %d chars, %s%s" % (

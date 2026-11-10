@@ -1,0 +1,829 @@
+{
+ "label": "quality-4-e698872",
+ "when": "2026-11-10T07:47:59",
+ "app": {
+  "version": "7.0.0",
+  "build": "279",
+  "beta": "2",
+  "rc": "0"
+ },
+ "head": "e698872 quality-4",
+ "set_version": 1,
+ "as_of": "2026-11-10",
+ "where": "server",
+ "server": "Ollama1",
+ "tier": "Fast",
+ "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
+ "wall_s": 781.5,
+ "records": [
+  {
+   "id": "f01",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Roughly what temperature does water boil at on the top of Everest, and why is it lower than at sea level?",
+   "answer": "It's 50°F and Clear right now, with a wind of 5 mph. The forecast is Sunny with a high of 66°F and low of 47°F on Tuesday, Sunny with a high of 62°F and low of 46°F on Wednesday, and Partly Cloudy with a high of 51°F and low of 37°F on Thursday.\n\nI didn't find information regarding the boiling point of water.",
+   "first_text_s": 31.25,
+   "elapsed_s": 31.71,
+   "app_first_s": 31.25,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 1,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 3
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 10,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer fails to address the question, providing irrelevant weather data and an explicit admission of missing information."
+   }
+  },
+  {
+   "id": "f02",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Who wrote One Hundred Years of Solitude, and when did it come out?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 31.94,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [
+     false,
+     false
+    ],
+    "ok": 2,
+    "of": 4
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide any information, which results in the minimum score for all categories."
+   }
+  },
+  {
+   "id": "f03",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "How many time zones does Brazil have?",
+   "answer": "Brazil has **four standard time zones** [1].\n\nThe specific zones are:\n- **Fernando de Noronha time** (UTC−02:00) [1]\n- **Brasília time** (UTC−03:00) [1]\n- **Amazon time** (UTC−04:00) [1]\n- **Acre time** (UTC−05:00) [1]\n\n**Brasília Time (BRT)** at **UTC-3** is the primary zone, housing over **90%** of the population [4]. Brazil **abolished Daylight Saving Time in 2019** [4][5][7], so these offsets remain fixed year-round.",
+   "first_text_s": 32.33,
+   "elapsed_s": 33.02,
+   "app_first_s": 32.33,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "Perfectly adheres to the direct, technical persona and reference sheet, listing all four zones and the 2019 DST abolition without fluff."
+   }
+  },
+  {
+   "id": "f04",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "What's the US dollar to Brazilian real exchange rate right now?",
+   "answer": "The exchange rate is approximately **5.511 BRL** per 1 USD as of 05:37 AM on 11-10-2026 [2]. \n\nThis is derived from a conversion of **200 USD to 1,102.2194 BRL** [2]. For comparison, the **ECB reference rate** was **5.5167 BRL** as of 2026-11-09 [1].\n\nOther data for 2026-11-10 shows **79.99 USD** converting to **441 BRL** [6].",
+   "first_text_s": 29.63,
+   "elapsed_s": 30.28,
+   "app_first_s": 29.63,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 3,
+    "complete": 6,
+    "concise": 8,
+    "fit": 8,
+    "overall": 5,
+    "why": "The answer includes a contradictory, likely hallucinated data point (79.99 USD to 441 BRL) that violates the 'no trap' rule and undermines the primary correct figure, despite meeting format and preference constraints."
+   }
+  },
+  {
+   "id": "r01",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "A train is scheduled to leave at 9:40 and the trip takes 2 hours 35 minutes. It leaves 15 minutes late. When does it arrive?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 36.08,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide the requested calculation or result."
+   }
+  },
+  {
+   "id": "r02",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "I owe $14,000 on a credit card at 24% APR, compounded monthly. If I pay $700 a month, about how many months until it's paid off, and roughly how much interest will I pay?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 44.38,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide any calculation or result."
+   }
+  },
+  {
+   "id": "r03",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "Which is bigger, 2^30 or 10^9, and by roughly how much?",
+   "answer": "**2^30** is the larger value, exceeding **10^9** by exactly **73,741,824**.\n\nThe calculation yields **1,073,741,824** for $2^{30}$ and exactly **1,000,000,000** for $10^9$. This represents a difference of roughly **7.37%**.\n\nIn computing, this is the standard distinction between a **gibibyte (GiB)** and a **gigabyte (GB)**. Because $2^{10}$ is **1,024** rather than **1,000**, the discrepancy compounds over three powers of ten.\n\nThe search results only contained information about a song by the Backstreet Boys, so I would check a calculator for any additional mathematical constants.",
+   "first_text_s": 33.92,
+   "elapsed_s": 34.83,
+   "app_first_s": 33.91,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 8,
+    "overall": 9,
+    "why": "Mathematically precise and fits the persona, but the irrelevant Backstreet Boys joke violates the 'direct/skip pleasantries' constraint."
+   }
+  },
+  {
+   "id": "r04",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "All bloops are razzies, and some razzies are lazzies. Does it follow that some bloops are lazzies?",
+   "answer": "It doesn't logically follow, Pat.\n\nWhile all **bloops** are **razzies**, the premise only states that **some razzies** are **lazzies** [8].\n\nBecause the **lazzies** could be comprised entirely of **non-bloop razzies**, the **bloops** could be **entirely separate** from the **lazzies** [2].\n\nTherefore, the conclusion that some bloops are lazzies is **not necessarily true** [8].",
+   "first_text_s": 30.17,
+   "elapsed_s": 30.65,
+   "app_first_s": 30.17,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is logically sound, perfectly adheres to the user's direct persona constraints, and matches the reference sheet's required structure and content exactly."
+   }
+  },
+  {
+   "id": "c01",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a Python function that returns the n-th Fibonacci number iteratively, and tell me its time complexity.",
+   "answer": "This **iterative approach** is the standard choice for balancing performance and memory, providing **O(n) time complexity**.\n\n```python\ndef fibonacci_iterative(n: int) -> int:\n    if n <= 0:\n        return 0\n    if n == 1:\n        return 1\n    \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b\n```\n\nThe **time complexity** is **O(n)** because the function performs a single linear pass to reach the $n$-th index. The **space complexity** is **O(1)** because it only tracks two variables regardless of the input size.\n\nFor massive inputs where $n$ is extremely large, **matrix exponentiation** can achieve **O(log n)** time complexity, though the iterative method is typically sufficient for standard use cases.",
+   "first_text_s": 37.06,
+   "elapsed_s": 37.7,
+   "app_first_s": 37.06,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is technically perfect and follows the direct persona, but the matrix exponentiation note, while accurate, is slightly extraneous given the user's request for 'the' iterative solution and preference for a single best option."
+   }
+  },
+  {
+   "id": "c02",
+   "category": "code",
+   "tier": "Fast",
+   "q": "In JavaScript, why does [1, 2, 10].sort() give [1, 10, 2], and how do I sort numbers properly?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 37.0,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [],
+    "ok": 0,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to address the question or provide any information."
+   }
+  },
+  {
+   "id": "c03",
+   "category": "code",
+   "tier": "Fast",
+   "q": "What does this command do: find . -name '*.log' -mtime +7 -delete",
+   "answer": "This command **permanently deletes** every file in the current directory and its subdirectories that ends in **.log** and was last modified **more than 7 days ago**.\n\n**Command Breakdown:**\n- `find .`: Initiates a **recursive search** starting from the current working directory.\n- `-name '*.log'`: Filters the search results to only include files with the **.log suffix**.\n- `-mtime +7`: Selects files with a **modification timestamp** strictly greater than 7 days. In most POSIX-compliant versions, this translates to files modified **8 or more days ago**.\n- `-delete`: **Removes the matched files** from the filesystem immediately without moving them to a trash bin.\n\n**Risk and Best Practice:**\nBecause `-delete` is an immediate, non-reversible action, it is standard practice to perform a **dry run** first. This ensures you don't accidentally purge critical system or application logs. Run this command to see the list of files that will be targeted:\n\n`find . -name '*.log' -mtime +7 -print`\n\nCheck your specific environment's `find` behavior using `man find`.",
+   "first_text_s": 24.32,
+   "elapsed_s": 25.45,
+   "app_first_s": 24.32,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Accurate and technically precise, but the verbose breakdown and unsolicited dry-run advice violate the user's preference for directness and brevity."
+   }
+  },
+  {
+   "id": "c04",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a SQL query for the top 3 customers by total order amount, from a table orders(customer_id, amount).",
+   "answer": "The correct query depends on your database engine; for **PostgreSQL**, **MySQL**, or **SQLite**, use the following:\n\n```sql\nSELECT customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC\nLIMIT 3;\n```\n\nThis query aggregates the **amount** field per **customer_id** using the **SUM** function, sorts the results in **descending order** (**DESC**), and uses **LIMIT 3** to isolate the top three records.\n\nIf you are using **SQL Server (T-SQL)**, use the **TOP** clause instead:\n\n```sql\nSELECT TOP 3 customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC;\n```",
+   "first_text_s": 54.88,
+   "elapsed_s": 55.68,
+   "app_first_s": 54.88,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 6,
+    "fit": 4,
+    "overall": 6,
+    "why": "The answer is technically correct but violates the user's explicit preference for directness by including unnecessary preamble, multiple dialect options, and explanatory text instead of a single best query."
+   }
+  },
+  {
+   "id": "w01",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a two-sentence apology to a client for missing yesterday's call, and offer two new times.",
+   "answer": "I apologize for missing our scheduled call yesterday. \n\nWould **Wednesday, Nov 11 at 2:00 PM** or **Thursday, Nov 12 at 10:00 AM** work for a rescheduled sync?",
+   "first_text_s": 36.5,
+   "elapsed_s": 36.74,
+   "app_first_s": 36.5,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer strictly adheres to the two-sentence constraint, provides a direct apology without excuses, offers two concrete times, and respects the user's preference for brevity and directness."
+   }
+  },
+  {
+   "id": "w02",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Rewrite this to sound friendlier, under 40 words: \"Your invoice is overdue. Pay immediately or service will be suspended.\"",
+   "answer": "Just a friendly reminder that your **invoice is currently past due**. To keep your **service running smoothly**, please settle the balance today. Thanks for your business!\n\nBy swapping \"overdue\" for \"past due\" and \"suspended\" for \"running smoothly,\" you shift the tone from a punitive threat to a focus on continuity. This maintains the necessary urgency while preserving the relationship with the client.",
+   "first_text_s": 39.91,
+   "elapsed_s": 40.35,
+   "app_first_s": 39.91,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 8,
+    "overall": 9,
+    "why": "The rewrite is excellent and fits all constraints, but the unsolicited explanation violates the 'direct/skip reasoning' preference."
+   }
+  },
+  {
+   "id": "w03",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a README intro for a command-line tool called tidyup that deletes old files from Downloads: a title and one paragraph.",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 48.17,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [],
+    "ok": 0,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide the requested title and paragraph."
+   }
+  },
+  {
+   "id": "w04",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Give me three name ideas for a small coffee shop in Florianópolis, one line each.",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 30.68,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [],
+    "never_hit": [],
+    "ok": 0,
+    "of": 0
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide any names or content."
+   }
+  },
+  {
+   "id": "h01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "Is it okay to take ibuprofen and acetaminophen together for a headache?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 42.85,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, providing no information, which fails all criteria including correctness, completeness, and adherence to the user's preference for directness."
+   }
+  },
+  {
+   "id": "m01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "I have $10,000. Should I pay off my 6% car loan early or put it in an index fund? Give me one pick.",
+   "answer": "Pay off the **6% car loan**.\n\nA 6% interest rate represents a high **hurdle rate** for equity investments. To justify an index fund, your portfolio would need to consistently outperform that 6% return after accounting for **expense ratios** and **capital gains taxes**.\n\nEliminating the debt provides a **guaranteed 6% return** on your $10,000, which effectively hedges against the **volatility** of the stock market. This move improves your monthly cash flow by removing a recurring liability from your balance sheet.\n\nThe web evidence does not contain specific index fund performance data or current lending rates, so I am using standard historical market averages for this comparison.",
+   "first_text_s": 22.82,
+   "elapsed_s": 23.45,
+   "app_first_s": 22.82,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 9,
+    "complete": 10,
+    "concise": 10,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer provides a clear, direct pick with sound financial reasoning, perfectly adhering to the user's preference for brevity and technical precision without any fluff or traps."
+   }
+  },
+  {
+   "id": "p01",
+   "category": "private",
+   "tier": "Fast",
+   "q": "According to my notes, when does my lease end and how much is my rent?",
+   "answer": "Your lease ends on **March 31, 2027** [9], and your monthly rent is **R$4,200** [9].\n\nThe payment is due on the **5th** of every month via **Pix** [9]. While the **condominium fee** is included in that amount, the **IPTU** is a separate cost of approximately **R$180** per month [9].",
+   "first_text_s": 14.83,
+   "elapsed_s": 15.26,
+   "app_first_s": 14.83,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is factually perfect, follows the direct persona constraints, and adheres to the required structure, though the IPTU detail, while accurate, is slightly extraneous to the specific question asked."
+   }
+  },
+  {
+   "id": "s01",
+   "category": "server",
+   "tier": "srv:5b346919:fast",
+   "q": "In two sentences: what does a GPU's VRAM limit mean for running a 30-billion-parameter model?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 29.64,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [],
+    "ok": 0,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "The answer is empty, failing to provide any information or adhere to the requested format."
+   }
+  }
+ ]
+}

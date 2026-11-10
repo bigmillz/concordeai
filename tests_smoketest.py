@@ -20804,7 +20804,9 @@ def _svc_stream(src):
     body = json.loads(sent[0]["body"])
     out["streamed"] = "".join(got) == "Hello" and last.get("eval_count") == 2
     out["signed"] = _sv_verify(pub, sent[0]) and sent[0]["path"] == "/api/chat"
-    out["only the chat"] = (set(body) == {"model", "messages", "stream", "options"}
+    # (6b560) and think:false: a model that reasons by default is told not to
+    out["only the chat"] = (set(body) == {"model", "messages", "stream", "options", "think"}
+                            and body["think"] is False
                             and body["model"] == "small:8b" and body["stream"] is True
                             and body["messages"] == [{"role": "system", "content": "sys"},
                                                      {"role": "user", "content": "hi"}]
@@ -25763,7 +25765,8 @@ check("servers (live): a signed chat streams end to end with Use cloud power off
       and _SVH.get("X-Models", "").isascii()
       and all(_SVLJ in f[1] for f in _sc1[2] if f[0] == "RUN")
       and _chat34 and _chat34[-1]["access"] and "X-O1-Signature" in _chat34[-1]["headers"]
-      and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options"}
+      and set(json.loads(_chat34[-1]["body"])) == {"model", "messages", "stream", "options", "think"}
+      and json.loads(_chat34[-1]["body"])["think"] is False          # (6b560) no hidden reasoning
       and _stub34 and [m["role"] for m in _stub34[-1][2]["messages"]] == ["system", "user"]
       and _stub34[-1][2]["messages"][-1]["content"] == "stream me please 334"
       and _chat34[-1]["ua"].startswith("ConcordeAI/"),
@@ -41873,6 +41876,19 @@ def _c560_all(src):
         '                if LANE_ROLE.get(agent_name, "") == "code":\n                    return' in sp
         and "_new, _notes = answer_polish(_shown, _pk, prompt)" in sp
         and sp.index('LANE_ROLE.get(agent_name, "") == "code"') < sp.index("answer_polish(_shown"))
+    ss = src[src.index("def server_stream("):src.index("def _srv_reads_pictures(")]
+    out["a server model is told not to reason unless a level is asked; one that refuses think:false is asked without it"] = (
+        '    _off_box = [not _think and (e.get("id"), model) not in _srv_nothink_refused]' in ss
+        and '        elif _off_box[0]:\n            d["think"] = False' in ss
+        and "            if _off_box[0] and resp.status == 400:" in ss
+        and '                _srv_nothink_refused.add((e.get("id"), model))\n                _off_box[0] = False' in ss
+        and '"_srv_nothink_refused",' in src[:src.index("_srv_nothink_refused = set()")])
+    sf = src[src.index("def server_first_answer("):src.index("# ---- what the pane does")]
+    out["a server answer with no text is a failure before the first word; an empty rewrite leaves the draft"] = (
+        '        if not shown[0]:\n            # AN EMPTY ANSWER IS A FAILURE BEFORE THE FIRST WORD (6b560)' in sf
+        and 'raise ServerError("server", "%s sent back an empty answer." % name)\n        return "server"' in sf
+        and "            if not shown[0]:\n                _m(draft)" in sf
+        and sf.index('raise ServerError("server", "%s sent back an empty answer."') < sf.index("    except ServerError as se:"))
     rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
     out["the council's final passes the question as the person's words"] = (
         '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "",\n'
@@ -41898,6 +41914,11 @@ _C560_MUT = [
      "_new, _notes = answer_polish(_shown, _pk)"),
     ("a reais range with 'and' not read as a range", r"(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?",
      r"(?:(?:\s?[–—-]\s?)(?:R\$)?"),
+    ("a server model left to reason", '        elif _off_box[0]:\n            d["think"] = False', '        elif False:\n            d["think"] = False'),
+    ("a refusal of think:false never retried", "            if _off_box[0] and resp.status == 400:", "            if False:"),
+    ("an empty server answer passed off as one", '            raise ServerError("server", "%s sent back an empty answer." % name)',
+     "            pass"),
+    ("an empty rewrite leaves nothing", "            if not shown[0]:\n                _m(draft)", "            if False:\n                _m(draft)"),
     ("'1 USD = 5.5 BRL' not read as a rate", r're.compile(r"\b1\s?(?:USD|', r're.compile(r"\bNEVER\s?(?:USD|'),
 ]
 _c560_caught = []
