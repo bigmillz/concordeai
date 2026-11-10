@@ -41876,7 +41876,7 @@ def _c560_all(src):
     ss = src[src.index("def server_stream("):src.index("def _srv_reads_pictures(")]
     out["think:false on the server is a dev copy's pilot only; one that refuses it is asked without it"] = (
         '    _off_box = [not _think and srv_nothink() and (e.get("id"), model) not in _srv_nothink_refused]' in ss
-        and 'return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"' in src
+        and 'return bool(globals().get("DEV_HOME")) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"' in src
         and '        elif _off_box[0]:\n            d["think"] = False' in ss
         and "            if _off_box[0] and resp.status == 400:" in ss
         and '                _srv_nothink_refused.add((e.get("id"), model))\n                _off_box[0] = False' in ss
@@ -41912,7 +41912,7 @@ _C560_MUT = [
      "_new, _notes = answer_polish(_shown, _pk)"),
     ("a reais range with 'and' not read as a range", r"(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?",
      r"(?:(?:\s?[–—-]\s?)(?:R\$)?"),
-    ("the pilot on in the shipped app", 'return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"',
+    ("the pilot on in the shipped app", 'return bool(globals().get("DEV_HOME")) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"',
      'return os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"'),
     ("the pilot never sends think:false", '        elif _off_box[0]:\n            d["think"] = False', '        elif False:\n            d["think"] = False'),
     ("a refusal of think:false never retried", "            if _off_box[0] and resp.status == 400:", "            if False:"),

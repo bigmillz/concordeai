@@ -23803,15 +23803,6 @@ def quality_ablate() -> set:
     return {w.strip().lower() for w in os.environ.get("MILLENAI_Q3_OFF", "").split(",") if w.strip()}
 
 
-def srv_nothink() -> bool:
-    """A dev copy's pilot (6b560, MILLENAI_Q4_NOTHINK=1): server answers that
-    ask for no reasoning level send think:false. Measured on the owner's
-    gemma4:12b: first words 31.8 -> 10.4 s, but the local judge's grade 8.2 ->
-    5.9 on the same 12 questions, so the shipped app keeps the model's own
-    reasoning (NOTES 6b560)."""
-    return bool(DEV_HOME) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"
-
-
 def _ddg_news(query: str, limit: int = GROUND_PER_QUERY, timelimit=FRESH_NEWS_LIMIT) -> list:
     """The news engine's dated hits for a query (6b520), as text-search
     rows with a 'date'. Never raises."""
@@ -26820,6 +26811,16 @@ _srv_think_refused = set()
 # copy's pilot only (srv_nothink, MILLENAI_Q4_NOTHINK=1) until the owner
 # picks; a server or model that refuses the field is asked again without it.
 _srv_nothink_refused = set()
+
+
+def srv_nothink() -> bool:
+    """A dev copy's pilot (6b560, MILLENAI_Q4_NOTHINK=1): server answers that
+    ask for no reasoning level send think:false. Measured on the owner's
+    gemma4:12b: first words 31.8 -> 10.4 s, but the local judge's grade 8.2 ->
+    5.9 on the same 12 questions, so the shipped app keeps the model's own
+    reasoning (NOTES 6b560). DEV_HOME is read from the module's globals: the
+    gauntlet runs this section on its own, where no dev copy is set."""
+    return bool(globals().get("DEV_HOME")) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"
 # THE CONTEXT A MODEL IS LOADED WITH (6b518): Ollama reloads a model whose
 # num_ctx changes, so a short side pass (the query plan) on the model the
 # last fact-check left on the card reloaded it (7.5 s, past the plan's 5 s)
