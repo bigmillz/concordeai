@@ -52155,18 +52155,20 @@ __HZ_FONTS__
 .hz #main:has(#hero) #hero{min-height:0;padding:0;align-items:center;text-align:center;gap:14px;justify-content:center;width:100%}
 .hz #hero .greet{font-family:var(--hz-font-display);font-weight:600;font-size:clamp(60px,9vw,124px);line-height:.98;letter-spacing:-.055em;color:#f8faff;margin:0;
   text-wrap:balance;position:relative;display:inline-block;
-  text-shadow:0 0 1px rgba(255,255,255,.6),0 0 16px rgba(205,222,255,.5),0 0 46px rgba(140,175,255,.42),0 12px 90px rgba(60,100,230,.5)}
+  text-shadow:0 0 1px rgba(255,250,242,.6),0 0 12px rgba(255,244,228,.42),0 0 24px rgba(255,240,220,.26)}
+/* THE GREETING'S AFTERGLOW in Full (6b549, per Patrick: silver and one hue, "too much rainbow"): warm white, still,
+   two zero-offset layers from the one string: a close glow hugging the letters (the text-shadow above, 12-24 px) and
+   a slightly stronger wide bloom (the blurred .bloom copy, 30 px, behind); no rainbow, rose or gold, no loop, no
+   sweep, and nothing offset, so it never reads as a second word */
 .hz #hero .greet .fill{position:relative;opacity:0;transition:opacity .55s var(--hz-ease-out)}
 .hz #hero .greet.shown .fill{opacity:1}
-.hz #hero .greet .bloom{position:absolute;inset:0;color:transparent;text-shadow:none;background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);background-size:300% 100%;
-  -webkit-background-clip:text;background-clip:text;filter:blur(24px) saturate(1.2);opacity:0;z-index:-1;transition:opacity 1.4s var(--hz-ease-out)}
-.hz #hero .greet.shown .bloom{opacity:.75;animation:hzBreatheB 8s ease-in-out 1.4s infinite,hzShim 16s linear infinite}
+.hz #hero .greet .bloom{position:absolute;inset:0;color:transparent;text-shadow:none;background:linear-gradient(rgba(255,242,224,1),rgba(255,242,224,1));
+  -webkit-background-clip:text;background-clip:text;filter:blur(30px);opacity:0;z-index:-1;transition:opacity 1.4s var(--hz-ease-out)}
+.hz #hero .greet.shown .bloom{opacity:.55}
 .hz #hero .greet .sheen{position:absolute;inset:0;pointer-events:none;color:transparent;text-shadow:none;opacity:0;
   background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.95) 48%,rgba(190,212,255,.9) 52%,transparent 65%);background-size:250% 100%;background-position:120% 0;
   -webkit-background-clip:text;background-clip:text}
-.hz #hero .greet.shown .sheen{opacity:1;animation:hzSheen 9s var(--hz-ease-out) 3s infinite}
-@keyframes hzSheen{0%{background-position:120% 0}30%,100%{background-position:-40% 0}}
-@keyframes hzBreatheB{0%,100%{opacity:.42}50%{opacity:.7}}
+.hz #hero .greet.shown .sheen{opacity:0}   /* no sweep over the words: the afterglow is still (6b549) */
 .hz-status{display:none}
 .hz #main:has(#hero) #composer-wrap{position:static;background:none;padding:0 24px 44px;max-width:808px;margin:0 auto;width:100%}
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,4,10,.5) 70%);padding:0 24px 22px}

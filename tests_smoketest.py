@@ -42461,8 +42461,8 @@ def _c542_gated(js, css, pg):
             # present still, for Full: the trace, the streak, the sweep, the comets, the ring, the bloom, the sheen, the dies
             and "async function hzTraceIn(el,opts){" in js and "function hzStreak(row,b){" in js and "function hzSweep(b){" in js
             and "function cometsDraw(){" not in pg and ".hz.hz-ultra #composer::before,.hz.hz-ultra-out #composer::before{animation:none;opacity:0;transition:opacity .2s}" in css
-            and ".hz #hero .greet.shown .bloom{opacity:.75;animation:hzBreatheB 8s ease-in-out 1.4s infinite,hzShim 16s linear infinite}" in css
-            and ".hz #hero .greet.shown .sheen{opacity:1;animation:hzSheen 9s var(--hz-ease-out) 3s infinite}" in css
+            and ".hz #hero .greet.shown .bloom{opacity:.55}" in css      # the greeting's bloom: Full's, warm white and still since 6b549
+            and ".hz #hero .greet.shown .sheen{opacity:0}" in css and "hzSheen" not in css      # the greeting's afterglow is still (6b549)
             and ".hz .hz-rig.working .die{animation:hzDie 1.2s ease-in-out infinite}" in css
             # and gated in Calm
             and ".hz:not(.hz-full) #hero .greet{text-shadow:none;color:#f8faff}" in css
@@ -42487,7 +42487,7 @@ def _c542_gated(js, css, pg):
             and "const hzq=isHz();   // no token counts beside Horizon's chats" in pg
             and 'const tk=hzq?{n:0,est:false}:chatTokens(c);if(tk.est&&tk.n)anyEst=true;' in pg
             and "const hzq=typeof isHz===\"function\"&&isHz();\n  return groups.map(g=>'<div class=\"cday\"><span>'+g.l+'</span>'\n    +(g.n&&!hzq?" in pg)
-check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, rings, arc, glide, bloom, sheen, dies, pulse; the comets, ripple, glow and landing ring went with the writing star, 6b544); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
+check("6b542 Calm and Balanced: Full's show is present and gated behind Effects Full (trace, streak, sweep, rings, arc, glide, the greeting's still warm bloom (6b549), dies, pulse; the comets, ripple, glow and landing ring went with the writing star, 6b544); the wordmark's glint, the sidebar's counts and the meter are gone under Horizon; the calm opening; the mutants are caught",
       _c542_gated(_hz_js, _hz_css, page)
       and not _c542_gated(_hz_js.replace('return hzMotionOK()&&hzFxLevel()==="full";', "return hzMotionOK();"), _hz_css, page)
       and not _c542_gated(_hz_js, _hz_css.replace(".hz:not(.hz-full) #hz-cglow{display:none}", ""), page)
@@ -42794,6 +42794,15 @@ def _sl549_calm_colour(css, pg):
     ultra = css[css.index("/* ---- ULTRA (6b544"):css.index("/* ---- the focus ring on the slider (6b544")]
     shim = "\n".join(l_ for l_ in pg.split("\n") if ".who b.shim" in l_ and "{background" in l_)   # in the page's own css, before Horizon's
     ring = css[css.index("/* a light runs round the composer at Extra"):css.index("/* a model a mode runs")]
+    # the greeting's afterglow in Full (6b549): warm white and still, zero-offset layers only, no colour at all
+    greet = "\n".join(l_ for l_ in re.sub(r"/\*.*?\*/", "", css, flags=re.S).split("\n") if "#hero .greet" in l_ or l_.startswith("  text-shadow:0 0 1px rgba(255,250,242"))
+    if not greet or any(_sl549_hue(c)[1] >= .2 for c in _sl549_colours(greet)) or "infinite" in greet or ".hz #hero .greet.shown .bloom{opacity:.55}" not in greet:
+        return False
+    for d_ in re.findall(r"text-shadow:([^;}]*)", greet):               # every shadow zero-offset: an offset one reads as a second word
+        for sh_ in re.split(r",(?![^()]*\))", d_):
+            n_ = re.findall(r"-?\d*\.?\d+", re.sub(r"rgba?\([^)]*\)|#[0-9a-fA-F]+", "", sh_))
+            if len(n_) >= 2 and (float(n_[0]) != 0 or float(n_[1]) != 0):
+                return False
     if any(_sl549_hue(c)[1] >= .2 for c in _sl549_colours(re.sub(r"/\*.*?\*/", "", base, flags=re.S))):
         return False
     for part in (ultra, shim, ring):
@@ -42865,7 +42874,12 @@ check("6b549 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       and not _sl549(_hz_css.replace("background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62))}", "background:linear-gradient(180deg,rgba(255,255,255,.92),rgba(255,255,255,.62)),linear-gradient(90deg,#4f8cff,#9b72ff 55%,#f07aa6)}"), _hz_js, page)
       and not _sl549(_hz_css.replace(".hz.hz-ultra .hz-sl-halo{background:linear-gradient(135deg,#8fb7ff,#a58bff)}", ".hz.hz-ultra .hz-sl-halo{background:#f2a6b4}"), _hz_js, page)
       and not _sl549(_hz_css.replace("conic-gradient(from var(--hz-a0),#dce8ff,#fff 25%,#c4d8ff 50%,#fff 75%,#dce8ff);", "conic-gradient(from var(--hz-a0),#cfe0ff,#b9a8ff 28%,#f2a6b4 56%,#e8415a 78%,#cfe0ff);"), _hz_js, page)
-      and not _sl549(_hz_css.replace("linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff)", "linear-gradient(90deg,#4fd1ff,#a58bff 50%,#7dff9b)"), _hz_js, page), "")   # a third hue (cyan to green): no more than one cool pair
+      and not _sl549(_hz_css.replace("linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff)", "linear-gradient(90deg,#4fd1ff,#a58bff 50%,#7dff9b)"), _hz_js, page)   # a third hue (cyan to green): no more than one cool pair
+      # the greeting's afterglow (6b549): the rainbow bloom back, a gold glow, a breathing loop, an offset (double) shadow
+      and not _sl549(_hz_css.replace("background:linear-gradient(rgba(255,242,224,1),rgba(255,242,224,1));", "background:linear-gradient(90deg,#9fa8ff,#ff8fc4,#ffc58a,#7ff0d6,#9fa8ff);"), _hz_js, page)
+      and not _sl549(_hz_css.replace("0 0 24px rgba(255,240,220,.26)}", "0 0 24px rgba(243,210,122,.5)}"), _hz_js, page)
+      and not _sl549(_hz_css.replace(".hz #hero .greet.shown .bloom{opacity:.55}", ".hz #hero .greet.shown .bloom{opacity:.55;animation:hzBreathe 8s ease-in-out infinite}"), _hz_js, page)
+      and not _sl549(_hz_css.replace("0 0 24px rgba(255,240,220,.26)}", "0 0 24px rgba(255,240,220,.26),0 12px 90px rgba(255,240,220,.4)}"), _hz_js, page), "")
 check("6b549 the slider's rules stay scoped under .hz and name no outside URL",
       _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
 # ==== the effort slider, slim and fluid (6b549): end ====

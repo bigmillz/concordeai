@@ -19755,3 +19755,12 @@ Extra's ring may hold no rose, pink, red, orange or gold (a coloured hue from 28
 gradient wider than one cool pair (coloured stops within 60°). Six mutants: a rose stop in Ultra's fill, the
 byline's old rainbow, a blue-to-rose fill below Ultra, a rose halo, the old ember rim, a cyan-to-green third
 hue. The five slider sections pass (37 checks) against a dev copy.
+
+**The greeting's glow in Full, the same rule.** Was a rainbow bloom (blue, pink, gold, mint) breathing and
+drifting on an 8 s and a 16 s loop, a sheen sweeping the words every 9 s, and blue text-shadows including an
+offset one (0 12px 90px). Now a warm-white afterglow, still: two zero-offset layers from the one string, a
+close glow hugging the letters (text-shadow 1 / 12 / 24 px, `rgba(255,244,228)`) and a slightly stronger wide
+bloom (the blurred `.bloom` copy, 30 px, .55, behind). The sheen span stays (one string, one box) at opacity 0.
+`_sl549_calm_colour` now also reads the greeting's rules: no colour, no loop, every shadow zero-offset; four
+mutants (the rainbow bloom, a gold glow, a breathing loop, an offset double). The 6b542 gating check pins the
+still bloom. Balanced's settle-in glow (`hzGreetIn`, cool white-blue, 1.5 s, once) is unchanged.
