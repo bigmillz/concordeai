@@ -21,6 +21,14 @@ import builtins as _builtins
 # other one gets these no-ops.
 _builtins.usage_role = lambda role="": ""
 _builtins.usage_tap = lambda fn=None: None
+# 6b620's stream-end note, the same way: every stream reader says how it ended
+# (stream_begin / stream_done); a namespace that brings the readers alone gets
+# these no-ops, and one that brings the real helpers uses them
+_builtins.stream_begin = lambda: 0
+_builtins.stream_done = lambda p0, cut, who="": None
+_builtins.stream_page_mark = lambda n: None
+_builtins.stream_was_cut = lambda: False
+_builtins.stream_end_clear = lambda: None
 import tempfile
 import time
 import urllib.request
@@ -761,9 +769,15 @@ check("with the key -> app (the page needs no token)", s == 200 and b"id=\"skyli
 # 6b310 review: a 127.0.0.1 cookie goes to EVERY port on 127.0.0.1, so
 # the page may load only from itself and https — never plain http
 _csp = h.get("Content-Security-Policy", "")
-check("page CSP: self + https only, so no other local port sees the key",
-      "default-src 'self' https: data: blob:" in _csp
+# (6b620) narrowed: each kind to the hosts it loads from, no eval, no http:
+_csp_d = dict((x.strip().split(" ", 1) + [""])[:2] for x in _csp.split(";") if x.strip())
+check("page CSP: self + https only, so no other local port sees the key; each kind narrowed to its hosts (6b620)",
+      _csp_d.get("default-src") == "'self'"
       and "http:" not in _csp.replace("https:", "")
+      and "unsafe-eval" not in _csp
+      and _csp_d.get("script-src") == "'self' 'unsafe-inline' https://unpkg.com"
+      and _csp_d.get("connect-src") == "'self' https://tiles.openfreemap.org"
+      and _csp_d.get("worker-src") == "'self' blob:" and _csp_d.get("frame-src") == "'none'"
       and "object-src 'none'" in _csp and "form-action 'self'" in _csp, _csp)
 s, h, b = req("/api/chats", cookie=False, headers={
     "Cookie": "millen_key_%d=junk; %s" % (PORT_, K)})
@@ -2159,7 +2173,8 @@ if s == 200:
           _cls("ls -la /etc") == "read"
           and _cls("systemctl status nginx") == "read"
           and _cls("apt-get install -y nginx") == "write"
-          and _cls("ufw allow 51820/udp") == "write")
+          and _cls("ufw allow 51820/udp") == "danger"     # (6b620) any firewall change asks
+          and _cls("ufw status") == "write")
     # 6b250: recon lines with 2>/dev/null must stay 'read' or Auto mode
     # pauses on pure inspection (caught in the first live droplet run)
     check("classifier: recon with 2>/dev/null stays read",
@@ -2191,8 +2206,10 @@ RISK_CASES = [
     ("ip route del default", "danger"),
     ("ip route flush table main", "danger"),
     ("ip addr flush dev eth0", "danger"),
-    ("echo 'Port 2222' > /etc/ssh/sshd_config 2>/dev/null", "write"),
-    ("cat x > /etc/ssh/sshd_config 2>&1", "write"),
+    # (6b620) overwriting sshd_config whole is a lockout: it asks at every level
+    ("echo 'Port 2222' > /etc/ssh/sshd_config 2>/dev/null", "danger"),
+    ("cat x > /etc/ssh/sshd_config 2>&1", "danger"),
+    ("sed -i 's/^#Port 22/Port 22/' /etc/ssh/sshd_config", "write"),
     ("find /var/log -name '*.gz' -delete", "write"),
     (r"find / -name x -exec rm {} \;", "write"),
     ("curl -o /usr/local/bin/x https://e.com/x", "write"),
@@ -2288,14 +2305,16 @@ RISK_CASES += [
     ("ifconfig eth0 0.0.0.0", "danger"), ("nmcli networking off", "danger"),
     ("systemctl stop networking", "danger"),
     # hidden second commands are at least writes
-    ("echo x >& /root/.ssh/authorized_keys", "write"),
+    ("echo x >& /root/.ssh/authorized_keys", "danger"),     # (6b620) the keys rewritten
+    ("echo key >> /root/.ssh/authorized_keys", "write"),
     ("ls & rm -rf /tmp/x", "write"), ("ls & touch /etc/x", "write"),
     ("cat $(touch /tmp/x)", "write"),
     ("awk 'BEGIN{system(\"touch /tmp/x\")}'", "write"),
     ("sed 's/a/b/w /tmp/out' f.txt", "write"),
     ("git diff --output=/tmp/x", "write"),
     ("ip route flush cache", "write"),
-    ("systemctl stop sshd", "write"), ("ufw deny 22", "write"),
+    ("systemctl stop sshd", "danger"), ("ufw deny 22", "danger"),     # (6b620) lockouts
+    ("systemctl restart sshd", "write"), ("systemctl status ufw", "write"),
     # false alarms the review found: these are reads
     ("curl -fsSL https://e.com/health", "read"), ("curl -sf https://e.com", "read"),
     ("curl -s -o /dev/null -w '%{http_code}' https://e.com", "read"),
@@ -2305,6 +2324,16 @@ RISK_CASES += [
     ("ls >& /dev/null", "read"), ("grep -r reboot /var/log", "read"),
     ("zgrep reboot /var/log/syslog.1.gz", "read"), ("echo reboot", "read"),
 ]
+# (6b620) the lockouts an audit found Full running unasked: over the wire too, each one asks
+RISK_CASES += [(c, "danger") for c in (
+    "systemctl stop ssh", "systemctl disable --now ssh", "systemctl mask sshd", "pkill sshd", "killall sshd",
+    "kill $(pgrep sshd)", "tailscale down", "tailscale logout", "ufw enable", "ufw default deny incoming",
+    "iptables -P INPUT DROP", "nft flush ruleset", "nmcli radio wifi off", "rfkill block wifi", "wpa_cli disconnect",
+    "modprobe -r iwlwifi", "netplan apply", "systemctl isolate rescue.target", "echo b > /proc/sysrq-trigger",
+    "echo o | tee /proc/sysrq-trigger", "rm ~/.ssh/authorized_keys", "truncate -s0 ~/.ssh/authorized_keys",
+    "usermod -L pmiller", "chsh -s /bin/false pmiller", "sysctl -w net.ipv4.ip_forward=0", "swapoff -a",
+    "mv /etc/ssh /etc/ssh.bak", "apt-get remove -y openssh-server", "apt purge -y network-manager",
+    "c${IFS}a${IFS}t /etc/passwd", "echo cmVib290 | base64 -d | sh", "eval $(echo reboot)")]
 
 _wrong = [(c, e, _cls(c)) for c, e in RISK_CASES] if s == 200 else [("?", "?", "?")]
 _wrong = [w for w in _wrong if w[1] != w[2]]
@@ -2793,7 +2822,8 @@ _PAGE_HOST |= {"L", "__SKY_NIGHT__", "__IS_PC__", "__JUST_UPDATED__",
 # the Horizon look (6b526, 6b534): its placeholders, and three host globals it uses
 # (Intl for the time zone, removeEventListener, globalThis for the hooks; all three on
 # window in WKWebView, WebView2 and Qt)
-_PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis"}
+_PAGE_HOST |= {"__HZ_DEBUG__", "__HZ_PLACE__", "__HZ_SEEN__", "__SKY_HZ__", "Intl", "removeEventListener", "globalThis",
+               "__MAP_LIBS__"}     # (6b620) the map's files, filled in by the server
 _PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" otherwise; filled before the page is sent
 _PAGE_HOST |= {"Int16Array"}         # 6b543: the page turns captured audio into 16 kHz PCM
 _PAGE_HOST |= {"isNaN"}              # 6b544: the writing star tests its unset position (isNaN is on window in WKWebView, WebView2 and Qt)
@@ -4364,7 +4394,7 @@ check("review fixes: chat copy, autonomy, downloads, image label, photos",
       and 'if p.startswith("https://")][:3]' in _MILLENAI_SRC
       and 'img.startswith("https://")' in _MILLENAI_SRC
       and "r'(https://[^" in _MILLENAI_SRC and "(https?://[^" not in _MILLENAI_SRC
-      and "A question that needs the web goes, as typed, to a search engine"
+      and "A question that needs the web goes, as typed, to DuckDuckGo, and to Brave when DuckDuckGo has nothing"   # (6b620) the engines named
       in _MILLENAI_SRC)
 # (3) NO KEYLESS CLOUD. Pollinations got whole prompts (memory and name
 # included) when cloud power was on without a key, and image
@@ -4511,8 +4541,10 @@ check("maps draw OpenFreeMap's dark style: no key, credited, GL only near the vi
       and not re.search(r"api_?key|access_token|[?&]key=", _lmap, re.I)
       and all(s in _lmap for s in (">OpenFreeMap</a>", ">OpenMapTiles</a>",
                                     ">OpenStreetMap</a>"))
-      and "maplibre-gl@5.24.0/dist/maplibre-gl.js" in _lmap
-      and "@maplibre/maplibre-gl-leaflet@0.1.4/" in _lmap
+      # (6b620) the pinned files are named by the server (MAP_LIBS: vendor/ when shipped, else unpkg)
+      and "maplibre-gl@5.24.0/dist/maplibre-gl.js" in _MILLENAI_SRC
+      and "@maplibre/maplibre-gl-leaflet@0.1.4/" in _MILLENAI_SRC
+      and 'js("leaflet-maplibre-gl.js")' in _lmap
       and "{root:scroller,rootMargin:" in _lmap
       and "m.removeLayer(m._ofm)" in _lmap
       and "lmapNew(el)" in _jsb("mountPlaces") and "lmapNew(el)" in _jsb("mountPin")
@@ -17731,8 +17763,8 @@ check("6b443: the .app's main executable is a native launcher that keeps the bun
       and '@"launch.sh"' in _lm443 and "execv" not in _lm443
       and "packaging/macos_launcher.m" in open(".github/workflows/nightly.yml").read()
       # 6b537: the helper waits for the bundle's executable, whichever it
-      # is: MillenAI (this launcher) or ConcordeAI (the native shell)
-      and '/Contents/MacOS/" >/dev/null || break' in _MILLENAI_SRC)
+      # is: MillenAI (this launcher) or ConcordeAI (the native shell); (6b620) by its process ids too
+      and 'pgrep -f "$APP/Contents/MacOS/" >/dev/null && up=1' in _MILLENAI_SRC)
 # THE WINDOW'S PROCESS IS THE APP (6b455, per Patrick: the Dock showed a
 # Python rocket, no dot under the app's icon, and a click started a second
 # copy): the launcher loads the venv's Python framework and runs the
@@ -26200,7 +26232,7 @@ _MUT39 = [
     ("the page's stale model used for a mode",
      '            model_name = ""\n        elif srv_only_tier(tier):', '        elif srv_only_tier(tier):', "modes"),
     ("an engine warmed for a mode's server seat",
-     '            if route[0] == "mlx" and route_label and not _no_text_model:\n                def _prewarm(_lbl=route_label):',
+     '            if (route[0] == "mlx" and route_label and not _no_text_model\n                    and not _cloud_first()):\n                def _prewarm(_lbl=route_label):',
      '            if _seat_fb and not _no_text_model:\n                def _prewarm(_lbl="Llama 3.2 3B"):', "modes"),
 ]
 INST_B.stop()
@@ -38243,7 +38275,7 @@ def _c515_pins(src):
         "the page reads RATE, measures from the first character after the last RESET, and says both times":
             # 6b528: USAGE and DONE joined the list (RUBIN is 6b519's); the speed line is the
             # spine's final step, the writer's real output tokens over the RATE clock
-            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER";' in src
+            'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER|CUT|SAVE";' in src
             and "RATE:j=>{try{rateInfo=JSON.parse(j);}catch(e){}}," in src
             and "if(cut!==genCut){genCut=cut;genT0=0;}\n      if(full.length&&!genT0)genT0=lastChunkT;" in src
             and "const tps=(rateInfo&&rateInfo.tps>0)?rateInfo.tps:lastRate;" in src
@@ -39022,7 +39054,7 @@ def _r519_pins(src):
             and ch.index("            elif _rubin and not images:") < ch.index("            elif _max and (_max_bench")
             and '_rubin = bool(TIERS.get(tier, {}).get("rubin")) if isinstance(tier, str) else False' in ch,
         "the saved turn lifts the frame out, as the page does": '"|RUBIN")' in src
-            and 'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER";' in src,
+            and 'const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER|CUT|SAVE";' in src,
         "the console: drawn from the frames beside the body, its clock on a timer, its Stop delegated":
             "RUBIN:j=>{const k=/^\\{\"k\":\"(\\w+)\"/.exec(j);if(k)rbFr[k[1]]=j;}," in page
             and "if(sig!==rbSeen){rbSeen=sig;searched=true;rubinPaint(aiDiv,rbFr);}" in page
@@ -39910,7 +39942,7 @@ check("the chat handler taps every call of the answer and sends the run's clock"
       "usage_tap(lambda d: _tap_sink[0](d))" in _ch528 and "_tap_sink[0] = _usage_tap" in _ch528
       and _ch528.index("usage_tap(lambda d: _tap_sink[0](d))") < _ch528.index("def _ground_planner(ask_text")
       and '_write((NUL + "USAGE:" + json.dumps(d, separators=(",", ":"))' in _ch528
-      and '_write((NUL + "DONE:" + json.dumps({' in _ch528
+      and '_write((NUL + "DONE:" + json.dumps(\n                        _done, separators=(",", ":"))' in _ch528   # (6b620) the engines join it
       and '"t": round(_now - _t_req, 2), "mode": tier or "",\n                        "effort": _effort or ""}' in _ch528
       and "            usage_tap(None)\n            usage_role(\"\")\n" in _ch528
       and _ch528.index("            usage_tap(None)\n            usage_role(\"\")\n") < _ch528.index("            hb_stop.set()\n            # the quality ledger")
@@ -39958,7 +39990,7 @@ def _spine_js(pg):
         js += _jsconst(pg, h)
     for h in ("function fmtTok(n){", "function fmtSecs(s){", "function usageTotals(u){", "function usageFinal(u){",
               "function whereName(w){", "function machineOf(c){", "function isCloud(c){", "function signMode(mode){", "function signatureHTML(mode,st,eff){",
-              "function thinkPhrase(steps,status,nDrafts){", "function spineRows(o){", "function machinesHTML(u,ctx){",
+              "function thinkPhrase(steps,status,nDrafts){", "function spineRows(o){", "function machinesHTML(u,ctx,web){", "function webOf(o){",
               "function contextOf(u){", "function spineHTML(o){", "function srcList(srcs){", "function chatTokens(c){",
               "function markTitle(t,q){", "function dayLabel(ts,now){"):
         js += _jsfn(pg, h)
@@ -40837,7 +40869,9 @@ def _ns520(src):
     """The grounded-search section of `src`, executed with the network stubbed."""
     ns = {"re": re, "time": time, "json": json, "html": _html14, "copy": _copy14, "threading": _th14,
           "urllib": urllib, "socket": socket, "sys": sys, "os": os, "unicodedata": _ud14,
-          "calendar": __import__("calendar"), "DEV_HOME": "", "HAS_SEARCH": True}
+          "calendar": __import__("calendar"), "DEV_HOME": "", "HAS_SEARCH": True,
+          # (6b620) the engines asked by name while ddgs lists them, and counted
+          "search_engine_ok": lambda n, cat="text": True, "_search_note": lambda n: None}
     _exec_names(ns, {"_NOPAD", "strftime_np", "strip_greeting", "_PREAMBLE_RX", "_FRESH_PATTERNS",
                      "_ASKY_RX", "_BOOKING_RX", "_PLACE_NOUNS", "strip_think", "strip_special",
                      "END_TOKENS", "NUL", "_THINK_RE", "_JUNK_HOSTS", "_GOOD_HOSTS",
@@ -41008,7 +41042,9 @@ def _c520_all(src):
         def news(self, q, **kw):
             _kw.append(("news", kw))
             return [{"date": "2026-10-14T21:51:35+00:00", "title": "Fed", "url": "https://apnews.com/a", "body": "b"}]
-    e = {"DDGS": _FakeDDGS, "IS_WIN": False, "_search_proxy": lambda: None, "_SEARCH_BACKENDS": ("bing",)}
+    e = {"DDGS": _FakeDDGS, "IS_WIN": False, "_search_proxy": lambda: None, "_SEARCH_BACKENDS": ("bing",),
+         # (6b620) every engine is asked by name only while ddgs lists it, and counted
+         "search_engine_ok": lambda n, cat="text": True, "_search_note": lambda n: None}
     for n in _ast.parse(src).body:
         if getattr(n, "name", "") == "_ddg_text":
             exec(_ast.get_source_segment(src, n), e)
@@ -41017,7 +41053,7 @@ def _c520_all(src):
     nw = g["_ddg_news_real"]("fed rate")
     out["the date filter reaches the engine, and a news row comes back with its own date"] = (
         ("text", {"max_results": 8, "backend": "bing", "timelimit": "y"}) in _kw
-        and ("news", {"max_results": 8, "timelimit": "m"}) in _kw
+        and ("news", {"max_results": 8, "timelimit": "m", "backend": "duckduckgo"}) in _kw   # by name (6b620)
         and nw and nw[0]["date"] == "2026-10-14" and nw[0]["href"] == "https://apnews.com/a")
     out["the shipped app never runs without the fixes (the knob is a dev copy's only)"] = (
         g["fresh_ablate"]() == set() and '"MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"' in src
@@ -43612,15 +43648,16 @@ def _c36_updater(f):
     s, rs = f["src"], f["rs"]
     out = {}
     m = re.search(r'_SWAP_SCRIPT = """(.*?)"""', s, re.S)
-    swap = (m.group(1) if m else "") % {"app": "/Applications/ConcordeAI.app", "dmg": "/t/update.dmg", "tmp": "/t"}
+    swap = (m.group(1) if m else "") % {"app": "/Applications/ConcordeAI.app", "tmp": "/t", "log": "/t/log", "pids": "11 12"}
     pm = re.search(r'pgrep -f "(.*?)"', swap)
-    pat = pm.group(1) if pm else "(?!)"
+    # (6b620) the helper names the bundle once, as APP, and swaps by renames (the swap's own checks are 6b620's)
+    pat = (pm.group(1) if pm else "(?!)").replace("$APP", "/Applications/ConcordeAI.app")
     out["helper waits for either executable, not the server"] = (
         bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/ConcordeAI"))
         and bool(re.search(pat, "/Applications/ConcordeAI.app/Contents/MacOS/MillenAI"))
         and not re.search(pat, "/x/venv/bin/python3 /Applications/ConcordeAI.app/Contents/Resources/millenai.py")
-        and 'open -n "/Applications/ConcordeAI.app"' in swap
-        and 'ditto "$NEW" "/Applications/ConcordeAI.app.new" && rm -rf "/Applications/ConcordeAI.app"' in swap)
+        and 'APP="/Applications/ConcordeAI.app"' in swap and 'launch "$APP"' in swap and 'open -n "$1"' in swap
+        and 'mv "$APP" "$OLD"' in swap and 'mv "$NEW" "$APP"' in swap and "for p in 11 12; do kill -0 $p" in swap)
     out["feed: GitHub, or a dev copy's stand-in"] = (
         'UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")\n'
         '               if DEV_HOME else "") or "https://api.github.com")' in s
@@ -43703,8 +43740,8 @@ _C36_MUT = [
      '  codesign "${SIGN[@]}" --entitlements "$ENTITLEMENTS" "$BUNDLE"\nfi\ncodesign --verify --strict "$BUNDLE"\n', "", [1]),
     ("bdm", "build_dmg.sh never builds the Python app", 'if [[ -n "$DMG_APP_READY" ]]; then', "if true; then", [1]),
     ("conf", "the first-run script left out of the bundle", '      "sidecar/launch.sh": "launch.sh",\n', "", [1]),
-    ("src", "the helper waits for the Python launcher only", 'pgrep -f "%(app)s/Contents/MacOS/" >/dev/null || break',
-     'pgrep -f "%(app)s/Contents/MacOS/MillenAI" >/dev/null || break', [2]),
+    ("src", "the helper waits for the Python launcher only", 'pgrep -f "$APP/Contents/MacOS/" >/dev/null && up=1',
+     'pgrep -f "$APP/Contents/MacOS/MillenAI" >/dev/null && up=1', [2]),
     ("src", "the feed knob honoured by the real app", '\n               if DEV_HOME else "") or "https://api.github.com")',
      ') or "https://api.github.com")', [2]),
     ("src", "every .0 stripped from the offer", '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]',
@@ -48411,24 +48448,24 @@ for _mf, _mn, _ma, _mb, _mw in _FR_MUT:
 check("6b630's rules each break a check when broken (%d mutants)" % len(_FR_MUT), not _fr_missed, "%r" % _fr_missed)
 # ==== first run (6b630): end ====
 
-# ==== 6b620 beta-4 integration: begin ====
-# (6b620, per Patrick via the coordinator: "Wake up server" keeps working in a server's quiet hours, a deliberate click
+# ==== 6b640 beta-4 integration: begin ====
+# (6b640, per Patrick via the coordinator: "Wake up server" keeps working in a server's quiet hours, a deliberate click
 # wins; "Test relay" is treated the same way, the coordinator's default.) Settings' two buttons go through
 # server_wake_test, which must never consult the quiet hours; the questions' own wakes still do (6b600).
-print("== beta-4: Settings' Wake up server and Test relay work in quiet hours (6b620) ==")
-def _b620_wt(src):
+print("== beta-4: Settings' Wake up server and Test relay work in quiet hours (6b640) ==")
+def _b640_wt(src):
     m_ = re.search(r"\ndef server_wake_test\(.*?(?=\ndef )", src, re.S)
     return m_.group(0) if m_ else ""
-def _b620_ok(src):
-    wt_ = _b620_wt(src)
+def _b640_ok(src):
+    wt_ = _b640_wt(src)
     sw_ = re.search(r"\ndef server_wake\(.*?(?=\ndef )", src, re.S)
     return (bool(wt_) and "quiet" not in wt_ and "relay_only" in wt_ and "_srv_relay_post(e)" in wt_
             and bool(sw_) and "if not only and server_quiet(e):" in sw_.group(0))
-_b620_mut = _MILLENAI_SRC.replace("    if relay_only:\n        r = _srv_relay_post(e)",
+_b640_mut = _MILLENAI_SRC.replace("    if relay_only:\n        r = _srv_relay_post(e)",
                                   "    if server_quiet(e):\n        return {\"ok\": False, \"kind\": \"quiet\", \"err\": \"quiet\"}\n    if relay_only:\n        r = _srv_relay_post(e)", 1)
-check("6b620 Settings' Wake up server and Test relay ignore the quiet hours (a deliberate click wins); a question's wake still keeps them; the mutant (the buttons held by the quiet hours) is caught",
-      _b620_ok(_MILLENAI_SRC) and _b620_mut != _MILLENAI_SRC and not _b620_ok(_b620_mut), "")
-# ==== 6b620 beta-4 integration: end ====
+check("6b640 Settings' Wake up server and Test relay ignore the quiet hours (a deliberate click wins); a question's wake still keeps them; the mutant (the buttons held by the quiet hours) is caught",
+      _b640_ok(_MILLENAI_SRC) and _b640_mut != _MILLENAI_SRC and not _b640_ok(_b640_mut), "")
+# ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====
 # USABLE ANSWERS (6b626, per Patrick: "it has to be usable"). The beta-4 walkthrough: "How do I hard-boil an egg?"
@@ -49859,6 +49896,812 @@ req("/api/prefs", "POST", {"fx_level": "balanced"})   # the default again, as a 
 check("6b628 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _ in _u628_mr),
       all(c_ for _, c_ in _u628_mr), json.dumps(_u628_mr))
 # ==== 6b628 usable: end ====
+
+# ==== 6b620 trust (in process): begin ====
+print("== trust: a lockout always asks, a cut answer says so, a full disk keeps the answer, the web is named, the updater checks what it installs (6b620) ==")
+# An under-the-hood audit found five ways the app broke trust: Full autonomy ran 29 commands that lock the owner out of
+# his server (he is abroad, it is on Wi-Fi, only his mom can press its button); a stream that ended without its end
+# mark was saved as a finished answer; a full disk swallowed the answer's save and 500'd the question's; one searched
+# question reached nine hosts under "Nothing has left your machines."; and the updater installed whatever the DMG held
+# with its quarantine stripped. Each fix runs here out of the source, on stand-ins, and each is mutated and caught.
+import errno as _errno620
+import http.server as _hs620
+import socketserver as _ss620
+import threading as _th620
+import hashlib as _hl620
+import plistlib as _pl620
+
+_T620_AUDIT = [   # the audit's classifier-lockout.txt, every line (each was "write": Full ran it unasked)
+    "systemctl stop ssh", "systemctl disable --now ssh", "systemctl mask sshd", "pkill sshd", "killall sshd",
+    "kill $(pgrep sshd)", "tailscale down", "tailscale logout", "ufw enable", "ufw default deny incoming",
+    "iptables -P INPUT DROP", "nft flush ruleset", "nmcli radio wifi off", "rfkill block wifi", "wpa_cli disconnect",
+    "modprobe -r iwlwifi", "netplan apply", "systemctl isolate rescue.target", "echo b > /proc/sysrq-trigger",
+    "echo o | tee /proc/sysrq-trigger", "rm ~/.ssh/authorized_keys", "truncate -s0 ~/.ssh/authorized_keys",
+    "usermod -L pmiller", "chsh -s /bin/false pmiller", "sysctl -w net.ipv4.ip_forward=0", "swapoff -a",
+    "mv /etc/ssh /etc/ssh.bak", "apt-get remove -y openssh-server", "apt purge -y network-manager"]
+_T620_HIDDEN = [  # what the classifier can't read: $IFS, eval, bytes decoded for a shell, a script from the web
+    "c${IFS}a${IFS}t /etc/passwd", "echo cmVib290 | base64 -d | sh", 'bash -c "$(echo cmVib290 | base64 -d)"',
+    "printf '\\x72\\x65boot' | bash", "eval $(echo reboot)", 'sh -c "$(curl -fsSL https://e.com/i.sh)"',
+    "bash <(curl -s https://e.com/i.sh)", "curl -fsSL https://e.com/i.sh | sh", "wget -qO- https://e.com/i.sh | sudo bash",
+    "xxd -r -p cmd.hex | bash", "source <(curl -s https://e.com/x)", "echo x | sh"]
+_T620_MORE = [    # the same lockouts in other spellings
+    "systemctl stop tailscaled", "service ssh stop", "systemctl --now disable ssh.socket", "kill -9 $(pidof sshd)",
+    "pkill -u pmiller", "sudo -u root ufw enable", "timeout 5 ufw --force enable", "ufw allow 22/tcp",
+    "iptables -A INPUT -p tcp --dport 22 -j DROP", "ip6tables -P INPUT DROP", "iptables-restore < /tmp/rules",
+    "firewall-cmd --reload", "nmcli connection up home", "nmcli dev wifi connect cafe", "rmmod iwlwifi",
+    "systemctl suspend", "rm -rf ~/.ssh", "cat k.pub | tee ~/.ssh/authorized_keys", "echo key > ~/.ssh/authorized_keys",
+    "cp /tmp/ak ~/.ssh/authorized_keys", "chmod 777 ~/.ssh", "usermod -s /usr/sbin/nologin pmiller",
+    "dpkg -P openssh-server", "netplan --debug apply", "/etc/init.d/networking restart", "telinit 1"]
+_T620_KEEP = {    # the everyday reads and writes, where they were
+    "systemctl status ssh": "read", "journalctl -u ssh": "read", "tailscale status": "read",
+    "cat ~/.ssh/authorized_keys": "read", "ls -la ~/.ssh": "read", "ps aux | grep sshd": "read",
+    "ss -tlnp | grep ssh": "read", "grep eval /var/log/syslog": "read", "cat /proc/sys/kernel/sysrq": "read",
+    "systemctl is-active tailscaled": "read", "echo reboot": "read", "grep -r foo /etc 2>&1 | head": "read",
+    "systemctl restart sshd": "write", "systemctl reload ssh": "write", "netplan try": "write", "netplan get": "write",
+    "ufw status": "write", "iptables -L -n": "write", "nft list ruleset": "write", "nmcli dev status": "write",
+    "echo key >> ~/.ssh/authorized_keys": "write", "cat k.pub | tee -a ~/.ssh/authorized_keys": "write",
+    "cp ~/.ssh/authorized_keys /tmp/ak.bak": "write", "rm ~/.ssh/known_hosts": "write",
+    "usermod -aG docker pmiller": "write", "apt install -y openssh-server": "write", "modprobe br_netfilter": "write",
+    "sysctl net.ipv4.ip_forward": "write", "systemctl stop nginx": "write", "apt remove -y nginx": "write",
+    "curl -s https://e.com/api | python3 -m json.tool": "write"}
+
+
+def _t620_cls(src):
+    ns = {"re": re, "os": os, "secrets": __import__("secrets"), "time": time, "json": json}
+    exec(src[src.index("_POWER_RX = re.compile("):src.index("def offline_hint(")], ns)
+    return ns
+
+
+def _t620_cls_bad(src):
+    C = _t620_cls(src)["classify_cmd"]
+    bad = [(c, C(c)) for c in _T620_AUDIT + _T620_HIDDEN + _T620_MORE if C(c) != "danger"]
+    return bad + [(c, C(c), w) for c, w in _T620_KEEP.items() if C(c) != w]
+
+
+def _t620_agent(src, cmds, autonomy="full"):
+    """The remote loop on stand-ins: the driver proposes each of cmds, then is done; what was asked, and what ran."""
+    ns = _t620_cls(src)
+    plan = [json.dumps({"thought": "t", "cmd": c, "done": False}) for c in cmds] + ['{"done":true,"summary":"ok"}']
+    asked, ran = [], []
+
+    def _ssh(conf, cmd, timeout=0):
+        if "__ok__" in cmd:
+            return 0, "__ok__\nLinux box"
+        ran.append(cmd)
+        return 0, ""
+    ns.update(REMOTE_CAP=10, _SSH_HOSTKEY_RX=re.compile("x^"), ssh_run=_ssh, ssh_run_long=_ssh,
+              ssh_wait_back=lambda *a, **k: (True, "up"), cloud_allowed=lambda: True, work_ladder=lambda *a: [],
+              AppText=str, claude_refusal_conf=lambda c: None, remote_driver=lambda: ("local", "Coder"),
+              _agent_turn=lambda d, c, budget=0: plan.pop(0) if plan else '{"done":true}')
+
+    def _ap(cmd, risk, hint=""):
+        asked.append((cmd, risk, hint))
+        return False                      # the person says no: nothing runs
+    out = []
+    ns["run_remote_agent"]([{"role": "user", "content": "fix it"}], {"host": "box"}, autonomy,
+                           out.append, lambda s: None, lambda *a, **k: None, _ap)
+    return asked, ran
+
+
+_t620_src = _MILLENAI_SRC
+_t620_bad = _t620_cls_bad(_t620_src)
+_t620_mut = {
+    "no LOCKOUT group in _DANGER_RX": _t620_src.replace('    _LOCKOUT_PAT + r"|"\n', "", 1),
+    "the firewall tools not parsed": _t620_src.replace('    if verb and _lockout_seg(verb, rest):\n        return "danger"\n', "", 1),
+    "a pipe into a shell let through": _t620_src.replace(
+        '    r"(?<!>)\\|&?\\s*(sudo\\s+(-\\S+\\s+)*)?(env\\s+)?(ba|z|da|k|c|tc|fi)?sh\\b|"\n', "", 1),
+    "the keys' rewrite let through": _t620_src.replace(
+        '    r"(?<!>)>(?!>)[&|]?\\s*[^\\s;&|]*(authorized_keys|/etc/ssh/)|"\n', "", 1)}
+_t620_mbad = {k: (v != _t620_src and bool(_t620_cls_bad(v))) for k, v in _t620_mut.items()}
+check("trust: every one of the audit's %d lockout commands, %d hidden ones and %d other spellings is danger (asks at "
+      "every level, Full included); %d everyday reads and writes stay where they were; each of 4 mutants is caught"
+      % (len(_T620_AUDIT), len(_T620_HIDDEN), len(_T620_MORE), len(_T620_KEEP)),
+      not _t620_bad and all(_t620_mbad.values()), "%r" % [_t620_bad[:6], _t620_mbad])
+_t620_a1 = _t620_agent(_t620_src, ["systemctl stop ssh", "ls -la", "netplan apply"])
+_t620_a2 = _t620_agent(_t620_src.replace('                   or (autonomy == "auto" and risk != "read")\n                   or risk == "danger")',
+                                         '                   or (autonomy == "auto" and risk != "read"))', 1),
+                       ["systemctl stop ssh"])
+check("trust: Full autonomy asks before \"systemctl stop ssh\" and \"netplan apply\" (danger), the second with "
+      "\"netplan try\" beside it, and runs neither when told no; a read runs unasked; the mutant (Full never asks) is caught",
+      [a[:2] for a in _t620_a1[0]] == [("systemctl stop ssh", "danger"), ("netplan apply", "danger")]
+      and _t620_a1[0][0][2] == "" and "netplan try" in _t620_a1[0][1][2]
+      and _t620_a1[1] == ["ls -la"]
+      and _t620_a2[0] == [] and _t620_a2[1] == ["systemctl stop ssh"]
+      and "netplan try --timeout 120" in _t620_src and 'if(d.hint){const h=document.createElement("div");h.className="aphint"' in page,
+      "%r" % [_t620_a1, _t620_a2])
+
+
+# ---- a cut answer: three stream readers against a stand-in that stops at word 30
+class _T620Stream(_hs620.BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+    mode = {"cut": False}
+
+    def log_message(self, *a):
+        pass
+
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("Content-Length") or 0))
+        cut = self.mode["cut"]
+        self.send_response(200)
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        p = self.path
+        for i in range(60):
+            if cut and i == 30:
+                self.wfile.flush()
+                self.connection.shutdown(2)
+                return
+            w = "word%d " % i
+            if p.endswith("/chat/completions"):
+                self.wfile.write(("data: %s\n\n" % json.dumps({"choices": [{"delta": {"content": w}}]})).encode())
+            elif p.endswith("/messages"):
+                self.wfile.write(("data: %s\n\n" % json.dumps({"type": "content_block_delta", "delta": {"text": w}})).encode())
+            else:
+                self.wfile.write((json.dumps({"message": {"content": w}, "done": False}) + "\n").encode())
+        if p.endswith("/chat/completions"):
+            self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
+        elif p.endswith("/messages"):
+            self.wfile.write(b'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}\n\n'
+                             b'data: {"type":"message_stop"}\n\n')
+        else:
+            self.wfile.write(b'{"message":{"content":""},"done":true,"done_reason":"stop"}\n')
+
+
+_t620_ss = _ss620.ThreadingTCPServer(("127.0.0.1", 0), _T620Stream)
+_t620_ss.daemon_threads = True
+_th620.Thread(target=_t620_ss.serve_forever, daemon=True).start()
+_T620_SB = "http://127.0.0.1:%d" % _t620_ss.server_address[1]
+
+
+def _t620_def(src, head):
+    a = src.index(head)
+    m = re.search(r"\n\n\n(?=\S)", src[a:])
+    return src[a:a + m.start() + 1]
+
+
+def _t620_streams(src):
+    """(cloud, claude, ollama) -> (whole: cut?, at word 30: cut?, words that reached the page)."""
+    ns = {"re": re, "json": json, "time": time, "urllib": urllib, "threading": _th620,
+          "profile_cache": lambda n, o: o, "NUL": "\x00", "Ctl": str, "APP_VERSION": "t",
+          "_openai_body": lambda c, m, mx, stream=False: {"model": "m", "messages": m, "stream": stream},
+          "CLOUD_MAX_OUT": {"claude": 100}, "_provider_of": lambda c: "groq", "_STREAM_USAGE_ASK": set(),
+          "_stream_usage_off": set(), "_is_provider_error": lambda t: False, "_cloud_budget_hit": lambda c: None,
+          "cloud_note_failure": lambda c, e: None, "_http_body": lambda e: "", "usage_note": lambda *a, **k: None,
+          "_mark_answered": lambda c: None, "cloud_glitch": lambda *a: None, "_anthropic_turns": lambda m: m,
+          "_anthropic_body": lambda c, t, s, mx, stream=False: {"messages": t, "stream": stream},
+          "MuseChannels": None, "MUSE_ROWS": (), "muse_level": lambda t: t, "GIANT_CTX": 0, "OLLAMA_THINK_OFF": (),
+          "GIANT_KEEP_ALIVE": "1m", "GIANT_LOAD_TIMEOUT": 30, "ollama_url": lambda p: _T620_SB + p}
+    exec(src[src.index("_stream_end = profile_cache("):src.index("_HW_MEMSIZE = [None]")], ns)
+    for h in ("def _anthropic_stream(", "def cloud_stream_conf(", "def stream_ollama("):
+        exec(_t620_def(src, h), ns)
+    conf = {"base": _T620_SB + "/v1", "key": "k", "model": "m", "name": "Groq"}
+    aconf = {"base": _T620_SB + "/anthropic.com/v1", "key": "k", "model": "m"}
+    runs = {"cloud": lambda em: ns["cloud_stream_conf"](conf, [{"role": "user", "content": "q"}], em),
+            "claude": lambda em: ns["cloud_stream_conf"](aconf, [{"role": "user", "content": "q"}], em),
+            "ollama": lambda em: ns["stream_ollama"]("tag", [{"role": "user", "content": "q"}], em)}
+    out = {}
+    for k, f in runs.items():
+        r = []
+        for cut in (False, True):
+            _T620Stream.mode["cut"] = cut
+            ns["stream_end_clear"]()
+            got = []
+
+            def em(t, got=got):
+                if t:
+                    ns["stream_page_mark"](len(t))
+                    got.append(t)
+            f(em)
+            r.append((ns["stream_was_cut"](), len("".join(got).split())))
+        # a draft collected for a merge (its words never reach the page) says nothing about the answer
+        _T620Stream.mode["cut"] = True
+        ns["stream_end_clear"]()
+        f(lambda t: None)
+        r.append(ns["stream_was_cut"]())
+        out[k] = r
+    return out
+
+
+_t620_sr = _t620_streams(_t620_src)
+_t620_want = {k: [(False, 60), (True, 30), False] for k in ("cloud", "claude", "ollama")}
+_t620_smut = {
+    "the cloud reader ignores its end mark": (_t620_src.replace(
+        'stream_done(p0, got and not fin[0], c.get("name") or _provider_of(c) or "")',
+        'stream_done(p0, False, c.get("name") or _provider_of(c) or "")', 1), "cloud"),
+    "Claude's reader ignores message_stop": (_t620_src.replace(
+        'stream_done(p0, got and not fin, "Claude")', 'stream_done(p0, False, "Claude")', 1), "claude"),
+    "Ollama's reader ignores done": (_t620_src.replace(
+        "stream_done(p0, not last, label or tag)", "stream_done(p0, False, label or tag)", 1), "ollama"),
+    "a draft counts as the answer": (_t620_src.replace(
+        '    if getattr(_stream_end, "page", 0) > p0:\n        _stream_end.cut', '    if True:\n        _stream_end.cut', 1), "cloud")}
+_t620_smr = {k: (v[0] != _t620_src and _t620_streams(v[0])[v[1]] != _t620_want[v[1]]) for k, v in _t620_smut.items()}
+check("trust: a stream that ends without its end mark is cut ([DONE] or finish_reason, Claude's message_stop, Ollama's "
+      "done): stopped at word 30 by a stand-in, each of the three readers keeps the 30 words and says cut; whole, it says "
+      "nothing; a draft that never reached the page says nothing; each of 4 mutants is caught",
+      _t620_sr == _t620_want and all(_t620_smr.values()), "%r" % [_t620_sr, _t620_smr])
+
+# the turn as saved, and the page's line
+_t620_ct = {"re": re, "json": json, "threading": _th620}
+exec(_t620_src[_t620_src.index("_TURN_TAGS = ("):_t620_src.index("def _turn_rec(t):")], _t620_ct)
+_t620_tr = _t620_ct["turn_record"]
+_t620_r1 = _t620_tr("word0 word1\x00CUT:{\"w\": \"Groq\"}\x00\x00DONE:{\"t\":1}\x00")
+_t620_r2 = _t620_tr("word0 word1\x00CUT:{}\x00", aborted=True)
+_t620_r3 = _t620_tr("the whole answer\x00DONE:{\"t\":1,\"web\":[\"DuckDuckGo\"]}\x00")
+_t620_ctm = {"re": re, "json": json, "threading": _th620}
+_t620_tm = _t620_src.replace('        elif tag == "CUT":\n            got["CUT"] = True\n', "", 1)
+exec(_t620_tm[_t620_tm.index("_TURN_TAGS = ("):_t620_tm.index("def _turn_rec(t):")], _t620_ctm)
+check("trust: a cut answer is saved with cut: true and the run's engines with it; a stopped one stays stopped, not cut; "
+      "the page draws one calm line, \"The connection dropped.\" with Continue and Try again, live and on reopen (only the "
+      "chat's last answer keeps the keys); CUT and SAVE are frames on both sides; the mutant (CUT unread) is caught",
+      _t620_r1 and _t620_r1.get("cut") is True and _t620_r1["content"] == "word0 word1"
+      and _t620_r2 and _t620_r2.get("stopped") is True and "cut" not in _t620_r2
+      and _t620_r3 and "cut" not in _t620_r3 and _t620_r3["run"].get("web") == ["DuckDuckGo"]
+      and not (_t620_ctm["turn_record"]("a\x00CUT:{}\x00") or {}).get("cut")
+      and "|CUT|SAVE" in _t620_ct["_TURN_TAGS"] and "|OFFER|CUT|SAVE\";" in page
+      and 'if(cutInfo&&full&&!wasAborted&&!isErr)trustLine(aiDiv,"cut");' in page
+      and 'if(role!=="user"&&m.role&&m.cut&&!m.stopped)trustLine(div,"cut");' in page
+      and 'const t=kind==="cut"?"The connection dropped."' in page
+      and 'data-trust-go="cont">Continue</button><button type="button" class="trust-go" data-trust-go="again">Try again</button>' in page
+      and '.msg.ai:not(:last-child)>.trustline[data-trust="cut"] .trust-go{display:none}' in page
+      and "if not _gone and _model_said[0] and stream_was_cut():" in _t620_src,
+      "%r" % [_t620_r1, _t620_r2, _t620_r3])
+
+
+# ---- a full disk: the answer kept in memory and saved by the retry; a stale profile dropped, not retried
+def _t620_save(src, fail):
+    ns = {"re": re, "json": json, "os": os, "time": time, "shutil": shutil, "threading": _th620,
+          "profile_cache": lambda n, o: o, "_turns_lock": _th620.Lock(), "_turns_live": {},
+          "StaleProfile": type("StaleProfile", (OSError,), {}), "ProfileCtx": type("ProfileCtx", (), {}),
+          "_bk": lambda b: "bk", "ctx_thread": lambda **k: None}
+    timers = []
+
+    class _Tm:
+        def __init__(s, *a, **k):
+            timers.append(a)
+
+        def start(s):
+            pass
+    ns["ctx_timer"] = _Tm
+    saved = []
+
+    def _late(cid, n, h, rec, base):
+        if fail[0]:
+            raise fail[0]
+        saved.append((cid, n, rec["content"]))
+        return cid, n + 1, "h"
+    ns["chat_append_late"] = _late
+    ns["_turn_rec"] = lambda t: {"role": "assistant", "content": "the answer"}
+    exec(src[src.index("SAVE_RETRY_S = 30\n"):src.index("def _turns_settle(")], ns)
+    t = {"id": "c1", "n": 1, "h": "h", "wire": [], "base": object()}
+    why = ns["_turn_finish"](t)
+    pend = len(ns["_turns_pending"])
+    fail[0] = None
+    left = ns["_pending_retry"]()
+    return why, pend, len(timers), left, saved
+
+
+_t620_full = _t620_save(_t620_src, [OSError(_errno620.ENOSPC, "No space left on device")])
+_t620_deny = _t620_save(_t620_src, [PermissionError(_errno620.EACCES, "Permission denied")])
+_t620_ok = _t620_save(_t620_src, [None])
+_t620_mfull = _t620_save(_t620_src.replace("            except OSError as exc:\n                t[\"save_fail\"] = save_fail_kind(exc)",
+                                           "            except ZeroDivisionError as exc:\n                t[\"save_fail\"] = save_fail_kind(exc)", 1),
+                         [OSError(_errno620.ENOSPC, "full")])
+check("trust: a full disk keeps the answer: the save says \"full\" (ENOSPC) or \"denied\" (a folder it can't write), the "
+      "answer waits in memory with a 30 s retry, and the retry saves it once the disk takes it; a save that works waits "
+      "for nothing; the page's line and the question's 507 are wired; under 1 GB free each answer says so; the mutant "
+      "(the save's error swallowed) is caught",
+      _t620_full[:4] == ("full", 1, 1, 0) and _t620_full[4] == [("c1", 1, "the answer")]
+      and _t620_deny[0] == "denied" and _t620_ok[:2] == ("", 0) and len(_t620_ok[4]) == 1
+      and _t620_mfull[0] == "" and _t620_mfull[1] == 0
+      and 'self._send_json({"err": SAVE_Q_FAIL[save_fail_kind(_exc)],' in _t620_src and "code=507)" in _t620_src
+      and '"full": "Couldn\\u2019t save your question: your disk is full. Free up some space, then send it again.",' in _t620_src
+      and ':kind==="nosave"?"Couldn\\u2019t save this answer: your disk is full. It\\u2019s still on screen."' in page
+      and 'if(saveInfo&&saveInfo.fail&&full)trustLine(aiDiv,"nosave");' in page
+      and "DISK_LOW_BYTES = 1_000_000_000" in _t620_src and '_fr["low"] = _low' in _t620_src,
+      "%r" % [_t620_full, _t620_deny, _t620_ok, _t620_mfull])
+
+
+def _t620_low(src, free):
+    ns = {"os": os, "time": time, "DISK_LOW_BYTES": 1_000_000_000,
+          "shutil": type("S", (), {"disk_usage": staticmethod(lambda d: type("U", (), {"free": free})())}),
+          "_disk_seen": [0.0, None]}
+    exec(_t620_def(src, "def disk_free_low("), ns)
+    return ns["disk_free_low"](type("B", (), {"dir": "/"})(), now=1e9)
+
+
+check("trust: under 1 GB free the answer's last frame says how much is left (0.42 GB); with room, nothing",
+      _t620_low(_t620_src, 420_000_000) == 0.42 and _t620_low(_t620_src, 50_000_000_000) is None, "")
+
+
+# ---- the web, named: two engines by name, never ddgs's "auto"; the page names them and never says nothing left
+def _t620_search(src, have=("duckduckgo", "brave"), first_empty=False):
+    calls = []
+
+    class _DD:
+        def __init__(s, proxy=None):
+            pass
+
+        def text(s, q, max_results=5, backend="auto", timelimit=None):
+            calls.append(("text", backend))
+            return [] if (first_empty and backend == "duckduckgo") else [{"title": "t", "href": "https://x", "body": "b"}]
+
+        def news(s, q, max_results=5, timelimit=None, backend="auto"):
+            calls.append(("news", backend))
+            return []
+    ns = {"re": re, "threading": _th620, "DDGS": _DD, "HAS_SEARCH": True, "IS_WIN": False,
+          "_search_proxy": lambda: None, "GROUND_PER_QUERY": 5, "FRESH_NEWS_LIMIT": "m", "_src_date_text": lambda s: s}
+    exec(src[src.index("SEARCH_ENGINES = ("):src.index("_SEARCH_PROXY = {")], ns)
+    ns["search_engine_ok"] = lambda n, cat="text": n in have
+    for h in ("def _ddg_text(", "def _ddg_more(", "def _ddg_news("):
+        exec(_t620_def(src, h), ns)
+    snap = ns["search_hits_snapshot"]()
+    ns["_ddg_text"]("q")
+    ns["_ddg_more"]("q")
+    ns["_ddg_news"]("q")
+    try:
+        return calls, ns["search_engines_since"](snap)
+    except Exception:
+        return calls, None
+
+
+_t620_q1 = _t620_search(_t620_src)
+_t620_q2 = _t620_search(_t620_src, first_empty=True)
+_t620_q3 = _t620_search(_t620_src, have=("duckduckgo",))
+_t620_q4 = _t620_search(_t620_src.replace('SEARCH_ENGINES = ("duckduckgo", "brave")', 'SEARCH_ENGINES = ("bing", "auto", "duckduckgo")', 1),
+                        have=("duckduckgo", "brave", "auto"))
+_t620_q5 = _t620_search(_t620_src, have=("brave",))
+_t620_q6 = _t620_search(_t620_src.replace("        if not search_engine_ok(backend):\n            continue\n", "", 1), have=("brave",))
+check("trust: a search asks DuckDuckGo, Brave when DuckDuckGo has nothing and as the second list, DuckDuckGo's news by "
+      "name, never ddgs's \"auto\" (one question reached nine hosts); an engine ddgs no longer lists is skipped, not "
+      "replaced by every engine; the answer names the engines it asked; 2 mutants (the old list; no engine check) are caught",
+      _t620_q1 == ([("text", "duckduckgo"), ("text", "brave"), ("news", "duckduckgo")], ["DuckDuckGo", "Brave"])
+      and _t620_q2[0] == [("text", "duckduckgo"), ("text", "brave"), ("text", "brave"), ("news", "duckduckgo")]
+      and _t620_q3 == ([("text", "duckduckgo"), ("news", "duckduckgo")], ["DuckDuckGo"])
+      and any(b == "auto" for _k, b in _t620_q4[0])
+      and _t620_q5[0][0] == ("text", "brave") and _t620_q6[0][0] == ("text", "duckduckgo")
+      and 'backend="auto"' not in _t620_def(_t620_src, "def _ddg_more(") + _t620_def(_t620_src, "def _ddg_text(")
+      and 'backend="duckduckgo") or []     # by name, never "auto" (6b620)' in _t620_src
+      and 'if _web:\n                        _done["web"] = _web' in _t620_src
+      and "to DuckDuckGo, and to Brave when DuckDuckGo has nothing;" in page,
+      "%r" % [_t620_q1, _t620_q2, _t620_q3, _t620_q4, _t620_q5, _t620_q6])
+_t620_mj = _spine_js(page) + r'''
+const L=[{w:"local",m:"x",o:5}],C=[{w:"groq",m:"x",o:5}];
+const ln=h=>(/class="mnote">([^<]*)</.exec(h)||[])[1];
+console.log(JSON.stringify({local:ln(machinesHTML(L,null)),web:ln(machinesHTML(L,null,["DuckDuckGo","Brave"])),
+ old:ln(machinesHTML(L,null,[])),cloud:ln(machinesHTML(C,null,["DuckDuckGo"])),
+ step:ln(spineHTML({steps:[{id:"search",l:"Searched the web",s:"done",d:"3 sources"}],usage:L,drafts:[],running:[],live:false})),
+ run:ln(spineHTML({steps:[],usage:L,drafts:[],running:[],live:false,run:{t:2,web:["Brave"]}})),
+ none:ln(spineHTML({steps:[],usage:L,drafts:[],running:[],live:false}))}));'''
+try:
+    _t620_m = _node_json(_t620_mj, "t620_machines.js")
+except Exception as _e620:
+    _t620_m = {"err": str(_e620)[:200]}
+try:
+    _t620_mm = _node_json(_spine_js(page.replace('const line=cloud.length?(wl?wl+" ":"")+"Some of this went through "+cloud.join(" and ")+"."\n    :wl||"Nothing has left your machines.";',
+                                                 'const line=cloud.length?"Some of this went through "+cloud.join(" and ")+".":"Nothing has left your machines.";', 1))
+                          + _t620_mj[len(_spine_js(page)):], "t620_machines_m.js")
+except Exception as _e620:
+    _t620_mm = {"err": str(_e620)[:200]}
+check("trust: the machines line after a search says \"Searched the web (DuckDuckGo and Brave).\" (and the cloud's line "
+      "after it), \"Searched the web.\" for an answer saved before the engines were named, and \"Nothing has left your "
+      "machines.\" only when nothing searched; the mutant (the old line) is caught",
+      _t620_m == {"local": "Nothing has left your machines.", "web": "Searched the web (DuckDuckGo and Brave).",
+                  "old": "Searched the web.", "cloud": "Searched the web (DuckDuckGo). Some of this went through Groq.",
+                  "step": "Searched the web.", "run": "Searched the web (Brave).", "none": "Nothing has left your machines."}
+      and _t620_mm.get("web") == "Nothing has left your machines.",
+      "%r" % [_t620_m, _t620_mm])
+
+
+# ---- the updater: the checksum, the signature, the team, Gatekeeper, and a swap that can't leave no app
+class _T620Resp:
+    def __init__(s, b):
+        s.b, s.headers = b, {"Content-Length": str(len(b))}
+
+    def read(s, n=-1):
+        if n is None or n < 0:
+            n = len(s.b)
+        out, s.b = s.b[:n], s.b[n:]
+        return out
+
+    def __enter__(s):
+        return s
+
+    def __exit__(s, *a):
+        return False
+
+
+def _t620_update(src, case):
+    """_do_update on stand-ins: the feed, hdiutil, ditto, codesign and spctl answer per case."""
+    tmpd = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    app = os.path.join(tmpd, "Apps", "ConcordeAI.app")
+    os.makedirs(os.path.join(app, "Contents"))
+    dmg = b"the new build"
+    sha = case.get("sha", _hl620.sha256(dmg).hexdigest())
+    runs, pops, timers = [], [], []
+
+    def _run(a, capture_output=True, text=True, timeout=0):
+        runs.append(a[0] + " " + a[1])
+        rc, out = 0, ""
+        if a[:2] == ["hdiutil", "attach"]:
+            rc = case.get("attach", 0)
+            if rc == 0:
+                mp = a[a.index("-mountpoint") + 1]
+                os.makedirs(os.path.join(mp, "ConcordeAI.app", "Contents"), exist_ok=True)
+                with open(os.path.join(mp, "ConcordeAI.app", "Contents", "Info.plist"), "wb") as f:
+                    _pl620.dump({"CFBundleVersion": str(case.get("build", 999))}, f)
+        elif a[0] == "ditto":
+            rc = case.get("ditto", 0)
+            if rc == 0:
+                shutil.copytree(a[1], a[2])
+        elif a[:2] == ["codesign", "--verify"]:
+            rc = case.get("verify", 0) if a[-1].endswith(".new") else 0
+        elif a[:2] == ["codesign", "-dvv"]:
+            new = a[-1].endswith(".new")
+            team = case.get("team", "") if new else case.get("cur_team", "")
+            out = ("Authority=Developer ID Application: P (%s)\nTeamIdentifier=%s\n" % (team, team) if team
+                   else "Signature=adhoc\nTeamIdentifier=not set\n")
+        elif a[0] == "spctl":
+            rc = case.get("spctl", 0)
+        return type("R", (), {"returncode": rc, "stdout": "", "stderr": out})()
+
+    class _Sp:
+        run = staticmethod(_run)
+
+        @staticmethod
+        def Popen(a, **k):
+            pops.append(a)
+
+    def _open(r, timeout=0):
+        u = r.full_url
+        return _T620Resp(dmg if u.endswith(".dmg") else (sha + "  ConcordeAI.dmg").encode())
+
+    class _Ur:
+        Request = urllib.request.Request
+        urlopen = staticmethod(_open)
+    ns = {"re": re, "os": os, "json": json, "time": time, "hashlib": _hl620, "plistlib": _pl620,
+          "shutil": shutil, "tempfile": type("T", (), {"mkdtemp": staticmethod(lambda prefix="": tempfile.mkdtemp(dir=tmpd))}),
+          "subprocess": _Sp, "urllib": type("U", (), {"request": _Ur}), "APP_BUILD": 280, "DEV_HOME": tmpd,
+          "UPDATE_TEAM_ID": "WNFPCU5A66", "_app_bundle_path": lambda: app,
+          "ctx_timer": lambda s, f, *a, **k: type("Tm", (), {"start": lambda self: timers.append(s)})()}
+    a = src.index('_SWAP_SCRIPT = """#!/bin/zsh')
+    exec(src[a:src.index("def _app_bundle_path():")], ns)
+    exec(_t620_def(src, "def update_log_path("), ns)
+    exec(_t620_def(src, "def _do_update():"), ns)
+    ns["_update"] = {"state": "idle", "url": "https://x/ConcordeAI.dmg", "size": len(dmg),
+                     "sha_url": "" if case.get("nosha") else "https://x/ConcordeAI.dmg.sha256"}
+    ns["_do_update"]()
+    left = sorted(n for n in os.listdir(os.path.dirname(app)))
+    script = open(pops[0][1]).read() if pops else ""
+    return {"state": ns["_update"]["state"], "note": ns["_update"].get("note", ""), "popen": len(pops),
+            "exit": timers == [1.5], "left": left, "script": script, "runs": runs}
+
+
+_T620_UC = {
+    "ok": {}, "nosha": {"nosha": True}, "badsha": {"sha": "0" * 64}, "attach": {"attach": 1}, "ditto": {"ditto": 1},
+    "verify": {"verify": 1}, "older": {"build": 100}, "wrongteam": {"team": "AAAAAAAAAA"},
+    "devid": {"team": "WNFPCU5A66"}, "gatekeeper": {"team": "WNFPCU5A66", "spctl": 3},
+    "downgrade": {"cur_team": "WNFPCU5A66"}}
+_t620_u = {k: _t620_update(_t620_src, v) for k, v in _T620_UC.items()}
+
+
+def _t620_refused(r, word):
+    return (r["state"] == "error" and word in r["note"] and r["popen"] == 0 and not r["exit"]
+            and r["left"] == ["ConcordeAI.app"])
+
+
+_t620_umut = {
+    "no checksum check": _t620_update(_t620_src.replace("        if not want or want != h.hexdigest():", "        if False:", 1),
+                                      _T620_UC["badsha"])["popen"] == 1,
+    "no signature check": _t620_update(_t620_src.replace("        why = update_trust(staged, app)", '        why = ""', 1),
+                                       _T620_UC["verify"])["popen"] == 1,
+    "no Gatekeeper": _t620_update(_t620_src.replace("        if g.returncode != 0:\n            return \"macOS didn", "        if False:\n            return \"macOS didn", 1),
+                                  _T620_UC["gatekeeper"])["popen"] == 1}
+check("trust: the updater checks before it quits: no checksum, a wrong checksum, a DMG that won't open, a copy that "
+      "fails, a signature that doesn't verify, an older build, a Developer ID of another team, one Gatekeeper refuses, or "
+      "an ad hoc build offered to a Developer ID install each leave this app running and say why, with nothing left "
+      "beside it; an ad hoc or Team WNFPCU5A66 build that checks out is staged and handed to the helper; the helper "
+      "keeps the quarantine (no xattr -dr); each of 3 mutants is caught",
+      _t620_u["ok"]["state"] == "restarting" and _t620_u["ok"]["popen"] == 1 and _t620_u["ok"]["exit"]
+      and _t620_u["ok"]["left"] == ["ConcordeAI.app", "ConcordeAI.app.new"]
+      and _t620_u["devid"]["state"] == "restarting" and "spctl -a" in _t620_u["devid"]["runs"]
+      and "spctl -a" not in _t620_u["ok"]["runs"]
+      and _t620_refused(_t620_u["nosha"], "no checksum") and _t620_refused(_t620_u["badsha"], "match its checksum")
+      and _t620_refused(_t620_u["attach"], "couldn’t be opened") and _t620_refused(_t620_u["ditto"], "copied")
+      and _t620_refused(_t620_u["verify"], "signature") and _t620_refused(_t620_u["older"], "older")
+      and _t620_refused(_t620_u["wrongteam"], "developer") and _t620_refused(_t620_u["gatekeeper"], "macOS didn")
+      and _t620_refused(_t620_u["downgrade"], "developer")
+      and "xattr" not in _t620_u["ok"]["script"] and 'codesign --verify --deep --strict "$NEW"' in _t620_u["ok"]["script"]
+      and '"$LSREG" -f "$1"' in _t620_u["ok"]["script"]
+      and re.search(r"for p in \d+( \d+)?; do kill -0 \$p", _t620_u["ok"]["script"])
+      and all(_t620_umut.values()),
+      "%r" % [{k: (v["state"], v["note"][:60], v["popen"], v["left"]) for k, v in _t620_u.items()}, _t620_umut])
+
+
+def _t620_swap(script, cs=0, up=1, ro=False):
+    """The swap helper itself, run by zsh on two stand-in bundles with codesign, open, pgrep and sleep stood in."""
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    apps, fb = os.path.join(d, "Apps"), os.path.join(d, "bin")
+    app = os.path.join(apps, "ConcordeAI.app")
+    for p, v in ((app, "old"), (app + ".new", "new")):
+        os.makedirs(p)
+        open(os.path.join(p, "v"), "w").write(v)
+    os.makedirs(fb)
+    tools = {"codesign": "exit %d" % cs, "sleep": "exit 0",
+             "open": 'echo "$@" >> "%s/opened"; [ %d = 1 ] && touch "%s/up"; exit 0' % (d, up, d),
+             "pgrep": '[ -f "%s/up" ]' % d,
+             "lsregister": 'echo "$@" >> "%s/registered"' % d}
+    for n, body in tools.items():
+        open(os.path.join(fb, n), "w").write("#!/bin/sh\n" + body + "\n")
+        os.chmod(os.path.join(fb, n), 0o755)
+    sh = os.path.join(d, "swap.sh")
+    # a process id that is waited for (a sleeper of this test's, gone in a second) and one long gone
+    sl = subprocess.Popen(["/bin/sleep", "1"])
+    script = script.replace("LSREG=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                            "LSREG=" + os.path.join(fb, "lsregister"))    # Launch Services stood in
+    open(sh, "w").write(script % {"app": app, "tmp": os.path.join(d, "tmp"), "log": os.path.join(d, "log"),
+                                  "pids": "%d 999999" % sl.pid})
+    os.makedirs(os.path.join(d, "tmp"))
+    if ro:
+        os.chmod(apps, 0o555)
+    try:
+        subprocess.run(["/bin/zsh", sh], env=dict(os.environ, PATH=fb + ":/usr/bin:/bin"), timeout=60,
+                       capture_output=True)
+    finally:
+        os.chmod(apps, 0o755)
+    opened = open(os.path.join(d, "opened")).read().split("\n") if os.path.exists(os.path.join(d, "opened")) else []
+    v = open(os.path.join(app, "v")).read() if os.path.exists(os.path.join(app, "v")) else None
+    return {"v": v, "left": sorted(os.listdir(apps)), "opened": len([o for o in opened if o.strip()]),
+            "log": open(os.path.join(d, "log")).read().strip() if os.path.exists(os.path.join(d, "log")) else ""}
+
+
+_t620_sw_src = _t620_src[_t620_src.index('_SWAP_SCRIPT = """') + len('_SWAP_SCRIPT = """'):]
+_t620_sw_src = _t620_sw_src[:_t620_sw_src.index('"""')]
+_t620_sw = {"ok": _t620_swap(_t620_sw_src), "badsig": _t620_swap(_t620_sw_src, cs=1),
+            "nomove": _t620_swap(_t620_sw_src, ro=True), "dies": _t620_swap(_t620_sw_src, up=0)}
+_t620_swm = {
+    "no second signature check": _t620_swap(_t620_sw_src.replace(' && codesign --verify --deep --strict "$NEW" 2>/dev/null', "", 1), cs=1)["v"] == "new",
+    "no rollback when the new app dies": _t620_swap(_t620_sw_src.replace('mv "$APP" "$APP.bad" && mv "$OLD" "$APP" && rm -rf "$APP.bad"', "true", 1), up=0)["v"] == "new"}
+check("trust: the swap is a rename aside and a rename in: a build that checks out goes in and opens, the old copy then "
+      "removed; one whose signature fails, or a move the disk refuses, leaves the old app in place and opens it; a new "
+      "app that is gone 20 s after it opened is swapped back and the old one opened (each open tried three times until the "
+      "app is seen running); never no app; each of 2 mutants is caught",
+      _t620_sw["ok"] == {"v": "new", "left": ["ConcordeAI.app"], "opened": 1, "log": "swapped"}
+      and _t620_sw["badsig"] == {"v": "old", "left": ["ConcordeAI.app"], "opened": 1, "log": "kept the old app"}
+      and _t620_sw["nomove"]["v"] == "old" and _t620_sw["nomove"]["opened"] == 1
+      and _t620_sw["dies"] == {"v": "old", "left": ["ConcordeAI.app"], "opened": 6, "log": "rolled back"}   # 3 tries each
+      and all(_t620_swm.values()),
+      "%r" % [_t620_sw, _t620_swm])
+_t620_rel = open("release.sh").read()
+_t620_ny = open(os.path.join(".github", "workflows", "nightly.yml")).read()
+check("trust: every release carries its DMG's SHA-256 (release.sh and the nightly write a .sha256 beside it and publish "
+      "it; it is never committed), and the updater reads it from the release's assets",
+      'shasum -a 256 "$DMG" | awk -v n="$DMG" \'{print $1 "  " n}\' > "$DMG.sha256"' in _t620_rel
+      and 'gh release create "v$BUILD" "$DMG" "$DMG.sha256" "$ZIP"' in _t620_rel
+      and 'gh release create nightly *.dmg *.dmg.sha256 *.zip' in _t620_ny and "shasum -a 256" in _t620_ny
+      and "*.dmg.sha256" in open(".gitignore").read()
+      and 'if a.get("name", "") == dmg.get("name", "") + ".sha256"), None)' in _t620_src, "")
+
+
+# ---- fonts and the map: local first, the network only without the file; SRI where verified
+def _t620_assets(src, files):
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    for f in files:
+        os.makedirs(os.path.dirname(os.path.join(d, f)), exist_ok=True)
+        open(os.path.join(d, f), "w").write("x")
+    ns = {"re": re, "os": os, "resource": lambda *p: os.path.join(d, *p)}
+    exec(src[src.index("HZ_FONT_FILES = ("):src.index("def hz_seen(")], ns)
+    return ns["font_links_html"](), ns["hz_font_css"](), ns["map_libs"]()
+
+
+_T620_FONTS = ["fonts/Michroma-Regular.ttf", "fonts/SpaceGrotesk-Variable.woff2", "fonts/IBMPlexMono-Regular.woff2",
+               "fonts/IBMPlexMono-Medium.woff2", "fonts/IBMPlexMono-SemiBold.woff2"]
+_t620_a0 = _t620_assets(_t620_src, _T620_FONTS[:1])
+_t620_a1 = _t620_assets(_t620_src, _T620_FONTS[:3])
+_t620_a2 = _t620_assets(_t620_src, _T620_FONTS + ["vendor/leaflet.js", "vendor/maplibre-gl.css"])
+check("trust: fonts and the map's files come from this app when they are here and from Google and unpkg only when they "
+      "aren't (none are shipped yet: Patrick hasn't approved the downloads); a half-local font set keeps Google's whole; "
+      "Leaflet's pinned files carry their published SRI (crossorigin), MapLibre's a TODO; /static/vendor/ serves only "
+      "the names listed",
+      "fonts.googleapis.com/css2?family=Space+Grotesk" in _t620_a0[0] and "Space Grotesk" not in _t620_a0[1]
+      and "fonts.googleapis.com" in _t620_a1[0] and "Space Grotesk" not in _t620_a1[1]
+      and _t620_a2[0] == "" and '@font-face{font-family:"Space Grotesk";src:url(/static/fonts/SpaceGrotesk-Variable.woff2) format("woff2");font-weight:300 700;' in _t620_a2[1]
+      and _t620_a0[2]["leaflet.js"] == {"u": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
+                                        "i": "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="}
+      and _t620_a0[2]["leaflet.css"]["i"] == "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      and _t620_a0[2]["maplibre-gl.js"]["i"] == "" and "TODO\n# (6b620): MapLibre GL 5.24.0" in _t620_src
+      and _t620_a2[2]["leaflet.js"] == {"u": "/static/vendor/leaflet.js", "i": ""}
+      and _t620_a2[2]["maplibre-gl.css"]["u"] == "/static/vendor/maplibre-gl.css"
+      and _t620_a2[2]["maplibre-gl.js"]["u"].startswith("https://unpkg.com/")
+      and 'if(i){e.integrity=i;e.crossOrigin="anonymous";}' in page and "const MAP_LIBS={" in page
+      and "__FONT_LINKS__" not in page and "__MAP_LIBS__" not in page and page.count("fonts.googleapis.com") == 2
+      and req("/static/vendor/leaflet.js", token=False)[0] == 404 and req("/static/vendor/evil.js", token=False)[0] == 404
+      and '[[ -d vendor ]] && ditto vendor "$BUNDLE/Contents/Resources/vendor"' in open("build_shell_dmg.sh").read(),
+      "%r" % [_t620_a0[0][:80], _t620_a1[0][:40], _t620_a2[0], _t620_a2[2]])
+
+
+# ---- the small ones: RAM read once, no warm-up for a cloud answer, Calm's still curtains
+def _t620_mem(src):
+    n = []
+    ns = {"_HW_MEMSIZE": [None], "subprocess": type("S", (), {"run": staticmethod(
+        lambda *a, **k: (n.append(1), type("R", (), {"stdout": "68719476736\n"})())[1])})}
+    exec(_t620_def(src, "def hw_memsize("), ns)
+    return [ns["hw_memsize"](), ns["hw_memsize"](), ns["hw_memsize"]()], len(n)
+
+
+check("trust: the Mac's RAM is read once a run (it ran a sysctl process on every stats poll); a cloud answer warms no "
+      "local engine (a 26B engine was read into memory for a Groq answer); Calm holds the aurora still under the glass",
+      _t620_mem(_t620_src) == ([68719476736] * 3, 1)
+      and _t620_src.count('["sysctl", "-n", "hw.memsize"]') == 1
+      and "            if (route[0] == \"mlx\" and route_label and not _no_text_model\n                    and not _cloud_first()):" in _t620_src
+      and "return bool(gate_ladder(_fl0, req_cloud))" in _t620_src
+      and ".hz.hz-calm #hz-aur1,.hz.hz-calm #hz-aur2,.hz.hz-calm #hz-aur2.hz-pulse{animation:none}" in page, "")
+# ==== 6b620 trust (in process): end ====
+
+# ==== 6b620 trust (live): begin ====
+print("== trust, live: a cut answer, a refused question, the engines one question reaches, a quit and a crash (6b620) ==")
+
+
+class _T620Stub(_hs620.BaseHTTPRequestHandler):
+    """A stand-in Groq (OpenAI-shaped) and a recording proxy that refuses every CONNECT."""
+    protocol_version = "HTTP/1.1"
+    st = {"cut": False, "gap": 0.0}
+    connects = []
+
+    def log_message(self, *a):
+        pass
+
+    def do_CONNECT(self):
+        self.connects.append(self.path.split(":")[0])
+        self.send_response(403)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_GET(self):
+        b = json.dumps({"data": [{"id": "openai/gpt-oss-120b"}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(b)))
+        self.end_headers()
+        self.wfile.write(b)
+
+    def do_POST(self):
+        d = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        if not d.get("stream"):
+            b = json.dumps({"choices": [{"message": {"role": "assistant", "content": "A stand-in reply."},
+                                         "finish_reason": "stop"}]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(b)))
+            self.end_headers()
+            self.wfile.write(b)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Connection", "close")
+        self.end_headers()
+        self.close_connection = True
+        try:
+            for i in range(60):
+                if self.st["cut"] and i == 30:
+                    self.wfile.flush()
+                    self.connection.shutdown(2)
+                    return
+                self.wfile.write(("data: %s\n\n" % json.dumps({"choices": [{"delta": {"content": "word%d " % i}}]})).encode())
+                self.wfile.flush()
+                time.sleep(self.st["gap"])
+            self.wfile.write(b'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n')
+        except OSError:
+            pass
+
+
+_t620_stub = _ss620.ThreadingTCPServer(("127.0.0.1", 0), _T620Stub)
+_t620_stub.daemon_threads = True
+_th620.Thread(target=_t620_stub.serve_forever, daemon=True).start()
+_T620_P = _t620_stub.server_address[1]
+
+
+def _seed620(h):
+    with open(os.path.join(h, "cloud.json"), "w") as f:
+        json.dump({"active": "groq", "providers": {"groq": {
+            "name": "Groq", "base": "http://127.0.0.1:%d/api.groq.com/openai/v1" % _T620_P,
+            "key": "gsk_" + "A" * 52, "model": "openai/gpt-oss-120b", "models": ["openai/gpt-oss-120b"], "status": "ok"}}}, f)
+    with open(os.path.join(h, "prefs.json"), "w") as f:
+        json.dump({"turbo": True, "seen_opening": True}, f)
+
+
+_ENV620 = {"HTTPS_PROXY": "http://127.0.0.1:%d" % _T620_P, "https_proxy": "http://127.0.0.1:%d" % _T620_P,
+           "HTTP_PROXY": "http://127.0.0.1:%d" % _T620_P, "http_proxy": "http://127.0.0.1:%d" % _T620_P,
+           "NO_PROXY": "127.0.0.1,localhost", "no_proxy": "127.0.0.1,localhost", "HF_HUB_OFFLINE": "1"}
+_T620 = Instance(9903, "T620", seed=_seed620, env=_ENV620).start()
+
+
+def _t620_ask(inst, cid, q="what is a lighthouse for?", web=False, wait=None):
+    body = {"messages": [{"role": "user", "content": q}], "tier": "Fast", "auto_web": web, "chat_id": cid}
+    r = urllib.request.Request(inst.base + "/api/chat", data=json.dumps(body).encode(),
+                               headers=dict(inst.headers, **{"Content-Type": "application/json"}))
+    buf = ""
+    try:
+        with urllib.request.urlopen(r, timeout=120) as resp:
+            st = resp.status
+            while True:
+                c = resp.read1(4096)
+                if not c:
+                    break
+                buf += c.decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, e.read().decode("utf-8", "replace"), []
+    except Exception as e:
+        return -1, str(e), []
+    frames = re.findall("\x00([A-Z0-9]+)(?::(.*?))?\x00", buf, flags=re.S)
+    return st, re.sub("\x00[A-Z0-9]+(:.*?)?\x00", "", buf, flags=re.S), frames
+
+
+def _t620_saved(inst, cid):
+    r = urllib.request.Request(inst.base + "/api/chats/one?id=" + cid, headers=inst.headers)
+    try:
+        with urllib.request.urlopen(r, timeout=20) as resp:
+            c = json.loads(resp.read()).get("chat") or {}
+    except Exception:
+        return []
+    return [m for m in (c.get("messages") or []) if m.get("role") == "assistant"]
+
+
+_T620Stub.st.update(cut=True, gap=0.0)
+_t620_c = _t620_ask(_T620, "ctrustcut0001")
+_T620Stub.st.update(cut=False)
+_t620_w = _t620_ask(_T620, "ctrustwhol001")
+_t620_cs, _t620_ws = _t620_saved(_T620, "ctrustcut0001"), _t620_saved(_T620, "ctrustwhol001")
+check("trust (live): a stand-in that closes the stream at word 30: the 30 words land, a CUT frame follows, and the turn "
+      "is saved with cut: true; the whole answer has no CUT and is saved finished",
+      _t620_c[0] == 200 and _t620_c[1].split() == ["word%d" % i for i in range(30)]
+      and [f for f in _t620_c[2] if f[0] == "CUT"] and _t620_cs and _t620_cs[-1].get("cut") is True
+      and _t620_w[0] == 200 and len(_t620_w[1].split()) == 60 and not [f for f in _t620_w[2] if f[0] == "CUT"]
+      and _t620_ws and "cut" not in _t620_ws[-1],
+      "%r" % [_t620_c[0], _t620_c[1][-80:], [f[0] for f in _t620_c[2]], _t620_cs[-1:] and {k: v for k, v in _t620_cs[-1].items() if k != "usage"}])
+os.chmod(_T620.home, 0o500)
+try:
+    _t620_d = _t620_ask(_T620, "ctrustdisk001")
+finally:
+    os.chmod(_T620.home, 0o700)
+check("trust (live): a question its folder won't take is refused before anything is asked: 507 and a human line, not a "
+      "dropped connection",
+      _t620_d[0] == 507 and "Couldn’t save your question" in json.loads(_t620_d[1] or "{}").get("err", ""), "%r" % [_t620_d[:2]])
+del _T620Stub.connects[:]
+_t620_s = _t620_ask(_T620, "ctrustweb0001", q="Who won the 1998 FIFA World Cup final and what was the score?", web=True)
+_t620_hosts = sorted(set(_T620Stub.connects))
+_t620_done = [json.loads(f[1]) for f in _t620_s[2] if f[0] == "DONE" and f[1]]
+check("trust (live): one searched question reaches only the named engines (the audit's reached nine hosts), and the "
+      "answer names them",
+      _t620_s[0] == 200 and _t620_hosts and set(_t620_hosts) <= {"html.duckduckgo.com", "search.brave.com"}
+      and _t620_done and set(_t620_done[-1].get("web") or []) <= {"DuckDuckGo", "Brave"} and _t620_done[-1].get("web"),
+      "%r" % [_t620_hosts, _t620_done])
+# a quit mid-answer: kept, and saved as stopped; a crash mid-answer: the journal puts most of it back, cut
+_T620Stub.st.update(gap=0.2)
+_t620_q = {}
+for _sig620, _cid620 in ((signal.SIGTERM, "ctrustquit001"), (signal.SIGKILL, "ctrustcrsh001")):
+    _th = _th620.Thread(target=lambda c=_cid620: _t620_ask(_T620, c), daemon=True)
+    _th.start()
+    time.sleep(12)
+    os.kill(_T620.proc.pid, _sig620)
+    _th.join(30)
+    try:
+        _T620.proc.wait(30)
+    except Exception:
+        pass
+    _T620 = Instance(9903, "T620", env=_ENV620).start()     # the same folder, no new seed
+    urllib.request.urlopen(urllib.request.Request(_T620.base + "/api/chats", headers=_T620.headers), timeout=20).read()
+    _t620_q[_sig620.name] = [{k: m.get(k) for k in ("stopped", "cut")} | {"n": len(m.get("content", ""))}
+                             for m in _t620_saved(_T620, _cid620)]
+_T620Stub.st.update(gap=0.0)
+check("trust (live): a quit (SIGTERM) mid-answer saves what was shown as stopped; a crash (SIGKILL) mid-answer leaves the "
+      "3-second journal, and the next run puts most of the answer back, marked cut (both were lost or saved as finished)",
+      len(_t620_q.get("SIGTERM", [])) == 1 and _t620_q["SIGTERM"][0]["stopped"] is True and _t620_q["SIGTERM"][0]["n"] > 100
+      and len(_t620_q.get("SIGKILL", [])) == 1 and _t620_q["SIGKILL"][0]["cut"] is True and _t620_q["SIGKILL"][0]["n"] > 100
+      and not os.path.exists(os.path.join(_T620.home, "turns.live.json")),
+      "%r" % [_t620_q])
+_T620.stop()
+_t620_stub.shutdown()
+_t620_ss.shutdown()
+# ==== 6b620 trust (live): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

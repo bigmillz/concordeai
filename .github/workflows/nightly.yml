@@ -58,7 +58,9 @@ jobs:
           python3 -m venv "$HOME/Library/Application Support/MillenAI/venv"
           ./build_shell_dmg.sh
           ./build_windows.sh
-          ls -la *.dmg *.zip
+          # the DMG's checksum rides with it: the updater refuses a download without one (6b620)
+          for f in *.dmg; do shasum -a 256 "$f" | awk -v n="$f" '{print $1 "  " n}' > "$f.sha256"; done
+          ls -la *.dmg *.dmg.sha256 *.zip
       - name: Publish the nightly prerelease
         env: { GH_TOKEN: "${{ github.token }}" }
         run: |
@@ -78,6 +80,6 @@ jobs:
           # then recreate — never edit in place, so published_at moves
           gh release delete nightly --yes --cleanup-tag 2>/dev/null || true
           git push origin :refs/tags/nightly 2>/dev/null || true
-          gh release create nightly *.dmg *.zip --prerelease --latest=false \
+          gh release create nightly *.dmg *.dmg.sha256 *.zip --prerelease --latest=false \
             --title "$SHOW nightly $SHA" \
             --notes "$(printf 'ConcordeAI %s nightly %s\n\n%s\n' "$SHOW" "$SHA" "$BULLETS")"

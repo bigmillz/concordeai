@@ -5,6 +5,7 @@ MillenAI.app/
 Concorde.app/
 ConcordeAI.app/
 *.dmg
+*.dmg.sha256
 __pycache__/
 *.pyc
 

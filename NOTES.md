@@ -21056,38 +21056,172 @@ this branch touches, not re-run on beta-3 to confirm it predates this.
   saying which clock, so it is left as the kit sends it.
 - This computer's clock decides while the server is asleep; a wrong clock here moves the hours.
 
-## 6b620 — beta-4: the integration (7.0 beta 4, per Patrick)
+## 6b620 — trust-1: a lockout always asks, a cut answer says so, a full disk keeps the answer, the web is named, the updater checks what it installs (7.0 beta, from an under-the-hood audit)
 
-Patrick, at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important that the chat
-page and also obviously the code page and all that looks really dialed in ... I want this UI to be perfect." Later
-(2026-11-11): "it has to be usable": usability first for betas 4 and 5; the Ultra push lands, no other new effects.
+An under-the-hood audit of beta-3 (c5d44c5, evidence in the session scratchpad's `audit/hood/`) found five ways the
+app broke trust, and a handful of cheap ones beside them. Branch `trust-1` from beta-3, server-side, with as little
+in the page as the fixes need (beta 4, the UI and parity, is being integrated beside it). Each fix has gauntlet checks
+and mutants that prove them (`6b620 trust (in process)`, `6b620 trust (live)`).
 
-**What is in.** Branch `beta-4` from beta-3 (c5d44c5, then its final head fbe9275 with the two gauntlet fixes):
-beta-4-panel (6b580), beta-4-chat (6b590), quality-4 (6b560), quiet-hours (6b600, a9081b6 then 5765264),
-beta-4-lanes (6b622), beta-4-md (6b623), beta-4-layout (6b624), beta-4-polish (6b625), beta-4-ultra (6b621) and
-first-run-1 (6b630). The last five came from a daily-use audit of the chat and Code pages (scratchpad
-`audit/daily/`): renderMD, the Code run log, the header at narrow widths, the composer under the column (its P0s),
-and its P1s; and from the web demo's d84e057, b509fe9, fa8385e and ddfdf72.
+**1. Full autonomy could lock Patrick out of his server.** He is abroad, the server is on Wi-Fi only and only his mom
+can press its button. The audit fed the classifier 29 commands that cut the owner off (sshd and Tailscale stopped,
+the firewall closed, the Wi-Fi or its driver taken away, `netplan apply`, rescue and sysrq, the keys, the login and
+the ssh server removed); every one came back `write`, which Full runs without asking. Now:
+- `_LOCKOUT_PAT`, a LOCKOUT group at the head of `_DANGER_RX`: stopping, disabling, masking or killing ssh/sshd/
+  tailscaled (pkill, killall, `kill $(pgrep sshd)`, `pkill -u`, loginctl); `tailscale down`/`logout`; ufw, iptables,
+  ip6tables, nft and firewall-cmd changes (their reads, and their names as arguments, stay out: the tools are also
+  parsed by subcommand in `_lockout_seg`, so `systemctl status ufw` and `cat /etc/ufw/user.rules` don't trip it);
+  nmcli/rfkill/wpa_cli/iw Wi-Fi changes, `modprobe -r` and `rmmod`, `netplan apply`, network sysctls; `systemctl
+  isolate`/rescue/emergency/suspend/hibernate, `telinit 1`, sysrq; removing, moving, truncating or overwriting
+  `~/.ssh`, `authorized_keys` or `/etc/ssh` (an append, `>>` or `tee -a`, stays a write; a copy FROM them, a backup,
+  stays a write), `usermod -L`/`-e`, nologin or false shells, `chage -E`, `deluser`, removing openssh-server,
+  Tailscale, NetworkManager, netplan.io, wpasupplicant or the firmware; `swapoff` (all swap gone under a resident
+  model: the box thrashes and nothing answers). Reboot and poweroff were already danger, at every spelling.
+- what the classifier can't read is not let through: `$IFS`, `eval` as a command, any pipe into a shell, `bash <(…)`,
+  `sh -c "$(curl …)"`, and bytes decoded (base64 -d, xxd -r, openssl -d, `\x..`) beside a shell.
+- `danger` asks at every level, Full included (it always did; the commands were simply not danger). `netplan apply`
+  comes with "Safer: netplan try --timeout 120. It undoes itself unless you confirm you can still reach the server."
+  on its approval card (an APPROVE frame's `hint`, one small line in the card), and the driver's rules say the same.
+- Pins moved: `systemctl stop sshd`, `ufw deny 22`, `ufw allow 51820/udp` and `echo x >& /root/.ssh/authorized_keys`
+  are danger now (any firewall change asks), and so is overwriting sshd_config whole (`echo 'Port 2222' >
+  /etc/ssh/sshd_config`: a one-line config behind a firewall that allows 22 is a lockout); `sed -i` on sshd_config
+  stays a write.
 
-**How the merges were resolved.**
-- 6b580 and 6b590 both wrote the question's bubble: 6b590's box, keys row and rhythm win (the keys sit in the flow
-  under the bubble; 6b580's absolute keys row went); 6b580 keeps only `border:0;width:fit-content`.
-- One face token: `--hz-font-chat` is `var(--hz-font-ui)` (Inter, else the system's sans).
-- The eased follow (6b580's `chatEase`) stands beside 6b590's `chatPin` (which knows `chatBulk` and `chatUnseen`).
-- 6b590's two rules that read as unscoped or round in 6b580's layout check: the screen-reader line is `:root
-  .chat-sr` (a page-wide utility, Classic too) and the jump key centres by `left:50%;margin-left:-16px`.
-- `hzBalance` keeps Funnels' home (6b625) and the empty state's line (6b630).
-- The merge interleaved 6b625's and 6b621's gauntlet blocks (their node scripts share lines); 6b621's block was put
-  back whole after 6b625's. NOTES are in number order: 6b560 between 6b555 and 6b570, 6b621 before 6b622.
+**2. A cut answer was saved as finished.** A provider or Ollama stream that ended without its own end mark (`[DONE]`
+or a `finish_reason`; Claude's `message_stop`; Ollama's `done`) landed and was saved like a whole one: the audit's
+stand-in closed the stream at word 30 and the turn said nothing. Each reader (`cloud_stream_conf`,
+`_anthropic_stream`, `stream_ollama`, and MLX's `stream_openai_compat`) now says how it ended (`stream_done`); only a
+stream whose words reached the page counts (the chat handler counts them, `stream_page_mark`: a draft collected for
+a merge doesn't), and a RESET that replaced the answer clears it. The handler sends `CUT` before `DONE`; the page
+draws one calm line, "The connection dropped." with **Continue** (asks "Continue from where you stopped.") and **Try
+again**, in the kind error line's look (beta 4's `.chat-err`, here in its least; only the chat's last answer keeps
+the keys), and the turn is saved with `cut: true`, so a reopened chat says it too.
 
-**Quiet hours and Settings (per Patrick, via the coordinator).** "Wake up server" keeps working at night: a deliberate
-click wins. "Test relay" is treated the same way (the coordinator's default, not Patrick's decision). Both go through
-`server_wake_test`, which never consulted the quiet hours; a check with a mutant now holds that.
+**3. A full disk lost the answer in silence.** `_turn_finish` swallowed the save's OSError, and `chat_append_turn`'s
+raised unhandled (the question's request died with no reply). Now a refused answer is kept in memory
+(`_turns_pending`) and tried again every 30 s and before the chat's next question; the stream's last frame (`SAVE
+{"fail": "full"|"denied"}`) gives the page its line: "Couldn't save this answer: your disk is full. It's still on
+screen." (or "…ConcordeAI can't write to its folder…"). A question that can't be saved gets 507 and "Couldn't save
+your question: your disk is full. Free up some space, then send it again." Under 1 GB free on the data folder's disk
+(`shutil.disk_usage`, read at most every 10 s) each answer ends with "Your disk is almost full (0.4 GB free). New
+answers may not save." A StaleProfile (also an OSError) is dropped as before, never retried.
 
-**Inter.** TODO: bundle Inter's official woff2 as `fonts/InterVariable.woff2` once Patrick approves the download;
-`HZ_FONT_FILES` already lists it and the tokens fall back to the system's sans until then.
+**4. "Nothing has left your machines" after a web search.** `_SEARCH_BACKENDS` was `("bing", "auto", "duckduckgo")`,
+but ddgs 9 ships its Bing engine disabled, and a backend it doesn't list silently becomes `auto`: every engine at
+once. One question reached nine hosts (Wikipedia, Grokipedia, Google, Yandex, Brave, Mojeek, Yahoo, Startpage,
+DuckDuckGo); `_ddg_more` asked `auto` by name too. Now `SEARCH_ENGINES = ("duckduckgo", "brave")`: DuckDuckGo, then
+Brave when it has nothing, Brave as the grounding's second list, DuckDuckGo's news by name; an engine ddgs no longer
+lists is skipped (`search_engine_ok`), never replaced. The engines a run asked ride its DONE frame (`web`, from a
+counter, `search_hits_snapshot`/`search_engines_since`) and are saved with the turn; the machines line says
+"Searched the web (DuckDuckGo and Brave)." (and the cloud's line after it), "Searched the web." for an older saved
+answer with a search step, and "Nothing has left your machines." only when nothing searched. Settings' note names
+them. (Funnel pictures still ask Bing's image search, `_fimg_bing`: not a chat question's search; left as it was.)
 
-**Verified.** GAUNTLET_LINE
+**5. The updater installed unchecked code.** `_SWAP_SCRIPT` mounted whatever the download was, `rm -rf`'d the app
+before the `mv` (a failed move left no app), stripped the quarantine and relaunched. Now `_do_update` checks
+everything while the app still runs, and a failure leaves it running with the reason in the Updates pane: the
+release's `.sha256` asset (refused when there is none), the download's SHA-256 against it, hdiutil, a staged copy
+beside the app (`<app>.new`), an older CFBundleVersion, `codesign --verify --deep --strict`, and with a Developer ID
+on either side the team (`UPDATE_TEAM_ID`, "WNFPCU5A66", for when Apple activates it; a dev copy may set
+`MILLENAI_UPDATE_TEAM`) and `spctl -a`; an ad hoc build offered to a Developer ID install is refused. The helper
+waits for this server and its shell by process id (a `pgrep` from the helper missed the shell, so an open made
+while it still ran handed over to it and went with it), checks the signature again, renames the old bundle aside,
+moves the new one in and puts the old back if anything fails. It always opens an app: Launch Services is told the
+bundle changed first (`touch` and `lsregister -f`: a new build renamed into a path it knew would not open at all,
+"Launchd job spawn failed", error 162, until it was registered again), each open is tried three times until the app
+is seen running, and if the new one is gone 20 s after it opened, the old one comes back. Quarantine is left as it
+came. `release.sh` and the nightly write and publish `<dmg>.sha256` (git-ignored).
+
+**6. Fonts, the map and the CSP: ready, nothing downloaded.** `WEB_FONT_FILES` (Space Grotesk, IBM Plex Mono 400/500/
+600) are served from `fonts/` when every one of them is there, and the Google stylesheet is dropped then
+(`__FONT_LINKS__`); until then it stays, whole. `MAP_LIBS` serve Leaflet, MapLibre and the bridge from `vendor/`
+under `/static/vendor/` when present (build_shell_dmg.sh and build_macos_app.sh carry the folder when it exists),
+else from unpkg, pinned, with SRI where verified: Leaflet 1.9.4's css and js carry the hashes leafletjs.com publishes
+(jsDelivr's listing of the same npm files agrees). MapLibre's and the bridge's have one source only (jsDelivr), so
+they are a TODO in the source with the values to confirm. `PAGE_CSP` narrowed from `default-src 'self' https: data:
+blob: 'unsafe-inline' 'unsafe-eval'` to each kind's hosts: scripts self and unpkg, styles self, Google and unpkg,
+fonts self, data and gstatic, connections self and the map's tiles, the map's worker from a blob, no frames, no eval;
+pictures stay `https:` (a source's photos come from anywhere). Left: `'unsafe-inline'` (the one-file page's inline
+scripts, styles and handlers need nonces first), and the Google and unpkg hosts until their files ship.
+
+**7. The cheap ones.** A quit or SIGTERM mid-answer saves it as `stopped` (it was saved as finished). Every 3 s the
+answers on their way are written to `turns.live.json` in their profile (one small file, not the chat store), marked
+cut; a clean end takes them out, and after a crash the next run puts them in their chats where the question still is
+(the first chat list or question of the run). `hw.memsize` is read once a run (a sysctl process ran on every stats
+poll). A local engine isn't warmed for an answer the cloud ladder will write (`_cloud_first`: one model, a cloud key
+the single path walks first; a 26B engine was read into memory for a Groq answer). Calm holds the aurora's two sways
+still (`.hz.hz-calm #hz-aur1,…{animation:none}`; the audit measured Calm at 33 % CPU with only those running).
+
+**Copy, old -> new (for Patrick's approval):**
+- machines line after a search: "Nothing has left your machines." -> "Searched the web (DuckDuckGo and Brave)." (or
+  the engines it asked; "Searched the web." for an older answer); with the cloud: "Some of this went through Groq."
+  -> "Searched the web (DuckDuckGo). Some of this went through Groq."
+- a cut answer (new): "The connection dropped." with "Continue" and "Try again"; Continue sends "Continue from where
+  you stopped."
+- a refused save (new): "Couldn't save this answer: your disk is full. It's still on screen." / "Couldn't save this
+  answer: ConcordeAI can't write to its folder. It's still on screen." (the second is not in the brief; it is what an
+  unwritable folder honestly is)
+- a refused question (new; it was a dropped connection): "Couldn't save your question: your disk is full. Free up
+  some space, then send it again." / "Couldn't save your question: ConcordeAI can't write to its folder. Nothing was
+  sent."
+- low disk (new): "Your disk is almost full (0.4 GB free). New answers may not save."
+- approval card (new): "Safer: netplan try --timeout 120. It undoes itself unless you confirm you can still reach
+  the server."
+- Settings, the cloud note: "A question that needs the web goes, as typed, to a search engine;" -> "…goes, as typed,
+  to DuckDuckGo, and to Brave when DuckDuckGo has nothing;"
+- the Updates pane's reasons (new): "This update has no checksum, so it wasn't installed", "The download didn't match
+  its checksum, so it wasn't installed", "The update couldn't be opened", "The update holds no app", "The update
+  couldn't be copied next to the app", "The update is older than this app", "Its signature didn't check out, so it
+  wasn't installed", "It isn't signed by ConcordeAI's developer, so it wasn't installed", "macOS didn't accept it, so
+  it wasn't installed".
+
+**Verified** (dev copies on 9971, 9975 and 9987 against a stand-in Groq and a recording proxy that refuses every
+CONNECT; never the real server; headless Chromium via Playwright for the page; the base is c5d44c5 run side by side):
+| | before (c5d44c5) | after (trust-1) |
+|---|---|---|
+| the audit's 29 lockout commands | all `write` (Full runs them) | all `danger` (asks at every level), plus 12 hidden forms and 26 other spellings; 31 everyday reads and writes unchanged |
+| a stream closed at word 30 | saved as finished, no frame | the 30 words, `CUT`, saved `cut: true`, "The connection dropped." with Continue / Try again on reopen |
+| the question with an unwritable folder | the connection dropped (RemoteDisconnected) | 507 and "Couldn't save your question: …" |
+| the answer with the folder made read-only mid-stream | never saved, nothing said | `SAVE {"fail": "denied"}`, saved by the 30 s retry once writable |
+| one searched question | 106 CONNECTs to 9 hosts | 12 to 2 (html.duckduckgo.com, search.brave.com); "Searched the web (DuckDuckGo and Brave)." |
+| a quit (SIGTERM) mid-answer | saved as finished | saved `stopped` |
+| a crash (SIGKILL) mid-answer | the answer lost | 283 of its characters back on the next start, `cut` |
+| a Groq answer on Fast | a 26B MLX engine loaded beside it | none |
+| the page's CSP | `default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'` | per kind (above); no violations in a page load |
+| Calm's aurora | hzSway running | none |
+
+The updater end to end with the real shell (updproof2's beta-1 bundle stamped with this source as 279 and 280, a
+stand-in GitHub on 9908, a dev folder; the scratchpad's `trust1/upd/proof.py`): 16/16 in one run. A corrupted DMG, a
+release with no `.sha256` and a DMG hdiutil can't open are each refused before the quit, the app still running and
+nothing beside it; with the bundle made immutable (`chflags uchg`) the move fails and the helper opens the old app
+(279) again; a good update swaps, opens 280, stays up past the 20 s watch and leaves nothing beside it. The proof found
+three things the helper now does: it waits by process id (its `pgrep` missed the shell, so an open handed over to the
+still-running app and went with it), it registers the bundle with Launch Services before opening (error 162 for a new
+build renamed into a path it knew), and it tries each open three times until the app is seen running.
+
+**Gauntlet:** a full run with its ports moved to 9981-9983 (9901-9903 were another run's): 1,518 / 1,537. The 17 reds
+that were this branch's (pins and mutation anchors that followed moved code, a slice that needed the stream helpers,
+two lint findings, the calm line's rules inside the Horizon block, the font link split across two literals) are fixed
+and re-run green in their sections (`6b620` 19/19 with every mutant caught; the Horizon scoping and 6b540-6b555 42/42;
+the classifier's 173 cases; the DONE clock; ISO-9; the profile lints). A second full run was stopped at 609 / 609 when
+the lead asked to hold full runs while beta 3's release run needed the memory. Two reds are not this branch's as far as
+can be told: `benchmark (live)` (the machine's memory crowded by other copies: "Other apps were using memory",
+`mem_rise` None) and `fluent (page, live)` (the answer's body also carried a numbered list of the run's own earlier
+chats, a Know citation; nothing here touches it). Neither was re-run on the base.
+
+**Left / worth knowing.**
+- The font and map files are not downloaded (Patrick's call): Space Grotesk (variable) and IBM Plex Mono 400/500/600
+  as woff2 in `fonts/`; Leaflet 1.9.4, MapLibre GL 5.24.0 and maplibre-gl-leaflet 0.1.4's five files in `vendor/`.
+  Then MapLibre's SRI (a TODO with jsDelivr's values) is moot and `PAGE_CSP` can drop unpkg and Google.
+- `'unsafe-inline'` stays in the CSP; the first-run splash still loads Michroma from Google.
+- The `.sha256` proves the download is the file the release serves, not who made it: that is the Developer ID's job
+  once Apple activates WNFPCU5A66 (then every update must carry it and pass Gatekeeper).
+- Cut detection covers streams on the request's own thread; one from another thread that reaches the page would not be
+  marked (none does today). `done_reason: "length"` is still not called cut.
+- An answer settled by the chat's next question (`_turns_settle`) on a full disk is lost with that question's 507.
+- Funnel pictures still ask Bing's image search (`_fimg_bing`).
+- A base dev copy stopped with SIGTERM left its pre-warmed MLX engine running (seen twice on c5d44c5); not looked into.
+- Verified in Blink, not in the app's WKWebView.
 
 ## 6b621 — beta-4-ultra: the sky, the aurora and Ultra at full strength, matched to the demo (7.0 beta 4, per Patrick)
 
@@ -21715,109 +21849,6 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
 - The command output is still not on the wire (6b622), so a danger card shows the command, not a preview of what it
   will delete.
 - Checked in an offscreen WKWebView and headless Chromium, not in the shipped window.
-## 6b630 — first-run-1: the app's own Python, the minimum-engine gate, a setup screen that says what it's doing, a home that says when nothing can answer, the Starter first (7.0 beta, per Patrick: the first-run audit's P0s)
-
-On `first-run-1`, from `beta-3` (c5d44c5). The fresh-eyes audit of a new Mac's first run (scratchpad
-`audit/first-run/`) found: the bootstrap ran `command -v python3`, the Command Line Tools' 3.9.6, so pip could only
-give mlx-lm 0.29.1 and the Light set's everyday model died with "Model type gemma4 not supported"; a Mac without the
-tools got a dialog with `xcode-select --install` in it, and the shell's own page said "set CONCORDE_PYTHON"; the
-setup screen was static text and an empty log box that said the window would open on its own while it was open; and
-the app said "ready" with no model at all: the first question ended in "⚠️ Backend error — Gemma 4 E2B's engine
-didn't start" (reproduced on beta-3 in a fake HOME, stills in the scratchpad's `fr1/stills/before`).
-
-**The app's own Python (P0 1).** `launch.sh` (build_macos_app.sh's LAUNCH heredoc, extracted into the shell by
-shell_stamp.py as before) never runs the system's Python. It downloads python-build-standalone 3.12.16 (release
-20261026, the install_only_stripped build, 25 MB) for the machine's architecture, checks its SHA-256 against the pin
-in the script (both arches' sums checked against the release's SHA256SUMS and GitHub's asset digests on 2026-11-10)
-**before** anything is unpacked, unpacks it into `~/Library/Application Support/MillenAI/python/cpython-3.12.16+20261026`
-and makes the venv from it. curl, shasum and tar are macOS's own; its TLS uses /etc/ssl/cert.pem (checked). Chosen
-over bundling it in the .app: the venv's ~350 MB of wheels needs the internet on a first run anyway, a bundled Python
-would add ~50 MB to the DMG (both arches; python-build-standalone has no universal build) and ~70 nested Mach-O files
-to sign and notarize under the hardened runtime (plus library validation against every pip wheel), and the download
-keeps the DMG at its size. The engine installs at the app's pins (`engine-requirements.txt`, written by
-shell_stamp.py from MLX_LM_PIN and MLX_PIN, a new bundle resource) instead of whatever pip picks. A venv older than
-3.11 (read from its pyvenv.cfg, never by running it: the Command Line Tools' 3.9 of an earlier first run) is moved
-aside and made again from our Python, and put back if that fails; the shell runs the setup for it too
-(`venv_too_old`). A setup stopped half way (Quit, a lost connection) leaves `.setup-unfinished` in the venv, so the
-next launch finishes it instead of starting the server on half a venv (`venv_ready`). In shell mode
-(`--bootstrap --shell`) there's no pywebview, no osascript, and the setup speaks to the shell in "@@" lines.
-
-**The gate.** MLX_TYPE_SINCE: the first mlx-lm that loads each newer model type, read off every mlx-lm wheel on PyPI
-from 0.28.4 to 0.32.2 (models/<type>.py or the type mapping): qwen3_5, qwen3_5_moe and glm_moe_dsa from 0.30.7, gemma4
-from 0.31.2, gemma4_unified from 0.32.0. MLX_REQUIRES now holds every MLX row of those types (Gemma 4 E2B and 26B,
-Qwen 3.5 9B, Qwen 3.8 27B, Qwen 3.6 35B MoE, GLM 5.3). On 0.29.1 they run on Ollama (GLM 5.3, MLX-only, isn't
-offered); Llama 3.2 1B stays on MLX; on the pin all are MLX.
-
-**The setup screen (P0 2, P1).** The shell's own page (SETUP_PAGE, a data: document): the wordmark, Inter with the
-system face until the font file is approved, one hairline bar for the whole setup (each step its share, the file
-downloading now filling most of it, never going back), "Step 2 of 4", the step's name, and the file with its size and
-percent (pip's `--progress-bar raw`), at most every 120 ms. A failure: "Setup didn't finish / Check your internet
-connection, then try again." with "Try again" and "Copy details" (the log's tail and the machine onto the clipboard
-with pbcopy, never on the screen). Both are navigations to `concorde-shell://`, answered by on_navigation and never
-loaded. Quit during the setup stops its whole process group (pip included). Nothing on any shell page names a
-command or an environment variable now; a dev's CONCORDE_PYTHON hint goes to stderr. An empty log box is hidden.
-
-**Nothing can answer yet (P0 3).** `/api/setup` says `models_ready` (models, not the Ollama engine's pseudo-row) and
-the `starter`'s state; `needs_setup` is "no model here" (it was "fewer than two", which held a Starter-only or
-cloud-only install in the first-run window forever). The home, while no model is here, no cloud key works and no
-paired server answers (`hzNoModel`; never claimed before it has asked), shows one line under the composer and one
-primary key, "Get a starter model · 0.8 GB · about 2 min", with "Use the cloud instead" (Settings › Cloud) beside it;
-the download's progress takes the key's place; it goes when a model is here (and a working cloud key with no model
-here sets Cloud Only, once). A question then stays in the box and the line says why. A relaunch opens no window over
-the app (the "Welcome. Setting up…" panel); the setup window opens only from the download strip now. The composer
-keeps the golden point with the line under it.
-
-**The Starter.** STARTER_MODEL = Llama 3.2 1B. `start_starter_first`: whatever set is picked, the starter downloads
-alone first and the rest of the set waits as "queued" (so the bar counts it) until it lands, then starts as before
-(an Ollama batch already went smallest first). `/api/setup/install` takes `starter` (the starter alone; no set is
-recorded, so the More-models card offers Light later).
-
-**The wizard (P1).** Five steps, Inter, a flat near-black card with hairlines, the step marks 2 px bars (no circles):
-a plain promise ("Private AI, running on your own machines."; no "About a minute", no "Several draft…"); Models, one
-list with a size and a time on every row (Starter, Light, Recommended, Everything, Cloud only); Cloud (its line asks
-for a key when Cloud only is picked); Your server (the pairing code first; the address and Cloudflare Access under
-Advanced; a failed pair takes the new entry back off); Ready, whose one filled key names what downloads first
-("Download Starter · 0.8 GB · about 2 min"), the rest of the set said on the line above ("Then Light follows in the
-background: 10 GB, about 28 min."). No limits, the giants box and auto-clean left the wizard; they are Settings ›
-Models' (Manage). Times before a download are estimates at 50 Mbit/s (DL_ASSUME_BPS); once bytes move every bar
-says its measured time.
-
-**What's new (P1).** release.sh writes RELEASE_NOTES.md between `<!-- whats-new -->` markers (GitHub doesn't show
-them) and the install notes after; `user_notes` shows only what is between them everywhere the app reads notes, and
-cuts an older body at its "**macOS**"/"**Windows**" boilerplate. Channel names: the app already says Beta everywhere
-(6b551); unchanged.
-
-**Measured** (this Mac, Apple silicon, a fast line; fake HOME, PATH /usr/bin:/bin:/usr/sbin:/sbin, the release bundle
-as a dev copy, Ollama hidden by the dev-only `no-ollama` hook): launch → setup done 50.2 s (Python 2.8 s, venv
-2.8 s, basics 3.3 s, engine 41 s), page loaded 50.7 s; the setup downloads 25 MB + 354 MB of wheels (torch, 139 MB,
-is mlx-whisper's) and the venv is 1.5 GB. The Starter's download ran on its real path with its blobs already on disk
-(Llama 3.2 1B is in this Mac's HF cache, so it wasn't fetched again): 11-15 s of the hub's metadata and linking; first
-words 0.4-2.2 s after the question. On a 50 Mbit/s line* the downloads alone are about 1 min for the setup and 2 min
-for the Starter: about 4 min from the first open to the first answer, plus the person's clicks. (*estimate) The
-failure screen, Copy details and Try again were proven in the real WKWebView through the debug shell's probe hook (a
-dead proxy for the download); Quit at 9 s left no process of that HOME; a venv marked unfinished was finished by the
-next launch (2.7 s).
-DMG (universal, both Developer ID signed, not notarized): beta-3's 5,881,829 bytes → 5,902,733 (+20.9 KB); the
-.app 12.88 → 12.94 MB. The Developer ID (hardened runtime) bundle's first run was repeated on a fresh HOME: setup done
-in 67 s, page loaded at 68 s, nothing in the hardened runtime in the way (the downloaded Python carries no quarantine).
-The full gauntlet is owed: 9901 and 9902 were held for the whole session by another helper's `concorde-front`; the
-sections this touches ran standalone (all green but three that need the full run's fixtures, none of them changed).
-
-**Checks.** A 6b630 block of seven checks and 23 mutants: launch.sh's pins and order (static) and its own functions
-run in zsh (a venv's age, pip's lines, a wrong SHA-256 never unpacked, the right one unpacked); the shell's screen,
-links, Quit and venv rules; the gate on 0.29.1 and on the pin; the home's who-can-answer table, the starter key, the
-send, the relaunch and the wizard's last key, run in node; start_starter_first run with stand-ins; user_notes and
-release.sh's markers. Re-pinned: the wizard's five steps, auto-clean and the giants box as Settings' only, 6b405's
-route and renderer counts, 6b494's MLX_REQUIRES, 6b537's bootstrap and resources, 6b551's notes helpers.
-
-**For Patrick.** The website's channel explainer and FAQ still say "Prerelease" (the app says Beta) and the FAQ says
-"Basic is one 0.8 GB model … Pro … Max" (the app: Starter, Light, Recommended, Everything); not edited. A code alone
-can't pair yet: the app pairs only over https and nothing tells it a server's address, so the address is asked for
-under Advanced; true code-only pairing needs the server to advertise itself or carry its address in the code (an
-ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
-setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
-Chromium and read back from the real WKWebView.
-
 ## 6b626 — beta-4-answers: no needless search, no topic bleed, the landmark kept, offline said plainly (7.0 beta 4, per Patrick)
 
 Patrick: "it has to be usable". The beta-4 walkthrough asked plain things and got wrong turns, all of them server
@@ -22076,3 +22107,140 @@ and the shell's check (two commands, the new permission).
 **Left.** The panel in a built shell, by hand. Patrick's call on a mode picked inside Code. Pre-existing, seen while
 measuring: 6b624's "the drawer opens at 760" fails the same way on f969040's page in the headless shell; a stray `*/`
 after ".hz #about-veil .us-card,Usage: the cards and lists in the one glass" in the About css (on f969040 too).
+
+## 6b630 — first-run-1: the app's own Python, the minimum-engine gate, a setup screen that says what it's doing, a home that says when nothing can answer, the Starter first (7.0 beta, per Patrick: the first-run audit's P0s)
+
+On `first-run-1`, from `beta-3` (c5d44c5). The fresh-eyes audit of a new Mac's first run (scratchpad
+`audit/first-run/`) found: the bootstrap ran `command -v python3`, the Command Line Tools' 3.9.6, so pip could only
+give mlx-lm 0.29.1 and the Light set's everyday model died with "Model type gemma4 not supported"; a Mac without the
+tools got a dialog with `xcode-select --install` in it, and the shell's own page said "set CONCORDE_PYTHON"; the
+setup screen was static text and an empty log box that said the window would open on its own while it was open; and
+the app said "ready" with no model at all: the first question ended in "⚠️ Backend error — Gemma 4 E2B's engine
+didn't start" (reproduced on beta-3 in a fake HOME, stills in the scratchpad's `fr1/stills/before`).
+
+**The app's own Python (P0 1).** `launch.sh` (build_macos_app.sh's LAUNCH heredoc, extracted into the shell by
+shell_stamp.py as before) never runs the system's Python. It downloads python-build-standalone 3.12.16 (release
+20261026, the install_only_stripped build, 25 MB) for the machine's architecture, checks its SHA-256 against the pin
+in the script (both arches' sums checked against the release's SHA256SUMS and GitHub's asset digests on 2026-11-10)
+**before** anything is unpacked, unpacks it into `~/Library/Application Support/MillenAI/python/cpython-3.12.16+20261026`
+and makes the venv from it. curl, shasum and tar are macOS's own; its TLS uses /etc/ssl/cert.pem (checked). Chosen
+over bundling it in the .app: the venv's ~350 MB of wheels needs the internet on a first run anyway, a bundled Python
+would add ~50 MB to the DMG (both arches; python-build-standalone has no universal build) and ~70 nested Mach-O files
+to sign and notarize under the hardened runtime (plus library validation against every pip wheel), and the download
+keeps the DMG at its size. The engine installs at the app's pins (`engine-requirements.txt`, written by
+shell_stamp.py from MLX_LM_PIN and MLX_PIN, a new bundle resource) instead of whatever pip picks. A venv older than
+3.11 (read from its pyvenv.cfg, never by running it: the Command Line Tools' 3.9 of an earlier first run) is moved
+aside and made again from our Python, and put back if that fails; the shell runs the setup for it too
+(`venv_too_old`). A setup stopped half way (Quit, a lost connection) leaves `.setup-unfinished` in the venv, so the
+next launch finishes it instead of starting the server on half a venv (`venv_ready`). In shell mode
+(`--bootstrap --shell`) there's no pywebview, no osascript, and the setup speaks to the shell in "@@" lines.
+
+**The gate.** MLX_TYPE_SINCE: the first mlx-lm that loads each newer model type, read off every mlx-lm wheel on PyPI
+from 0.28.4 to 0.32.2 (models/<type>.py or the type mapping): qwen3_5, qwen3_5_moe and glm_moe_dsa from 0.30.7, gemma4
+from 0.31.2, gemma4_unified from 0.32.0. MLX_REQUIRES now holds every MLX row of those types (Gemma 4 E2B and 26B,
+Qwen 3.5 9B, Qwen 3.8 27B, Qwen 3.6 35B MoE, GLM 5.3). On 0.29.1 they run on Ollama (GLM 5.3, MLX-only, isn't
+offered); Llama 3.2 1B stays on MLX; on the pin all are MLX.
+
+**The setup screen (P0 2, P1).** The shell's own page (SETUP_PAGE, a data: document): the wordmark, Inter with the
+system face until the font file is approved, one hairline bar for the whole setup (each step its share, the file
+downloading now filling most of it, never going back), "Step 2 of 4", the step's name, and the file with its size and
+percent (pip's `--progress-bar raw`), at most every 120 ms. A failure: "Setup didn't finish / Check your internet
+connection, then try again." with "Try again" and "Copy details" (the log's tail and the machine onto the clipboard
+with pbcopy, never on the screen). Both are navigations to `concorde-shell://`, answered by on_navigation and never
+loaded. Quit during the setup stops its whole process group (pip included). Nothing on any shell page names a
+command or an environment variable now; a dev's CONCORDE_PYTHON hint goes to stderr. An empty log box is hidden.
+
+**Nothing can answer yet (P0 3).** `/api/setup` says `models_ready` (models, not the Ollama engine's pseudo-row) and
+the `starter`'s state; `needs_setup` is "no model here" (it was "fewer than two", which held a Starter-only or
+cloud-only install in the first-run window forever). The home, while no model is here, no cloud key works and no
+paired server answers (`hzNoModel`; never claimed before it has asked), shows one line under the composer and one
+primary key, "Get a starter model · 0.8 GB · about 2 min", with "Use the cloud instead" (Settings › Cloud) beside it;
+the download's progress takes the key's place; it goes when a model is here (and a working cloud key with no model
+here sets Cloud Only, once). A question then stays in the box and the line says why. A relaunch opens no window over
+the app (the "Welcome. Setting up…" panel); the setup window opens only from the download strip now. The composer
+keeps the golden point with the line under it.
+
+**The Starter.** STARTER_MODEL = Llama 3.2 1B. `start_starter_first`: whatever set is picked, the starter downloads
+alone first and the rest of the set waits as "queued" (so the bar counts it) until it lands, then starts as before
+(an Ollama batch already went smallest first). `/api/setup/install` takes `starter` (the starter alone; no set is
+recorded, so the More-models card offers Light later).
+
+**The wizard (P1).** Five steps, Inter, a flat near-black card with hairlines, the step marks 2 px bars (no circles):
+a plain promise ("Private AI, running on your own machines."; no "About a minute", no "Several draft…"); Models, one
+list with a size and a time on every row (Starter, Light, Recommended, Everything, Cloud only); Cloud (its line asks
+for a key when Cloud only is picked); Your server (the pairing code first; the address and Cloudflare Access under
+Advanced; a failed pair takes the new entry back off); Ready, whose one filled key names what downloads first
+("Download Starter · 0.8 GB · about 2 min"), the rest of the set said on the line above ("Then Light follows in the
+background: 10 GB, about 28 min."). No limits, the giants box and auto-clean left the wizard; they are Settings ›
+Models' (Manage). Times before a download are estimates at 50 Mbit/s (DL_ASSUME_BPS); once bytes move every bar
+says its measured time.
+
+**What's new (P1).** release.sh writes RELEASE_NOTES.md between `<!-- whats-new -->` markers (GitHub doesn't show
+them) and the install notes after; `user_notes` shows only what is between them everywhere the app reads notes, and
+cuts an older body at its "**macOS**"/"**Windows**" boilerplate. Channel names: the app already says Beta everywhere
+(6b551); unchanged.
+
+**Measured** (this Mac, Apple silicon, a fast line; fake HOME, PATH /usr/bin:/bin:/usr/sbin:/sbin, the release bundle
+as a dev copy, Ollama hidden by the dev-only `no-ollama` hook): launch → setup done 50.2 s (Python 2.8 s, venv
+2.8 s, basics 3.3 s, engine 41 s), page loaded 50.7 s; the setup downloads 25 MB + 354 MB of wheels (torch, 139 MB,
+is mlx-whisper's) and the venv is 1.5 GB. The Starter's download ran on its real path with its blobs already on disk
+(Llama 3.2 1B is in this Mac's HF cache, so it wasn't fetched again): 11-15 s of the hub's metadata and linking; first
+words 0.4-2.2 s after the question. On a 50 Mbit/s line* the downloads alone are about 1 min for the setup and 2 min
+for the Starter: about 4 min from the first open to the first answer, plus the person's clicks. (*estimate) The
+failure screen, Copy details and Try again were proven in the real WKWebView through the debug shell's probe hook (a
+dead proxy for the download); Quit at 9 s left no process of that HOME; a venv marked unfinished was finished by the
+next launch (2.7 s).
+DMG (universal, both Developer ID signed, not notarized): beta-3's 5,881,829 bytes → 5,902,733 (+20.9 KB); the
+.app 12.88 → 12.94 MB. The Developer ID (hardened runtime) bundle's first run was repeated on a fresh HOME: setup done
+in 67 s, page loaded at 68 s, nothing in the hardened runtime in the way (the downloaded Python carries no quarantine).
+The full gauntlet is owed: 9901 and 9902 were held for the whole session by another helper's `concorde-front`; the
+sections this touches ran standalone (all green but three that need the full run's fixtures, none of them changed).
+
+**Checks.** A 6b630 block of seven checks and 23 mutants: launch.sh's pins and order (static) and its own functions
+run in zsh (a venv's age, pip's lines, a wrong SHA-256 never unpacked, the right one unpacked); the shell's screen,
+links, Quit and venv rules; the gate on 0.29.1 and on the pin; the home's who-can-answer table, the starter key, the
+send, the relaunch and the wizard's last key, run in node; start_starter_first run with stand-ins; user_notes and
+release.sh's markers. Re-pinned: the wizard's five steps, auto-clean and the giants box as Settings' only, 6b405's
+route and renderer counts, 6b494's MLX_REQUIRES, 6b537's bootstrap and resources, 6b551's notes helpers.
+
+**For Patrick.** The website's channel explainer and FAQ still say "Prerelease" (the app says Beta) and the FAQ says
+"Basic is one 0.8 GB model … Pro … Max" (the app: Starter, Light, Recommended, Everything); not edited. A code alone
+can't pair yet: the app pairs only over https and nothing tells it a server's address, so the address is asked for
+under Advanced; true code-only pairing needs the server to advertise itself or carry its address in the code (an
+ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
+setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
+Chromium and read back from the real WKWebView.
+
+## 6b640 — beta-4: the integration (7.0 beta 4, per Patrick)
+
+Patrick, at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important that the chat
+page and also obviously the code page and all that looks really dialed in ... I want this UI to be perfect." Later
+(2026-11-11): "it has to be usable": usability first for betas 4 and 5; the Ultra push lands, no other new effects.
+
+**What is in.** Branch `beta-4` from beta-3 (c5d44c5, then its final head fbe9275 with the two gauntlet fixes):
+beta-4-panel (6b580), beta-4-chat (6b590), quality-4 (6b560), quiet-hours (6b600, a9081b6 then 5765264),
+beta-4-lanes (6b622), beta-4-md (6b623), beta-4-layout (6b624), beta-4-polish (6b625), beta-4-ultra (6b621) and
+first-run-1 (6b630). The last five came from a daily-use audit of the chat and Code pages (scratchpad
+`audit/daily/`): renderMD, the Code run log, the header at narrow widths, the composer under the column (its P0s),
+and its P1s; and from the web demo's d84e057, b509fe9, fa8385e and ddfdf72.
+
+**How the merges were resolved.**
+- 6b580 and 6b590 both wrote the question's bubble: 6b590's box, keys row and rhythm win (the keys sit in the flow
+  under the bubble; 6b580's absolute keys row went); 6b580 keeps only `border:0;width:fit-content`.
+- One face token: `--hz-font-chat` is `var(--hz-font-ui)` (Inter, else the system's sans).
+- The eased follow (6b580's `chatEase`) stands beside 6b590's `chatPin` (which knows `chatBulk` and `chatUnseen`).
+- 6b590's two rules that read as unscoped or round in 6b580's layout check: the screen-reader line is `:root
+  .chat-sr` (a page-wide utility, Classic too) and the jump key centres by `left:50%;margin-left:-16px`.
+- `hzBalance` keeps Funnels' home (6b625) and the empty state's line (6b630).
+- The merge interleaved 6b625's and 6b621's gauntlet blocks (their node scripts share lines); 6b621's block was put
+  back whole after 6b625's. NOTES are in number order: 6b560 between 6b555 and 6b570, 6b621 before 6b622.
+
+**Quiet hours and Settings (per Patrick, via the coordinator).** "Wake up server" keeps working at night: a deliberate
+click wins. "Test relay" is treated the same way (the coordinator's default, not Patrick's decision). Both go through
+`server_wake_test`, which never consulted the quiet hours; a check with a mutant now holds that.
+
+**Inter.** TODO: bundle Inter's official woff2 as `fonts/InterVariable.woff2` once Patrick approves the download;
+`HZ_FONT_FILES` already lists it and the tokens fall back to the system's sans until then.
+
+**Verified.** GAUNTLET_LINE
+

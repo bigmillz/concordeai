@@ -64,6 +64,7 @@ python3 packaging/shell_stamp.py --engine-reqs "$APP/Contents/Resources/engine-r
 # the titlebar lockup is a native NSTextField and cannot pull Michroma
 # from Google the way the page does — it needs the real file (6b258)
 [[ -d fonts ]] && cp -R fonts "$APP/Contents/Resources/"
+[[ -d vendor ]] && cp -R vendor "$APP/Contents/Resources/"    # the map's scripts (6b620)
 # the HDR light source (6b261): one tiny PQ clip, same as ConcordeVPN
 [[ -d vfx ]] && cp -R vfx "$APP/Contents/Resources/"
 
