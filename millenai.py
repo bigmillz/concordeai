@@ -54938,12 +54938,34 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil #p-persona #user-name{margin-bottom:16px}
 .hz #about-veil #p-know .sx-priv{display:block;margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
 @media (prefers-reduced-motion:reduce){.hz #about-veil .sx-advb::after{transition:none}}
+/* one design language (6b625): rows with a label on the left and the control on the same right edge; About's quiet list */
+.hz #about-veil .sx-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:48px;padding:8px 0;margin:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil .set-h+.sx-row,.hz #about-veil .set-h+#look-row,.hz #about-veil .set-h+.toggle-row,.hz #about-veil .set-h+#beta-row{border-top:0}
+.hz #about-veil .sx-rowt{min-width:0}
+.hz #about-veil .sx-rowt b{display:block;font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sx-rowt #up-reldate{margin:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);text-align:left}
+.hz #about-veil .sx-row #about-check{width:auto;margin:0;align-self:center;flex:none}
+.hz #about-veil .spane>#up-notes{margin:8px 0 0}
+.hz #about-veil .spane>#set-spec{order:0;display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:0;row-gap:0;margin:0;padding:0;border:0;
+  font:450 13px/20px var(--hz-font-ui);letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.hz #about-veil .spane>#set-spec>div{display:contents}
+.hz #about-veil .spane>#set-spec>div.sx-gone{display:none!important}
+.hz #about-veil .spane>#set-spec dt,.hz #about-veil .spane>#set-spec dd{margin:0;padding:8px 0;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil .spane>#set-spec dt{color:var(--sx-meta);padding-right:24px}
+.hz #about-veil .spane>#set-spec dd{color:var(--sx-ink);text-align:right;white-space:normal}
+.hz #about-veil .spane>#set-spec>div:first-child dt,.hz #about-veil .spane>#set-spec>div:first-child dd{border-top:0}
+.hz #about-veil .spane>.sx-site{display:inline-block;order:1;align-self:flex-start;margin:16px 0 0;font:450 13px/20px var(--hz-font-ui);color:var(--sx-ink2);text-decoration:none}
+.hz #about-veil .spane>.sx-site:hover{color:var(--sx-ink)}
+.hz #about-veil #about-foot:not(:has(#about-site)){justify-content:flex-end}
+.hz #about-veil .snav-chev{display:none}
+.hz #about-veil #snav-models-kids{display:flex;flex-direction:column;gap:2px}
+.hz #about-veil #snav-models{padding-left:10px}
 /* a phone: the dialog is the screen; the rail runs along the top */
 @media (max-width:640px){
   .hz #about-veil{align-items:stretch;padding:0}
   .hz #about-veil #about-card{width:100vw;height:100%;max-width:none;max-height:none;border:0;border-radius:0;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
   .hz #about-veil #set-rail{flex-direction:row;padding:12px;border-right:0;border-bottom:var(--sx-hl) solid rgba(255,255,255,.08);overflow:auto hidden;scrollbar-width:none}
-  .hz #about-veil .sx-slab,.hz #about-veil #set-spec{display:none}
+  .hz #about-veil .sx-slab,.hz #about-veil #set-rail #set-spec{display:none}
   .hz #about-veil #set-nav{flex-direction:row;gap:2px;width:max-content}
   .hz #about-veil #snav-models-kids:not([hidden]){display:contents}
   .hz #about-veil .snav{width:auto;padding:0 10px}
@@ -55563,7 +55585,7 @@ __CODE_ROWS__
            check says one is ready (it mirrors #update-flag), "Updating…" while it installs; never in the Nightly -->
       <button id="hz-update" type="button" hidden>Update ready</button>
       <button id="hz-settings" type="button" class="hz-ib" aria-label="Settings" title="Settings (⌘,)">
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.01a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.01a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
       </button>
     </div>
   </header>
@@ -67145,7 +67167,7 @@ function bmCvPaint(){
 async function openAbout(){
   // Settings always opens on About (6b318, per Patrick), never on
   // whichever pane it was closed on
-  if(aboutVeil.hidden)settingsPane("p-about");
+  if(aboutVeil.hidden)settingsPane(typeof sxSetFirst==="function"?sxSetFirst():"p-about");   // Horizon opens on General (6b625)
   aboutVeil.hidden=false;
   if(typeof slSelAll==="function")slSelAll();   // a look changed to Horizon since load draws its controls now (6b551)
   paintAccount();                    // the Account pane (6b257)
@@ -71618,9 +71640,8 @@ function sxSetSimplify(){
     if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
     sxAdv(pp,[g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
   if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(x=>x.classList.add("sx-gone"));
-  // About: the version, What's new, Check now and Effects; the rest under Advanced
-  const ab=g("#p-about");const fn=g("#fx-level-note");if(fn)fn.classList.add("sx-gone");
-  if(ab)sxAdv(ab,[g("#beta-row"),g("#autochk-toggle"),g("#look-row"),g("#micwarm-toggle"),g("#micwarm-note")]);
+  // About was four things at once: it splits into General, Appearance, Voice and About (Pat, 2026-11-11)
+  sxSetPanes(v,g);
   // Your stuff: the privacy line stays, the long paragraph goes; the cloud switch and re-reading under Advanced
   const pk=g("#p-know");
   if(pk){const td=pk.querySelector(":scope>.tdesc"),pv=g("#know-privacy");if(td&&pv){td.before(pv);pv.classList.add("sx-priv");td.classList.add("sx-gone");}
@@ -71629,10 +71650,49 @@ function sxSetSimplify(){
   // Local models: the line that repeats the heading goes
   const pm=g("#p-models");if(pm)pm.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
 }
+// ONE DESIGN LANGUAGE (6b625, per Patrick: "something about a lot of this doesn't feel cohesive"): About's mix becomes
+// four clear panes. General: the version with its date and Check now on one row, the update channel, automatic checks,
+// What's new. Appearance: Look and Effects. Voice: keeping the microphone ready. About: a quiet two-column list
+// (Version with its build, Chip, Memory, Models) and the site link. The page's own nodes move (ids and handlers kept).
+function sxPane(id,title){const s=document.createElement("section");s.className="spane";s.id=id;s.setAttribute("aria-label",title);
+  const h=document.createElement("div");h.className="set-h";h.textContent=title;s.appendChild(h);return s;}
+function sxRow(label,sub,ctl){const r=document.createElement("div");r.className="sx-row";const t=document.createElement("div");t.className="sx-rowt";
+  const b=document.createElement("b");b.textContent=label;t.appendChild(b);if(sub)t.appendChild(sub);r.appendChild(t);if(ctl)r.appendChild(ctl);return r;}
+function sxSetPanes(v,g){
+  const body=g("#about-body"),ab=g("#p-about"),nav=g("#set-nav");if(!body||!ab||!nav||g("#sx-p-general"))return;
+  const gen=sxPane("sx-p-general","General"),look=sxPane("sx-p-look","Appearance"),voice=sxPane("sx-p-voice","Voice");
+  const ver=((g("#up-version")||{}).textContent||"").trim();
+  const vr=sxRow(ver?"Version "+ver:"Version",g("#up-reldate"),g("#about-check"));vr.id="sx-ver-row";
+  [vr,g("#beta-row"),g("#autochk-toggle"),g("#up-notes")].forEach(n=>{if(n)gen.appendChild(n);});
+  const fl=g("#fx-level-note");if(fl)fl.textContent="How much the sky moves.";
+  [g("#look-row"),g("#fx-level-row"),fl].forEach(n=>{if(n)look.appendChild(n);});
+  [g("#micwarm-toggle"),g("#micwarm-note")].forEach(n=>{if(n)voice.appendChild(n);});
+  // About: the list, then the site
+  const up=g("#up-version"),bd=g("#sx-build"),sp=g("#set-spec"),site=g("#about-site");
+  if(up)up.classList.add("sx-gone");if(bd)bd.classList.add("sx-gone");
+  const acc=g("#spec-accel");if(acc&&acc.parentNode)acc.parentNode.classList.add("sx-gone");
+  const av=g("#about-ver"),bn=bd&&(/\d+/.exec(bd.textContent)||[])[0];if(av&&bn&&av.textContent.indexOf("build")<0)av.textContent=av.textContent.trim()+" (build "+bn+")";
+  const h=ab.querySelector(".set-h");if(sp)(h?h.after(sp):ab.prepend(sp));if(site){site.classList.add("sx-site");ab.appendChild(site);}
+  body.insertBefore(gen,ab);body.insertBefore(look,ab);body.insertBefore(voice,ab);
+  // the rail: General, Appearance, Voice first; About last
+  const mk=(id,t)=>{const b=document.createElement("button");b.type="button";b.className="snav";b.dataset.pane=id;b.textContent=t;b.addEventListener("click",()=>settingsPane(id));return b;};
+  const first=nav.firstElementChild;[mk("sx-p-general","General"),mk("sx-p-look","Appearance"),mk("sx-p-voice","Voice")].forEach(b=>nav.insertBefore(b,first));
+  const ra=nav.querySelector('.snav[data-pane="p-about"]');if(ra)nav.appendChild(ra);
+  // Models: its three panes always listed under it, indented; the row itself opens the first (no lone chevron)
+  const mg=g("#snav-models"),mk2=g("#snav-models-kids");
+  if(mg&&mk2){mk2.hidden=false;mg.addEventListener("click",e=>{e.stopImmediatePropagation();settingsPane("p-models");},true);}
+}
+// where Settings opens: General (the old About pane's first purpose, updates)
+function sxSetFirst(){return sxSimple&&$("#sx-p-general")?"sx-p-general":"p-about";}
 // a pane asked for by name that now lives inside another (the account is You's)
 function sxSetRedirect(id){if(id==="p-account"&&sxSimple){const a=$("#sx-adv-p-persona");const b=a&&a.previousElementSibling;if(a&&a.hidden&&b)b.click();return "p-persona";}return id;}
+// ⌘, (Ctrl+, on a PC) opens Settings from the page itself: the shell's menu has the key, a page without that menu
+// (a dev copy, the browser) had nothing (6b625)
+function sxComma(e){const m=(typeof IS_PC!=="undefined"&&IS_PC)?(e.ctrlKey&&!e.metaKey):(e.metaKey||e.ctrlKey);
+  if(!m||e.altKey||e.shiftKey||e.key!==",")return;e.preventDefault();const v=$("#about-veil");if(v&&v.hidden&&typeof openAbout==="function")openAbout();}
 function sxBoot(){
   sxSetWire();sxPhWire();sxHostWire();sxLanePaint();sxSetSimplify();
+  addEventListener("keydown",sxComma,true);
   const ci=$("#chat-inner");
   if(ci&&window.MutationObserver&&!ci._sx){ci._sx=true;let q=false;
     new MutationObserver(()=>{if(q)return;q=true;setTimeout(()=>{q=false;sxLanePaint();},0);}).observe(ci,{childList:true});}
