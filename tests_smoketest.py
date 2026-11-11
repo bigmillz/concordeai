@@ -30979,6 +30979,401 @@ check("auto sleep: %d mutations, each caught by a check above" % len(_W46_MUT),
 # ==== 6b346 auto sleep: end ====
 
 
+# ==== 6b600 quiet hours: begin ====
+print("== quiet hours: a sleeping server is left asleep at night unless it was picked alone (6b600) ==")
+# Patrick: during his home server's quiet hours (23:00 to 08:00, the server's
+# own clock in Florida) the app must not wake a sleeping paired server unless
+# the person picked that server alone ("<name> Only"); the question goes to
+# this computer or the cloud as the fallback does, with one status line. The
+# kit's "quiet" (signed /v1/sleep-config and /v1/whoami) isn't installed yet,
+# so it is the stand-in transport's answers here; the clock is a stand-in too,
+# and wake packets go to a list. In process, on the servers section alone.
+import datetime as _dt600
+from zoneinfo import ZoneInfo as _zi600
+_Q600 = {"enabled": True, "start": "23:00", "end": "08:00", "tz": "America/New_York", "now": False,
+         "sleep_minutes": 12}
+_Q600K = {k: v for k, v in _Q600.items() if k != "now"}       # what is kept: never `now`
+
+
+def _q600_at(hh, mm=0, tz="America/New_York", day=(2026, 11, 10)):
+    """That time on the server's clock, as the UTC instant this computer reads."""
+    return _dt600.datetime(*day, hh, mm, tzinfo=_zi600(tz)).astimezone(_dt600.timezone.utc)
+
+
+def _q600_ns(src, quiet=_Q600, hour=3):
+    """A paired server whose cards and sleep setting are known, whose last
+    /v1/sleep-config carried `quiet` (None: an older kit's, without it), on a
+    stand-in clock at `hour` in Florida; packets are recorded, never sent."""
+    ns, ctx, d = _sv_ns(src)
+    _sv_paired(ns, ctx)
+    sid = ns["_srv_read"](ctx)[0]["id"]
+    t, packets, clock = [1000.0], [], [_q600_at(hour)]
+    ns["_srv_wake_clock"] = lambda: t[0]
+
+    def _spin(s_):
+        if t[0] > 9000:
+            raise RuntimeError("the wake never gave up")
+        t[0] += s_
+    ns["_srv_wake_sleep"] = _spin
+    ns["_srv_udp"] = lambda pkt, addr: packets.append((pkt, addr))
+    ns["_srv_bcast_addrs"] = lambda: ["255.255.255.255", "192.168.1.255"]
+    ns["_srv_quiet_clock"] = lambda: clock[0]
+    good = {"enabled": True, "minutes": 30, "supported": True, "wake": [_W46_MAC]}
+    if quiet is not None:
+        good["quiet"] = quiet
+    routes, off = _w46_ok_routes(ns)
+    routes["/v1/sleep-config"] = [_SvResp(200, good)]
+    log = []
+    _w46_router(ns, routes, log)
+    ns["server_sleep_get"](ctx, sid)
+    return {"ns": ns, "ctx": ctx, "d": d, "sid": sid, "t": t, "packets": packets, "clock": clock,
+            "routes": routes, "off": off, "log": log, "good": good}
+
+
+def _q600_asleep(z):
+    """The server found not answering; no wake call lately; no notes left."""
+    ns = z["ns"]
+    z["routes"]["/v1/whoami"] = [z["off"]]
+    z["routes"]["/v1/info"] = [z["off"]]
+    ns["_srv_wake_at"].clear()
+    ns["server_check"](ns["_srv_read"](z["ctx"])[0])
+    ns["server_quiet_reset"]()
+    ns["server_take_wake_notes"]()
+    del z["packets"][:]
+
+
+def _q600_wakes(z):
+    """A mode's question wakes it as before this build: the refresh sends the
+    call, it answers, no quiet line; asleep again, it is on the list to wake."""
+    ns, routes, off = z["ns"], z["routes"], z["off"]
+    _q600_asleep(z)
+    ns["_srv_seen"][z["sid"]]["at"] = 0
+    routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
+    routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
+    ns["server_refresh_modes"](z["ctx"])
+    ok = (len(z["packets"]) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)]
+          and ns["server_take_quiet_notes"]() == [])
+    _q600_asleep(z)
+    return ok and ns["server_sleepers"](z["ctx"]) == [z["sid"]] and ns["server_take_quiet_notes"]() == []
+
+
+def _q600c_clean(src):
+    out = {}
+    z = _q600_ns(src)
+    ns, ctx, sid = z["ns"], z["ctx"], z["sid"]
+    fp = os.path.join(z["d"], "servers.json")
+    out["kept"] = (ns["_srv_read"](ctx)[0]["quiet"] == _Q600K
+                   and json.load(open(fp))["servers"][0]["quiet"] == _Q600K)
+    C = ns["_srv_clean_quiet"]
+    bad = [dict(_Q600, enabled="yes"), dict(_Q600, enabled=1), dict(_Q600, enabled=None),
+           dict(_Q600, start="24:00"), dict(_Q600, start="8:00"), dict(_Q600, start=2300), dict(_Q600, start="23:00:00"),
+           dict(_Q600, end="23:60"), dict(_Q600, end=None), dict(_Q600, end="08:00 "), dict(_Q600, end="０８:00"),
+           dict(_Q600, tz="Mars/Base"), dict(_Q600, tz="../etc/passwd"), dict(_Q600, tz="/usr/share/zoneinfo/UTC"),
+           dict(_Q600, tz=5), dict(_Q600, tz=""), dict(_Q600, tz="America/New_York/"), dict(_Q600, tz="x" * 65),
+           dict(_Q600, sleep_minutes=True), dict(_Q600, sleep_minutes=-1), dict(_Q600, sleep_minutes=99999),
+           dict(_Q600, sleep_minutes="12"), dict(_Q600, sleep_minutes=12.0),
+           {k: v for k, v in _Q600.items() if k != "sleep_minutes"}, {k: v for k, v in _Q600.items() if k != "tz"},
+           {k: v for k, v in _Q600.items() if k != "enabled"}, None, [], "23:00-08:00", {}, 1]
+    out["malformed"] = [i for i, b in enumerate(bad) if C(b) is not None] == []
+    out["good"] = (C(_Q600) == _Q600K and C(dict(_Q600, extra="more", now="x")) == _Q600K
+                   and C(dict(_Q600, enabled=False, tz="Etc/GMT+5", start="00:00", end="23:59", sleep_minutes=0))
+                   == {"enabled": False, "start": "00:00", "end": "23:59", "tz": "Etc/GMT+5", "sleep_minutes": 0}
+                   and C(dict(_Q600, sleep_minutes=1440))["sleep_minutes"] == 1440)
+    # an answer without it (an older kit) keeps what was kept; a malformed one drops it, never a guess
+    base = {k: v for k, v in z["good"].items() if k != "quiet"}
+    z["routes"]["/v1/sleep-config"] = [_SvResp(200, base)]
+    ns["server_sleep_get"](ctx, sid)
+    a1 = ns["_srv_read"](ctx)[0]["quiet"]
+    z["routes"]["/v1/sleep-config"] = [_SvResp(200, dict(base, quiet=dict(_Q600, tz="Mars/Base")))]
+    ns["server_sleep_get"](ctx, sid)
+    a2 = ns["_srv_read"](ctx)[0]["quiet"]
+    out["sleep answers"] = a1 == _Q600K and a2 is None
+    # a check's signed whoami carries it too: kept, kept through one without it, dropped when malformed
+    z["routes"]["/v1/whoami"] = [_SvResp(200, {"device_id": "x", "quiet": dict(_Q600, start="22:30")})]
+    ns["server_check"](ns["_srv_read"](ctx)[0])
+    w1 = ns["_srv_read"](ctx)[0]["quiet"]
+    z["routes"]["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    ns["server_check"](ns["_srv_read"](ctx)[0])
+    w2 = ns["_srv_read"](ctx)[0]["quiet"]
+    z["routes"]["/v1/whoami"] = [_SvResp(200, {"device_id": "x", "quiet": "nonsense"})]
+    ns["server_check"](ns["_srv_read"](ctx)[0])
+    w3 = ns["_srv_read"](ctx)[0]["quiet"]
+    out["whoami"] = w1 == dict(_Q600K, start="22:30") and w2 == w1 and w3 is None
+    # never sent: none; a hand-edited file is believed only when it is right
+    z0 = _q600_ns(src, quiet=None)
+    out["never"] = z0["ns"]["_srv_read"](z0["ctx"])[0]["quiet"] is None
+    raw = json.load(open(fp))
+    raw["servers"][0]["quiet"] = dict(_Q600K, tz="Nowhere/City")
+    open(fp, "w").write(json.dumps(raw))
+    r0 = ns["_srv_read"](ctx)[0]["quiet"]
+    raw["servers"][0]["quiet"] = _Q600K
+    open(fp, "w").write(json.dumps(raw))
+    r1 = ns["_srv_read"](ctx)[0]["quiet"]
+    out["file"] = r0 is None and r1 == _Q600K
+    return all(out.values()), out
+
+
+def _q600c_window(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    A, q = ns["srv_quiet_at"], _Q600K
+    out["night"] = ([A(q, _q600_at(h, m)) for h, m in ((22, 59), (23, 0), (23, 59), (0, 0), (3, 0), (7, 59), (8, 0), (12, 0))]
+                    == [False, True, True, True, True, True, False, False])
+    day = dict(q, start="09:00", end="17:00")
+    out["day"] = ([A(day, _q600_at(h, m)) for h, m in ((8, 59), (9, 0), (16, 59), (17, 0), (23, 30), (3, 0))]
+                  == [False, True, True, False, False, False])
+    same = dict(q, start="08:00", end="08:00")
+    out["start == end never"] = not any(A(same, _q600_at(0, 0) + _dt600.timedelta(minutes=k)) for k in range(0, 1440, 7))
+    out["off"] = not A(dict(q, enabled=False), _q600_at(3)) and not A(None, _q600_at(3)) and not A({}, _q600_at(3))
+    # the server's own zone, summer and winter, never this computer's
+    out["zone"] = (A(q, _dt600.datetime(2026, 7, 1, 3, 30, tzinfo=_dt600.timezone.utc))           # 23:30 EDT
+                   and not A(q, _dt600.datetime(2026, 1, 15, 3, 30, tzinfo=_dt600.timezone.utc))  # 22:30 EST
+                   and not A(dict(q, tz="Asia/Tokyo"), _q600_at(3)))                            # 17:00 in Tokyo
+    # with no time given, this computer's clock
+    ns["_srv_quiet_clock"] = lambda: _q600_at(3)
+    a, s1 = A(q), ns["server_quiet"]({"quiet": q})
+    ns["_srv_quiet_clock"] = lambda: _q600_at(12)
+    b, s2 = A(q), ns["server_quiet"]({"quiet": q})
+    out["clock"] = a and not b and s1 == "08:00" and s2 == "" and ns["server_quiet"]({"quiet": None}) == ""
+    return all(out.values()), out
+
+
+def _q600c_wake(src):
+    out = {}
+    z = _q600_ns(src)
+    ns, ctx, sid, packets, routes, off = z["ns"], z["ctx"], z["sid"], z["packets"], z["routes"], z["off"]
+    night = [("Desktop", "08:00")]
+    # a mode's refresh (a question that may go elsewhere, a funnel, a picture's old wake): no call, one note
+    _q600_asleep(z)
+    ns["_srv_seen"][sid]["at"] = 0
+    ns["server_refresh_modes"](ctx)
+    out["mode"] = (not packets and ns["server_take_wake_notes"]() == []
+                   and ns["server_take_quiet_notes"]() == night and ns["_srv_wake_at"] == {})
+    # the list the modes, the Code lane and a picture wake after the headers
+    _q600_asleep(z)
+    ns["_srv_update"](ctx, lambda es: ([x.update(gen={"image": True, "video": True}) for x in es], {"ok": True})[1])
+    sl, gl = ns["server_sleepers"](ctx), ns["server_gen_sleepers"](ctx, "image")
+    out["sleepers"] = sl == [] and gl == [] and not packets and ns["server_take_quiet_notes"]() == night
+    # the ten-second ask, should the hours begin after the list was made: no step, no call
+    _q600_asleep(z)
+    steps, said = [], []
+    w = ns["server_wake_ask"]([sid], ctx, said.append, lambda *a: steps.append(a), None, lambda: True)
+    out["ask"] = w == [] and not steps and not said and not packets and ns["server_take_quiet_notes"]() == night
+    _q600_asleep(z)
+    out["wake"] = ns["server_wake"](ns["_srv_read"](ctx)[0]) == "" and not packets
+    # "<name> Only" wakes it as before, and no quiet line: checked before the headers ...
+    _q600_asleep(z)
+    ns["_srv_seen"][sid]["at"] = 0
+    routes["/v1/whoami"] = [off, _SvResp(200, {"device_id": "x"})]
+    routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
+    ns["server_only_resolve"](sid, ctx)
+    out["only"] = (len(packets) == 4 and ns["server_take_wake_notes"]() == [("Desktop", True)]
+                   and ns["server_take_quiet_notes"]() == [])
+    # ... and woken after them, with its step
+    _q600_asleep(z)
+    ns["server_take_wake_pending"]()
+    ns["server_only_resolve"](sid, ctx, defer=True)
+    pend = ns["server_take_wake_pending"]()
+    routes["/v1/info"] = [off, _SvResp(200, {"gpu": {}})]
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    said = []
+    lbl, why = ns["server_only_wake"](sid, ctx, said.append, lambda: True)
+    out["only after the headers"] = (pend == sid and lbl == "Desktop · small:8b" and why == "" and len(packets) == 4
+                                     and said[-1] == "Desktop is awake." and ns["server_take_quiet_notes"]() == [])
+    # awake and answering at night: used as always (its check, its pick), nothing to say
+    _q600_asleep(z)
+    routes["/v1/whoami"] = [_SvResp(200, {"device_id": "x"})]
+    routes["/v1/info"] = [_SvResp(200, {"gpu": {}})]
+    ns["server_check"](ns["_srv_read"](ctx)[0])
+    st = ns["server_only_state"](ns["_srv_read"](ctx)[0])
+    ns["server_refresh_modes"](ctx)
+    out["awake"] = (st["ok"] and ns["_srv_seen"][sid]["reachable"] is True and ns["server_sleepers"](ctx) == []
+                    and ns["server_take_quiet_notes"]() == [] and ns["server_take_wake_notes"]() == []
+                    and ns["server_only_resolve"](sid, ctx)[0] == "Desktop · small:8b" and not packets)
+    # no card to wake it with: quiet hours kept nothing asleep, so nothing to say
+    ns["_srv_update"](ctx, lambda es: ([x.update(wake=[]) for x in es], {"ok": True})[1])
+    _q600_asleep(z)
+    out["no card"] = ns["server_sleepers"](ctx) == [] and ns["server_take_quiet_notes"]() == []
+    ns["_srv_update"](ctx, lambda es: ([x.update(wake=[_W46_MAC]) for x in es], {"ok": True})[1])
+    # unreachable, the app reads the hours itself: at 08:00 it is morning, and a mode wakes it as before
+    z["clock"][0] = _q600_at(8)
+    out["morning"] = _q600_wakes(z)
+    z["clock"][0] = _q600_at(14)
+    out["day"] = _q600_wakes(z)
+    z["clock"][0] = _q600_at(23, 5)
+    _q600_asleep(z)
+    out["night again"] = ns["server_sleepers"](ctx) == [] and ns["server_take_quiet_notes"]() == night
+    # no hours ever sent, hours turned off, start == end: as before this build, at 03:00
+    for k, qv in (("never sent", None), ("turned off", dict(_Q600, enabled=False)),
+                  ("start == end", dict(_Q600, start="08:00", end="08:00"))):
+        out[k] = _q600_wakes(_q600_ns(src, quiet=qv, hour=3))
+    return all(out.values()), out
+
+
+def _q600c_line(src):
+    out = {}
+    ns, ctx, d = _sv_ns(src)
+    L = ns["server_quiet_line"]
+    lead = "Ollama1 is in quiet hours until 08:00, so "
+    out["this computer"] = L("Ollama1", "08:00", ["Llama 3.2 3B"]) == lead + "this computer is answering."
+    out["the cloud"] = (L("Ollama1", "08:00", ["Llama 3.2 3B"], True) == lead + "the cloud is answering."
+                        and L("Ollama1", "08:00", [], True) == lead + "the cloud is answering.")
+    out["both"] = (L("Ollama1", "08:00", ["Llama 3.2 3B", "Llama 3.2 3B"], True)
+                   == lead + "this computer and the cloud are answering.")
+    out["another server"] = L("Ollama1", "08:00", ["Desk · small:8b"]) == lead + "Desk is answering."
+    nobody = lead + "it wasn’t woken."
+    out["nobody to name"] = (L("Ollama1", "08:00", []) == nobody and L("Ollama1", "08:00", None, True) == nobody
+                             and L("Ollama1", "08:00", ["Ollama1 · small:8b"]) == nobody)
+    lines = [L("*Olla<b>ma1*`", "08:00", x, c) for x in (None, [], ["Llama 3.2 3B"]) for c in (False, True)]
+    out["plain"] = (all(x.startswith("Olla b ma1 is in quiet hours") for x in lines)
+                    and not any(ch in "".join(lines) for ch in "*<>`\0"))
+    out["words"] = not any("Mac" in x for x in lines + [ns["SRV_QUIET_LINE"], ns["SRV_QUIET_NOWAKE"]])
+    # each server once a request, and a new request starts with none
+    e = {"id": "aaaaaaaa", "name": "Ollama1", "quiet": _Q600K}
+    ns["_srv_quiet_clock"] = lambda: _q600_at(3)
+    T, N, R = ns["server_take_quiet_notes"], ns["_srv_quiet_note"], ns["server_quiet_reset"]
+    R()
+    N(e)
+    N(e)
+    n1 = T()
+    N(e)
+    n2 = T()
+    N(e)
+    R()
+    n3 = T()
+    N(e)
+    n4 = T()
+    out["notes"] = n1 == [("Ollama1", "08:00")] and n2 == [] and n3 == [] and n4 == [("Ollama1", "08:00")]
+    # the chat: reset with the request's other notes, said after the headers and before any wake; a picture's too
+    h0 = src.index("server_take_wake_pending()\n        server_quiet_reset()")
+    h1 = src.index("def status(text: str):", h0)
+    h2 = src.index("for _qn, _qe in server_take_quiet_notes():\n            try:", h1)
+    h3 = src.index("if _so_wake and _srv_only:", h2)
+    seg = src[h2:h3]
+    out["handler"] = (h0 < src.index("server_refresh_modes(self.ctx, wake=False)", h0) < h1 < h2 < h3
+                      and "status(server_quiet_line(_qn, _qe, None if (img_subject or vid_subject) else council," in seg
+                      and "gate_ladder(fast_cloud_ladder(), req_cloud, cloud_only)" in seg)
+    m0 = src.index("def server_make(")
+    m1 = src.index("server_gen_sleepers(ctx, kind)", m0)
+    m2 = src.index("for _qn, _qe in server_take_quiet_notes():", m1)
+    m3 = src.index("e = server_gen_pick(ctx, kind)", m1)
+    out["picture"] = m1 < m2 < m3 and "status(server_quiet_line(_qn, _qe))" in src[m2:m3]
+    return all(out.values()), out
+
+
+def _q600c_secrets(src):
+    out = {}
+    z = _q600_ns(src, quiet=dict(_Q600, extra="CANARY-quiet-extra"))
+    ns, ctx, sid = z["ns"], z["ctx"], z["sid"]
+    _q600_asleep(z)
+    ns["server_sleepers"](ctx)
+    notes = ns["server_take_quiet_notes"]()
+    row = ns["_srv_read"](ctx)[0]
+    line = ns["server_quiet_line"](notes[0][0], notes[0][1], ["Llama 3.2 3B"])
+    kept = json.load(open(os.path.join(z["d"], "servers.json")))["servers"][0]["quiet"]
+    blob = json.dumps([row["quiet"], kept, notes, line, ns["_srv_public"](row)])
+    sec = [row[k].reveal() for k in ("access_secret", "seed", "access_id")]
+    out["no secret"] = all(s and s not in blob for s in sec) and "SECRET34" not in blob and "CANARY" not in blob
+    out["five things"] = set(kept) == {"enabled", "start", "end", "tz", "sleep_minutes"} and row["quiet"] == _Q600K
+    return all(out.values()), out
+
+
+_Q600_CHECKS = [
+    ("quiet hours: a server's \"quiet\" is kept cleaned from its signed sleep setting and whoami (a bool, two HH:MM, "
+     "a zone zoneinfo knows, whole minutes, never `now`); anything malformed is dropped, an older kit's answer keeps it, "
+     "a hand-edited file isn't believed", _q600c_clean),
+    ("quiet hours: read on this computer's clock in the server's own zone; the night crosses midnight, 08:00 is "
+     "morning, start == end is never quiet, summer and winter time", _q600c_window),
+    ("quiet hours: no wake call for a mode, the Code lane, a picture or a funnel while they are on; \"<name> Only\" "
+     "wakes it as before; an awake server is used; outside them, with none sent, off, or start == end, as before",
+     _q600c_wake),
+    ("quiet hours: the one line (\"Ollama1 is in quiet hours until 08:00, so this computer is answering.\"), who answers "
+     "named, once a request, said after the headers and for a picture", _q600c_line),
+    ("quiet hours: nothing new carries a secret, and only the five cleaned fields are kept", _q600c_secrets),
+]
+
+
+def _q600_run(src):
+    out = []
+    for name, fn in _Q600_CHECKS:
+        try:
+            ok, det = fn(src)
+        except Exception as e_:
+            ok, det = False, "raised %r" % e_
+        out.append((name, bool(ok), det))
+    return out
+
+
+for _n600, _o600, _d600 in _q600_run(_MILLENAI_SRC):
+    check(_n600, _o600, "%r" % (_d600,))
+
+_Q600_MUT = [
+    ("a zone zoneinfo doesn't know believed", "    if _srv_tz(tz) is None:\n        return None\n", ""),
+    ("a time that isn't HH:MM believed", '_SRV_HHMM_RX = re.compile(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]")',
+     '_SRV_HHMM_RX = re.compile(r"[0-9:]+")'),
+    ("a bool taken for the minutes", "if not isinstance(sm, int) or isinstance(sm, bool) or not 0 <= sm <= SRV_SLEEP_MAX:",
+     "if not isinstance(sm, int) or not 0 <= sm <= SRV_SLEEP_MAX:"),
+    ("minutes out of range kept", "if not isinstance(sm, int) or isinstance(sm, bool) or not 0 <= sm <= SRV_SLEEP_MAX:",
+     "if not isinstance(sm, int) or isinstance(sm, bool):"),
+    ("the switch not checked", '    if not (isinstance(v, dict) and isinstance(v.get("enabled"), bool)):\n        return None\n    st, en,',
+     '    if not isinstance(v, dict):\n        return None\n    st, en,'),
+    ("the answer kept whole", 'return {"enabled": v["enabled"], "start": st, "end": en, "tz": tz, "sleep_minutes": sm}',
+     "return dict(v)"),
+    ("not kept from the sleep setting's answer", '            x["quiet"] = _srv_clean_quiet(js["quiet"])\n', "            pass\n"),
+    ("an older kit's answer wipes it",
+     '        if "quiet" in js:          # its quiet hours (6b600); an older kit sends none\n'
+     '            x["quiet"] = _srv_clean_quiet(js["quiet"])\n',
+     '        x["quiet"] = _srv_clean_quiet(js.get("quiet"))\n'),
+    ("not kept from a check's whoami", "            _srv_keep_quiet(e, js)           # its quiet hours, when it says them (6b600)\n", ""),
+    ("a whoami without it wipes it", '    if not isinstance(js, dict) or "quiet" not in js:\n        return\n    q = _srv_clean_quiet(js["quiet"])',
+     '    if not isinstance(js, dict):\n        return\n    q = _srv_clean_quiet(js.get("quiet"))'),
+    ("a file's hours believed", "        e[\"quiet\"] = _srv_clean_quiet(e.get(\"quiet\"))    # the server's quiet hours (6b600)\n", ""),
+    ("the night not crossing midnight", "    return a <= m < b if a < b else (m >= a or m < b)", "    return a <= m < b"),
+    ("the end minute still quiet", "    return a <= m < b if a < b else (m >= a or m < b)",
+     "    return a <= m <= b if a < b else (m >= a or m <= b)"),
+    ("start == end quiet all day", ' or q.get("start") == q.get("end"):\n        return False', ":\n        return False"),
+    ("hours turned off still kept", 'q.get("enabled") is not True or q.get("start")', 'q.get("start")'),
+    ("this computer's zone, not the server's", "    t = (now or _srv_quiet_clock()).astimezone(tz)",
+     "    t = (now or _srv_quiet_clock())"),
+    ("a mode's refresh wakes it at night", '    if not only and server_quiet(e):\n        _srv_quiet_note(e)\n        return ""',
+     '    if False:\n        _srv_quiet_note(e)\n        return ""'),
+    ("\"<name> Only\" kept asleep too", "    if not only and server_quiet(e):", "    if server_quiet(e):"),
+    ("the check of \"<name> Only\" not marked as such", "            server_wake_if_down(e, ctx, defer, only=True)\n",
+     "            server_wake_if_down(e, ctx, defer)\n"),
+    ("the wake after the headers not \"<name> Only\"'s", "rewait=rewait, only=rewait)", "rewait=rewait, only=False)"),
+    ("the list after the headers takes it", 'and s.get("kind") == "offline" and _srv_wakeable(e) and server_quiet(e)):',
+     'and s.get("kind") == "offline" and _srv_wakeable(e) and False):'),
+    ("an awake server noted", 'if (_srv_paired(e) and e.get("prefer") is not False and not s.get("reachable")\n'
+     '                    and s.get("kind") == "offline" and _srv_wakeable(e) and server_quiet(e)):',
+     "if (_srv_paired(e) and _srv_wakeable(e) and server_quiet(e)):"),
+    ("a server with no card noted", "and _srv_wakeable(e) and server_quiet(e)):", "and server_quiet(e)):"),
+    ("the ten-second ask's own look skipped", "        if server_quiet(e):        # its quiet hours began since (6b600): no step, no call\n",
+     "        if False:\n"),
+    ("the note never taken down", '        n[e["id"]] = (e["name"], server_quiet(e) or e["quiet"]["end"])', "        pass"),
+    ("said twice in one request", "    out = [v for k, v in n.items() if k not in said]", "    out = list(n.values())"),
+    ("an earlier request's notes kept", "    _srv_wake_tl.quiet, _srv_wake_tl.quiet_said = {}, set()", "    pass"),
+    ("the request's reset left out", "        server_quiet_reset()               # nor a quiet-hours note (6b600)\n", ""),
+    ("the chat not told", "        for _qn, _qe in server_take_quiet_notes():\n            try:",
+     "        for _qn, _qe in []:\n            try:"),
+    ("a picture's turn named who answers", "None if (img_subject or vid_subject) else council,", "council,"),
+    ("a picture not told", "    for _qn, _qe in server_take_quiet_notes():      # kept asleep by its quiet hours (6b600)\n"
+     "        status(server_quiet_line(_qn, _qe))\n", ""),
+    ("\"this Mac\"", '        who = "this computer is"', '        who = "this Mac is"'),
+    ("the cloud never named", '    elif cloud:\n        who = "the cloud is"', '    elif False:\n        who = "the cloud is"'),
+    ("a name with markup", "    n = _srv_plain(name)\n    ls = [x for x", "    n = str(name)\n    ls = [x for x"),
+]
+_q600m = []
+for _d600, _o600, _n600 in _Q600_MUT:
+    if _MILLENAI_SRC.count(_o600) != 1:
+        _q600m.append((_d600, "anchor missing %d" % _MILLENAI_SRC.count(_o600)))
+        continue
+    _r600 = _q600_run(_MILLENAI_SRC.replace(_o600, _n600, 1))
+    _q600m.append((_d600, [n for n, o, _x in _r600 if not o][:1] or "MISSED"))
+check("quiet hours: %d mutations, each caught by a check above" % len(_Q600_MUT),
+      all(isinstance(v, list) for _d, v in _q600m), "%r" % [x for x in _q600m if not isinstance(x[1], list)])
+# ==== 6b600 quiet hours: end ====
+
+
 # ==== 6b430 local network prompt: begin ====
 print("== the Mac's Local Network prompt (6b430) ==")
 # Patrick: "still no pop-up to allow the app to access devices on the local network."

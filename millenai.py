@@ -26872,6 +26872,7 @@ def o1_pair_proof(key: bytes, device_id: str, pub: str, nonce: str) -> bytes:
 _SRV_PLAIN = ("id", "name", "url", "device_id", "public_key", "device_name",
               "paired_at", "added_at", "models", "prefer", "wake", "sleep", "gen", "relay")
 _SRV_SECRET = ("access_id", "access_secret", "seed", "relay_token")
+_SRV_PLAIN += ("quiet",)          # the server's quiet hours (6b600): no secret in them
 
 
 def _srv_read(ctx) -> list:
@@ -26887,6 +26888,7 @@ def _srv_read(ctx) -> list:
         e["wake"], e["sleep"] = _srv_clean_wake(e.get("wake")), _srv_clean_sleep(e.get("sleep"))
         e["gen"] = _srv_clean_gen(e.get("gen"))          # what it can make (6b356)
         e["relay"] = _srv_clean_relay(e.get("relay"))    # the wake relay (6b431)
+        e["quiet"] = _srv_clean_quiet(e.get("quiet"))    # the server's quiet hours (6b600)
         for k in _SRV_SECRET:
             e[k] = _Secret(s.get(k))
         out.append(e)
@@ -27848,7 +27850,7 @@ def server_only_resolve(sid: str, ctx, defer=False):
         if not (s.get("models") and s.get("reachable") and not s.get("err")
                 and time.time() - float(s.get("at") or 0) < SRV_ONLY_FRESH_S):
             server_check(e)
-            server_wake_if_down(e, ctx, defer)
+            server_wake_if_down(e, ctx, defer, only=True)
     st = server_only_state(e)
     if (defer and not st["ok"] and _srv_paired(e) and not getattr(_srv_wake_tl, "pending", "")
             and (_srv_seen.get(e["id"]) or {}).get("kind") == "offline"
@@ -28555,6 +28557,7 @@ def _srv_check(e, limit=None) -> dict:
         seen["latency_ms"] = int((time.monotonic() - t) * 1000)
         if st == 200 and paired:
             seen["reachable"] = seen["auth"] = True
+            _srv_keep_quiet(e, js)           # its quiet hours, when it says them (6b600)
             st2, tags = _srv_json(e, "GET", "/api/tags", timeout=left())
             if st2 != 200:
                 raise _srv_fail(e, st2, tags)
@@ -29222,6 +29225,8 @@ def _srv_sleep_call(ctx, sid: str, method: str, obj=None) -> dict:
             return {"err": SRV_GONE}
         x["wake"] = v["wake"]
         x["sleep"] = {"enabled": v["enabled"], "minutes": v["minutes"]}
+        if "quiet" in js:          # its quiet hours (6b600); an older kit sends none
+            x["quiet"] = _srv_clean_quiet(js["quiet"])
         return {"ok": True}
     _srv_update(ctx, fn)
     return {"ok": True, "sleep": {"enabled": v["enabled"], "minutes": v["minutes"], "supported": v["supported"]},
@@ -29249,6 +29254,155 @@ def server_sleep_set(ctx, sid: str, d: dict) -> dict:
     if not body:
         return {"ok": False, "kind": "input", "err": "Nothing to change."}
     return _srv_sleep_call(ctx, sid, "POST", body)
+
+
+# ---- quiet hours (6b600)
+# Patrick (2026-11): during his home server's quiet hours (23:00 to 08:00 in
+# the server's own time zone, Florida) the app must not wake a sleeping
+# server unless the person picked that server alone. The kit's signed
+# /v1/sleep-config and /v1/whoami answers carry "quiet": {enabled, start,
+# end ("HH:MM", the server's own clock), tz (an IANA name), now, sleep_minutes}.
+# A cleaned copy is kept with the server's row (never `now`: it was true when
+# it was said); anything malformed is dropped, never guessed, and a server
+# that never sent one has no quiet hours. While it is asleep the app reads the
+# hours itself, on this computer's clock in the server's zone. In them nothing
+# a question does wakes it (a mode, the Code lane, a picture, a funnel),
+# except "<name> Only" (or a mode on it alone), which wakes it as before. A
+# server that is awake and answering is used as always: quiet hours only stop
+# waking. One status line says why it wasn't woken.
+_SRV_HHMM_RX = re.compile(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]")
+SRV_QUIET_LINE = "%s is in quiet hours until %s, so %s answering."
+SRV_QUIET_NOWAKE = "%s is in quiet hours until %s, so it wasn’t woken."
+
+
+def _srv_tz(name):
+    """The time zone called name, or None: an IANA name zoneinfo has (it
+    refuses a path, a dot segment or a name it doesn't know), nothing else."""
+    if not isinstance(name, str) or not 0 < len(name) <= 64:
+        return None
+    try:
+        from zoneinfo import ZoneInfo
+        return ZoneInfo(name)
+    except Exception:
+        return None
+
+
+def _srv_clean_quiet(v):
+    """{enabled, start, end, tz, sleep_minutes} as the server last said, or None:
+    a bool, two "HH:MM", a zone zoneinfo knows and a whole number of minutes.
+    One part wrong and none of it is believed."""
+    if not (isinstance(v, dict) and isinstance(v.get("enabled"), bool)):
+        return None
+    st, en, tz, sm = v.get("start"), v.get("end"), v.get("tz"), v.get("sleep_minutes")
+    if not (isinstance(st, str) and _SRV_HHMM_RX.fullmatch(st)
+            and isinstance(en, str) and _SRV_HHMM_RX.fullmatch(en)):
+        return None
+    if _srv_tz(tz) is None:
+        return None
+    if not isinstance(sm, int) or isinstance(sm, bool) or not 0 <= sm <= SRV_SLEEP_MAX:
+        return None
+    return {"enabled": v["enabled"], "start": st, "end": en, "tz": tz, "sleep_minutes": sm}
+
+
+def _srv_keep_quiet(e, js):
+    """A signed whoami that carries `quiet`: its cleaned copy kept with the
+    server's row (written only when it changed). No `quiet` in it: kept as it was."""
+    if not isinstance(js, dict) or "quiet" not in js:
+        return
+    q = _srv_clean_quiet(js["quiet"])
+    if e.get("quiet") == q:
+        return
+
+    def fn(entries):
+        x = _srv_find(entries, e["id"])
+        if x is None:
+            return {"err": SRV_GONE}
+        x["quiet"] = q
+        return {"ok": True}
+    e["quiet"] = q
+    try:
+        _srv_update(bound_ctx(), fn)
+    except (StoreReadError, NoProfile):
+        pass                       # kept for this check; the next one saves it
+
+
+def _srv_quiet_clock():
+    """Now, in UTC (the gauntlet's own clock stands in)."""
+    import datetime as _dt
+    return _dt.datetime.now(_dt.timezone.utc)
+
+
+def srv_quiet_at(q, now=None) -> bool:
+    """Whether the kept hours q are on at `now` (default: this computer's
+    clock) in the server's zone: start <= time < end, across midnight when
+    end comes first; start == end is never quiet."""
+    if not isinstance(q, dict) or q.get("enabled") is not True or q.get("start") == q.get("end"):
+        return False
+    tz = _srv_tz(q.get("tz"))
+    if tz is None:
+        return False
+    t = (now or _srv_quiet_clock()).astimezone(tz)
+    m = t.hour * 60 + t.minute
+    a = int(q["start"][:2]) * 60 + int(q["start"][3:])
+    b = int(q["end"][:2]) * 60 + int(q["end"][3:])
+    return a <= m < b if a < b else (m >= a or m < b)
+
+
+def server_quiet(e) -> str:
+    """The end of server e's quiet hours ("08:00") while they are on, else ''."""
+    q = e.get("quiet")
+    return q["end"] if srv_quiet_at(q) else ""
+
+
+def _srv_quiet_note(e):
+    """Remember, for the request's one line, that quiet hours kept e asleep."""
+    n = getattr(_srv_wake_tl, "quiet", None)
+    if n is None:
+        n = _srv_wake_tl.quiet = {}
+    if e["id"] not in n and len(n) < SERVER_MAX:
+        n[e["id"]] = (e["name"], server_quiet(e) or e["quiet"]["end"])
+
+
+def server_quiet_reset():
+    """A new request: no quiet notes left from an earlier one on this thread."""
+    _srv_wake_tl.quiet, _srv_wake_tl.quiet_said = {}, set()
+
+
+def server_take_quiet_notes() -> list:
+    """[(server name, end)] for the servers quiet hours kept asleep since the
+    last call, each server once a request."""
+    n = getattr(_srv_wake_tl, "quiet", None) or {}
+    said = getattr(_srv_wake_tl, "quiet_said", None)
+    if said is None:
+        said = _srv_wake_tl.quiet_said = set()
+    out = [v for k, v in n.items() if k not in said]
+    said.update(n)
+    _srv_wake_tl.quiet = {}
+    return out
+
+
+def server_quiet_line(name, end, labels=None, cloud=False) -> str:
+    """The one line (6b600): who answers instead, from the roster (labels)
+    and whether the cloud may (cloud). labels None (a picture, a video) or
+    nobody to say: only that it wasn't woken."""
+    n = _srv_plain(name)
+    ls = [x for x in (labels or []) if isinstance(x, str) and x]
+    here = any(x in MODEL_ROUTES and not server_label(x) for x in ls)
+    other = next((x.split(SERVER_SEP, 1)[0] for x in ls if server_label(x)
+                  and x.split(SERVER_SEP, 1)[0] != name), "")
+    if labels is None:
+        who = ""
+    elif here and cloud and len(ls) > 1:
+        who = "this computer and the cloud are"
+    elif cloud:
+        who = "the cloud is"       # one seat with cloud power on: the cloud is asked first
+    elif here:
+        who = "this computer is"
+    elif other:
+        who = "%s is" % _srv_plain(other)
+    else:
+        who = ""
+    return SRV_QUIET_LINE % (n, end, who) if who else SRV_QUIET_NOWAKE % (n, end)
 
 
 def srv_magic_packet(mac: str) -> bytes:
@@ -29591,7 +29745,7 @@ def server_wake_test(ctx, sid: str, relay_only: bool = False) -> dict:
     return out
 
 
-def server_wake(e, progress=None, alive=None, wait_s=None, skip=None, rewait=False) -> str:
+def server_wake(e, progress=None, alive=None, wait_s=None, skip=None, rewait=False, only=False) -> str:
     """Wake server e with a magic packet and wait for it to answer. "woke",
     "tried" (no answer in wait_s, SRV_WAKE_WAIT_S unless given), "skipped"
     (skip() said the person went on without it, 6b461), "stopped" (alive() said the reader
@@ -29603,8 +29757,12 @@ def server_wake(e, progress=None, alive=None, wait_s=None, skip=None, rewait=Fal
     /v1/info. progress(seconds waited) is called as it waits, so a page can say so.
     rewait (6b570, "<name> Only"): inside the five minutes no call goes out, but
     the answer is still waited for (a wake already on its way, or a slow boot),
-    instead of reporting the server as it stood: that was the dead end."""
+    instead of reporting the server as it stood: that was the dead end.
+    only (6b600): the person picked e alone; nothing else wakes it in its quiet hours."""
     if not _srv_wakeable(e):
+        return ""
+    if not only and server_quiet(e):
+        _srv_quiet_note(e)
         return ""
     t0 = _srv_wake_clock()
     with _srv_lock:          # two questions at once send one wake-up call, not two
@@ -29672,14 +29830,15 @@ def server_take_wake_pending():
     return p
 
 
-def server_wake_if_down(e, ctx=None, defer=False):
+def server_wake_if_down(e, ctx=None, defer=False, only=False):
     """After a check that found e not answering: wake it for the question
     being asked. Only the request paths call this. A wake that got no answer
     marks the server down (as any failed request does), so the questions of
     the next minute skip it instead of each waiting for it. defer: do not
     wait here (the page has no headers yet, so it would see nothing for a
     minute); say which server is to be woken (server_take_wake_pending) and
-    let the caller wake it with a status the page shows (server_only_wake)."""
+    let the caller wake it with a status the page shows (server_only_wake).
+    only (6b600): "<name> Only" asked; a server in its quiet hours is woken for nothing else."""
     s = _srv_seen.get(e["id"]) or {}
     if s.get("reachable") or s.get("kind") != "offline":
         return
@@ -29689,7 +29848,7 @@ def server_wake_if_down(e, ctx=None, defer=False):
         if _srv_wakeable(e):
             _srv_wake_tl.pending = e["id"]
         return
-    r = server_wake(e)
+    r = server_wake(e, only=only)
     if r:
         _srv_wake_tl.notes = (getattr(_srv_wake_tl, "notes", None) or []) + [(e["name"], r == "woke")]
     if r == "tried" and ctx is not None:
@@ -29730,7 +29889,7 @@ def server_wake_step(e, status, step, skip, alive, wait_s: int, rewait=False) ->
         step("wake", lbl, "run", "%d s" % left)
         status("Waking %s... %d s" % (name, left))
     r = server_wake(e, _prog, alive, wait_s, skip.is_set if skip is not None else None,
-                    rewait=rewait)
+                    rewait=rewait, only=rewait)       # rewait is "<name> Only"'s (6b600)
     if r == "woke":
         step("wake", "Woke %s" % name, "done", "")
     elif r == "skipped":
@@ -29789,11 +29948,16 @@ def server_only_wake(sid: str, ctx, status, alive=None, step=None, skip=None):
 def server_sleepers(ctx) -> list:
     """ids of ctx's servers a question may wake now (6b461): paired, not
     turned off for the modes, last found not answering, with a card that wakes
-    them, and no wake-up call within SRV_WAKE_GAP_S."""
+    them, and no wake-up call within SRV_WAKE_GAP_S. Not one in its quiet
+    hours (6b600): that one is noted for the request's line instead."""
     out = []
     try:
         for e in _srv_read(ctx):
             s = _srv_seen.get(e["id"]) or {}
+            if (_srv_paired(e) and e.get("prefer") is not False and not s.get("reachable")
+                    and s.get("kind") == "offline" and _srv_wakeable(e) and server_quiet(e)):
+                _srv_quiet_note(e)
+                continue
             if (_srv_paired(e) and e.get("prefer") is not False and not s.get("reachable")
                     and s.get("kind") == "offline" and _srv_wake_due(e)):
                 out.append(e["id"])
@@ -29836,6 +30000,9 @@ def server_wake_ask(sids, ctx, status, step, skip, alive=None):
     for sid in sids:
         e = _srv_find(ents, sid)
         if e is None:
+            continue
+        if server_quiet(e):        # its quiet hours began since (6b600): no step, no call
+            _srv_quiet_note(e)
             continue
         name = _srv_plain(e["name"])
         r = server_wake_step(e, status, step, skip, alive, SRV_WAKE_ASK_S)
@@ -29898,6 +30065,8 @@ def server_make(ctx, kind: str, subject: str, use, notes, sock, emit, step, stat
         raise
     except Exception:
         _gw = []
+    for _qn, _qe in server_take_quiet_notes():      # kept asleep by its quiet hours (6b600)
+        status(server_quiet_line(_qn, _qe))
     if _gw is None:                 # the reader left while it waited
         return True
     e = server_gen_pick(ctx, kind)
@@ -44531,6 +44700,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _so_mode, _so_seats = srv_only_mode(tier), []
         server_take_wake_notes()           # none left from an earlier request on this thread (6b346)
         server_take_wake_pending()
+        server_quiet_reset()               # nor a quiet-hours note (6b600)
         # a mode's server seats -> what answers in their place (6b339), and
         # how the turn's one seat went ("server", "fallback", "failed")
         _seat_fb = {}
@@ -45983,6 +46153,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # a server that was asleep was woken before this answer (6b346)
         for _wn, _wok in server_take_wake_notes():
             status(("%s is awake." if _wok else "%s didn\u2019t wake.") % _wn)
+        # A SERVER IN ITS QUIET HOURS IS LEFT ASLEEP (6b600, per Patrick): one
+        # line says so and who answers instead; a picture or a video says only
+        # that it wasn't woken. "<name> Only" wakes it as before (no note).
+        for _qn, _qe in server_take_quiet_notes():
+            try:
+                _q_cloud = bool(gate_ladder(fast_cloud_ladder(), req_cloud, cloud_only))
+            except Exception:
+                _q_cloud = False
+            status(server_quiet_line(_qn, _qe, None if (img_subject or vid_subject) else council,
+                                     _q_cloud))
 
         # "<name> Only" on a server that sleeps (6b369): the wake goes out now
         # that the page has its headers, says "Waking <name>... 12 s" while it
