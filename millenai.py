@@ -5268,6 +5268,17 @@ def _family_of(label: str) -> str:
     return base
 
 
+# A STAND-IN ENGINE (6b627), dev copies only: the engine-port hook routes
+# every MLX model to one port, and engine-cmd (in _spawn_mlx_engine) starts
+# that script there instead of mlx_lm, so the gauntlet can have an engine
+# die mid-answer, refuse, or load slowly with no real model and none of the
+# desktop app's engines (the 88xx ports are shared by every copy).
+if _hook_arg("engine-port").isdigit():
+    for _el, (_ek, _ep) in list(MODEL_ROUTES.items()):
+        if _ek == "mlx":
+            MODEL_ROUTES[_el] = ("mlx", int(_hook_arg("engine-port")))
+
+
 # who merges in combine mode — strongest first
 MERGE_RANK = sorted((l for l in MODEL_ROUTES),
                     key=lambda l: -MODEL_INFO[l]["mem"])
@@ -7423,8 +7434,9 @@ def _spawn_mlx_engine(label: str, offline: bool = False) -> bool:
     os.makedirs(logdir, exist_ok=True)
     log = open(os.path.join(logdir, f"managed-{port}.log"), "ab")
     proc = subprocess.Popen(
-        [sys.executable, "-m", "mlx_lm", "server",
-         "--model", MLX_REPOS[label], "--port", str(port)],
+        ([sys.executable, _hook_arg("engine-cmd")] if _hook_arg("engine-cmd")   # a dev copy's stand-in (6b627)
+         else [sys.executable, "-m", "mlx_lm", "server"])
+        + ["--model", MLX_REPOS[label], "--port", str(port)],
         stdout=log, stderr=log,
         env=(dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1")
              if offline else None),
@@ -7441,6 +7453,8 @@ def _stop_other_mlx(keep_label: str):
     for label, proc in list(_mlx_procs.items()):
         if label == keep_label or proc.poll() is not None:
             continue
+        if (MODEL_ROUTES.get(label) or (0, 0))[1] == (MODEL_ROUTES.get(keep_label) or (0, 1))[1]:
+            continue    # one engine for both: only a dev copy's stand-in shares a port (6b627)
         # THE EVICTION HAS TO ACTUALLY FINISH (6b239). This used to
         # terminate, wait 8s, and then drop the handle whatever happened
         # — so a big engine that was slow to die had its 17 GB still
@@ -7461,6 +7475,7 @@ def _stop_other_mlx(keep_label: str):
             except Exception:
                 pass
         _mlx_procs.pop(label, None)
+        _LOADS["warm"].discard(label)       # its next start loads again (6b627)
         stopped = True
         print(f"  stopped idle MLX engine for {label}")
     if stopped:
@@ -7495,10 +7510,14 @@ def ensure_mlx_engine(label: str, timeout: float = 180.0) -> bool:
         return True
     if not mlx_model_cached(MLX_REPOS[label]):
         return False
+    if mlx_label_damaged(label):
+        return False             # never an engine on damaged weights (6b627): run_model says why
     _stop_other_mlx(label)
     if not _spawn_mlx_engine(label):
         return False
     deadline = time.time() + timeout
+    _LOADS["at"][label] = time.time()     # the loading line's clock, to its first word (6b627)
+    _LOADS["warm"].discard(label)
     while time.time() < deadline:
         # ours, not a squatter that grabbed the port while ours loaded
         if _port_in_use(port) and _listener_is_mine(port) is True:
@@ -11177,10 +11196,17 @@ def _check_update_live():
     except urllib.error.HTTPError as exc:
         # 404 simply means the repo has no releases yet — not a failure
         note = ("No releases yet" if exc.code == 404
-                else "HTTP %s" % exc.code)
+                else "Couldn’t reach the update server")   # was "HTTP <code>" (6b627)
         return {"configured": True, "available": False, "note": note}
     except Exception as exc:
-        return {"configured": True, "available": False, "note": str(exc)[:120]}
+        # NO RAW ERRORS (6b627): "<urlopen error [Errno 61] Connection
+        # refused>" was the button's whole answer offline
+        answer_fail_log("update check", exc)
+        if net_down_error(exc):
+            return {"configured": True, "available": False, "offline": True,
+                    "note": "No internet connection"}
+        return {"configured": True, "available": False,
+                "note": "Couldn’t reach the update server"}
     tag = rel.get("tag_name", "")
     # the tag is a build counter (v19); the release *title* is the version
     # people recognise (1.0.3) — show that, but still compare on the tag
@@ -31913,6 +31939,319 @@ class MuseChannels:
         return "".join(out)
 
 
+# ==== robust (6b627): begin ====
+# WHEN A LOCAL ENGINE FAILS, THE PERSON IS TOLD PLAINLY AND THE APP GOES ON
+# (6b627, per Patrick: "it has to be usable"). A usability walkthrough of
+# beta 4 found: an engine that died mid-answer left the answer cut off but
+# saved and shown as finished; an overlapping request showed "Backend error -
+# RuntimeError: ..."; a damaged model file froze the page 20 s and then said
+# "HTTP 404. generation thread died", with no fallback (the fallback after a
+# failure never ran: the error line itself counted as words sent) and no way
+# to repair it; a first load showed "Asking this Mac" for 110 s.
+#   EngineCut: a local engine's stream that ended without its end mark
+#     ([DONE] or a finish_reason; Ollama's done line), or whose connection
+#     broke mid-read. With words already on the page the answer is "Cut off"
+#     (the CUT frame; saved with cut: true); with none it is retried as an
+#     engine that went away.
+#   ModelDamaged: an MLX model whose weights are unreadable (a safetensors
+#     header that does not parse or does not match the file's size, or a
+#     config.json that does not parse). Known in milliseconds, before any
+#     engine starts: the next model answers, and the page offers Re-download
+#     (the REPAIR frame, /api/model/repair).
+#   The loading line: a cold MLX engine is announced as a step, "Loading
+#     <model>", with how long it took here last time (run/engine-loads.json)
+#     or "the first time takes about a minute".
+class EngineCut(RuntimeError):
+    """A local engine's stream stopped before its end mark (6b627)."""
+
+    def __init__(self, who: str = "", detail: str = ""):
+        super().__init__("%s stopped before the answer finished%s" % (
+            who or "The model", (" (%s)" % detail) if detail else ""))
+        self.who = who or ""
+
+
+class ModelDamaged(RuntimeError):
+    """An MLX model's files are damaged (6b627): download it again."""
+
+    def __init__(self, label: str):
+        super().__init__("%s’s files are damaged" % label)
+        self.label = label
+
+
+def _engine_lines(resp, who: str):
+    """The engine's response, line by line; a connection that breaks mid-read
+    is an EngineCut (it used to surface raw, or, as ConnectionResetError, be
+    taken for the page's own Stop). A read that outwaits the socket timeout
+    stays what it is (run_model says so)."""
+    it = iter(resp)
+    while True:
+        try:
+            line = next(it)
+        except StopIteration:
+            return
+        except (TimeoutError, socket.timeout):
+            raise
+        except (ConnectionError, http.client.HTTPException, OSError,
+                ValueError) as e:
+            raise EngineCut(who, type(e).__name__) from None
+        yield line
+
+
+_DMG_SEEN = {}      # file -> ((mtime, size), whole): a file is read again only when it changes
+
+
+def _safetensors_whole(path: str, size: int) -> bool:
+    """Its header parses and the tensors it lists end exactly at the file's
+    end (a truncated or overwritten file fails one or the other)."""
+    try:
+        with open(path, "rb") as fh:
+            h = fh.read(8)
+            if len(h) < 8:
+                return False
+            n = int.from_bytes(h, "little")
+            if n < 2 or n > 100_000_000 or 8 + n > size:
+                return False
+            meta = json.loads(fh.read(n).decode("utf-8"))
+        if not isinstance(meta, dict):
+            return False
+        end = 0
+        for k, v in meta.items():
+            if k == "__metadata__":
+                continue
+            o = v.get("data_offsets") if isinstance(v, dict) else None
+            if not (isinstance(o, list) and len(o) == 2):
+                return False
+            end = max(end, int(o[1]))
+        return 8 + n + end == size
+    except Exception:
+        return False
+
+
+def _json_whole(path: str, size: int) -> bool:
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            return isinstance(json.load(fh), dict)
+    except Exception:
+        return False
+
+
+def mlx_weights_damage(repo: str) -> list:
+    """The damaged files of a downloaded MLX model ([] when it is whole or
+    not downloaded): its config and its weights, header checks only (a few
+    milliseconds), remembered until a file changes."""
+    snaps = glob.glob(os.path.join(_hf_model_dir(repo), "snapshots", "*",
+                                   "config.json"))
+    if not snaps:
+        return []
+    snap = os.path.dirname(snaps[0])
+    bad = []
+    for f in [snaps[0]] + sorted(glob.glob(os.path.join(snap, "*.safetensors"))):
+        try:
+            st = os.stat(f)
+        except OSError:
+            bad.append(f)            # a link to a blob that is gone
+            continue
+        key = (st.st_mtime, st.st_size)
+        seen = _DMG_SEEN.get(f)
+        if seen and seen[0] == key:
+            whole = seen[1]
+        else:
+            whole = (_json_whole if f.endswith(".json")
+                     else _safetensors_whole)(f, st.st_size)
+            _DMG_SEEN[f] = (key, whole)
+        if not whole:
+            bad.append(f)
+    return bad
+
+
+def mlx_label_damaged(label: str) -> bool:
+    route = MODEL_ROUTES.get(label)
+    if not route or route[0] != "mlx" or label not in MLX_REPOS:
+        return False
+    try:
+        return bool(mlx_weights_damage(MLX_REPOS[label]))
+    except Exception:
+        return False
+
+
+def mlx_repair(label: str) -> dict:
+    """Download a damaged MLX model again (6b627): only the damaged files go
+    (the snapshot's link and the blob behind it, inside the model's own
+    cache folder), then the usual download fetches what is missing."""
+    if label not in MLX_REPOS or (MODEL_ROUTES.get(label) or ("",))[0] != "mlx":
+        return {"ok": False, "err": "That model can’t be downloaded again here."}
+    repo = MLX_REPOS[label]
+    bad = mlx_weights_damage(repo)
+    if not bad:
+        return {"ok": False, "err": "Its files look whole. Nothing to download."}
+    home = os.path.realpath(_hf_model_dir(repo))
+    with _engine_lock:
+        _retire_engine(label)
+    gone = []
+    for f in bad:
+        for q in (os.path.realpath(f), f):
+            if (q.startswith(home + os.sep) or os.path.realpath(
+                    os.path.dirname(q)).startswith(home + os.sep)) and os.path.lexists(q):
+                try:
+                    os.remove(q)
+                    gone.append(os.path.basename(q))
+                except OSError:
+                    pass
+        _DMG_SEEN.pop(f, None)
+    return {"ok": True, "removed": gone, "started": start_model_downloads([label])}
+
+
+# HOW LONG AN ENGINE TAKES TO LOAD HERE: measured at each cold start, kept
+# in the app's run folder; the loading line quotes it
+_LOADS = {"t": None, "at": {}, "warm": set()}   # at: label -> when its engine started; warm: has written since
+
+
+def _loads_path() -> str:
+    return os.path.join(app_dir(), "run", "engine-loads.json")
+
+
+def engine_load_secs(label: str):
+    """Seconds this model's engine took to load here (an average leaning on
+    the newest), or None when it never has."""
+    if _LOADS["t"] is None:
+        try:
+            with open(_loads_path(), "r", encoding="utf-8") as f:
+                d = json.load(f)
+            _LOADS["t"] = d if isinstance(d, dict) else {}
+        except Exception:
+            _LOADS["t"] = {}
+    v = _LOADS["t"].get(label)
+    return float(v) if isinstance(v, (int, float)) and v > 0 else None
+
+
+def engine_load_note(label: str, secs: float):
+    if not (0.5 < secs < 3600):
+        return
+    old = engine_load_secs(label)
+    _LOADS["t"][label] = round(secs if old is None else old * 0.5 + secs * 0.5, 1)
+    try:
+        os.makedirs(os.path.dirname(_loads_path()), exist_ok=True)
+        tmp = _loads_path() + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(_LOADS["t"], f)
+        os.replace(tmp, _loads_path())
+    except Exception:
+        pass
+
+
+def engine_load_line(label: str, since: float = 0.0) -> str:
+    """The loading step's time in words: "about 40 s" from what it took here
+    (less what has passed), "the first time takes about a minute" when it
+    never loaded here."""
+    est = engine_load_secs(label)
+    if est is None:
+        return "the first time takes about a minute"
+    left = max(5.0, est - max(0.0, time.time() - since)) if since else est
+    if left < 50:
+        return "about %d s" % (int(round(left / 5.0)) * 5 or 5)
+    if left < 90:
+        return "about a minute"
+    return "about %d minutes" % int(round(left / 60.0))
+
+
+def engine_must_load(label: str) -> bool:
+    """A local MLX model whose engine hasn't written a word since it started:
+    cold, or loading now (mlx_lm binds its port at once and loads the
+    weights on its first request, so an open port is not a loaded model)."""
+    route = MODEL_ROUTES.get(label)
+    if not route or route[0] != "mlx" or "local-record" in TEST_HOOKS:
+        return False
+    try:
+        if not _port_in_use(route[1]):
+            return True                    # cold, or its engine died
+    except Exception:
+        return False
+    return label not in _LOADS["warm"] and label in _LOADS["at"]
+
+
+_LOAD_SAID = {}     # label -> [(step, t0)]: the loading lines waiting for that model's first words
+
+
+def engine_load_say(label: str, step) -> None:
+    """A cold engine is said to be loading, with how long it takes here (the
+    page's live line shows it with its clock); its first words close the
+    step (engine_first_words, from run_model) and note the time it took, for
+    next time. A damaged model is known first, and said by the caller."""
+    if not engine_must_load(label):
+        return
+    if mlx_label_damaged(label):
+        raise ModelDamaged(label)
+    t0 = _LOADS["at"].get(label)
+    step("load", "Loading %s" % label, "run", engine_load_line(label, t0 or 0.0))
+    _LOAD_SAID.setdefault(label, []).append((step, t0 or time.time()))
+
+
+def engine_first_words(label: str) -> None:
+    """run_model saw this model's first words: it has loaded."""
+    if label in _LOADS["warm"] and label not in _LOAD_SAID:
+        return
+    at = _LOADS["at"].pop(label, None)
+    _LOADS["warm"].add(label)
+    if at is not None:
+        engine_load_note(label, time.time() - at)
+    for step, t0 in _LOAD_SAID.pop(label, []):
+        try:
+            step("load", "Loaded %s" % label, "done",
+                 "%d s" % max(1, round(time.time() - t0)))
+        except Exception:
+            pass
+
+
+def engine_load_forget(step, failed: bool = False) -> None:
+    """An answer ended (or its model failed: failed=True closes its loading
+    line as "<model> didn't load"): its loading lines wait for nothing more."""
+    for lbl in list(_LOAD_SAID):
+        if failed and any(x[0] is step for x in _LOAD_SAID.get(lbl, [])):
+            try:
+                step("load", "%s didn’t load" % lbl, "done", "")
+            except Exception:
+                pass
+        rest = [x for x in _LOAD_SAID.get(lbl, []) if x[0] is not step]
+        if rest:
+            _LOAD_SAID[lbl] = rest
+        else:
+            _LOAD_SAID.pop(lbl, None)
+
+
+def plain_fail_line(exc) -> str:
+    """What the person reads when an answer failed and no model took over:
+    one plain line, never an exception's text (that goes to the log)."""
+    if isinstance(exc, ModelDamaged):
+        return ("⚠️ %s couldn’t load: its files are damaged."
+                % exc.label)
+    if isinstance(exc, EngineCut):
+        return "⚠️ %s." % str(exc).split(" (")[0]
+    return "⚠️ The model couldn’t answer this time."
+
+
+def net_down_error(exc) -> bool:
+    """The machine can't reach the internet: no name lookup, no route, the
+    connection refused or timed out (6b627)."""
+    import errno as _en
+    r = getattr(exc, "reason", None) or exc
+    if isinstance(r, (socket.gaierror, ConnectionRefusedError, TimeoutError,
+                      socket.timeout)):
+        return True
+    return isinstance(r, OSError) and getattr(r, "errno", None) in (
+        _en.ENETUNREACH, _en.EHOSTUNREACH, _en.ENETDOWN, _en.ECONNREFUSED,
+        _en.EADDRNOTAVAIL, getattr(_en, "ETIMEDOUT", -1))
+
+
+def answer_fail_log(where: str, exc) -> None:
+    """The technical detail of a failed answer, for the log alone."""
+    try:
+        print("  failed (%s): %s: %s" % (where, type(exc).__name__,
+                                                str(exc)[:300]), file=sys.stderr)
+    except Exception:
+        pass
+# ==== robust (6b627): end ====
+
+
 def stream_ollama(tag: str, messages: list, emit,
                   giant: bool = False, big: bool = False,
                   label: str = "", thinking: bool = False, num_ctx: int = 0) -> None:
@@ -31976,7 +32315,7 @@ def stream_ollama(tag: str, messages: list, emit,
         with urllib.request.urlopen(
                 req, timeout=GIANT_LOAD_TIMEOUT if (giant or big)
                 else 600) as resp:
-            for raw_line in resp:
+            for raw_line in _engine_lines(resp, label or tag):   # a broken read is a cut (6b627)
                 line = raw_line.decode("utf-8").strip()
                 if not line:
                     continue
@@ -32006,6 +32345,9 @@ def stream_ollama(tag: str, messages: list, emit,
             tail = muse.close()
             if tail:
                 emit(tail)
+        if not last and sent[0]:
+            # no done line after words: Ollama (or its runner) went away mid-answer (6b627)
+            raise EngineCut(label or tag)
     finally:
         try:
             # a big model's context is the one fixed above (6b528); the
@@ -32055,6 +32397,7 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
         headers={"Content-Type": "application/json"},
     )
     emitted = False
+    fin = False             # its own end mark came: [DONE] or a finish_reason (6b627)
     in_think = False
     raw_body = []
     t0, sent, rep = time.time(), [0], None
@@ -32062,7 +32405,7 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
     muse = MuseChannels() if model_label in MUSE_ROWS else None
     try:
         with urllib.request.urlopen(req, timeout=600) as resp:
-            for raw_line in resp:
+            for raw_line in _engine_lines(resp, model_label):   # a broken read is a cut (6b627)
                 line = raw_line.decode("utf-8", errors="replace")
                 raw_body.append(line)
                 line = line.strip()
@@ -32070,6 +32413,7 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
                     continue
                 data = line[5:].strip()
                 if data == "[DONE]":
+                    fin = True
                     break
                 try:
                     obj = json.loads(data)
@@ -32079,6 +32423,7 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
                     rep = obj["usage"]
                 # the usage chunk's choices are [] (6b325)
                 choice = (obj.get("choices") or [{}])[0] or {}
+                fin = fin or bool(choice.get("finish_reason"))
                 delta = choice.get("delta") or {}
                 whole = choice.get("message") or {}
                 # Reasoning models stream their chain of thought in a separate
@@ -32115,6 +32460,9 @@ def stream_openai_compat(port: int, model_label: str, messages: list, emit,
             tail = muse.close()
             if tail:
                 emit(tail)
+        if emitted and not fin:
+            # words, then the stream simply ended: the engine died mid-answer (6b627)
+            raise EngineCut(model_label)
 
         if not emitted:
             # server didn't stream — try the body as one plain JSON completion
@@ -32194,6 +32542,7 @@ def _need_engine(label: str, timeout: float = 180.0):
 def _retire_engine(label: str):
     """Drop an engine handle AND the process behind it. Popping the
     handle alone left a live copy of the weights nobody tracked."""
+    _LOADS["warm"].discard(label)           # its next start loads again (6b627)
     proc = _mlx_procs.pop(label, None)
     if proc is not None and proc.poll() is None:
         try:
@@ -32315,6 +32664,8 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
     if kind is None:
         raise RuntimeError("No downloaded model can take this. Add one in Settings > Models.")
     if kind == "mlx":
+        if mlx_label_damaged(label):
+            raise ModelDamaged(label)       # known in ms, before any engine starts (6b627)
         global _mlx_last_use
         _mlx_last_use = time.time()
         with _engine_lock:
@@ -32325,6 +32676,8 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
             got = []
 
             def _tap(chunk):
+                if kind == "mlx" and not got and str(chunk).strip():
+                    engine_first_words(label)    # loaded: the loading line closes (6b627)
                 got.append(chunk)
                 emit(chunk)
 
@@ -32353,6 +32706,9 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
                     _need_engine(label)
                 time.sleep(1.5)
                 continue
+            if kind == "mlx" and "".join(got).strip():
+                _LOADS["warm"].add(label)        # it has written: no longer loading (6b627)
+                _LOADS["at"].pop(label, None)
             return
         except urllib.error.HTTPError as e:
             detail = ""
@@ -32376,11 +32732,15 @@ def run_model(label: str, messages: list, emit, thinking: bool = False,
                     "%s didn’t load within an hour. It reads %d GB from disk each time." % (label, round(
                         MODEL_INFO[label]["gb"])))
             raise RuntimeError("%s stopped answering." % label)
-        except urllib.error.URLError:
+        except (urllib.error.URLError, EngineCut) as _ue:
             # engine may be mid-startup, or another MillenAI instance on
             # this machine terminated it on ITS exit (shared 88xx ports —
             # seen live: a release restart killed the desktop's engine).
             # Respawn it and try again before ever surfacing an error.
+            # An engine cut off after its words reached the page is not
+            # asked again: the words would repeat (6b627)
+            if isinstance(_ue, EngineCut) and "".join(got).strip():
+                raise
             attempts += 1
             if attempts > 2:
                 raise
@@ -39914,7 +40274,12 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
 
 
 def offline_hint(kind: str, err: Exception) -> str:
-    """Turn a backend error into an actually useful message."""
+    """Turn a backend error into an actually useful message. Never an
+    exception's own text (6b627): the detail goes to the log, the person
+    reads one plain line, marked as the error it is."""
+    answer_fail_log(kind or "engine", err)
+    if isinstance(err, (EngineCut, ModelDamaged)):
+        return plain_fail_line(err)
     # NB: HTTPError subclasses URLError — it MUST be checked first,
     # and its body usually contains the engine's real explanation.
     if isinstance(err, urllib.error.HTTPError):
@@ -39937,15 +40302,17 @@ def offline_hint(kind: str, err: Exception) -> str:
                     + ("Install it in Settings > Models."
                        if IS_WIN else
                        "Run `ollama pull <model>`."))
-        return ("The engine refused the request (HTTP %s). %s"
-                % (err.code, detail or "No details."))
+        # (6b627) the HTTP code and the engine's own words ("generation thread
+        # died") were the whole answer, and not even marked an error
+        return plain_fail_line(err)
     if isinstance(err, urllib.error.URLError):
         if kind == "ollama":
             if IS_WIN:
                 return ("The engine isn’t answering yet. Try again in a minute, or quit and reopen.")
             return ("Ollama isn\u2019t reachable on port %d. Start it with `ollama serve`."
                     % OLLAMA_PORT[0])
-        return ("No MLX server on that port. Start it first.")
+        return ("⚠️ The model isn’t running right now. "
+                "Try again in a moment.")   # was a line naming the MLX server and its port (6b627)
     # a model too big for RAM gets SIGKILLed mid-load; the engine reports
     # this as a terminated helper or a truncated stream
     text = str(err).lower()
@@ -39953,7 +40320,7 @@ def offline_hint(kind: str, err: Exception) -> str:
                                "process has terminated")):
         return pc_words(
                 "The model ran out of memory. Close some apps and retry, or pick a smaller one.")
-    return f"⚠️ Backend error — {type(err).__name__}: {err}"
+    return plain_fail_line(err)     # was the exception's own type and text (6b627)
 
 
 # ------------------------------------------------------------ skyline cache
@@ -42952,6 +43319,7 @@ _TURN_TAGS = ("RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2"
               "|STEP|APPROVE|RATE"      # RATE: the writer's pace (6b515), the page's twin
               "|USAGE|DONE"             # a model call's tokens; the run's clock (6b528)
               "|OFFER"                  # the way on when a server didn't answer (6b570)
+              "|CUT|REPAIR"             # an answer cut off; a damaged model (6b627)
               "|RUBIN")                 # Vera Rubin's console (6b519)
 # the page's rules, character for character: JS "." stops at a line
 # break, and JS "$" (unlike Python's) only at the very end
@@ -43022,6 +43390,8 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
         elif tag == "OFFER" and isinstance(d, dict):
             got["OFFER"] = dict({"server": str(d.get("server") or "")[:60]},
                                 **({"asleep": 1} if d.get("asleep") else {}))
+        elif tag == "CUT":
+            got["CUT"] = True                # the answer was cut off (6b627)
         elif tag == "STEP" and isinstance(d, dict) and d.get("id"):
             st = got.setdefault("STEP", {})
             _prev = st.get(d["id"]) or {}
@@ -43095,6 +43465,8 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
         rec["offer"] = got["OFFER"]          # the buttons come back with the chat (6b570)
     if aborted and full:
         rec["stopped"] = True                # a Stop keeps what was shown, and says so (6b570)
+    elif got.get("CUT") and full:
+        rec["cut"] = True                    # cut off: a reopened chat says so too (6b627)
     if got.get("STEP"):
         _sv = list(got["STEP"].values())
         # a Code run is every command it ran, up to REMOTE_CAP and its
@@ -45928,6 +46300,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 want = []
             self._send_json({"started": start_model_downloads(want)})
             return
+        if self.path == "/api/model/repair":
+            # a damaged model downloaded again (6b627): its damaged files go,
+            # the usual download brings them back
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                _rl = str((json.loads(self.rfile.read(n)) or {}).get("label") or "")
+            except (ValueError, json.JSONDecodeError, AttributeError):
+                _rl = ""
+            self._send_json(mlx_repair(_rl))
+            return
         if self.path == "/api/model/update":
             # Update models (6b306): replacements download, each old
             # model goes once its replacement is complete; with servers
@@ -48351,6 +48733,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # the polish fails, the draft stays as the answer. The
                     # saved chat keeps what follows the last RESET (turn_text).
                     status(f"{lbl} is writing a first draft")
+                    engine_load_say(lbl, step)    # a cold engine: "Loading <model>", until its first words (6b627)
                     parts = []
                     draft = ""
 
@@ -48413,6 +48796,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  lbl, round(MODEL_INFO[lbl]["gb"])), "run", "")
                     else:
                         step("draft", "Writing the answer", "run", lbl)
+                    engine_load_say(lbl, step)    # a cold engine: "Loading <model>", until its first words (6b627)
                     # guarded like every other path: a lone model that
                     # collapses into repetition gets cut back to its
                     # coherent prefix instead of streaming the loop
@@ -48433,10 +48817,33 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError):
                 pass
         except Exception as exc:
-            try:
-                emit("\n" + offline_hint(kind, exc))
-            except (BrokenPipeError, ConnectionResetError):
-                pass
+            # (6b627) the failure is said AFTER the rescue is tried: its own
+            # line used to go first, counted as words sent, so the rescue
+            # below never ran. Words already on the page: the answer was cut
+            # off; they stay, marked so (CUT), never followed by an error.
+            _fail_lbl = route_label or model_name
+            _was_cut = bool(_model_said[0] and shown_n[0] > 0)
+            engine_load_forget(step, True)     # a loading line closes: it didn't load
+            if _was_cut:
+                answer_fail_log(_fail_lbl or kind, exc)
+                try:
+                    _write((NUL + "CUT:" + json.dumps(
+                        {"w": str(getattr(exc, "who", "") or _fail_lbl or "")[:60]})
+                        + NUL).encode("utf-8"))
+                except Exception:
+                    pass
+            elif isinstance(exc, ModelDamaged):
+                # a damaged model: the page offers Re-download (6b627)
+                try:
+                    _write((NUL + "REPAIR:" + json.dumps({"m": exc.label})
+                            + NUL).encode("utf-8"))
+                except Exception:
+                    pass
+            if not _model_said[0]:
+                # (6b627) no model's words went out: the frames before the
+                # failure (RUN, a RESET) counted as sent too, so the rescue
+                # below never ran after a refusal or a damaged model
+                sent[0] = 0
             if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:
                 # every path stayed silent (engine died mid-answer, a
                 # provider returned nothing). Try the smallest brain on
@@ -48462,15 +48869,31 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         pulled = ollama_pulled_tags() or set()
                         alt = next((l for l in reversed(MERGE_RANK)
                                     if model_cached(l, pulled)
-                                    and l != (route_label or model_name)), None)
+                                    and l != (route_label or model_name)
+                                    and not mlx_label_damaged(l)), None)   # (6b627)
                         if alt:
                             status(f"retrying on {alt}")
+                            engine_load_say(alt, step)    # (6b627) a cold one says it is loading
                             run_model(alt, full_messages, memit)
-                    except Exception:
-                        pass
-            if not sent[0]:
-                emit("The engine stopped and the backup didn’t answer. Ask again.")
+                    except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                        raise
+                    except Exception as _ax:
+                        answer_fail_log("rescue", _ax)
+                        if _model_said[0] and shown_n[0] > 0:
+                            # the rescue was cut off in its turn (6b627)
+                            try:
+                                _write((NUL + "CUT:" + json.dumps({"w": str(alt or "")[:60]})
+                                        + NUL).encode("utf-8"))
+                            except Exception:
+                                pass
+            if not _was_cut and not _model_said[0]:
+                # nothing answered: one plain line, marked as an error (6b627)
+                try:
+                    emit("\n" + offline_hint(kind, exc))
+                except (BrokenPipeError, ConnectionResetError):
+                    pass
         finally:
+            engine_load_forget(step)       # (6b627) its loading lines, if any, end with it
             _srv_think.brief = False       # (6b570) a greeting's one pass ends with it
             # the effort ends with the answer (6b534): a title or a memory
             # pass after it on this thread reasons at the model's default
@@ -55417,6 +55840,24 @@ html.hz #sidebar{background:var(--chat-panel);-webkit-backdrop-filter:none;backd
   .hz #chat-inner>.msg,.hz #chat-inner.chat-swap,.hz .uedit{animation:none!important}
   .hz #input,.hz .msg .mact,.hz #jumpdown,.hz #jumpdown[hidden],.hz #chat-queued{transition:none}}
 /* ==== the chat (6b590): end ==== */
+/* ==== ROBUST (6b627): css begin ====
+   When something fails, one quiet line in the kind error line's look (6b590's .chat-err: the ember hairline, plain
+   words) and the way on as a key: "Cut off" under a cut answer with Try again (only the chat's last answer keeps the
+   key), a damaged model's Download again, a long silence mid-answer said in the meta ink. No new effect. */
+.hz .msg.ai>.chat-err.robrow{grid-column:1;margin:12px 0 0}
+.hz .msg.ai:not(:last-child)>.robrow[data-rob="cut"] .chat-err-go{display:none}
+.hz .rob-go{height:32px;padding:0 12px;border-radius:8px;cursor:pointer;font:500 13px/1 var(--hz-font-chat);letter-spacing:-.005em;
+  -webkit-font-smoothing:antialiased;background:transparent;color:var(--chat-ink);border:var(--chat-hw) solid var(--chat-line-2);
+  transition:background .15s var(--hz-ease-out),border-color .15s var(--hz-ease-out)}
+.hz .rob-go:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.24)}
+.hz .rob-go:disabled{cursor:default;color:var(--chat-ink-3);background:transparent;border-color:var(--chat-line-2)}
+.hz.hz-kb .rob-go:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+.hz:not(.hz-kb) .rob-go:focus-visible{outline:0;box-shadow:none}
+.hz .msg.ai>.robquiet{grid-column:1;margin:8px 0 0;font:450 13px/18px var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink-3);
+  font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
+#up-checked{margin:6px 0 0;font-size:12px;color:var(--dim)}
+.hz #about-veil #up-checked{margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta,var(--dim))}
+/* ==== ROBUST (6b627): css end ==== */
 /* ==== THE CODE LANE AND FUNNELS (6b622, per Patrick: "the code page and all that looks really dialed in ... I want
    this UI to be perfect"; the web demo's Code and Funnels views, "the middle ground"): the same flat surfaces as the
    chat. Runs: a risk tag (11 px caps), the command in mono, a state line that shimmers silver while it runs (2.4 s a
@@ -56886,6 +57327,7 @@ __CODE_ROWS__
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check now</button>
+      <div id="up-checked" role="status" aria-live="polite" hidden></div>
       <!-- 6b285: three channels. Stable is the default; Beta
            (value "beta", kept for saved prefs; "Prerelease" from 6b318,
            "Beta" again in 6b551 per Patrick, to match the website and the
@@ -61064,6 +61506,8 @@ function livePhrase(steps,running,status,drafts,comp,done){
   if(done&&done.t>0)return {text:"Done in "+fmtSecs(done.t),who:[]};
   const run=(steps||[]).filter(x=>x&&x.s!=="done"),s=run.length?run[run.length-1]:null;
   const byId=id=>(steps||[]).find(x=>x&&x.id===id);
+  // a cold model loading, with how long it takes here (6b627): "Loading Gemma 4 E2B, about 40 s"
+  if(s&&s.id==="load")return {text:(s.l||"Loading the model")+(s.d?", "+s.d:""),who:[]};
   if(s&&s.id==="wake")return {text:/^Waking /.test(s.l||"")?s.l:"Waking your server",who:[]};
   if(s&&s.id==="verify"){const d=String(s.d||""),k=d.indexOf("·");return {text:"Checking the answer",who:k>0?[d.slice(k+1).trim()]:[]};}
   if(s&&s.id==="review")return {text:"Reviewing the draft",who:s.d&&/[A-Za-z]/.test(s.d)&&!/note|problem/.test(s.d)?[s.d]:[]};
@@ -61388,6 +61832,7 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   {const ll=div.querySelector(":scope>.liveline.done");if(ll&&m.stopped)ll.classList.add("stopped");}   // 6b570
   if(form)body.appendChild(formCard(form));
   if(role!=="user"&&m.role&&m.offer)offerRow(div,m.offer);   // a reopened chat keeps the way on (6b570)
+  if(role!=="user"&&m.role&&m.cut&&!m.stopped)robCutPaint(div,{w:((m.usage||[]).filter(Boolean).slice(-1)[0]||{}).m||""});   // a cut answer says so when reopened (6b627)
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
   if(role!=="user"&&m.role&&isHz()&&runSteps(m.steps).length){div.classList.add("hz-coderun");runsPaint(div,{steps:m.steps,rest:true});}   // 6b622
@@ -61585,7 +62030,9 @@ input.addEventListener("keydown",e=>{
 input.addEventListener("input",()=>{if(sendQueued&&!input.value.trim()){sendQueued=false;
   const qc=$("#composer");if(qc)qc.classList.remove("queued");}});
 // during a Vera Rubin run the first ■ stops it cleanly, a second cuts the stream (6b519)
-sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()):sendSafe();
+// the key is Stop only in the chat that is answering (6b627): in any other chat it is Send, and a question typed there
+// waits its turn ("Sends when the other chat's answer is done"), as Enter does
+sendBtn.addEventListener("click",()=>{ robStopHere()?(rubinStop()||abortCtl.abort()):sendSafe();
   if(isHz())input.focus({preventScroll:true}); });   // the words go back to the box after a send or a stop (6b590)
 
 /* ------------------------------------------------------ image paste */
@@ -62126,12 +62573,14 @@ async function send(){
   // the live line ticks on its own clock, from the first second (6b528)
   liveLinePaint(aiDiv);
   const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);
+  const robQT=setInterval(()=>robQuietTick(aiDiv,full),500);   // a long silence mid-answer is said (6b627)
   // the writer's pace (6b515): the server's RATE frame when it sent one, else
   // the page's own clock from the first character shown after the last RESET
   let rateInfo=null,genT0=0,genCut=-1,lastChunkT=0;
   const seenStatus=[];
   let srvWho="";         // the server that answered, if one did (6b334)
   let offer=null;        // the way on when a server pick couldn't answer (6b570)
+  let robCut=null,robFix=null;   // the answer was cut off; a damaged model (6b627)
   const hereFrom=isSrvMode(tier)?hereOnce:null;hereOnce=null;   // this send runs here once (6b570)
   inner.querySelectorAll(".offerrow").forEach(x=>x.remove());
   lastModels="";
@@ -62376,6 +62825,8 @@ async function send(){
         USAGE:j=>{try{usage.push(JSON.parse(j));}catch(e){}},  // a model call's tokens (6b528)
         DONE:j=>{try{runInfo=JSON.parse(j);}catch(e){}},       // the run's clock and mode (6b528)
         OFFER:j=>{try{offer=JSON.parse(j);}catch(e){}},        // the way on (6b570)
+        CUT:j=>{try{robCut=JSON.parse(j)||{};}catch(e){robCut={};}},   // the stream stopped short (6b627)
+        REPAIR:j=>{try{robFix=JSON.parse(j)||null;}catch(e){}},      // a damaged model: Re-download (6b627)
         DRAFT:j=>{
                  try{const d=JSON.parse(j);
                      if(globalThis.hzReady&&!drafts.some(x=>x.m===d.m))hzTele("draft",d);
@@ -62479,6 +62930,7 @@ async function send(){
   if(rubinLive&&rubinLive.div===aiDiv)rubinEnd();      // its clock stops (6b519)
   aiDiv.classList.remove("live");
   clearInterval(liveT);
+  clearInterval(robQT);robQuietTick(aiDiv,null);   // (6b627)
   const secs0=(performance.now()-t0)/1000;
   // the spine settles (6b528): every node done, the run's numbers, the sources
   collapseSteps(searched?sources:null,{drafts:drafts,usage:usage,run:runInfo,secs:secs0,
@@ -62559,6 +63011,7 @@ async function send(){
     aiDiv.appendChild(rb);
   }
   if(isErr&&!wasAborted)chatErrPaint(aiDiv,full);   // a kind line and Try again (6b590)
+  robLand(aiDiv,robCut,robFix,!!full&&!isErr,wasAborted);   // Cut off with Try again; a damaged model's Re-download (6b627)
   if(full&&!isErr){
     // THE NUMBERS LIVE BESIDE THE ANSWER NOW (6b528): the spine's final step
     // carries the writer's pace (its real output tokens over the RATE clock),
@@ -62593,6 +63046,7 @@ async function send(){
     if(steps.length)rec.steps=steps.map(s=>Object.assign({id:s.id,l:s.l,s:s.s==="skip"?"skip":"done",d:s.d},s.r?{r:s.r}:{},s.n?{n:s.n}:{}));   // a run's risk and size ride along (6b622)
     if(offer)rec.offer=offer;
     if(wasAborted)rec.stopped=true;      // a Stop keeps what was shown, and says so (6b570)
+    else if(robCut)rec.cut=true;         // cut off: a reopened chat says so too (6b627)
     myMessages.push(rec);
     sbFootPaint();                   // today's tokens in the sidebar's foot
     // viewing the owning chat but the live bubble was detached by a
@@ -62918,8 +63372,9 @@ function chatHash(msgs,n){
 // L5, R-2-22, one corpus checks both)
 // USAGE: a model call's tokens; DONE: the run's clock and its mode (6b528); RUBIN: Vera Rubin's console (6b519)
 const FRAME_TAGS="RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN|OFFER";
-const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS+"):(.*?)\u0000","g");
-const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS+"):[^\u0000]*$");
+const FRAME_TAGS_ALL=FRAME_TAGS+"|CUT|REPAIR";   // an answer cut off; a damaged model (6b627)
+const FRAME_RX=new RegExp("\u0000("+FRAME_TAGS_ALL+"):(.*?)\u0000","g");
+const FRAME_PART=new RegExp("\u0000(?:"+FRAME_TAGS_ALL+"):[^\u0000]*$");
 function streamText(raw,on){
   const t=raw.replace(FRAME_RX,(_,tag,j)=>{if(on&&on[tag])on[tag](j);return "";})
     .replace(FRAME_PART,"");
@@ -64366,7 +64821,7 @@ document.addEventListener("keydown",e=>{
     if(srvAllClose()){e.preventDefault();return;}
     if(engMenuEsc()){e.preventDefault();return;}
     if(typeof sxHostEsc==="function"&&sxHostEsc()){e.preventDefault();return;}   // the host sheet (6b625)
-    if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
+    if(robStopHere()){e.preventDefault();abortCtl.abort();return;}   // only in the chat that is answering (6b627)
     // close whatever modal is open, outermost last
     if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
     if(impAskRun){impAskClose(false);e.preventDefault();return;}   // the drop's ask
@@ -64409,6 +64864,7 @@ $("#newchat").addEventListener("click",()=>{
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
+  robKeySync();                     // the key is Send here: the answer on its way is the other chat's (6b627)
   input.focus();
 });
 
@@ -69834,9 +70290,8 @@ $("#about-check").addEventListener("click",async ev=>{
       b.onclick=()=>{aboutVeil.hidden=true;openUpdate();};
       return;
     }
-    else b.textContent=r.note?("No update \u2014 "+r.note)
-                             :"You\u2019re up to date";
-  }catch(e){b.textContent="Couldn’t check. Try again.";}
+    else{robUpLine(r);b.textContent=was;b.disabled=false;return;}   // the result stays readable, under the key (6b627)
+  }catch(e){robUpLine(null);b.textContent=was;b.disabled=false;return;}
   setTimeout(()=>{b.textContent=was;b.disabled=false;},2600);
 });
 // Forget Me moved to the Account pane (6b257) — it opens the scoped
@@ -72368,6 +72823,7 @@ function chatPlaceSave(){
 // flash), faded in over 180 ms from .55 (never from nothing), the title in the header, the box focused
 function chatArrive(id){
   chatUnseen=false;chatGlideTo=0;chatAnc=null;
+  robKeySync();                     // Stop only in the chat that is answering (6b627)
   const at=chatPlaces().get(id);
   chatRoom();
   if(at!=null){scroller.style.scrollBehavior="auto";scroller.scrollTop=at;scroller.style.scrollBehavior="";
@@ -72584,7 +73040,7 @@ function chatInit(){
   input.addEventListener("paste",chatPaste);
   {const c=$("#composer");if(c&&!$("#chat-queued")){const q=document.createElement("div");q.id="chat-queued";q.setAttribute("aria-live","polite");
     q.textContent="";c.appendChild(q);
-    new MutationObserver(()=>{if(c.classList.contains("queued"))q.textContent="Sends when this answer is done";}).observe(c,{attributes:true,attributeFilter:["class"]});}}
+    new MutationObserver(()=>{if(c.classList.contains("queued"))q.textContent=robQueuedLine();}).observe(c,{attributes:true,attributeFilter:["class"]});}}
   const comp=$("#composer");let dn=0;
   addEventListener("dragenter",e=>{if(hasFiles(e)&&comp){dn++;comp.classList.add("drop");}});
   addEventListener("dragleave",e=>{if(hasFiles(e)&&comp&&--dn<=0){dn=0;comp.classList.remove("drop");}});
@@ -72601,6 +73057,99 @@ function chatJumpPlace(){
 }
 chatInit();
 /* ==== the chat (6b590): script end ==== */
+/* ==== ROBUST (6b627): script begin ==== */
+// USABLE WHEN THINGS GO WRONG (6b627, per Patrick: "it has to be usable"). Functions and var only (the TDZ): send(),
+// the keys and the stream call into this block.
+// THE STOP KEY BELONGS TO THE CHAT THAT IS ANSWERING. New chat (6b624) and a switch leave an answer to finish in its
+// own chat; the key on the other page stayed the stop key, so a click there killed that answer (saved as "**") and
+// sent nothing. Now the key is Stop only while the chat on screen is the one answering; anywhere else it is Send, and a
+// question sent there waits its turn, as Enter already did.
+function robStopHere(){
+  return !!(generating&&abortCtl&&(genChat==null||curChat===genChat));
+}
+function robKeySync(){
+  if(typeof chatSendKey==="function")chatSendKey(robStopHere());
+  const q=document.getElementById("chat-queued"),c=document.getElementById("composer");
+  if(q&&c&&c.classList.contains("queued"))q.textContent=robQueuedLine();
+}
+function robQueuedLine(){
+  return generating&&genChat!=null&&curChat!==genChat?"Sends when the other chat’s answer is done"
+    :"Sends when this answer is done";
+}
+// AN ANSWER CUT OFF SAYS SO. The engine died mid-answer (or its connection broke): the server sends CUT and saves the
+// turn with cut: true. The live line says "Cut off" instead of "Done in", and one line under the words says what
+// happened, with Try again (6b590's delegated .chat-err-go: regenerate) on the chat's last answer.
+function robCutPaint(div,info){
+  if(!div)return;
+  const ll=div.querySelector(":scope>.liveline.done");
+  if(ll){const em=ll.querySelector("em");if(em)em.textContent="Cut off";ll.classList.add("stopped");}
+  const old=div.querySelector(':scope>.robrow[data-rob="cut"]');if(old)old.remove();
+  const who=info&&typeof info==="object"&&info.w?String(info.w):"";
+  const row=document.createElement("div");row.className="chat-err robrow";row.dataset.rob="cut";row.setAttribute("role","status");
+  row.innerHTML='<span class="chat-err-t"></span><button type="button" class="chat-err-go">Try again</button>';
+  // the live line already says "Cut off" when there is one
+  row.querySelector(".chat-err-t").textContent=(ll?"":"Cut off: ")+(who||(ll?"The model":"the model"))+" stopped before the answer finished.";
+  robRowPut(div,row);
+}
+// a line goes right under the words (and their live line), above the proof's chips and the answer's actions
+function robRowPut(div,row){
+  const at=div.querySelector(":scope>.liveline.done")||div.querySelector(":scope>.body");
+  if(at&&at.parentNode===div)at.insertAdjacentElement("afterend",row);else div.appendChild(row);
+}
+// A DAMAGED MODEL: its files failed their check before any engine started, so the next model answered (or none could,
+// and the error line says so). Download again removes the damaged files and fetches them (/api/model/repair).
+function robFixPaint(div,fix,answered){
+  if(!div||!fix||!fix.m)return;
+  const m=String(fix.m);
+  let row=answered?null:div.querySelector(":scope .chat-err[role=alert]");   // nothing answered: the error line takes the key
+  if(!row){
+    row=document.createElement("div");row.className="chat-err robrow";row.dataset.rob="fix";row.setAttribute("role","status");
+    row.innerHTML='<span class="chat-err-t"></span>';
+    row.querySelector(".chat-err-t").textContent=m+(answered?"’s files are damaged, so another model answered.":"’s files are damaged.");
+    robRowPut(div,row);
+  }
+  const b=document.createElement("button");b.type="button";b.className="rob-go";b.textContent="Download again";
+  b.addEventListener("click",async()=>{
+    b.disabled=true;b.textContent="Starting…";
+    const t=row.querySelector(".chat-err-t");
+    try{
+      const r=await(await api("/api/model/repair",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({label:m})})).json();
+      if(r&&r.ok){b.textContent="Downloading";if(t){t.textContent="Downloading "+m+" again. You can keep chatting.";t.removeAttribute("title");}}
+      else{b.disabled=false;b.textContent="Download again";if(t&&r&&r.err)t.textContent=r.err;}
+    }catch(e){b.disabled=false;b.textContent="Download again";if(t)t.textContent="Couldn’t start the download. Try again.";}
+  });
+  row.appendChild(b);
+}
+function robLand(div,cut,fix,answered,aborted){
+  if(aborted)return;
+  if(cut&&answered)robCutPaint(div,cut);
+  if(fix)robFixPaint(div,fix,answered);
+}
+// A LONG SILENCE MID-ANSWER IS SAID: words were coming, then nothing for 10 s (an engine swapping, a slow step): one
+// meta line under them counts the wait, and goes as soon as words come again. null clears it.
+function robQuietTick(div,full){
+  if(!div)return;
+  let q=div.querySelector(":scope>.robquiet");
+  if(full==null){if(q)q.remove();return;}
+  const n=full.length,now=performance.now();
+  if(div._robN!==n){div._robN=n;div._robT=now;if(q)q.remove();return;}
+  if(!n||now-div._robT<10000)return;
+  if(!q){q=document.createElement("div");q.className="robquiet";
+    const b=div.querySelector(":scope>.body");if(b)b.insertAdjacentElement("afterend",q);else div.appendChild(q);}
+  const t="Still waiting on the model · "+Math.round((now-div._robT)/1000)+" s";
+  if(q.textContent!==t)q.textContent=t;
+}
+// THE UPDATE CHECK'S ANSWER STAYS READABLE: a line under Check now ("You're up to date" flashed on the key for 2.6 s
+// and went), and offline it says so ("<urlopen error [Errno 61] Connection refused>" was the key's whole text)
+function robUpLine(r){
+  const el=document.getElementById("up-checked");if(!el)return;
+  el.textContent=!r?"Couldn’t check. Try again."
+    :r.offline?"No internet connection. Connect and try again."
+    :r.note?String(r.note).replace(/\.?$/,"."):"You’re up to date.";
+  el.hidden=false;
+}
+/* ==== ROBUST (6b627): script end ==== */
 
 /* ==== bring your chats (6b529): script begin ==== */
 // BRING YOUR CHATS (6b529, per Patrick: "quickly connect another AI app and

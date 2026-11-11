@@ -3305,6 +3305,7 @@ check("a bare retired tag means its :latest pull and nothing else",
 _soz = dict(_LH, ollama_url=lambda p: "http://127.0.0.1:1" + p,
             urllib=__import__("urllib.request"))
 _exec_names(_soz, {"stream_ollama", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                   "EngineCut", "_engine_lines",     # 6b627: a stream that stops short is a cut
                    "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF",
                    # 6b533: Muse Glimmer's channels
                    "MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MuseChannels", "muse_level", "_muse_hold", "_muse_could_head"})
@@ -6808,6 +6809,7 @@ def _uzns(**over):
                            "cloud_stream_conf", "_STREAM_USAGE_ASK",
                            "_stream_usage_off", "stream_ollama",
                            "stream_openai_compat", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                           "EngineCut", "_engine_lines",     # 6b627: a stream that stops short is a cut
                            "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF",
                            # 6b533: Muse Glimmer's channels
                            "MUSE_ROWS", "MUSE_TOKENS", "MUSE_ENDS", "MuseChannels", "muse_level", "_muse_hold", "_muse_could_head"})
@@ -39027,7 +39029,9 @@ def _r519_pins(src):
             "@media (prefers-reduced-motion:reduce){.rbcon::before,.rblive{animation:none}" in page
             and ".novideo .rbcon::before,.novideo .rblive{animation:none}" in page,
         "the send button's first press stops it cleanly; no countdown, no Answer now":
-            "generating?(rubinStop()||abortCtl.abort()):sendSafe()" in page
+            # (6b627) the key stops only the chat that is answering: robStopHere() is generating in that chat
+            "robStopHere()?(rubinStop()||abortCtl.abort()):sendSafe()" in page
+            and "return !!(generating&&abortCtl&&(genChat==null||curChat===genChat));" in page
             and 'etaTxt=(runTier!=="Vera Rubin"&&!streamDone' in page
             and 'const nowBtn=(runTier!=="Vera Rubin"&&curHid' in page,
         "the menu: under Max, no words on its row (6b458), its pop-out, the chip says its name":
@@ -40530,6 +40534,7 @@ def _mu_engines(src):
               MLX_REPOS={"Muse Glimmer 30B": "mlx-community/Muse-Glimmer-30B-4bit",
                          "Gemma 4 26B": "mlx-community/gemma-4-26b-a4b-it-4bit"})
     _s5_exec(src, ns, {"stream_ollama", "stream_openai_compat", "GIANT_CTX", "GIANT_KEEP_ALIVE",
+                       "EngineCut", "_engine_lines",     # 6b627: a stream that stops short is a cut
                        "GIANT_LOAD_TIMEOUT", "OLLAMA_THINK_OFF"})
     return ns, sent, plan
 
@@ -41353,7 +41358,8 @@ def _c522_paths(src):
     so = {"json": json, "time": time, "urllib": _ty522.SimpleNamespace(request=_ty522.SimpleNamespace(
         Request=urllib.request.Request, urlopen=_uo)), "ollama_url": lambda p: "http://127.0.0.1:1" + p,
         "usage_note": lambda *a, **k: None, "GIANT_CTX": 32768, "GIANT_KEEP_ALIVE": "30m", "GIANT_LOAD_TIMEOUT": 3600,
-        "OLLAMA_THINK_OFF": set(), "MUSE_ROWS": frozenset()}   # Muse's rows (6b533) reached stream_ollama after this check
+        "OLLAMA_THINK_OFF": set(), "MUSE_ROWS": frozenset(),
+        "_engine_lines": lambda r, w: iter(r), "EngineCut": RuntimeError}   # (6b627) the reader's cut check, passed through; Muse's rows (6b533) reached stream_ollama after this check
     exec(_def522(src, "stream_ollama"), so)
     so["stream_ollama"]("local-o:9b", [{"role": "user", "content": "x"}], [].append, num_ctx=74752)
     so["stream_ollama"]("big:70b", [{"role": "user", "content": "x"}], [].append, big=True, num_ctx=59392)
@@ -48792,6 +48798,617 @@ for _mn, _ma, _mb in _C626_MUT:
         _c626_caught.append((_mn, "not caught"))
 check("6b626's rules each break a check when broken (%d mutants)" % len(_C626_MUT), not _c626_caught, "%r" % _c626_caught)
 # ==== 6b626 answers: end ====
+# ==== 6b627 robust: begin ====
+print("== usable when things go wrong: Stop only in the answering chat, a cut answer says so, a damaged model falls through with Download again, a load and a long silence said, offline said plainly (6b627) ==")
+# USABLE WHEN THINGS GO WRONG (6b627, per Patrick: "it has to be usable"; a usability walkthrough of beta 4). Three
+# parts, each with mutants the same predicate catches. (1) In process: the robust block's own functions lifted from the
+# source (a damaged model known from its files' headers and sizes, the plain failure lines, offline told from the
+# error, the loading line's words) and turn_record saving a CUT answer as cut. (2) Live: a copy of its own on 9903
+# whose MLX engines are a stand-in (the engine-port and engine-cmd hooks: a script on a free port that can answer, close
+# mid-answer, reset, exit, refuse with mlx_lm's 404 or send nothing), in a fake model cache, with no Ollama and the
+# update API on a closed port: a cold load said with its time, a stream cut three ways marked CUT and saved cut, a
+# refusal rescued by the next model with no error shown, nothing answering said in one plain line, a damaged model
+# known in milliseconds (REPAIR) and rescued, /api/model/repair, the update check offline; mutated copies of the app
+# (the end mark not checked, the old order that never rescued, the raw exception, no damage check) each caught.
+# (3) The page, headless Chromium over the DevTools protocol on that copy: the send key across two chats (Stop only in
+# the answering one; Send elsewhere, queued, the answer saved whole), the cut line and Try again (live and reopened),
+# Download again, the loading line, the silence line, the update line; mutants served in place of the page.
+import struct as _st627, hashlib as _hl627, glob as _gl627, http.client as _hc627
+_R627_SRC = _MILLENAI_SRC
+def _r627_blk(src):
+    return src[src.index("# ==== robust (6b627): begin ===="):src.index("# ==== robust (6b627): end ====")]
+def _r627_ns(blk, hf):
+    import http as _http627
+    ns = {"json": json, "os": os, "glob": _gl627, "socket": socket, "http": _http627, "time": time, "sys": sys,
+          "MODEL_ROUTES": {"M": ("mlx", 1)}, "MLX_REPOS": {"M": "org/m"}, "TEST_HOOKS": frozenset(), "Ctl": str,
+          "_hf_model_dir": lambda repo: os.path.join(hf, "hub", "models--" + repo.replace("/", "--")),
+          "app_dir": lambda: hf, "_port_in_use": lambda p: False}
+    exec(blk, ns)
+    return ns
+# (1) in process
+def _r627_damage(blk):
+    hf = tempfile.mkdtemp(prefix="hf627-", dir=_SMOKE_TMP)
+    ns = _r627_ns(blk, hf)
+    snap = os.path.join(hf, "hub", "models--org--m", "snapshots", "0")
+    os.makedirs(snap)
+    json.dump({"model_type": "x"}, open(os.path.join(snap, "config.json"), "w"))
+    hdr = json.dumps({"w": {"dtype": "F32", "shape": [2], "data_offsets": [0, 8]}}).encode()
+    good = _st627.pack("<Q", len(hdr)) + hdr + b"\0" * 8
+    f = os.path.join(snap, "model.safetensors")
+    res = {}
+    for name, data in (("whole", good), ("short", good[:-1]), ("noise", os.urandom(4096)), ("long", good + b"\0")):
+        open(f, "wb").write(data)
+        res[name] = [os.path.basename(x) for x in ns["mlx_weights_damage"]("org/m")]
+    open(f, "wb").write(good)
+    open(os.path.join(snap, "config.json"), "w").write("{not json")
+    res["config"] = [os.path.basename(x) for x in ns["mlx_weights_damage"]("org/m")]
+    res["label"] = ns["mlx_label_damaged"]("M")
+    return res
+def _r627_damage_ok(r):
+    return (r["whole"] == [] and r["short"] == ["model.safetensors"] and r["noise"] == ["model.safetensors"]
+            and r["long"] == ["model.safetensors"] and r["config"] == ["config.json"] and r["label"] is True)
+def _r627_words(blk):
+    ns = _r627_ns(blk, _SMOKE_TMP)
+    ns["_LOADS"]["t"] = {"A": 40.0, "B": 70.0, "C": 200.0}
+    return {"plain": [ns["plain_fail_line"](RuntimeError("the server answered but sent no usable completion (first bytes: '')")),
+                      ns["plain_fail_line"](ns["ModelDamaged"]("Gemma 4 E2B")),
+                      ns["plain_fail_line"](ns["EngineCut"]("Gemma 4 E2B", "ConnectionResetError"))],
+            "net": [ns["net_down_error"](urllib.error.URLError(ConnectionRefusedError(61, "Connection refused"))),
+                    ns["net_down_error"](urllib.error.URLError(socket.gaierror(8, "nodename nor servname provided"))),
+                    ns["net_down_error"](urllib.error.URLError(TimeoutError("timed out"))),
+                    ns["net_down_error"](ValueError("bad json")), ns["net_down_error"](urllib.error.URLError(PermissionError(1, "x")))],
+            "load": [ns["engine_load_line"](x) for x in ("Z", "A", "B", "C")]}
+def _r627_words_ok(r):
+    p = r["plain"]
+    return (p == ["\u26a0\ufe0f The model couldn\u2019t answer this time.", "\u26a0\ufe0f Gemma 4 E2B couldn\u2019t load: its files are damaged.",
+                  "\u26a0\ufe0f Gemma 4 E2B stopped before the answer finished."]
+            and r["net"] == [True, True, True, False, False]
+            and r["load"] == ["the first time takes about a minute", "about 40 s", "about a minute", "about 3 minutes"])
+def _r627_turn(src):
+    import ast as _ast
+    want = {"_TURN_TAGS", "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP", "turn_text", "turn_record", "_places_worth_showing"}
+    ns_ = {"re": re, "json": json}
+    for node in _ast.parse(src).body:
+        nm = [node.name] if isinstance(node, _ast.FunctionDef) else [t.id for t in getattr(node, "targets", []) if isinstance(t, _ast.Name)]
+        if set(nm) & want:
+            exec(compile(_ast.Module([node], []), "turn627", "exec"), ns_)
+    N_ = "\x00"
+    cut = ns_["turn_record"]("Half an answer that " + N_ + 'CUT:{"w": "Gemma 4 E2B"}' + N_ + N_ + 'DONE:{"t":1}' + N_)
+    whole = ns_["turn_record"]("A whole answer." + N_ + 'DONE:{"t":1}' + N_)
+    stop = ns_["turn_record"]("Stopped here " + N_ + 'CUT:{"w": "x"}' + N_, aborted=True)
+    return {"cut": cut, "whole": whole, "stop": stop}
+def _r627_turn_ok(r):
+    c, w, s = r["cut"] or {}, r["whole"] or {}, r["stop"] or {}
+    return (c.get("cut") is True and "CUT" not in c.get("content", "") and c.get("content", "").startswith("Half an answer")
+            and "cut" not in w and s.get("stopped") is True and "cut" not in s)
+_b627 = _r627_blk(_R627_SRC)
+_c627_in = {"damage": _r627_damage_ok(_r627_damage(_b627)), "words": _r627_words_ok(_r627_words(_b627)),
+            "turn": _r627_turn_ok(_r627_turn(_R627_SRC))}
+_m627_in = [
+    ("a file only its header checked", "damage", _b627.replace("        return 8 + n + end == size", "        return True")),
+    ("the config not checked", "damage", _b627.replace("for f in [snaps[0]] + sorted(", "for f in sorted(")),
+    ("the exception's own text shown", "words", _b627.replace('def plain_fail_line(exc) -> str:\n',
+                                                               'def plain_fail_line(exc) -> str:\n    return "\\u26a0\\ufe0f " + type(exc).__name__ + ": " + str(exc)\n')),
+    ("offline never told", "words", _b627.replace("def net_down_error(exc) -> bool:\n", "def net_down_error(exc) -> bool:\n    return False\n")),
+    ("the loading line without its time", "words", _b627.replace('        return "the first time takes about a minute"', '        return ""')),
+]
+_m627_in_r = []
+for _d, _g, _mb in _m627_in:
+    if _mb == _b627:
+        _m627_in_r.append((_d, "anchor missing"))
+        continue
+    try:
+        _ok = _r627_damage_ok(_r627_damage(_mb)) if _g == "damage" else _r627_words_ok(_r627_words(_mb))
+    except Exception as _e:
+        _ok = False
+    _m627_in_r.append((_d, _ok))
+_tm627 = _R627_SRC.replace('        elif tag == "CUT":\n            got["CUT"] = True', '        elif tag == "CUT":\n            pass')
+_m627_in_r.append(("turn_record forgetting the cut", _r627_turn_ok(_r627_turn(_tm627)) if _tm627 != _R627_SRC else "anchor missing"))
+_offh = _R627_SRC[_R627_SRC.index("def offline_hint(kind: str, err: Exception) -> str:"):]
+_offh = _offh[:_offh.index("\n\n\n")]
+check("6b627 in process: a damaged model known from its files (a short, padded or random safetensors, a config that doesn't parse; a whole one passes); the failure lines plain (no exception's text, no HTTP code; offline_hint has no raw fallback); offline told from the error; the loading line's words; a CUT answer saved cut (a whole one and a Stop not); %d mutants caught" % len(_m627_in_r),
+      all(_c627_in.values()) and all(x_[1] is False for x_ in _m627_in_r)
+      and "Backend error" not in _offh and "The engine refused the request" not in _offh and _offh.count("plain_fail_line(err)") >= 2
+      and "No MLX server on that port" not in _offh,
+      "%r" % [_c627_in, _m627_in_r])
+# (2) live: a copy whose engines are a stand-in
+_R627_STUB = r'''"""A stand-in MLX engine (6b627): an OpenAI-compatible SSE server that can answer, die mid-answer, refuse or load
+slowly. Started by a dev copy through the engine-cmd hook (--model REPO --port P), or by hand.
+Its behaviour is read from stubmode.json beside it on every request:
+  {"default": "ok", "<repo>": "drop|die|reset|404|ok", "words": 40, "first": 0, "gap": 0.02}
+  ok    : streams `words` words, a finish_reason chunk, then [DONE]
+  drop  : streams `words` words, then closes the connection (no end mark)
+  die   : streams `words` words, then the process exits (an engine killed mid-answer)
+  reset : streams `words` words, then resets the connection (RST)
+  404   : HTTP 404 {"error": "generation thread died"} (mlx_lm's answer when its loader died)
+  empty : a 200 with an empty body (the app's "sent no usable completion")
+  pause : with pause_at, the seconds the stream goes quiet after word pause_at
+  first : seconds the FIRST request after start waits before its first word (mlx_lm loads its weights then)
+Every request is appended to stub.log beside it (model, mode)."""
+import json, os, socket, struct, sys, time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+MODE = os.environ.get("STUB_MODE_FILE") or os.path.join(HERE, "stubmode.json")
+LOG = os.path.join(HERE, "stub.log")
+args = sys.argv[1:]
+port = int(args[args.index("--port") + 1]) if "--port" in args else 9939
+started = [time.time(), False]
+
+
+def cfg():
+    try:
+        with open(MODE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+class H(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+
+    def log_message(self, *a):
+        pass
+
+    def do_GET(self):
+        body = json.dumps({"object": "list", "data": [{"id": "stub", "object": "model"}]}).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0) or 0)
+        try:
+            req = json.loads(self.rfile.read(n) or b"{}")
+        except Exception:
+            req = {}
+        c = cfg()
+        model = str(req.get("model") or "")
+        mode = c.get(model) or c.get("default") or "ok"
+        with open(LOG, "a") as f:
+            f.write(json.dumps({"t": round(time.time(), 2), "model": model, "mode": mode, "port": port}) + "\n")
+        if mode == "404":
+            body = json.dumps({"error": "generation thread died"}).encode()
+            self.send_response(404)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.end_headers()
+        if not started[1]:
+            started[1] = True
+            time.sleep(float(c.get("first") or 0))
+        words = int(c.get("words") or 40)
+        gap = float(c.get("gap") if c.get("gap") is not None else 0.02)
+        if mode == "empty":
+            self.wfile.flush()
+            return
+        for i in range(words):
+            if c.get("pause") and i == int(c.get("pause_at") or 0) and i:
+                time.sleep(float(c["pause"]))
+            w = ("Stand-in word %d" % i if i == 0 else "word%d" % i) + " "
+            ch = {"choices": [{"index": 0, "delta": {"content": w}, "finish_reason": None}]}
+            self.wfile.write(("data: " + json.dumps(ch) + "\n\n").encode())
+            self.wfile.flush()
+            time.sleep(gap)
+        if mode == "drop":
+            self.wfile.flush()
+            self.close_connection = True
+            return
+        if mode == "die":
+            self.wfile.flush()
+            os._exit(1)
+        if mode == "reset":
+            self.wfile.flush()
+            self.connection.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+            self.connection.close()
+            return
+        ch = {"choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]}
+        self.wfile.write(("data: " + json.dumps(ch) + "\n\n").encode())
+        self.wfile.write(b"data: [DONE]\n\n")
+        self.wfile.flush()
+
+
+def _orphan_watch(parent=os.getppid()):
+    # the app that started it is gone (its copy stopped): so is the stand-in, never an orphan on a port
+    while True:
+        time.sleep(0.5)
+        if os.getppid() != parent:
+            os._exit(0)
+
+
+import threading
+threading.Thread(target=_orphan_watch, daemon=True).start()
+try:
+    with open(os.path.join(HERE, "stub.pids"), "a") as f:
+        f.write("%d\n" % os.getpid())
+except OSError:
+    pass
+ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
+'''
+def _r627_free():
+    with socket.socket() as so_:
+        so_.bind(("127.0.0.1", 0))
+        return so_.getsockname()[1]
+_r627_dir = tempfile.mkdtemp(prefix="eng627-", dir=_SMOKE_TMP)
+open(os.path.join(_r627_dir, "stub_engine.py"), "w").write(_R627_STUB)
+_r627_hf = os.path.join(_r627_dir, "hf")
+_R627_REPOS = {"mlx-community/Llama-3.2-1B-Instruct-4bit": None, "mlx-community/gemma-4-e2b-it-4bit": None}
+def _r627_hf_make(damaged=()):
+    for repo in _R627_REPOS:
+        snap = os.path.join(_r627_hf, "hub", "models--" + repo.replace("/", "--"), "snapshots", "0" * 40)
+        os.makedirs(snap, exist_ok=True)
+        json.dump({"model_type": "stub"}, open(os.path.join(snap, "config.json"), "w"))
+        st_ = os.path.join(snap, "model.safetensors")
+        _R627_REPOS[repo] = st_
+        if repo in damaged:
+            open(st_, "wb").write(os.urandom(4096))
+        else:
+            h_ = json.dumps({"w": {"dtype": "F32", "shape": [2], "data_offsets": [0, 8]}}).encode()
+            open(st_, "wb").write(_st627.pack("<Q", len(h_)) + h_ + b"\0" * 8)
+_r627_hf_make()
+_R627_GEMMA = "mlx-community/gemma-4-e2b-it-4bit"
+def _r627_mode(o):
+    open(os.path.join(_r627_dir, "stubmode.json"), "w").write(json.dumps(o))
+def _r627_env():
+    return {"HF_HOME": _r627_hf, "MILLENAI_UPDATE_API": "http://127.0.0.1:%d" % _r627_free(),
+            "MILLENAI_TEST_HOOKS": "engine-port=%d,engine-cmd=%s,no-ollama,no-downloads" % (_r627_free(), os.path.join(_r627_dir, "stub_engine.py"))}
+def _r627_chat(inst, q, cid=None, timeout=90):
+    b_ = {"model": "Gemma 4 E2B", "models": [], "tier": "Fast", "auto_web": False, "messages": [{"role": "user", "content": q}]}
+    if cid:
+        b_.update(chat_id=cid, lane="ai", after_len=0, after_hash=_hl627.sha256(b"").hexdigest())
+    r_ = urllib.request.Request(inst.base + "/api/chat", data=json.dumps(b_).encode(),
+                                headers=dict(inst.headers, **{"Content-Type": "application/json"}))
+    t0_ = time.time()
+    try:
+        with urllib.request.urlopen(r_, timeout=timeout) as resp_:
+            raw_ = resp_.read().decode("utf-8", "replace")
+    except Exception as e_:
+        raw_ = "REQUEST FAILED %r" % e_
+    fr_ = [(t, j) for t, j in re.findall("\x00([A-Z0-9]+):(.*?)\x00", raw_)]
+    txt_ = re.sub("\x00[A-Z0-9]+:.*?\x00", "", raw_)
+    txt_ = txt_.split("\x00RESET\x00")[-1]
+    return {"raw": raw_, "fr": fr_, "txt": txt_, "secs": time.time() - t0_}
+def _r627_get(inst, path):
+    r_ = urllib.request.Request(inst.base + path, headers=inst.headers)
+    try:
+        with urllib.request.urlopen(r_, timeout=30) as resp_:
+            return resp_.read().decode("utf-8", "replace")
+    except Exception as e_:
+        return "GET FAILED %r" % e_
+def _r627_post(inst, path, d):
+    r_ = urllib.request.Request(inst.base + path, data=json.dumps(d).encode(), headers=dict(inst.headers, **{"Content-Type": "application/json"}))
+    try:
+        with urllib.request.urlopen(r_, timeout=30) as resp_:
+            return json.loads(resp_.read().decode("utf-8", "replace"))
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _r627_cid(n):
+    return "c" + ("r627" + str(n) + "0" * 26)[:26]
+def _r627_steps(c, sid):
+    return [json.loads(j) for t, j in c["fr"] if t == "STEP" and '"id": "%s"' % sid in j]
+def _r627_scene(inst, sc):
+    """One live scene; its facts."""
+    if sc == "load":
+        _r627_mode({"default": "ok", "words": 12, "first": 1.5})
+        c = _r627_chat(inst, "Say hello.")
+        ls = _r627_steps(c, "load")
+        return {"run": [s for s in ls if s.get("s") == "run"][:1], "done": [s for s in ls if s.get("s") == "done"][:1], "words": "word11" in c["txt"]}
+    if sc == "load2":     # its engine exits mid-answer; the next question loads it again, with the time it took before
+        _r627_mode({"default": "die", "words": 6})
+        _r627_chat(inst, "Say hello.")
+        _r627_mode({"default": "ok", "words": 8, "first": 0.5})
+        c = _r627_chat(inst, "Say hello again.")
+        return {"run": [s for s in _r627_steps(c, "load") if s.get("s") == "run"][:1]}
+    if sc in ("drop", "reset", "die"):
+        _r627_mode({"default": sc, "words": 12})
+        cid = _r627_cid({"drop": 1, "reset": 2, "die": 3}[sc])
+        c = _r627_chat(inst, "Write me a short note.", cid)
+        time.sleep(0.6)
+        try:
+            ms = (json.loads(_r627_get(inst, "/api/chats/one?id=" + cid)).get("chat") or {}).get("messages") or []
+        except ValueError:
+            ms = []
+        return {"cut": [j for t, j in c["fr"] if t == "CUT"][:1], "warn": "\u26a0" in c["raw"], "words": "word11" in c["txt"],
+                "saved": [{"role": m.get("role"), "cut": m.get("cut")} for m in ms]}
+    if sc == "refused":
+        _r627_mode({"default": "ok", "words": 9, _R627_GEMMA: "404"})
+        c = _r627_chat(inst, "Give me one tip.")
+        return {"rescued": "word8" in c["txt"], "retry": any(t == "STATUS" and j.startswith("retrying on ") for t, j in c["fr"]),
+                "raw": [w for w in ("HTTP", "generation thread", "\u26a0", "refused") if w in c["raw"]]}
+    if sc == "empty":
+        _r627_mode({"default": "empty"})
+        c = _r627_chat(inst, "Give me one tip.")
+        return {"line": c["txt"].strip(), "raw": [w for w in ("Error", "usable completion", "Backend", "first bytes") if w in c["raw"]]}
+    if sc == "damaged":
+        _r627_hf_make(damaged=(_R627_GEMMA,))
+        _r627_mode({"default": "ok", "words": 9})
+        c = _r627_chat(inst, "Give me one tip.")
+        rp = _r627_post(inst, "/api/model/repair", {"label": "Gemma 4 E2B"})
+        gone = not os.path.exists(_R627_REPOS[_R627_GEMMA])
+        again = _r627_post(inst, "/api/model/repair", {"label": "Gemma 4 E2B"})
+        _r627_hf_make()
+        return {"repair": [j for t, j in c["fr"] if t == "REPAIR"][:1], "rescued": "word8" in c["txt"], "secs": round(c["secs"], 2),
+                "warn": "\u26a0" in c["raw"], "rp": rp, "gone": gone, "again": again}
+    if sc == "update":
+        try:
+            u = json.loads(_r627_get(inst, "/api/update/check?force=1"))
+        except ValueError:
+            u = {}
+        return {"u": u}
+    return {}
+def _r627_scene_ok(sc, r):
+    if sc == "load":
+        return (len(r["run"]) == 1 and r["run"][0].get("l") == "Loading Gemma 4 E2B" and r["run"][0].get("d") == "the first time takes about a minute"
+                and len(r["done"]) == 1 and r["done"][0].get("l") == "Loaded Gemma 4 E2B" and r["words"])
+    if sc == "load2":
+        return len(r["run"]) == 1 and bool(re.match(r"about \d+ s$", r["run"][0].get("d", "")))
+    if sc in ("drop", "reset", "die"):
+        return (len(r["cut"]) == 1 and '"Gemma 4 E2B"' in r["cut"][0] and not r["warn"] and r["words"]
+                and r["saved"] == [{"role": "user", "cut": None}, {"role": "assistant", "cut": True}])
+    if sc == "refused":
+        return r["rescued"] and r["retry"] and r["raw"] == []
+    if sc == "empty":
+        return r["line"] == "\u26a0\ufe0f The model couldn\u2019t answer this time." and r["raw"] == []
+    if sc == "damaged":
+        return (r["repair"] == ['{"m": "Gemma 4 E2B"}'] and r["rescued"] and r["secs"] < 5 and not r["warn"]
+                and r["rp"].get("ok") is True and "model.safetensors" in (r["rp"].get("removed") or []) and r["gone"]
+                and r["again"].get("ok") is False)
+    if sc == "update":
+        u = r["u"]
+        return u.get("offline") is True and u.get("note") == "No internet connection" and u.get("available") is False
+    return False
+_R627 = Instance(9903, "R627", env=_r627_env()).start()
+_c627_live = {}
+for _sc in ("load", "drop", "reset", "die", "load2", "refused", "empty", "damaged", "update"):
+    _rs = _r627_scene(_R627, _sc)
+    _c627_live[_sc] = (_r627_scene_ok(_sc, _rs), _rs)
+check("6b627 live, on stand-in engines: a cold load said (\"Loading Gemma 4 E2B\", \"the first time takes about a minute\", then its time from the last load); an answer whose engine closed, reset or exited mid-stream marked CUT, no error line, saved cut; a refusal (mlx_lm's 404) rescued by the next model with no error shown; nothing answering said in one plain line; a damaged model known at once (REPAIR), rescued, repaired by /api/model/repair; the update check offline says so",
+      all(v_[0] for v_ in _c627_live.values()), "%r" % {k_: v_[1] for k_, v_ in _c627_live.items() if not v_[0]})
+# (3) the page
+_R627_PAGE = r'''// 6b627: headless Chromium over the DevTools protocol (node's own WebSocket), on a copy whose MLX engines are a stand-in
+// argv: <chromium> <base> <cookie name> <key> <token> <groups,comma> <stubmode.json> <gemma safetensors> [mutation.json]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, groupsArg, modef, gemf, mutf] = process.argv.slice(2);
+const G = new Set(groupsArg.split(","));
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-627-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { S: {}, errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 380000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const mode = o => fs.writeFileSync(modef, JSON.stringify(o));
+const goodST = () => { const h = Buffer.from(JSON.stringify({ w: { dtype: "F32", shape: [2], data_offsets: [0, 8] } })); const n = Buffer.alloc(8); n.writeBigUInt64LE(BigInt(h.length)); return Buffer.concat([n, h, Buffer.alloc(8)]); };
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel","calm");localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");}catch(e){}` });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); if (r && r.exceptionDetails) out.errs.push("eval: " + JSON.stringify(r.exceptionDetails).slice(0, 240)); return r && r.result ? r.result.value : undefined; };
+  await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  let ready = false;
+  for (let tries = 0; tries < 2 && !ready; tries++) { await send("Page.navigate", { url: base + "/" });
+    for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#input")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro&&typeof send==="function"`); } }
+  if (!ready) { out.errs.push("page not ready"); return done(); }
+  await sleep(800);
+  const S = out.S;
+  const K = `(()=>{const b=document.querySelector("#send"),r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {label:b.getAttribute("aria-label"),stop:b.classList.contains("stop"),hit:!!h&&(h===b||b.contains(h))};})()`;
+  const fresh = async () => { await ev(`document.querySelector("#newchat").click()`); await sleep(350); };
+  const ask = async q => { await ev(`(()=>{const i=document.querySelector("#input");i.value=${JSON.stringify(q)};i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`); };
+  const started = async () => { for (let i = 0; i < 50; i++) { if (await ev(`generating`)) return true; await sleep(100); } return false; };
+  const idle = async (ms = 60000) => { await started(); const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(`!generating`)) return true; await sleep(200); } return false; };
+  const ROW = kind => `(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop();if(!d)return null;const row=d.querySelector(':scope>.robrow[data-rob="${kind}"]'),b=row&&row.querySelector("button");
+    let hit=false;if(b){b.scrollIntoView({block:"center"});const r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);hit=!!h&&(h===b||b.contains(h));}
+    const ll=d.querySelector(":scope>.liveline em");return {row:row?row.querySelector(".chat-err-t").textContent:null,btn:b?b.textContent:null,hit,live:ll?ll.textContent:null,sw:document.documentElement.scrollWidth<=innerWidth};})()`;
+  try {
+    if (G.has("sendstop")) {   // the key belongs to the chat that is answering
+      mode({ default: "ok", words: 50, gap: 0.12 });
+      await fresh(); await ask("Pears?"); await started(); await sleep(1500);
+      const s = S.sendstop = { inA: await ev(K) };
+      const A = await ev(`(window.__A=curChat,window.__ac=abortCtl,curChat)`);
+      await fresh(); s.inNew = await ev(K);
+      await ask("And apples?"); await sleep(400);
+      s.click = await ev(`({gen:generating,genA:genChat===window.__A,queued:document.querySelector("#composer").classList.contains("queued"),line:(document.querySelector("#chat-queued")||{}).textContent})`);
+      await ev(`document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))`); await sleep(300);
+      s.esc = await ev(`generating&&!window.__ac.signal.aborted`);
+      await ev(`loadChat(window.__A)`); await sleep(500); s.backInA = await ev(K);
+      await fresh();
+      await ev(`(()=>{const i=document.querySelector("#input");if(!i.value.trim()){i.value="And apples?";i.dispatchEvent(new Event("input",{bubbles:true}));}document.querySelector("#send").click();})()`);
+      for (let i = 0; i < 300; i++) { await sleep(200); if (await ev(`!generating&&curChat&&curChat!==window.__A&&messages.length>=2`)) break; }
+      await sleep(1200);
+      s.after = await ev(`(async()=>{const r=await(await api("/api/chats/one?id="+encodeURIComponent(window.__A))).json();const ms=(r.chat||r).messages||[];
+        return {aborted:window.__ac.signal.aborted?1:0,savedA:ms.map(m=>[m.role,!!m.stopped]),lenA:((ms[1]||{}).content||"").length,
+          newMsgs:messages.map(m=>m.role==="user"?"user:"+m.content:"assistant")};})()`);
+    }
+    if (G.has("cut")) {   // a cut answer says so, with Try again; reopened, it still does
+      mode({ default: "drop", words: 25, gap: 0.03 });
+      await fresh(); await ask("A note?"); await idle(); await sleep(900);
+      const c = S.cut = { live: await ev(ROW("cut")) };
+      const cid = await ev(`curChat`);
+      mode({ default: "ok", words: 8 });
+      await fresh();
+      await ev(`(async()=>{chats=chats.filter(x=>x.id!==${JSON.stringify(cid)});await loadChatsFromDisk();})()`); await sleep(1200);
+      await ev(`loadChat(${JSON.stringify(cid)})`); await sleep(1000);
+      c.reopened = await ev(ROW("cut"));
+    }
+    if (G.has("fix")) {   // a damaged model: the next model answers, and Download again
+      fs.writeFileSync(gemf, require("crypto").randomBytes(4096));
+      mode({ default: "ok", words: 9 });
+      await fresh(); await ask("A tip?"); await idle(); await sleep(700);
+      const f = S.fix = await ev(`(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),row=d&&d.querySelector(':scope>.robrow[data-rob="fix"]'),b=row&&row.querySelector(".rob-go");
+        let hit=false;if(b){const r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);hit=!!h&&(h===b||b.contains(h));}
+        return {text:row?row.querySelector(".chat-err-t").textContent:null,btn:b?b.textContent:null,hit};})()`);
+      await ev(`(()=>{const b=document.querySelector(".robrow .rob-go");if(b)b.click();})()`); await sleep(1500);
+      f.clicked = await ev(`(()=>{const r=[...document.querySelectorAll('.robrow[data-rob="fix"]')].pop();return r?r.querySelector(".chat-err-t").textContent:null;})()`);
+      fs.writeFileSync(gemf, goodST());
+    }
+    if (G.has("load")) {   // a cold engine: the live line says it's loading and how long it takes here
+      mode({ default: "die", words: 4 });
+      await fresh(); await ask("Figs?"); await idle(); await sleep(1500);
+      mode({ default: "ok", words: 10, first: 6 });
+      await fresh(); await ask("Plums?"); await started();
+      S.load = { during: null, seen: [] };
+      for (let i = 0; i < 30; i++) {   // the line as it reads over the first 6 s (a step can land a beat after the send)
+        const t = await ev(`(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),l=d&&d.querySelector(".liveline em");return l?l.textContent:null;})()`);
+        if (t && S.load.seen[S.load.seen.length - 1] !== t) S.load.seen.push(t);
+        if (t && /^Loading /.test(t)) { S.load.during = t; break; }
+        await sleep(200);
+      }
+      await idle(); await sleep(400);
+    }
+    if (G.has("quiet")) {   // words, then a long silence: counted under them, gone when words come again
+      mode({ default: "ok", words: 30, gap: 0.05, pause_at: 6, pause: 15 });
+      await fresh(); await ask("Tides?"); await started();
+      for (let i = 0; i < 100; i++) { if (await ev(`(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),b=d&&d.querySelector(".body");return !!b&&b.textContent.indexOf("word")>=0;})()`)) break; await sleep(100); }
+      await sleep(12800);
+      S.quiet = { during: await ev(`(()=>{const q=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop().querySelector(":scope>.robquiet");return q?q.textContent:null;})()`) };
+      await idle(); await sleep(500);
+      S.quiet.after = await ev(`!!document.querySelector(".robquiet")`);
+    }
+    if (G.has("update")) {   // the update check's answer stays readable; offline it says so
+      await ev(`openAbout()`); await sleep(900);
+      await ev(`document.querySelector("#about-check").click()`); await sleep(1600);
+      const rd = `(()=>{const k=document.querySelector("#about-check"),l=document.querySelector("#up-checked");return {key:k.textContent,line:l&&!l.hidden?l.textContent:null};})()`;
+      S.update = { at1: await ev(rd) }; await sleep(3600); S.update.at5 = await ev(rd);
+      await ev(`document.querySelector("#about-veil").hidden=true`);
+    }
+  } catch (e) { out.errs.push("driver: " + String(e && e.stack || e).slice(0, 300)); }
+  done();
+});
+'''
+def _r627_page(inst, groups, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="p627-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "d.js"), "w").write(_R627_PAGE)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "d.js"), exe, inst.base, inst.cookie.split("=", 1)[0], inst.key, inst.token,
+            ",".join(groups), os.path.join(_r627_dir, "stubmode.json"), _R627_REPOS[_R627_GEMMA]]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+        args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=400)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _r627_page_ok(r):
+    S_ = r.get("S") or {}
+    k_ = {}
+    s_ = S_.get("sendstop") or {}
+    a_ = s_.get("after") or {}
+    k_["sendstop"] = ((s_.get("inA") or {}).get("label") == "Stop" and (s_.get("inNew") or {}).get("label") == "Send"
+                      and (s_.get("inNew") or {}).get("stop") is False and (s_.get("inNew") or {}).get("hit") is True
+                      and (s_.get("click") or {}).get("gen") is True and (s_.get("click") or {}).get("genA") is True
+                      and (s_.get("click") or {}).get("queued") is True and (s_.get("click") or {}).get("line") == "Sends when the other chat\u2019s answer is done"
+                      and s_.get("esc") is True and (s_.get("backInA") or {}).get("label") == "Stop"
+                      and a_.get("aborted") == 0 and a_.get("savedA") == [["user", False], ["assistant", False]] and a_.get("lenA", 0) > 200
+                      and a_.get("newMsgs") == ["user:And apples?", "assistant"])
+    c_ = S_.get("cut") or {}
+    lv_, ro_ = c_.get("live") or {}, c_.get("reopened") or {}
+    k_["cut"] = (lv_.get("live") == "Cut off" and lv_.get("row") == "Gemma 4 E2B stopped before the answer finished." and lv_.get("btn") == "Try again"
+                 and lv_.get("hit") is True and lv_.get("sw") is True)
+    k_["reopen"] = (ro_.get("live") == "Cut off" and ro_.get("row") == "Gemma 4 E2B stopped before the answer finished." and ro_.get("hit") is True)
+    f_ = S_.get("fix") or {}
+    k_["fix"] = (f_.get("text") == "Gemma 4 E2B\u2019s files are damaged, so another model answered." and f_.get("btn") == "Download again"
+                 and f_.get("hit") is True and f_.get("clicked") == "Downloading Gemma 4 E2B again. You can keep chatting.")
+    l_ = S_.get("load") or {}
+    k_["load"] = bool(re.match(r"Loading Gemma 4 E2B, about \d+ s$", l_.get("during") or ""))
+    q_ = S_.get("quiet") or {}
+    k_["quiet"] = bool(re.match(r"Still waiting on the model \u00b7 1\d s$", q_.get("during") or "")) and q_.get("after") is False
+    u_ = S_.get("update") or {}
+    k_["update"] = ((u_.get("at1") or {}).get("line") == "No internet connection. Connect and try again." and (u_.get("at5") or {}).get("line") == "No internet connection. Connect and try again."
+                    and (u_.get("at5") or {}).get("key") == "Check now")
+    return k_
+_r627p = _r627_page(_R627, ["sendstop", "cut", "fix", "load", "quiet", "update"])
+_k627p = _r627_page_ok(_r627p)
+check("6b627 the page: the send key is Stop only in the chat that is answering (New chat: Send, a click queues \"Sends when the other chat's answer is done\", Escape stops nothing, the answer lands whole; back in that chat: Stop); a cut answer says \"Cut off\" with Try again, live and reopened; a damaged model's Download again; the loading line with its time; a long silence counted; the update check's offline line stays",
+      not _r627p.get("err") and not _r627p.get("errs") and all(_k627p.values()),
+      "%r" % [[k_ for k_, v_ in _k627p.items() if not v_], _r627p.get("err"), (_r627p.get("errs") or [])[:3],
+              {k_: v_ for k_, v_ in (_r627p.get("S") or {}).items()}])
+_R627_PM = [
+    ("the key stops any chat's answer again", ["sendstop"], [['sendBtn.addEventListener("click",()=>{ robStopHere()?', 'sendBtn.addEventListener("click",()=>{ generating?']], "sendstop"),
+    ("the key not repainted on New chat", ["sendstop"], [["  robKeySync();                     // the key is Send here", "  void 0;                     // the key is Send here"]], "sendstop"),
+    ("a cut answer landing as a whole one", ["cut"], [["  robLand(aiDiv,robCut,robFix,!!full&&!isErr,wasAborted);", "  void 0;"]], "cut"),
+    ("a reopened cut answer saying nothing", ["cut"], [["m.cut&&!m.stopped)robCutPaint(div,", "m.cut&&!m.stopped&&0)robCutPaint(div,"]], "reopen"),
+    ("no Download again", ["fix"], [["  if(fix)robFixPaint(div,fix,answered);", "  void 0;"]], "fix"),
+    ("the loading step not said", ["load"], [['  if(s&&s.id==="load")return {text:', '  if(0)return {text:']], "load"),
+    ("a silence not counted", ["quiet"], [["  const robQT=setInterval(()=>robQuietTick(aiDiv,full),500);", "  const robQT=0;"]], "quiet"),
+    ("the update's answer flashing on the key", ["update"], [["    else{robUpLine(r);b.textContent=was;b.disabled=false;return;}", "    else b.textContent=r.note?(\"No update \\u2014 \"+r.note):\"You\\u2019re up to date\";"]], "update"),
+]
+_c627pm = []
+for _d, _g, _mu, _w in _R627_PM:
+    _rm = _r627_page(_R627, _g, _mu)
+    _km = _r627_page_ok(_rm)
+    _c627pm.append((_d, _rm.get("mutated", 0) >= 1 and not _rm.get("errs") and _km.get(_w) is False))
+check("6b627 the page: %d mutants served in place of the page, each caught by the part it breaks" % len(_R627_PM),
+      all(x_[1] for x_ in _c627pm), "%r" % [x_ for x_ in _c627pm if not x_[1]])
+_R627.stop()
+# (2b) mutated copies of the app, each caught by the live scene it breaks
+_R627_SM = [
+    ("the end mark not checked", "drop", "        if emitted and not fin:\n", "        if False:\n"),
+    ("the failure said before the rescue (the old order: it never ran)", "refused",
+     "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:\n",
+     "            emit(\"\\n\" + offline_hint(kind, exc))\n            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:\n"),
+    ("the raw exception shown", "empty", "    return plain_fail_line(err)     # was",
+     "    return f\"\\u26a0\\ufe0f Backend error \\u2014 {type(err).__name__}: {err}\"     # was"),
+    ("damaged weights never noticed", "damaged", "def mlx_label_damaged(label: str) -> bool:\n",
+     "def mlx_label_damaged(label: str) -> bool:\n    return False\n"),
+]
+_c627sm = []
+for _i, (_d, _sc, _a, _bm) in enumerate(_R627_SM):
+    if _R627_SRC.count(_a) != 1:
+        _c627sm.append((_d, "anchor missing"))
+        continue
+    _dir = os.path.join(_SMOKE_TMP, "mut627-%d" % _i)
+    os.makedirs(_dir)
+    open(os.path.join(_dir, "millenai.py"), "w", encoding="utf-8").write(_R627_SRC.replace(_a, _bm))
+    for _n in ("vfx", "fonts"):
+        if os.path.exists(_n):
+            os.symlink(os.path.abspath(_n), os.path.join(_dir, _n))
+    _M = Instance(9903, "M627-%d" % _i, cwd=_dir, env=_r627_env()).start()
+    try:
+        _c627sm.append((_d, _r627_scene_ok(_sc, _r627_scene(_M, _sc))))
+    finally:
+        _M.stop()
+check("6b627 live: %d mutated copies of the app, each caught by the scene it breaks" % len(_R627_SM),
+      all(x_[1] is False for x_ in _c627sm), "%r" % _c627sm)
+# no stand-in engine outlives its copy (each exits when its parent does; any left is stopped here)
+time.sleep(1.2)
+try:
+    for _p in set(open(os.path.join(_r627_dir, "stub.pids")).read().split()):
+        try:
+            os.kill(int(_p), signal.SIGTERM)
+        except (OSError, ValueError):
+            pass
+except OSError:
+    pass
+# ==== 6b627 robust: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
