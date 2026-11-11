@@ -49799,7 +49799,8 @@ def _c626_all(src):
         pl3, said3, _a3, _s3, st3 = _pl626(g, web=False, offline=True)
         out["offline: the lookup says so, stops (no pin asked for), and the step says it couldn't check"] = (
             pl3.offline and ("read", "Couldn\u2019t check what\u2019s open", "done", "") in said3
-            and st3["geo_asked"] == ["eiffel tower"] and st3["geo"] is None)
+            and st3["geo_asked"] == ["eiffel tower"] and st3["geo"] is None
+            and "check" not in (getattr(pl3, "t", None) or {"check": 0}))   # (beta 4) it stops before the check stage: no live call needed to tell
     except Exception as e_:
         out["the lookups: %r" % (e_,)] = False
     # ---- the turn a place question becomes (lifted out of the handler word for word)
