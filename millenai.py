@@ -41836,6 +41836,58 @@ FUNNEL_SUMMARY_SYS = (
     "named and reconciled in one clause; never silently dropped.")
 
 
+# A PICK'S OWN NUMBER (beta 4): "14-inch", '14"', "13 in", "2 kg", "500 GB",
+# "$1,500": a number with its unit, read from the picks and from the verdict.
+_FN_NUM_RX = re.compile(
+    r"(?<![\w.])(\$\s?\d[\d,]*(?:\.\d+)?|\d+(?:\.\d+)?)\s?(-?\s?inch(?:es)?\b|\"|in\b|kg\b|lbs?\b|gb\b|tb\b|"
+    r"hours?\b|hrs?\b|minutes?\b|mins?\b|days?\b|nights?\b|weeks?\b|people\b|seats?\b)?", re.I)
+_FN_UNIT = {'"': "inch", "in": "inch", "inches": "inch", "lb": "lbs", "hr": "hours", "hrs": "hours",
+            "hour": "hours", "min": "minutes", "mins": "minutes", "minute": "minutes", "day": "days",
+            "night": "nights", "week": "weeks", "seat": "seats"}
+
+
+def _fn_nums(text: str) -> list:
+    """(unit, value) pairs in text: the unit folded (inch, kg, gb ...), a
+    price as ("$", value). A bare number has no unit and is not read."""
+    out = []
+    for m in _FN_NUM_RX.finditer(text or ""):
+        num, unit = m.group(1), (m.group(2) or "").lower().replace("-", "").replace(" ", "")
+        if num.startswith("$"):
+            unit, num = "$", num[1:].strip()
+        if not unit:
+            continue
+        unit = _FN_UNIT.get(unit, unit)
+        try:
+            out.append((unit, float(num.replace(",", ""))))
+        except ValueError:
+            pass
+    return out
+
+
+def funnel_pick_conflicts(picks, verdict: str) -> list:
+    """[(picked, found)]: a unit the person clicked a number for (14-inch)
+    that the verdict names only with other numbers (13-inch, never 14). A
+    price is a ceiling, so a lower price is no conflict. Pure."""
+    said = _fn_nums(verdict)
+    out = []
+    for p in picks or []:
+        for unit, val in _fn_nums(str(p)):
+            vals = [v for u, v in said if u == unit]
+            if not vals or any(abs(v - val) < 1e-9 for v in vals):
+                continue
+            if unit == "$" and all(v <= val for v in vals):
+                continue
+            out.append((str(p), "%g %s" % (vals[0], unit)))
+    return out
+
+
+def funnel_pick_fix_note(conflicts) -> str:
+    return ("Your recommendation contradicts what the person picked: "
+            + "; ".join("they picked \"%s\", and the verdict says %s" % c for c in conflicts)
+            + ". Rewrite the verdict so it honours every pick exactly (the same size, number or "
+              "amount), in the same shape and length, as a fresh recommendation. Never mention this note.")
+
+
 def funnel_summary_sys_for(goal: str) -> str:
     """Care mode applies to the verdict too — a tender decision gets a
     tender recommendation, same detection as the stages."""
@@ -46517,6 +46569,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             "; ".join(asked) or "not recorded")}]
                 out = ""
                 _eng = ""
+                _gen = None          # what wrote the verdict, for the pick check's one rewrite (beta 4)
                 # the verdict is a draft the audit below checks, so it
                 # writes at the work effort; the audit is the final word
                 if use_cloud:
@@ -46524,6 +46577,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         out = cloud_text(_conf, msgs, timeout=120)
                         if out:
                             _eng = str(_conf.get("model") or "cloud")
+                            _gen = ("cloud", _conf)
                             break
                 if not out:
                     # then the person's server (6b339), the strongest general
@@ -46544,6 +46598,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             out = strip_think("".join(_sparts))
                             if out:
                                 _eng = "server:%s \u00b7 %s" % (_sp["server"], _sp["name"])
+                                _gen = ("model", _sp["label"])
                         except (StaleProfile, BrokenPipeError,
                                 ConnectionResetError):
                             raise
@@ -46566,6 +46621,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             out = strip_think("".join(parts))
                             if out:
                                 _eng = "local:" + lbl
+                                _gen = ("model", lbl)
                         except Exception:
                             out = ""
                 # THE VERIFY PASS (6b271, judged three cycles running:
@@ -46644,6 +46700,30 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # an auditor that crashes forfeits its say; the
                     # verdict ships un-audited rather than not at all
                     # (6b277 — the bare-% crash closed the socket)
+                    pass
+                # A PICK'S OWN NUMBER HOLDS (beta 4, the walkthrough: a clicked
+                # 14-inch came back as a 13-inch laptop; the audit is cloud
+                # only, so a local or server verdict had no check): a size,
+                # length, weight or price the person clicked that the verdict
+                # contradicts gets one rewrite on the same model, kept only
+                # if it no longer contradicts
+                try:
+                    _pc = funnel_pick_conflicts(picks, out)
+                    if out and _pc and _gen:
+                        _fm = msgs + [{"role": "assistant", "content": out},
+                                      {"role": "user", "content": funnel_pick_fix_note(_pc)}]
+                        if _gen[0] == "cloud":
+                            _nw = cloud_text(_gen[1], _fm, timeout=120) or ""
+                        else:
+                            _np = []
+                            run_model(_gen[1], _fm, _np.append)
+                            _nw = strip_think("".join(_np))
+                        _nw = (_nw or "").strip()
+                        if _nw and not funnel_pick_conflicts(picks, _nw):
+                            out = _nw
+                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                    raise
+                except Exception:
                     pass
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
@@ -57438,6 +57518,23 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz .hz-sl[data-lv="3"] .hz-sl-fill::after,.hz .hz-sl[data-lv="3"] .hz-sl-bloom::after{opacity:.5}
 @media (prefers-reduced-motion:reduce){.hz .hz-sl-track,.hz .hz-sl-fill,.hz .hz-sl-bloom{transform:none!important}.hz .hz-sl.dragging .hz-sl-led::after{animation:none!important;opacity:0}}
 /* ==== ultra at full strength (6b621): end ==== */
+/* ==== THE RECENT CHATS UNDER THE COMPOSER (beta 4, per Patrick's target picture, the web demo's home): three quiet
+   rows, the composer's width, the title and its day in Inter, one-device-pixel hairlines, no counts, no glow; the
+   lane's own chats; not on Funnels' home (its form holds the place). The composer stays on the golden point. ==== */
+#hz-history{display:none}
+.hz #main:has(#hero) #hz-history:not([hidden]){display:flex;flex-direction:column;width:100%;max-width:var(--hz-read-w,640px);margin:24px auto 0;pointer-events:auto}
+.hz.hz-sx-fn #hz-history,.hz.hz-intro #hz-history{display:none!important}
+.hz .hz-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:24px;height:40px;padding:0 8px;box-sizing:border-box;
+  border:0;border-top:var(--chat-hw,1px) solid rgba(255,255,255,.07);border-radius:0;background:transparent;font:450 13px/40px var(--hz-font-ui);letter-spacing:-.005em;
+  color:rgba(255,255,255,.72);text-align:left;cursor:pointer;width:100%;-webkit-font-smoothing:antialiased;transition:background .15s var(--hz-ease-out),color .15s var(--hz-ease-out)}
+.hz .hz-row:last-child{border-bottom:var(--chat-hw,1px) solid rgba(255,255,255,.07)}
+.hz .hz-row:hover{background:rgba(255,255,255,.035);color:var(--hz-ink)}
+.hz .hz-row .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz .hz-row .w{font-size:12px;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hz:not(.hz-kb) .hz-row:focus-visible{outline:0;box-shadow:none}
+.hz.hz-kb .hz-row:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+@media (prefers-reduced-motion:reduce){.hz .hz-row{transition:none}}
+/* ==== the recent chats (beta 4): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -58157,6 +58254,8 @@ __CODE_ROWS__
     </div>
     <!-- (6b555, per Patrick: "we need to fix these suggestions too. I think we just get rid of them. They look tacky.")
          the home is the greeting, the composer and the sky; recent chats live in the sidebar -->
+    <!-- (beta 4, per Patrick's target picture: the web demo's home with three quiet recent chats under the composer) -->
+    <nav id="hz-history" aria-label="Recent chats" hidden></nav>
   </div>
 </main>
 
@@ -59987,7 +60086,7 @@ function modeShow(which){
   setTimeout(renderChats,0);
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
-  if(globalThis.hzReady)hzLanePaint();   // Horizon's lanes (6b526)
+  if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes, and the home's rows (beta 4)
   sxLaneSoon();                          // the lane's placeholder, home line, host chip, funnel form (6b625)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
@@ -65103,6 +65202,7 @@ function dayRows(rows,row,now){
     +'</div>'+g.rows.map(row).join("")).join("");
 }
 function renderChats(flip){
+  if(globalThis.hzReady&&typeof hzHistoryPaint==="function")setTimeout(hzHistoryPaint,0);   // the home's recent rows (beta 4)
   const el=$("#chat-list");
   // the sidebar shows the ACTIVE LANE only, like Claude: Code lists
   // code chats, Agents lists specialist chats, Chat lists the rest
@@ -65695,12 +65795,18 @@ function fnHzFlow(){
   c.innerHTML='<div class="who">Funnel</div><div class="ftrail" role="list" aria-label="Your choices"></div><div class="hz-stages" role="list"></div>';
   inner.appendChild(c);fnHzBox=c;fnHzOf=fnState;fnHzStickWire();return c;
 }
+// what a stage says while its question comes (beta 4, the walkthrough: "Stage 6…" after "5 of 5"): "Stage N of M…",
+// and once every stage is answered, the pick being made, never a stage past the last
+function fnWaitLabel(picked,stages){
+  const n=picked+1,m=+stages||0;
+  return m&&n>m?"Weighing your choices…":"Stage "+n+(m?" of "+m:"")+"…";
+}
 // a new stage: a mark on the funnel's hairline, "Stage N…" until the question comes
 function fnHzStage(box){
   if(!isHz()||!fnState)return false;
   const c=fnHzFlow();
   box.className="hz-stage cur wait";box.setAttribute("role","listitem");
-  box.innerHTML='<div class="body"><span class="fn-wait">Stage '+(fnState.picks.length+1)+'…</span></div>';
+  box.innerHTML='<div class="body"><span class="fn-wait">'+esc(fnWaitLabel(fnState.picks.length,fnState.stages))+'</span></div>';
   c.querySelector(".hz-stages").appendChild(box);
   return true;
 }
@@ -72765,13 +72871,62 @@ async function hzTraceIn(el,opts){
   });
 }
 // ---- words from data
-function hzGreeting(){
-  const d=new Date(hzNow()),h=d.getHours(),nm=(typeof NICK==="string"&&NICK)?NICK:"";
-  if(h<5)return nm?"Up late, "+nm+"?":"Up late?";
-  if(h<12)return "Good morning"+(nm?", "+nm:"")+".";
-  if(h<18)return "Good afternoon"+(nm?", "+nm:"")+".";
-  return "Good evening"+(nm?", "+nm:"")+".";
+// THE HEADLINES (beta 4, per Patrick: "I would like more variety in the headlines"): a pool, each line with when it
+// may show: h [from,to] hours (wraps past midnight), d weekdays (0 = Sunday), m months (0-11), lane ("ai", "code",
+// "funnel"), first (the first open only, true; returning only, false); n is the same line with the person's name
+// ({name}, from "what should Concorde call you"), used SOME of the time, never always. One line is picked per visit
+// to the home (the pick holds while the conditions hold, so a repaint never swaps it), never the line shown last
+// time when another fits, a lane's own lines first. Every line is the same one greeting: the same face, size and
+// draw-in (hzHeadline, hzHeadlineShow); a longer line is fitted to one line (hzGreetFit) and a short one is never
+// shrunk. The pool ships with the lines Patrick has approved; the bigger list waits for his approval (NOTES 6b640).
+var HZ_HEADLINES=[
+  {t:"Up late?",n:"Up late, {name}?",h:[0,4]},
+  {t:"Good morning.",n:"Good morning, {name}.",h:[5,11]},
+  {t:"Good afternoon.",n:"Good afternoon, {name}.",h:[12,17]},
+  {t:"Good evening.",n:"Good evening, {name}.",h:[18,23]},
+];
+var hzGreetMemo=null;
+function hzGreetFits(L,c){
+  if(L.h){const a=L.h[0],b=L.h[1];if(!(a<=b?(c.h>=a&&c.h<=b):(c.h>=a||c.h<=b)))return false;}
+  if(L.d&&L.d.indexOf(c.d)<0)return false;
+  if(L.m&&L.m.indexOf(c.m)<0)return false;
+  if(L.lane&&L.lane!==c.lane)return false;
+  if(L.first!=null&&L.first!==c.first)return false;
+  return true;
 }
+// pure: the pool, the moment ({h,d,m,lane,first}), the line shown last, a random number in [0,1) -> {i, name}
+function hzGreetPick(pool,c,last,rnd){
+  let p=pool.map((L,i)=>[L,i]).filter(x=>hzGreetFits(x[0],c));
+  const own=p.filter(x=>x[0].lane);if(own.length)p=own;               // a lane's own lines first
+  if(!p.length)p=pool.map((L,i)=>[L,i]).filter(x=>!x[0].h&&!x[0].d&&!x[0].m&&!x[0].lane&&x[0].first==null);
+  if(!p.length)p=pool.map((L,i)=>[L,i]);
+  const fresh=p.filter(x=>x[0].t!==last);if(fresh.length)p=fresh;     // never the same line twice in a row
+  const k=Math.min(p.length-1,Math.floor(rnd*p.length));
+  return {i:p[k][1],name:rnd*7%1<.4};                                // the name some of the time (about 2 in 5)
+}
+function hzGreeting(){
+  const d=new Date(hzNow()),nm=(typeof NICK==="string"&&NICK)?NICK:"";
+  const c={h:d.getHours(),d:d.getDay(),m:d.getMonth(),lane:typeof uiMode==="string"?uiMode:"ai",first:!HZ_SEEN};
+  const key=c.lane+"|"+c.first+"|"+HZ_HEADLINES.map(L=>hzGreetFits(L,c)?1:0).join("");
+  if(!hzGreetMemo||hzGreetMemo.key!==key){
+    let last="";try{last=localStorage.getItem("millen.hz_greet_last")||"";}catch(e){}
+    const pk=hzGreetPick(HZ_HEADLINES,c,last,Math.random());
+    hzGreetMemo={key:key,i:pk.i,name:pk.name};
+    try{localStorage.setItem("millen.hz_greet_last",HZ_HEADLINES[pk.i].t);}catch(e){}
+  }
+  const L=HZ_HEADLINES[hzGreetMemo.i];
+  return nm&&L.n&&hzGreetMemo.name?L.n.replace(/\{name\}/g,nm):L.t;
+}
+// a longer line keeps the greeting's face and draw-in and is fitted to one line; a short line is never shrunk
+function hzGreetFit(g){
+  g.style.fontSize="";
+  const cs=getComputedStyle(g),fs=parseFloat(cs.fontSize)||0,lh=parseFloat(cs.lineHeight)||fs;
+  const room=(g.parentElement&&g.parentElement.clientWidth)||innerWidth;
+  if(!fs||!room)return;
+  let k=1;
+  for(let i=0;i<8&&(g.getBoundingClientRect().height>lh*1.4||g.scrollWidth>room)&&k>.72;i++){k-=.04;g.style.fontSize=(fs*k).toFixed(1)+"px";}
+}
+addEventListener("resize",()=>{const g=document.querySelector("#hero .greet");if(g&&g.style&&g.style.fontSize)hzGreetFit(g);});   // a fitted line refits
 // ONE GREETING (6b542, per Patrick, from the friend's screen: "UpUptate?", two copies of
 // "Up late?" offset from each other: a trace layer left standing over text that had moved).
 // Since 6b555 (the preview's look in the app) the greeting is ONE text node at every level, never a copy:
@@ -72784,6 +72939,7 @@ function hzHeadline(g,text){
   if(g.dataset.hzText===text&&g.dataset.hzMode===mode)return;
   hzTraceKill();
   g.dataset.hzText=text;g.dataset.hzMode=mode;g.classList.remove("shown","aglow");g.textContent=text;
+  if(typeof hzGreetFit==="function"&&g.getBoundingClientRect&&g.style)hzGreetFit(g);   // one line, the same face (beta 4)
   if(mode==="one"){void g.offsetWidth;g.classList.add("shown");}   // Calm: one text node, shown plainly
 }
 async function hzHeadlineShow(g){
@@ -72799,8 +72955,33 @@ function hzHomePaint(){
   if(!hzReady||!document.documentElement.classList.contains("hz"))return;   // Classic keeps its plain greeting (integration)
   const g=$("#hero .greet");
   if(g){hzHeadline(g,hzGreeting());if(!document.documentElement.classList.contains("hz-intro"))hzHeadlineShow(g);}
-  hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();hzGlowFit();
+  hzHistoryPaint();hzMachinesPaint();hzLanePaint();hzModesPaint();hzTitlePaint();hzGlowFit();
 }
+// THE RECENT CHATS UNDER THE COMPOSER (beta 4, per Patrick's target picture): the lane's three latest, title and day
+function hzWhen(ts){
+  if(!(ts>0))return "";
+  const d=new Date(ts),now=new Date(hzNow()),day=x=>Math.floor((x.getTime()-x.getTimezoneOffset()*60000)/86400000);
+  const dd=day(now)-day(d);
+  if(dd<=0)return "Today";if(dd===1)return "Yesterday";
+  if(dd<7)return d.toLocaleDateString(undefined,{weekday:"long"});
+  return d.toLocaleDateString(undefined,{month:"short",day:"numeric"});
+}
+function hzHistoryPaint(){
+  const box=$("#hz-history");if(!box)return;
+  if(!$("#hero")||!document.documentElement.classList.contains("hz")){box.hidden=true;return;}
+  const lane=typeof uiMode==="string"?uiMode:"ai";
+  const laneOK=c=>(lane==="code"||lane==="funnel")?(c.lane||"ai")===lane:((c.lane||"ai")!=="code"&&(c.lane||"ai")!=="funnel");
+  const mine=(typeof chats!=="undefined"?chats:[]).filter(c=>c&&c.id!==curChat&&laneOK(c)&&String(c.title||"").trim()&&c.ts>0)
+    .sort((a,b)=>(+b.ts||0)-(+a.ts||0)).slice(0,3);
+  box.hidden=!mine.length;
+  const html=mine.map(c=>'<button type="button" class="hz-row" data-id="'+esc(c.id)+'"><span class="t">'+esc(c.title)+'</span>'
+    +'<span class="w">'+esc(hzWhen(c.ts))+'</span></button>').join("");
+  if(box.innerHTML!==html)box.innerHTML=html;
+  const cp=$("#composer"),cw=cp?Math.round(cp.getBoundingClientRect().width):0;
+  if(cw>0&&box.style.maxWidth!==cw+"px")box.style.maxWidth=cw+"px";   // the composer's own width
+  if(typeof hzBalance==="function")hzBalance();
+}
+addEventListener("resize",()=>{if(typeof hzHistoryPaint==="function")hzHistoryPaint();});
 // ---- the machines as dies in their makers' colours (this Mac, each paired
 // server by ITS name, never an assumed one; a server whose maker isn't known is
 // an ice die); a hover card; the one working pulses. data-machine and .rig let
@@ -73432,9 +73613,10 @@ function hzBalance(){
   const w=$("#composer-wrap"),c=$("#composer");if(!w||!c)return;
   if(!$("#hero")||!document.documentElement.classList.contains("hz")){w.style.paddingBottom="";return;}
   if(document.documentElement.classList.contains("hz-sx-fn")){if(w.style.paddingBottom!=="0px")w.style.paddingBottom="0px";return;}   // Funnels' home: the form holds the place (6b625)
-  // the empty state's line under the composer (6b630) doesn't move the box off its point
+  // the empty state's line under the composer (6b630) and the recent rows (beta 4) don't move the box off its point
   const nm=$("#hz-nomodel"),nmH=nm&&!nm.hidden?nm.getBoundingClientRect().height+14:0;
-  const pb=Math.max(16,hzBalanceFor(innerHeight,c.getBoundingClientRect().height)-nmH);
+  const hi=$("#hz-history"),hiH=hi&&!hi.hidden&&hi.offsetParent?hi.getBoundingClientRect().height+24:0;
+  const pb=Math.max(16,hzBalanceFor(innerHeight,c.getBoundingClientRect().height)-nmH-hiH);
   if(w.style.paddingBottom!==pb+"px")w.style.paddingBottom=pb+"px";
 }
 // ---- the send: two ice rings from the button; the night brightens while it
@@ -73774,6 +73956,8 @@ function hzInit(){
   hzLaneMenuWire();   // the lanes as a menu under 940 px of header room (6b624)
   const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig,.hz-mdot")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
   const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
+  const hist=$("#hz-history");if(hist)hist.addEventListener("click",e=>{   // a recent chat opens (beta 4)
+    const row=e.target.closest(".hz-row");if(row&&row.dataset.id&&typeof loadChat==="function")loadChat(row.dataset.id);});
   const sel=$("#look-sel");
   if(sel){try{sel.value=localStorage.getItem("millen.look")==="classic"?"classic":"horizon";}catch(e){}
     sel.addEventListener("change",()=>setLook(sel.value));}
