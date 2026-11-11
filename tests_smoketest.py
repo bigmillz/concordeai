@@ -36,6 +36,27 @@ import urllib.error
 import urllib.parse
 from collections import Counter
 
+# THIS PROCESS STAYS HOME TOO (6b640, the lead's rule of 2026-11-11): many checks run the app's own functions here, so
+# a public name is refused at the lookup, as in a test copy under MILLENAI_SEARCH_STUB; loopback and the LAN resolve.
+_smoke_gai0 = socket.getaddrinfo
+
+
+def _smoke_getaddrinfo(host, *a, **k):
+    import ipaddress as _ipa
+    h = (host.decode() if isinstance(host, bytes) else str(host or "")).strip().lower().strip("[]").rstrip(".")
+    try:
+        _ad = _ipa.ip_address(h.split("%")[0])
+        _loc = _ad.is_loopback or _ad.is_private or _ad.is_link_local or _ad.is_unspecified
+    except ValueError:
+        _loc = (not h or "." not in h or h == "localhost"
+                or h.endswith((".localhost", ".local", ".test", ".lan", ".home.arpa", ".internal")))
+    if not _loc:
+        raise socket.gaierror(socket.EAI_NONAME, "the gauntlet makes no live lookups (%s)" % h)
+    return _smoke_gai0(host, *a, **k)
+
+
+socket.getaddrinfo = _smoke_getaddrinfo
+
 
 def _uq(s):
     return urllib.parse.quote(s, safe="")
@@ -26581,7 +26602,7 @@ _F570_PAGE_JS = r'''
 const cfg = JSON.parse(process.env.F570);
 const { chromium } = require(cfg.pw);
 (async () => {
-  const browser = await chromium.launch({ executablePath: cfg.chromium, headless: true, args: ["--use-mock-keychain"] });
+  const browser = await chromium.launch({ executablePath: cfg.chromium, headless: true, args: ["--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"] });
   const res = {};
   try {
     const ctx = await browser.newContext({ viewport: { width: 1320, height: 860 } });
@@ -46206,7 +46227,7 @@ const { spawn } = require("child_process"), fs = require("fs"), path = require("
 const [exe, base, ckName, key, tok, fx, mutf] = process.argv.slice(2);
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-cdp-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { landed: false, text: "", errs: [], sent: false };
 const done = code => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -46317,7 +46338,7 @@ const { spawn } = require("child_process"), fs = require("fs"), path = require("
 const [exe, base, ckName, key, tok, mutf] = process.argv.slice(2);
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-hdr-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { cases: [], errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -46769,7 +46790,7 @@ const [exe, base, ckName, key, tok, groups, mutf] = process.argv.slice(2);
 const G = new Set(String(groups || "open,edit,keys,actions,err,paste,motion").split(","));
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-c590-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "--window-size=1320,900", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { steps: {}, errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -47678,7 +47699,7 @@ const [exe, base, ckName, key, tok, groupsArg, mutf] = process.argv.slice(2);
 const G = new Set(groupsArg.split(","));
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-624-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { S: {}, errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -47950,20 +47971,29 @@ _px_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE POLISH (6b625"):_MILLEN
 def _px_css_ok(css):
     r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     return (_hz_scoped(css)
-            and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|[^-]blur\(|box-shadow:0 0 [1-9]", r_)
-            and ".hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;" in r_
-            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;" in r_
+            and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|(?<!backdrop-filter:)blur\(|box-shadow:0 0 [1-9]", r_)
+            and ".hz #about-veil{background:rgba(0,0,0,.3);-webkit-backdrop-filter:blur(10px) saturate(1.25);backdrop-filter:blur(10px) saturate(1.25);" in r_
+            and ".hz #about-veil #about-card{position:relative;width:min(720px,calc(100vw - 32px));height:auto;min-height:min(420px,calc(100vh - 48px));max-height:min(600px,calc(100vh - 48px));\n  grid-template-columns:208px minmax(0,1fr);grid-template-rows:minmax(0,1fr);\n  background:rgba(26,26,30,.88);border:var(--sx-hl) solid rgba(255,255,255,.09);border-radius:16px;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 24px 70px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(40px) saturate(1.5);backdrop-filter:blur(40px) saturate(1.5);" in r_
             and "--sx-s0:#0e0e10;--sx-s1:#141416;--sx-s2:#1a1a1d;--sx-s3:#1f1f22;--sx-s4:#2a2a2f" in r_ and "--sx-lab:rgba(255,255,255,.5)" in r_
             and ".hz #about-veil:not([hidden]){animation:sxFade .18s var(--sx-e) both}" in r_ and "@keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}" in r_
-            and ".hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}" in r_
-            and ".hz #about-veil .snav{height:30px;flex:none;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);" in r_
-            and ".hz #about-veil .snav:hover{background:var(--sx-s2);" in r_ and ".hz #about-veil .snav.on{background:var(--sx-s3);" in r_
+            and ".hz #about-veil .sx-slab{display:none}" in r_
+            and ".hz #about-veil .snav{display:flex;align-items:center;gap:9px;height:28px;flex:none;padding:0 8px;border:0;border-radius:7px;background:none;color:rgba(255,255,255,.78);font:450 13px/1 var(--hz-font-ui);" in r_
+            and ".hz #about-veil .snav:hover{background:rgba(255,255,255,.05);" in r_ and ".hz #about-veil .snav.on{background:rgba(255,255,255,.1);" in r_
+            and ".hz #about-veil .snav .sx-ico{width:16px;height:16px;flex:none;" in r_ and ".hz #about-veil #about-foot{display:none}" in r_
+            and ".hz #about-veil #sx-x{position:absolute;top:12px;right:12px;" in r_
+            and ".hz #about-veil .sx-group{display:flex;flex-direction:column;margin:0 0 12px;padding:0;border-radius:12px;" in r_
+            and "background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}" in r_
+            and ".hz #about-veil .sx-glab{margin:16px 0 6px 14px;font:500 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.5)}" in r_
+            and ".hz #about-veil .spane.on{animation:sxPaneIn .15s var(--sx-e) both}" in r_ and "@keyframes sxPaneIn{from{opacity:0}to{opacity:1}}" in r_
+            and ".hz.sx-setopen #main>:not(#hz-sky){opacity:0;" in r_
+            and ".hz #about-veil .toggle-row.on .switch,.hz #about-veil input[type=checkbox].sx-sw:checked{background:#8fb3f5;box-shadow:none}" in r_
             and "min-height:48px;padding:8px 0;margin:0;\n  border-top:var(--sx-hl) solid rgba(255,255,255,.08)" in r_
-            and ".hz #about-veil .sl-seg{height:30px;padding:2px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s2);box-shadow:none}" in r_
-            and "border-radius:6px;background:var(--sx-s4);box-shadow:none;" in r_
-            and ".hz #about-veil .switch{width:32px;height:18px;border-radius:5px;" in r_
-            and "height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);" in r_
-            and ".hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 12px;border-radius:8px;" in r_
+            and ".hz #about-veil .sl-seg{height:28px;padding:2px;border-radius:8px;border:0;background:rgba(0,0,0,.28);box-shadow:none}" in r_
+            and "border-radius:6px;background:rgba(255,255,255,.16);box-shadow:none;" in r_
+            and ".hz #about-veil .switch{width:34px;height:20px;border-radius:6px;" in r_ and "width:16px;height:16px;border-radius:4px;background:#fff;" in r_
+            and "height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);" in r_
+            and "box-shadow:0 0 0 3px rgba(159,192,255,.18)}" in r_
+            and ".hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 13px;border-radius:14px;" in r_
             and "@media (max-width:640px){" in r_ and ".hz #about-veil #set-rail{flex-direction:row;" in r_
             # one type system: no mono caps in Settings, the tables, the palette
             and "--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);" in r_ and "--sans:var(--hz-font-ui)}" in r_
@@ -47976,9 +48006,11 @@ def _px_css_ok(css):
             and ".hz #imp-sheet{border-radius:14px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:none;" in r_
             and ".hz #about-veil #sugg-toggle,.hz #about-veil #sugg-note{display:none}" in r_
             and "@media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card," in r_)
-check("6b625 the css: Settings in the demo's dialog (672 x 640, #141416, a 10 % hairline, radius 14, a 55 % backdrop, the 180 ms fade and 6 px rise), its rail (184, 11 px caps at 50 %, rows 13 px / 30 high on #1a1a1d / #1f1f22), 48 px rows, the #1a1a1d / #2a2a2f segmented control, 32 x 18 squared switches, 32 px inputs on #0e0e10, 28 px buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; five mutants caught",
+check("6b625 the css: Settings, the night edition (Pat's pick A): a translucent graphite sheet (720 wide, sized to its content up to 600, radius 16, a 1 px top highlight, a soft shadow, the sky behind blurred), no eyebrow, a 208 rail of 28 px rows with 16 px line icons and a filled selection, a quiet x and no footer, grouped inset lists (radius 12, hairlines inset 14), small grey group labels, a 150 ms pane fade, the page behind stepping back; the 180 ms fade and 6 px rise, the segmented control, 34 x 20 ice switches with squared knobs, 32 px inputs with a soft ice ring, pill buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; seven mutants caught",
       _px_css_ok(_px_css)
-      and not _px_css_ok(_px_css.replace("minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;", "minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:18px;", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css.replace("rgba(255,255,255,.09);border-radius:16px;\n  box-shadow:inset", "rgba(255,255,255,.09);border-radius:20px;\n  box-shadow:inset", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css.replace("-webkit-backdrop-filter:blur(40px) saturate(1.5);backdrop-filter:blur(40px) saturate(1.5);", "-webkit-backdrop-filter:none;backdrop-filter:none;", 1))   # a sheet with nothing behind it softened
+      and not _px_css_ok(_px_css + "\n.hz #about-veil .snav{filter:blur(2px)}")                                                # a blur that is not the backdrop's
       and not _px_css_ok(_px_css + "\n.hz #about-veil .snav.on{box-shadow:0 0 12px rgba(255,255,255,.3)}")                      # a glow on the rail
       and not _px_css_ok(_px_css.replace(".hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;", ".hz .msg.ai .body th{font:500 11px/16px var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;", 1))   # mono caps heads
       and not _px_css_ok(_px_css + "\n#about-card{color:red}")                                                                  # a rule outside Horizon
@@ -48210,13 +48242,14 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       rowH:Math.round(rr.height),rowBg:getComputedStyle(row).backgroundColor,lab:[lab.textContent,ls.fontSize,ls.fontWeight,ls.textTransform,getComputedStyle(lab).display],
       mono:leaves.filter(e=>/mono/i.test(getComputedStyle(e).fontFamily.split(",")[0])).map(e=>e.textContent.trim().slice(0,16)),
       caps:leaves.filter(e=>getComputedStyle(e).textTransform==="uppercase"&&getComputedStyle(e).display!=="none").map(e=>e.textContent.trim().slice(0,16)),
-      sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE},
+      sw:(()=>{const h=getComputedStyle(document.documentElement).overflowX,y=getComputedStyle(document.body).overflowX,clip=v=>v==="hidden"||v==="clip",locked=clip(h)||(h==="visible"&&clip(y));return [locked?innerWidth:document.documentElement.scrollWidth,innerWidth];})(),focus:${AE},
       rows:[...v.querySelectorAll("#set-nav>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
       genCtl:[...v.querySelectorAll("#sx-p-general .toggle-row,#sx-p-general .sl-seg,#sx-p-general .sl-menu,#sx-p-general .about-btn")].filter(e=>e.offsetParent!==null).length,
-      panes:["#sx-p-general","#sx-p-look","#sx-p-voice","#p-about"].map(s=>{const p=v.querySelector(s);return p?[...p.querySelectorAll("#beta-row,#autochk-toggle,#about-check,#up-notes,#look-row,#fx-level-row,#micwarm-toggle,#set-spec,#about-site")].map(e=>e.id).join(","):null;}),
-      about:[...v.querySelectorAll("#p-about #set-spec>div:not(.sx-gone) dt")].map(e=>getComputedStyle(e).textTransform==="none"&&/Inter|apple|system/i.test(getComputedStyle(e).fontFamily)?e.textContent:"X"),
-      adv:["#p-persona","#p-know"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]")),
-      look:(()=>{const n=["#fx-level-note","#micwarm-note"].map(s=>getComputedStyle(v.querySelector(s)).color),
+      panes:["#sx-p-general","#sx-p-look","#p-about"].map(s=>{const p=v.querySelector(s);return p?[...p.querySelectorAll("#beta-row,#autochk-toggle,#about-check,#up-notes,#look-row,#fx-level-row,#micwarm-toggle,#set-spec,#about-site,#sx-aboutline,#sx-whatsnew")].map(e=>e.id).join(","):null;}),
+      about:[(v.querySelector("#sx-aboutline")||{}).textContent||"",getComputedStyle(v.querySelector("#set-spec")).display],
+      kids:[...v.querySelectorAll("#snav-models-kids>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
+      adv:["#p-persona"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]")),
+      look:(()=>{const n=["#fx-level-note","#micwarm-note"].map(s=>getComputedStyle(v.querySelector(s)).display),
           st=document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#about-veil .switch,#about-veil .switch::after{transition:none!important}"})),k=["#autochk-toggle","#micwarm-toggle"].map(s=>{const e=v.querySelector(s);const was=e.classList.contains("on");e.classList.remove("on");const c=getComputedStyle(e.querySelector(".switch"),"::after").backgroundColor;if(was)e.classList.add("on");return c;}),stx=st.remove(),
           segs=[...v.querySelectorAll(".sl-seg")].map(e=>[getComputedStyle(e).height,getComputedStyle(e).borderTopLeftRadius].join(" "));
         return {notes:n,knobs:k,segs:[...new Set(segs)],title:getComputedStyle(v.querySelector("#sx-p-general .set-h")).textAlign,chev:getComputedStyle(v.querySelector(".snav-chev")).display,
@@ -48229,6 +48262,29 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
     return {head:p.querySelector(".set-h").textContent,fields:f.map(e=>e.id),labels:[...p.querySelectorAll(".sx-lab")].map(e=>e.textContent),
       personal:/\\b(where (do )?you live|city|town|home|location|address|zip|postcode|job|work in|units?|metric)\\b/i.test(words),
       account:!!p.querySelector(".sx-advc #acct-card")&&!!p.querySelector(".sx-advc #about-forget")};})()`);
+  // tight (6b625): What's new behind its link; every pane's rows 40 high, no helper sentence over six words, no boxed
+  // sub-card, the roster one line a model, the pane padding 24
+  await ev(`(()=>{settingsPane("p-models");return 1;})()`);   // the roster loads on the visit: wait for its rows
+  await until(`[...document.querySelectorAll("#about-veil .ros-row")].some(e=>e.offsetParent!==null)`, 8000);
+  out.tight = await ev(`(()=>{const v=document.querySelector("#about-veil"),o={long:[],rosH:0,cards:[],rows:[]};
+    settingsPane("sx-p-general");const n=v.querySelector("#up-notes"),w=v.querySelector("#sx-whatsnew");
+    if(n.hidden||!n.textContent.trim()){n.innerHTML="<p><b>What is new</b></p><p>Stand-in notes.</p>";n.hidden=false;}
+    o.ver=Math.round(v.querySelector("#sx-ver-row b").getBoundingClientRect().height);o.wn=[getComputedStyle(n).display];w.click();o.wn.push(getComputedStyle(n).display,w.getAttribute("aria-expanded"));w.click();o.wn.push(getComputedStyle(n).display);
+    for(const id of ["sx-p-general","sx-p-look","p-models","p-cloud","p-servers","p-usage","p-persona","p-about"]){settingsPane(id);const p=v.querySelector("#"+id);
+      p.querySelectorAll(".tdesc,.kn-hint,.sx-cline,#fx-level-note,#micwarm-note,#sugg-note,#know-privacy,#turbo-note").forEach(e=>{if(e.offsetParent!==null&&!e.closest(".sx-advc")){const t=e.textContent.replace(/Details$/,"").trim();if(t.split(/ +/).length>6)o.long.push(id+": "+t.slice(0,48));}});
+      if(id==="p-models")o.rosH=Math.max(0,...[...p.querySelectorAll(".ros-row")].filter(e=>e.offsetParent!==null).map(e=>Math.round(e.getBoundingClientRect().height)));
+      p.querySelectorAll(".us-card:not(.us-chart),.plan-card,.set-card,#acct-card").forEach(e=>{if(e.offsetParent!==null&&getComputedStyle(e).borderTopWidth!=="0px")o.cards.push(id+" boxed "+(e.id||e.className));});
+      p.querySelectorAll(".sx-group,.sx-srv,#cloudkey-box,.us-grid,.us-chart").forEach(e=>{if(e.offsetParent!==null&&getComputedStyle(e).borderTopLeftRadius!=="12px")o.cards.push(id+" group "+(e.id||e.className));});
+      p.querySelectorAll(":scope>.sx-group>.toggle-row,:scope>.sx-group>#beta-row,:scope>.sx-group>#look-row,:scope>.sx-group>#fx-level-row,:scope>.sx-group>.sx-row:not(#sx-ver-row),:scope>.toggle-row,:scope>.sx-row:not(#sx-ver-row)").forEach(e=>{if(e.offsetParent!==null)o.rows.push(Math.round(e.getBoundingClientRect().height));});}
+    o.pad=getComputedStyle(v.querySelector("#about-body")).paddingLeft;
+    o.nrows=o.rows.length;o.rows=[...new Set(o.rows)];
+    settingsPane("sx-p-general");const c=v.querySelector("#about-card"),x=v.querySelector("#sx-x"),xr=x&&x.getBoundingClientRect(),xh=xr&&document.elementFromPoint(xr.left+xr.width/2,xr.top+xr.height/2),cs=getComputedStyle(c);
+    o.night={x:!!xh&&(xh===x||x.contains(xh)),foot:getComputedStyle(v.querySelector("#about-foot")).display,
+      icons:[...v.querySelectorAll("#set-nav .snav")].filter(e=>e.offsetParent!==null).map(e=>!!e.querySelector("svg.sx-ico")).every(Boolean),
+      labs:[...v.querySelectorAll("#sx-p-general>.sx-glab")].map(e=>e.textContent),sub:(v.querySelector("#sx-p-general>.sx-sub2")||{}).textContent||"",
+      blur:(cs.backdropFilter||cs.webkitBackdropFilter||"").indexOf("blur(40px)")>=0,open:document.documentElement.classList.contains("sx-setopen"),
+      behind:getComputedStyle(document.querySelector("#main>:not(#hz-sky)")).opacity,h:Math.round(c.getBoundingClientRect().height)};
+    settingsPane("p-persona");return o;})()`);
   out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
   await press("Escape", "Escape", 27); await sleep(40);
   out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
@@ -48237,11 +48293,13 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
   // the header's right: the status dot kept, a clean line gear for Settings, no light/dark button; ⌘, opens Settings
   out.head = await ev(`(()=>{const r=document.querySelector("#hz-right"),g=document.querySelector("#hz-settings"),m=document.querySelector("#hz-machines");
     return {dot:!!m&&r.contains(m)&&m.getClientRects().length>0,gear:!!g&&r.contains(g)&&g.getAttribute("aria-label")==="Settings"&&/^Settings \\((⌘|Ctrl\\+),\\)$/.test(g.title)&&/^M12\\.22 2h/.test((g.querySelector("svg path")||{getAttribute:()=>""}).getAttribute("d")),
-      theme:[...document.querySelectorAll("#hz-top button,#hz-top [role=button]")].filter(e=>/light|dark|theme|sun\\b|moon/i.test((e.getAttribute("aria-label")||"")+" "+(e.title||"")+" "+e.id)).length};})()`);
+      theme:[...document.querySelectorAll("#hz-top button,#hz-top [role=button]")].filter(e=>/light|dark|theme|sun\\b|moon/i.test((e.getAttribute("aria-label")||"")+" "+(e.title||"")+" "+e.id)).length,
+      gpu:!!document.getElementById("hz-gpub")||/GPU sky| fps/.test(document.body.innerText)};})()`);
   await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 }); await sleep(300);
   out.comma = await ev(`!document.querySelector("#about-veil").hidden`);
-  await press("Escape", "Escape", 27); await sleep(320);
+  out.xhit = await click("#about-veil #sx-x"); await sleep(320);   // the quiet x closes it, and the page behind comes back
+  out.xclose = await ev(`[document.querySelector("#about-veil").hasAttribute("hidden"),document.documentElement.classList.contains("sx-setopen")]`);
   if (MODE === "full") {
     // ---- the palette: a Code chat says Code; the return arrow is a character
     await ev(`(()=>{chats.unshift({id:"px-code-1",lane:"code",title:"Fix the nginx config",ts:Date.now(),messages:[]});palOpen();return 1;})()`); await sleep(200);
@@ -48300,30 +48358,40 @@ def _px_live(width, mode="full", mutation=None):
         return json.loads(r_.stdout)
     except Exception as e_:
         return {"err": repr(e_)}
+def _px_tight_ok(t):
+    return (t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
+            and t.get("rows") == [40] and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
+            and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px"
+            and _px_night_ok(t.get("night") or {}))
+def _px_night_ok(n):
+    return (n.get("x") is True and n.get("foot") == "none" and n.get("icons") is True and n.get("labs") == ["Updates", "Microphone"]
+            and n.get("sub") == "Updates and the microphone." and n.get("blur") is True and n.get("open") is True and n.get("behind") == "0")
 def _px_set_ok(r, phone=False):
     s_, o_, c_ = r.get("set") or {}, r.get("open") or {}, r.get("closing") or {}
     return (not r.get("err") and not r.get("errs") and r.get("suggest") == 0
             and o_.get("veil") == "sxFade" and o_.get("card") == "sxRise"
-            and s_.get("bg") == "rgb(20, 20, 22)" and s_.get("veil") == "rgba(0, 0, 0, 0.55)"
+            and s_.get("bg") == "rgba(26, 26, 30, 0.88)" and s_.get("veil") == "rgba(0, 0, 0, 0.3)"
             and (s_.get("w") == (s_.get("sw") or [0, 0])[1] and s_.get("radius") == "0px" and s_.get("railDir") == "row" if phone
-                 else s_.get("w") == 672 and s_.get("h") == 640 and s_.get("radius") == "14px" and s_.get("rail") == 184 and s_.get("railDir") == "column"
-                 and s_.get("lab") == ["Settings", "11px", "600", "uppercase", "block"] and s_.get("caps") == ["Settings"])
-            and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
+                 else s_.get("w") == 720 and 420 <= (s_.get("h") or 0) <= 600 and s_.get("radius") == "16px" and s_.get("rail") == 208 and s_.get("railDir") == "column")
+            and (s_.get("lab") or [0] * 5)[4] == "none" and s_.get("caps") == []
+            and s_.get("rowH") == 28 and s_.get("rowBg") == "rgba(255, 255, 255, 0.1)" and s_.get("mono") == []
             and (s_.get("focus") or "").startswith("button.snav|General")
             and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
-            and s_.get("rows") == ["General", "Appearance", "Voice", "You", "Your stuff", "Models", "Usage", "About"]
-            and s_.get("genCtl") == 3 and s_.get("adv") == [True, True]
-            and s_.get("panes") == ["about-check,beta-row,autochk-toggle,up-notes", "look-row,fx-level-row", "micwarm-toggle", "set-spec,about-site"]
-            and s_.get("about") == ["version", "chip", "memory", "models"]
-            and (s_.get("look") or {}).get("notes") == ["rgba(255, 255, 255, 0.55)"] * 2 and (s_.get("look") or {}).get("knobs") == ["rgb(141, 145, 155)"] * 2
+            and s_.get("rows") == ["General", "Appearance", "Models", "You", "About"] and s_.get("kids") == ["Local", "Cloud", "Servers", "Usage"]
+            and s_.get("genCtl") == 4 and s_.get("adv") == [True]
+            and s_.get("panes") == ["sx-whatsnew,about-check,beta-row,autochk-toggle,up-notes,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,about-site,set-spec"]
+            and bool(re.match(r"ConcordeAI \d.* \(build \d+\)", (s_.get("about") or [""])[0])) and (s_.get("about") or ["", ""])[1] == "none"
+            and _px_tight_ok(r.get("tight") or {})
+            and (s_.get("look") or {}).get("notes") == ["none", "none"] and (s_.get("look") or {}).get("knobs") == ["rgb(255, 255, 255)"] * 2
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
-            and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona"]
+            and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona", "know-path"]
             and (r.get("you") or {}).get("labels") == ["What should we call you?", "Anything to keep in mind?"]
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
-            and r.get("head") == {"dot": True, "gear": True, "theme": 0} and r.get("comma") is True
+            and r.get("head") == {"dot": True, "gear": True, "theme": 0, "gpu": False} and r.get("comma") is True
+            and (r.get("xhit") or {}).get("hit") is True and r.get("xclose") == [True, False]
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
             and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
 def _px_full_ok(r):
@@ -48344,7 +48412,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings simpler and in one language (General, Appearance, Voice, You, Your stuff, Models with its three under it, Usage, About; General the updates, Appearance Look and Effects, Voice the microphone, About a quiet Inter list without Accel; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings in the night edition (a 720 sheet sized to its content, the sky behind blurred, a rail of line icons and 28 px rows, a quiet x that closes it, no footer, General's Updates and Microphone groups under one grey line, the page behind stepped back while open and back after) and tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -48357,11 +48425,22 @@ _px_mw = [
     ("About left as four things at once (no General, Appearance or Voice)", [["  sxSetPanes(v,g);\n", ""]]),
     ("⌘, opens nothing in the page", [['  addEventListener("keydown",sxComma,true);\n', ""]]),
     ("the job-shaped prompt back in You", [["ps.placeholder=\"Short answers, and say what you're unsure of.\";", ""]]),
+    ("rows 48 high again", [[".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}", ".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:48px;padding:8px 0}"]]),
+    ("What's new back on General's face", [[".hz #about-veil #sx-p-general:not(.sx-notes)>#up-notes{display:none}", ""]]),
+    ("Your stuff its own section again", [["gone(g('.snav[data-pane=\"p-know\"]'));", ""]]),
+    ("Usage outside Models", [['if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}', ""]]),
+    ("the roster two lines a model", [[".hz #about-veil .ros-row .rd{grid-column:3;grid-row:1;", ".hz #about-veil .ros-row .rd{grid-column:2/4;grid-row:2;"]]),
+    ("a long helper sentence back under Cloud", [['p.textContent="While on, prompts leave your machines. ";', 'p.textContent="Optional. While on, cloud models answer and your prompts leave your machines. ";']]),
+    ("the Close footer back", [[".hz #about-veil #about-foot{display:none}", ".hz #about-veil #about-foot{display:flex}"]]),
+    ("no quiet x on the sheet", [["if(card)card.appendChild(x);", ""]]),
+    ("General's rows not grouped", [['const g1=sxGroup([g("#sx-ver-row"),g("#beta-row"),g("#autochk-toggle")],"Updates","sx-g-updates");', "const g1=null;"]]),
+    ("the page behind left showing", [['    document.documentElement.classList.toggle("sx-setopen",!x&&sxHz());   // the page behind steps back (6b625, night edition)\n', ""]]),
+    ("the GPU badge on a page with no debug spec", [["function sxBoot(){\n", "function sxBoot(){\n  setTimeout(()=>{const b=document.createElement(\"div\");b.id=\"hz-gpub\";b.textContent=\"GPU sky on \\u00b7 119 fps \\u00b7 Apple GPU\";document.body.appendChild(b);},0);\n"]]),
 ]
 _px_mr = []
 for d_, m_ in _px_mw:
     r_ = _px_live(1440, "full", m_)
-    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "errs", "mutated")}))
+    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "tight", "head", "xclose", "errs", "mutated")}))
 check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
       all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
 # (6) Servers, much cleaner (Patrick: "It still looks like way too much for me, bud"): the page's own sxSrvState and
@@ -48413,6 +48492,35 @@ _px_s6m = [("an error shown as the status", 'esc(waking&&st!=="awake"?"Waking…
 _px_s6r = [(d_, _px_srv_ok(_px_srv(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _px_s6m]
 check("6b625 Servers, much cleaner (the page's sxSrvState and sxSrvCard, in node): one status word (Awake, Asleep, Can't reach), a server the relay or Wake-on-LAN can wake Asleep never an error, the server's error sentence never printed, Wake only when asleep, Use for answers, chips when awake and one grey line when not, Sleeps after N min idle, and Test, Pair again, Change token, the wake relay, the guide and Remove server only under Advanced; four mutants caught",
       _px_srv_ok(_px_s6) and all(r_ is False for _, r_ in _px_s6r), "%r %r" % (_px_s6, _px_s6r))
+# (7) The GPU badge ("GPU sky on · 119 fps · Apple GPU", ?hz=gpu=1) is a dev copy's only: the release page's HZ_DEBUG is
+# null because hz_debug_spec answers None outside a dev copy and every test hook is empty there; any call of hzGpuBadge
+# sits behind hzS.debug.gpu. Run on hz_debug_spec itself (exec'd from the source) and on the source text.
+def _px_gpu_ok(src):
+    try:
+        ns_ = {"re": re, "urllib": urllib}
+        a_ = src.index("_HZ_DEBUG_RX = re.compile(")
+        e_ = src.index("\n\n\n", src.index("def hz_debug_spec(path: str, dev: bool):"))
+        exec(src[a_:e_], ns_)
+        f_ = ns_["hz_debug_spec"]
+        fn_ok = (f_("/?hz=gpu=1", False) is None and f_("/", False) is None and f_("/?hz=gpu=1", True) == "gpu=1")
+    except Exception as ex_:
+        return "spec: %r" % ex_
+    page_ = src[src.index("HTML_CONTENT"):]
+    calls_ = [m_.start() for m_ in re.finditer(r"(?<!function )hzGpuBadge\(\)", page_)]
+    guarded = all(page_[max(0, c_ - 60):c_].rstrip().endswith('if(hzS.debug&&hzS.debug.gpu==="1")') for c_ in calls_)
+    return (fn_ok and guarded
+            and "if x.strip()) if DEV_HOME else frozenset()" in src
+            and "_hz_spec = hz_debug_spec(self.path, bool(DEV_HOME))" in src
+            and '.replace("__HZ_DEBUG__", json.dumps(_hz_spec))' in src
+            and "HZ_DEBUG=__HZ_DEBUG__" in src) or "calls %d guarded %r fn %r" % (len(calls_), guarded, fn_ok)
+_px_g7 = _px_gpu_ok(_MILLENAI_SRC)
+_px_g7m = [("the debug spec served outside a dev copy", "    if not dev:\n        return None\n    m = _HZ_DEBUG_RX", "    m = _HZ_DEBUG_RX"),
+           ("test hooks outside a dev copy", "if x.strip()) if DEV_HOME else frozenset()", "if x.strip())"),
+           ("a badge call with no debug guard", "HZ_DEBUG=__HZ_DEBUG__", "HZ_DEBUG=__HZ_DEBUG__;setTimeout(()=>{if(typeof hzGpuBadge===\"function\")hzGpuBadge();},0)"),
+           ("the page's HZ_DEBUG a fixed spec", '.replace("__HZ_DEBUG__", json.dumps(_hz_spec))', '.replace("__HZ_DEBUG__", json.dumps("gpu=1"))')]
+_px_g7r = [(d_, _px_gpu_ok(_MILLENAI_SRC.replace(a_, b_, 1)) if a_ in _MILLENAI_SRC else "anchor missing") for d_, a_, b_ in _px_g7m]
+check("6b625 the GPU badge (\"GPU sky on · 119 fps · Apple GPU\") is a dev copy's only: outside one hz_debug_spec answers None for /?hz=gpu=1 and the test hooks are empty, so the page's HZ_DEBUG is null, and every hzGpuBadge() call is behind hzS.debug.gpu; the live page (no debug spec) has no badge; four mutants caught",
+      _px_g7 is True and all(r_ is not True for _, r_ in _px_g7r), "%r %r" % (_px_g7, _px_g7r))
 # ==== 6b625 the polish: end ====
 # ==== 6b621 ultra at full strength: begin ====
 # ULTRA AT FULL STRENGTH, THE AURORA FLUID AND CENTRED, THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have
@@ -49352,6 +49460,113 @@ check("6b640 no test searches the real web: every copy starts with the stand-in 
       _w640_ok(_MILLENAI_SRC, _w640_me)
       and not _w640_ok(_MILLENAI_SRC.replace('SEARCH_STUB = bool(DEV_HOME) and os.environ', 'SEARCH_STUB = True and os.environ', 1), _w640_me)
       and not _w640_ok(_MILLENAI_SRC.replace("def _net_probe():\n    if SEARCH_STUB:\n        return", "def _net_probe():\n    if False:\n        return", 1), _w640_me), "")
+# THE STAND-IN WEB, PROVEN (6b640, the lead's rule of 2026-11-11: no test reaches a live third-party service, OSM's
+# Nominatim and Overpass, the forecast, map tiles and image search included). The block runs in a child python whose
+# own network is a tripwire (every name lookup and connect is recorded and refused, so not even a mutant can leave):
+# the geocoder, the places and the forecast come back as fixtures shaped like the services' replies, a made-up place
+# finds nothing, wttr.in, the official rates and any other public host are refused at once (a custom opener too), the
+# name lookup refuses a public host, and the LAN is left alone. Mutants: the lookup guard not installed; urllib not
+# routed through the stand-in; every host called local. The page's own fetches (tiles, fonts, footage) are kept home
+# by --host-resolver-rules on every headless Chromium this file starts, and this process refuses public names too.
+_SW640_PY = r'''
+import json, re, sys, socket, hashlib, http.client, urllib.request, urllib.error, urllib.parse
+HITS = []
+def _trip_gai(host, *a, **k):
+    h = host.decode() if isinstance(host, bytes) else str(host)
+    if h in ("127.0.0.1", "localhost", "::1"):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", a[0] if a else 0))]
+    HITS.append(h)
+    raise OSError("tripwire: %s" % h)
+def _trip_connect(self, addr):
+    HITS.append(str(addr[0]))
+    raise OSError("tripwire connect")
+socket.getaddrinfo = _trip_gai
+socket.socket.connect = _trip_connect
+SEARCH_STUB = True
+exec(compile(open(sys.argv[1]).read(), "stand-in", "exec"), globals())
+out = {}
+def get(url, data=None, opener=None):
+    try:
+        r = (opener.open(url, data, timeout=5) if opener else urllib.request.urlopen(url, data, timeout=5))
+        return json.load(r)
+    except urllib.error.HTTPError as e:
+        return {"http": e.code}
+    except Exception as e:
+        return {"refused": type(e).__name__}
+out["nom"] = get("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=" + urllib.parse.quote("katz's delicatessen, new york"))
+out["nom0"] = get("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + urllib.parse.quote("qzxvbn cafe bushwick"))
+out["om"] = get("https://api.open-meteo.com/v1/forecast?latitude=40.7&longitude=-73.9&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&temperature_unit=fahrenheit&timezone=auto&forecast_days=3")
+out["ov"] = get(urllib.request.Request("https://overpass-api.de/api/interpreter", data=urllib.parse.urlencode({"data": '[out:json];(nwr["amenity"~"^(pharmacy)$"]["name"](around:1400,40.69,-73.92););out center body 60;'}).encode()))
+out["wttr"] = get("https://wttr.in/brooklyn?format=j1")
+out["rates"] = get("https://api.frankfurter.app/latest?from=USD&to=EUR")
+out["other"] = get("https://example.com/")
+out["custom"] = get("https://example.com/", opener=urllib.request.build_opener(urllib.request.HTTPRedirectHandler))
+try:
+    socket.getaddrinfo("tiles.openfreemap.org", 443); out["gai"] = "resolved"
+except OSError as e:
+    out["gai"] = str(e)[:60]
+out["lan"] = [_stub_local_host(h) for h in ("127.0.0.1", "10.0.0.5", "192.168.1.20", "desk", "desk.local", "localhost", "[::1]")]
+out["pub"] = [_stub_local_host(h) for h in ("nominatim.openstreetmap.org", "8.8.8.8", "example.com", "api.github.com")]
+out["hits"] = HITS
+print(json.dumps(out))
+'''
+
+
+def _sw640_block(src):
+    a = src.index("# THE STAND-IN WEB (beta 4")
+    e = src.index("    socket.getaddrinfo = _stub_getaddrinfo\n", a) + len("    socket.getaddrinfo = _stub_getaddrinfo\n")
+    return src[a:e]
+
+
+def _sw640_run(src):
+    try:
+        blk = _sw640_block(src)
+    except ValueError:
+        return {"err": "block missing"}
+    bp, hp = os.path.join(_si_dir, "sw640-block.py"), os.path.join(_si_dir, "sw640-run.py")
+    open(bp, "w").write(blk)
+    open(hp, "w").write(_SW640_PY)
+    p_ = subprocess.run([sys.executable, "-I", hp, bp], capture_output=True, text=True, timeout=60)
+    try:
+        return json.loads(p_.stdout.strip().splitlines()[-1])
+    except Exception:
+        return {"err": (p_.stdout + p_.stderr)[-400:]}
+
+
+def _sw640_ok(r):
+    nom, om, ov = r.get("nom"), r.get("om") or {}, r.get("ov") or {}
+    return (not r.get("err") and isinstance(nom, list) and len(nom) == 1 and float(nom[0]["lat"]) and "New York" in nom[0]["display_name"]
+            and (nom[0].get("address") or {}).get("city") == "New York" and r.get("nom0") == []
+            and om.get("timezone") == "America/New_York" and len((om.get("daily") or {}).get("time") or []) == 3
+            and isinstance((om.get("current") or {}).get("temperature_2m"), float)
+            and len(ov.get("elements") or []) == 3 and all((e.get("tags") or {}).get("name") for e in ov["elements"])
+            and r.get("wttr") == {"refused": "URLError"} and r.get("rates") == {"refused": "URLError"}
+            and r.get("other") == {"refused": "URLError"} and r.get("custom") == {"refused": "URLError"}
+            and "stand-in web" in str(r.get("gai")) and r.get("lan") == [True] * 7 and r.get("pub") == [False] * 4
+            and r.get("hits") == [])
+
+
+_sw640_r = _sw640_run(_MILLENAI_SRC)
+_sw640_muts = [("the lookup guard not installed", "    socket.getaddrinfo = _stub_getaddrinfo\n", "    pass\n"),
+               ("urllib not routed through the stand-in", "    urllib.request.OpenerDirector.open = _stub_open\n", "    pass\n"),
+               ("every host called local", '    return ("." not in h or h == "localhost"\n', '    return True or ("." not in h or h == "localhost"\n')]
+_sw640_bad = []
+for _d, _o, _n in _sw640_muts:
+    if _MILLENAI_SRC.count(_o) != 1:
+        _sw640_bad.append((_d, "anchor missing"))
+    elif _sw640_ok(_sw640_run(_MILLENAI_SRC.replace(_o, _n, 1))):
+        _sw640_bad.append((_d, "MISSED"))
+check("6b640 the stand-in web: a test copy's geocoder, places and forecast are fixtures, a made-up place finds nothing, "
+      "wttr.in, the rates and any other public host are refused (a custom opener too), the lookup refuses public names, "
+      "the LAN is untouched, and nothing reached the tripwire; %d mutants caught" % len(_sw640_muts),
+      _sw640_ok(_sw640_r) and not _sw640_bad, json.dumps(_sw640_r)[:900] + " " + repr(_sw640_bad))
+_sw640_chs = [m.start() for m in re.finditer(r'spawn\(exe, \["--headless"', open(os.path.abspath(__file__)).read())]
+check("6b640 every headless Chromium this run starts keeps the page's own fetches home (tiles, fonts, footage): "
+      "--host-resolver-rules maps every public name to nothing",
+      len(_sw640_chs) >= 6 and open(os.path.abspath(__file__)).read().count(
+          '"--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",') == len(_sw640_chs)
+      and 'args: ["--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"]' in open(os.path.abspath(__file__)).read()
+      and socket.getaddrinfo.__name__ == "_smoke_getaddrinfo", "%d launches" % len(_sw640_chs))
 # A CUT-OFF KEY SAYS SO, AND HAIKU COSTS HAIKU (6b640, from the App Store spike and answers-1): /api/cloud/set threw
 # TypeError (the connection dropped) for a short key that starts with its provider's prefix: its message had one value
 # too many; claude-haiku-5-5 was missing from CLAUDE_PRICES and costed at Fable's price. The message is formatted here
@@ -50137,7 +50352,7 @@ const [exe, base, ckName, key, tok, groupsArg, modef, gemf, mutf] = process.argv
 const G = new Set(groupsArg.split(","));
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-627-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { S: {}, errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -51678,7 +51893,7 @@ const { spawn } = require("child_process"), fs = require("fs"), path = require("
 const [exe, base, ckName, key, tok, mutf] = process.argv.slice(2);
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-631-"));
-const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { S: {}, errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}

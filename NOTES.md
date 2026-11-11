@@ -21952,6 +21952,104 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
   stuff's "Answers can draw on your own chats and the folders you choose, found on this computer, and say which chat or
   file they used." (its privacy line kept).
 
+**Settings, tight (per Patrick, 2026-11-11 09:25: "let's clean up the settings a lot, make them very concise, very
+tight, all that").** A second pass after 9051f4b, Horizon only, the page's own nodes moved once at boot (ids and
+handlers kept), Classic untouched:
+- Five sections instead of eight: General · Appearance · Models (Local, Cloud, Servers, Usage under it) · You · About.
+  Voice folds into General (Keep microphone ready); Your stuff folds into You; Usage moves under Models.
+- General: the version row carries What's new (a quiet link that opens the notes in place) and Check now; under it the
+  channel, Check for updates and Keep microphone ready. The date line under the version shows only when it is news
+  (an update is ready, another release is out, or checks are off). The notes are no longer on the face.
+- Appearance: Look and Effects, no note. About: one quiet line, "ConcordeAI 7.0 beta 2 (build 279) · M4 PRO · 48 GB" on this Mac,
+  then the site. The facts list is hidden (its nodes stay; the line reads them and follows their updates).
+- You: the two optional fields and Save, then your chats and folders ("Use my chats in answers", the folder list,
+  Add folder); under Advanced the answer length, the cloud switch for your stuff, the index line and counts, Read
+  everything again, the account, bringing chats and Erase everything. Your stuff is nested in You, not copied: it loses
+  `.spane` and is "on" while You is, so `knowRefresh()` and its polling run exactly as before; `settingsPane("p-know")`
+  (a source chip's link) now opens You.
+- Cloud: the 46-word paragraph becomes "While on, prompts leave your machines." with a Details link that shows the
+  whole paragraph in place (what goes to Google and to the search engine stays one click away).
+- Rows: 40 high and one line (label left, control right); the roster one line a model (name, what it is for in grey,
+  size, its action); pane padding 24; the boxed sub-cards (Usage's four, the key box, the account card) unboxed; the
+  server cards keep their box. Helper sentences gone from every face (the micwarm and Effects notes, Your stuff's
+  hints and privacy line, the persona paragraph); Pat's approved Servers line kept.
+- Dictation language: the app has no such setting (Whisper picks the language itself), so none was invented.
+- GPU badge: "GPU sky on · 119 fps · Apple GPU" (beta-4's `hzGpuBadge`, `?hz=gpu=1`) is a dev copy's only. Pinned:
+  `hz_debug_spec` answers None outside a dev copy (exec'd from the source), test hooks are empty there, the page's
+  HZ_DEBUG is `json.dumps(_hz_spec)`, every `hzGpuBadge()` call sits behind `hzS.debug.gpu`, and the live page has no
+  badge; 4 source mutants and 1 live mutant. Proven on this branch and on beta-4's source (where the badge exists).
+
+**Tests (tight):** the live check's Settings probe follows the five sections (rows, Models' four, General's four
+controls, the panes' members, About's one line with the build, the notes hidden) and a new tight probe (What's new
+none → block → none with aria-expanded, every pane's rows 40, no visible helper over six words, no boxed sub-card,
+the roster ≤ 44 high, padding 24, the version label one line); `You` now has the folder field; the header has no GPU
+badge. Seven new live mutants: rows 48 again, What's new on the face, Your stuff its own section, Usage outside
+Models, the roster two lines, a long helper back under Cloud, a badge on a page with no debug spec. The pure GPU pin
+with four mutants. The 390 check's "no sideways scroll" now asks whether the reader can scroll (the body clips with
+overflow-x hidden, carried to the viewport); scrollWidth alone counted the sky's drifting layers (the moon's glow, the
+wash) 24 px past the edge, so the check passed or failed with the time of day, at 9051f4b as well.
+
+**Copy, tight (old → new, for Patrick's approval):**
+- Rail: "Voice" → removed (its switch in General); "Your stuff" → removed (inside You); "Usage" → under Models.
+- General: "7.0 beta 3 released on …"/"Released on …" under the version → shown only when it is news; the notes box
+  "What's new in …" → behind a new "What's new" link on the version row; "On for 15 seconds after you dictate." →
+  removed.
+- Appearance: "How much the sky moves." → removed.
+- About: the list "Version / Chip / Memory / Models" → one line "ConcordeAI 7.0 beta 2 (build 279) · <chip> ·
+  <memory>"; the models count is no longer shown.
+- You: "Include my chats" → "Use my chats in answers"; "Stays on your machines. Cloud only if you allow it." → removed;
+  "Notes, text, PDF (text only), Word, web pages and mail files in the folders you add. Nothing outside them is read."
+  → removed; "Off: answers that use your stuff stay on your machines. On: a cloud model may read it too, and the answer
+  says so." → removed (the switch "Let cloud models read my stuff too" kept, under Advanced); "Response length" →
+  under Advanced.
+- Cloud: "Optional. While on, cloud models answer and your prompts leave your machines. Gemini pictures and video go
+  to Google whenever a Gemini key is saved. Keys stay saved when off. A question that needs the web goes, as typed, to
+  a search engine; weather and place questions send the place name." → "While on, prompts leave your machines." +
+  new "Details" link (the full text behind it, unchanged).
+
+**Settings, the night edition (per Patrick, 2026-11-11 ~10:20: "Clean this up. It just looks very Microsoft. Just dry.
+Tasteless."; two directions shown as stills, A "Apple System Settings, night edition" and B "Claude-sharp"; Pat picked
+A and approved its three new lines).** Horizon only; the page's own nodes, ids and handlers kept:
+- The sheet: 720 wide, sized to its content (420 to 600 high, the body scrolls past that), rgba(26,26,30,.88) graphite
+  with the sky behind blurred (the sheet 40 px, the backdrop 10 px), a 1 px top highlight, a soft shadow, radius 16.
+  The page behind (greeting, conversation, composer, header) steps back to 0 while it is open (`html.sx-setopen`, set
+  in the same `hidden` setter that runs the fade), so the sheet sits on the sky alone.
+- The rail: no "SETTINGS" eyebrow; 13 px rows 28 high, each with a 16 px line icon (General, Appearance, Models and its
+  Local, Cloud, Servers, Usage, You, About); a filled selection; the selected icon ice.
+- No footer: a quiet × at the top right (Close, Esc). The Close button stays in the page (hidden) and the × clicks it,
+  so every close path is the one it was.
+- Grouped inset lists: radius 12 on rgba(255,255,255,.045), hairlines inset 14 from the left (a background line, so no
+  pseudo-element fights the rows'), rows 40 high. General: "Updates and the microphone." under the title, then
+  "Updates" (version with What's new and Check now, channel, Check for updates) and "Microphone" (Keep microphone
+  ready); the notes open between them. Appearance, About, You (the two fields; your chats and folders), every
+  Advanced, each server, the pairing form, the roster under each grey heading, Cloud's key box and Usage's numbers,
+  chart and benchmark are groups.
+- Controls: 34 x 20 ice switches with rounded-square knobs (no circles), pill buttons (28 high, radius 14), 32 px inputs
+  with normal tracking and a soft ice ring on focus, the segmented control on a dark well. A server's state is a word
+  with a glyph: a moon asleep, a small ice square awake; model chips in ice.
+- A 150 ms pane fade; none under reduced motion. Titles 20/500; a pane's one grey line under it.
+
+**Found on the way (the trimmed gauntlet, the servers block):** three pins of other blocks that earlier 6b625 work had
+broken, each restored without touching the pin: the engine menu's Esc line again sits right above the stop line (the
+host sheet's Esc moved above it); the 6b367 Test-result mutant again finds srvCard's srv-msg line once (the 6b625 card
+words its own with single quotes); the lane hooks are guarded (`typeof sxLaneSoon`), so setAgent lifted into node by the
+rules review runs without the polish block.
+
+**Tests (night edition):** the css check re-pins the sheet (720, auto height to 600, the graphite, radius 16, the
+highlight and shadow, both blurs), no eyebrow, the rail's 28 px rows and 16 px icons, no footer, the ×, the groups and
+their inset hairlines, the grey labels, the pane fade, the page stepping back, ice switches, pills, the input ring; a
+blur is allowed only as a backdrop (the no-glow rule otherwise unchanged); seven mutants (a rounder sheet, a sheet with
+nothing softened behind it, a blur that is not the backdrop's, plus the four it had). The live check measures the
+sheet (720 x 420..600, radius 16, the graphite, the 30 % veil, a 208 rail of 28 px rows on a 10 % fill, no eyebrow and
+no caps), the × hittable and closing it with the page behind back, the footer gone, an icon on every visible rail row,
+General's two labels and its line, the backdrop blur, the page behind at 0 while open, white knobs off, every group at
+radius 12 and no bordered card inside; four more live mutants (the footer back, no ×, General ungrouped, the page behind
+left showing).
+
+**Copy, night edition (old → new):** new "Updates and the microphone." (General's line), group labels "Updates" and
+"Microphone" (all three approved by Pat); "SETTINGS" eyebrow → removed; "Close" button → a × (its label "Close", tooltip
+"Close (Esc)").
+
 **Left / worth knowing.**
 - Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
@@ -21968,6 +22066,15 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
 - The command output is still not on the wire (6b622), so a danger card shows the command, not a preview of what it
   will delete.
 - Checked in an offscreen WKWebView and headless Chromium, not in the shipped window.
+- Tight: the hidden Your-stuff hint said which file types are read; it is gone from the face. If people ask "why
+  wasn't my .pages file used", it may want to come back as a Details link like Cloud's.
+- Tight: the About line drops the installed-models count ("models" fact); Local lists them.
+- Night edition: two layers of backdrop blur over the GPU sky cost a little GPU while Settings is open (the page behind
+  is at 0 then, so the sky is all it blurs). Checked in an offscreen WKWebView and headless Chromium (computed style
+  has the blur); at 88 % the stills look near-solid, so whether the stars read softly through it is for the shipped
+  window to show.
+- Night edition: the sheet's height follows the pane (420 to 600), so it changes size between panes.
+
 ## 6b626 — beta-4-answers: no needless search, no topic bleed, the landmark kept, offline said plainly (7.0 beta 4, per Patrick)
 
 Patrick: "it has to be usable". The beta-4 walkthrough asked plain things and got wrong turns, all of them server
@@ -22540,7 +22647,43 @@ harness at a time (6b555 header 40 cases, 6b580 layout, 6b624 page, 6b625 live a
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
 
+**The reds of run C (a full run on 2b2d6ef, 1472 passed, 21 failed, then a crash at 6b531), classified.** Real:
+Classic's `#up-checked` rule (6b627) sat inside the Horizon slice unscoped (moved before it); the usage pane's plural
+line read a parent that a lifted harness lacks (guarded); `millen.hz_greet_last` was written but not kept by
+storeBoot's sweep (kept); 6b627's model-repair and load-note writers were missing from the machine lints' lists
+(added); the stand-in search engine found the gauntlet's made-up "qzxvbn cafe" (a five-consonant word now finds
+nothing, as a real index would). **The dictation red was a stale helper**: `shell/dictate/concorde-dictate` is a build
+output and had been built before 6b641's Swift landed, so it ignored `--locale` and exited on the Spanish region;
+rebuilt, the real recognizer writes "What's up, man?" after the empty utterance. Intentional changes, re-pinned at equal
+strength: the geocode's "town" (6b626), giants and the polish pass behind answer_kind (6b626), Settings opening on its
+first pane (6b625), the picture asked, never downloaded (6b628's vision_offer), the minute stamp in clock_line (6b626),
+the prefs chain with fx_level and dict_lang after comps, findOpen placing the bar first (6b640), the grounded turn past
+12 KB (the rules grew; a cut that fits still leaves it whole, and the checker's 12 KB cut keeps the rules and the
+question), the saved-key line on one line, the edit window. The Servers mutants anchored on text that 6b625's cleaner
+card now repeats: each anchors on its own card, Horizon's card got its own mutants, and a new check reads both cards
+(the relay token a password field, the address escaped, in each).
+
+**beta-4-polish af84ac7 merged** (d13d73b, Settings tight; af84ac7, the night edition, Pat's pick A; both Pat-approved):
+the Dictation language row (6b641) goes into General's Microphone group with Keep microphone ready (the tight pass folded
+Voice into General); the Escape order stays the engine menu, the host sheet, then a stop only in the answering chat
+(6b627); the You label stays "What should we call you?" (the branch's harness had "What should Concorde call you?").
+
+**The stand-in web (the lead's rule, widened the same day: no test reaches any live third-party service; OSM's usage
+policy forbids automated traffic).** Under MILLENAI_SEARCH_STUB a copy answers its own outbound calls: Nominatim, Overpass
+and open-meteo (the forecast and the time zone) from fixtures shaped like their replies (a made-up place finds nothing;
+Chicago, Paris, the Eiffel Tower and Lisbon sit where they are, any other place in Brooklyn; three stand-in venues with
+hours), wttr.in refused so the forecast's second rung answers, the official rates and every other public host refused at
+once as if offline (OpenerDirector.open, so a custom opener too), and the name lookup refuses public hosts (a call that
+skips urllib can't leave); loopback and the LAN are untouched, and each refused host is named once on stderr. The
+gauntlet's own process refuses public names at the lookup too (many checks run the app's functions in it), and every
+headless Chromium it starts carries `--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1`, so
+the page's own fetches (map tiles, fonts, the footage) stay home. A check runs the block in a child python whose network
+is a tripwire (every lookup and connect recorded and refused), with three mutants (the lookup guard, the urllib route,
+every host called local); nothing reached the tripwire. These fixtures are made up from the services' documented
+shapes, not recorded: recording one would have meant calling the service.
+
 **Verified.** GAUNTLET_LINE
+
 ## 6b641 — dictation, polished: the language told, never guessed; it listens as you speak and stops when you do; the C++ shell's own path (7.0 beta 4, per Patrick)
 
 Patrick, in the C++ Preview: he pressed ⌘D, said "What's up, man?", and the composer got **"Hvittar"**; the composer

@@ -97,7 +97,7 @@ MACHINE_STATE = frozenset((
     # folders it has been recovered for
     "_HW_MEMSIZE", "_search_hits", "_pending_timer", "_disk_seen",
     # (6b627) the models found damaged, the engines' load times, the loads already said
-    "_DMG_SEEN", "_LOADS", "_LOAD_SAID",
+    "_DMG_SEEN", "_LOADS", "_LOAD_SAID", "_STUB_SEEN", "_STUB_PLACES",
     "_journal_run", "_journal_done",
     # the instance, the window, the boot code, the updater
     "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
@@ -935,6 +935,132 @@ class _StubDDGS:
 if SEARCH_STUB:
     DDGS = _StubDDGS
     HAS_SEARCH = True
+
+# THE STAND-IN WEB (beta 4, the lead's rule of 2026-11-11: no test reaches a live third-party service from this Mac;
+# OpenStreetMap's usage policy forbids automated traffic, and a rate-limited address breaks Patrick's own app). Under
+# SEARCH_STUB every outbound call this copy makes is either answered here, from a fixture shaped like the service's own
+# reply (the geocoder, the places, the forecast and the time zone), or refused at once as if offline (wttr.in, so the
+# forecast's second rung answers; the official rates; everything else). Loopback and the LAN (a paired server, the
+# relay) are untouched. The name lookup refuses any public host as well, so a call that skips urllib (http.client,
+# a socket) can't leave either; each refused host is named once on stderr.
+_STUB_SEEN = set()
+
+
+def _stub_local_host(h: str) -> bool:
+    """Loopback, the LAN, or a dotless or .local/.test/.lan name: a call there stays on this side of the router."""
+    import ipaddress as _ip
+    h = (h or "").strip().lower().strip("[]").rstrip(".")
+    if not h:
+        return True
+    try:
+        a = _ip.ip_address(h.split("%")[0])
+        return a.is_loopback or a.is_private or a.is_link_local or a.is_unspecified
+    except ValueError:
+        pass
+    return ("." not in h or h == "localhost"
+            or h.endswith((".localhost", ".local", ".test", ".lan", ".home.arpa", ".internal")))
+
+
+def _stub_said(host: str):
+    if host not in _STUB_SEEN:
+        _STUB_SEEN.add(host)
+        try:
+            sys.stderr.write("stand-in web: no live call to %s (MILLENAI_SEARCH_STUB)\n" % host)
+        except Exception:
+            pass
+
+
+_STUB_PLACES = {   # a few places the gauntlet names, where they really are; any other place sits in Brooklyn
+    "chicago": (41.8781, -87.6298, "Chicago, Cook County, Illinois, United States", "Chicago"),
+    "eiffel": (48.8584, 2.2945, "Tour Eiffel, 5, Avenue Anatole France, Paris, Île-de-France, France", "Paris"),
+    "paris": (48.8566, 2.3522, "Paris, Île-de-France, France", "Paris"),
+    "lisbon": (38.7223, -9.1393, "Lisboa, Portugal", "Lisboa"),
+    "campo de ourique": (38.7180, -9.1660, "Campo de Ourique, Lisboa, Portugal", "Lisboa")}
+
+
+def _stub_web_answer(url: str, data=None):
+    """(status, JSON bytes) for a service the gauntlet's answers lean on, or None (refused, as if offline)."""
+    import datetime as _sdt
+    u = urllib.parse.urlsplit(url)
+    host, qs = (u.hostname or "").lower(), urllib.parse.parse_qs(u.query)
+    if host == "nominatim.openstreetmap.org":
+        q = " ".join(qs.get("q", [""])[0].split())
+        if not q or re.search(r"\b[b-df-hj-np-tv-xz]{5,}\b", q, re.I):
+            return 200, b"[]"            # a made-up word: no map knows it
+        n = int(hashlib.sha1(q.encode()).hexdigest()[:6], 16)
+        head = " ".join(w[:1].upper() + w[1:] for w in q.split(",")[0].split())[:60]
+        for k_, (la_, lo_, dn_, ci_) in _STUB_PLACES.items():
+            if k_ in q.lower():
+                return 200, json.dumps([{"lat": "%.6f" % la_, "lon": "%.6f" % lo_, "display_name": dn_,
+                                         "address": {"city": ci_}}]).encode()
+        row = {"lat": "%.6f" % (40.6943 + (n % 200 - 100) / 4000.0), "lon": "%.6f" % (-73.9213 + (n // 200 % 200 - 100) / 4000.0),
+               "display_name": "%s, Brooklyn, Kings County, New York, United States" % head,
+               "address": {"city": "New York", "state": "New York", "country": "United States"}}
+        return 200, json.dumps([row]).encode()
+    if host in ("overpass-api.de", "overpass.kumi.systems"):
+        body = urllib.parse.parse_qs((data or b"").decode("utf-8", "replace")).get("data", [""])[0]
+        m = re.search(r"around:\d+,(-?[\d.]+),(-?[\d.]+)", body)
+        kind = (re.search(r'"amenity"~"\^\(([a-z_]+)', body) or [None, "cafe"])[1]
+        if not m:
+            return 200, b'{"elements": []}'
+        lat, lon = float(m.group(1)), float(m.group(2))
+        els = [{"type": "node", "id": 9000 + i, "lat": lat + i / 2000.0, "lon": lon - i / 2000.0,
+                "tags": {"name": "Stand-in %s %d" % (kind.replace("_", " ").title(), i), "amenity": kind,
+                         "opening_hours": "Mo-Su 07:00-23:00" if i != 3 else "Mo-Fr 09:00-17:00"}} for i in (1, 2, 3)]
+        return 200, json.dumps({"elements": els}).encode()
+    if host == "api.open-meteo.com":
+        try:
+            lat, lon = float(qs["latitude"][0]), float(qs["longitude"][0])
+        except (KeyError, ValueError):
+            return 400, b'{"error": true, "reason": "latitude and longitude"}'
+        days = max(1, min(int((qs.get("forecast_days") or ["3"])[0] or 3), 16))
+        tz_, off_ = (("Europe/Paris", 1) if lon > 0 else ("Europe/Lisbon", 0) if lon > -30
+                     else ("America/Chicago", -6) if lon < -82 else ("America/New_York", -5))
+        now = _sdt.datetime.now(_sdt.timezone(_sdt.timedelta(hours=off_)))
+        out = {"latitude": lat, "longitude": lon, "timezone": tz_, "timezone_abbreviation": "",
+               "current": {"time": now.strftime("%Y-%m-%dT%H:%M"), "temperature_2m": 54.0, "apparent_temperature": 52.0,
+                           "weather_code": 2, "wind_speed_10m": 7.0, "relative_humidity_2m": 61,
+                           "is_day": 1 if 7 <= now.hour < 17 else 0}}
+        if "daily" in qs:
+            ds = [(now + _sdt.timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days)]
+            out["daily"] = {"time": ds, "temperature_2m_max": [58.0 + i % 3 for i in range(days)],
+                            "temperature_2m_min": [44.0 + i % 2 for i in range(days)],
+                            "weather_code": [2, 3, 61, 0, 1, 2, 3, 0, 1][:days] + [2] * max(0, days - 9)}
+        return 200, json.dumps(out).encode()
+    return None
+
+
+if SEARCH_STUB:
+    _od_open = urllib.request.OpenerDirector.open
+
+    def _stub_open(self, fullurl, data=None, *a, **k):
+        req = fullurl if isinstance(fullurl, urllib.request.Request) else urllib.request.Request(fullurl, data)
+        host = (urllib.parse.urlsplit(req.full_url).hostname or "")
+        if _stub_local_host(host):
+            return _od_open(self, fullurl, data, *a, **k)
+        got = _stub_web_answer(req.full_url, data if data is not None else req.data)
+        if got is None:
+            _stub_said(host)
+            raise urllib.error.URLError(OSError("stand-in web: no live call to %s" % host))
+        code, body = got
+        import io as _sio
+        hdr = http.client.HTTPMessage()
+        hdr["Content-Type"] = "application/json"
+        if code != 200:
+            raise urllib.error.HTTPError(req.full_url, code, "stand-in", hdr, _sio.BytesIO(body))
+        return urllib.response.addinfourl(_sio.BytesIO(body), hdr, req.full_url, code)
+
+    urllib.request.OpenerDirector.open = _stub_open
+    _gai = socket.getaddrinfo
+
+    def _stub_getaddrinfo(host, *a, **k):
+        h = host.decode() if isinstance(host, bytes) else str(host or "")
+        if not _stub_local_host(h):
+            _stub_said(h)
+            raise socket.gaierror(socket.EAI_NONAME, "stand-in web: no live lookups in a test copy (%s)" % h)
+        return _gai(host, *a, **k)
+
+    socket.getaddrinfo = _stub_getaddrinfo
 
 try:
     import psutil
@@ -57238,7 +57364,7 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
 /* ---- SETTINGS: the demo's dialog ---------------------------------------------------------------------------------- */
 @keyframes sxFade{from{opacity:0}to{opacity:1}}
 @keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}
-.hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);
+.hz #about-veil{background:rgba(0,0,0,.3);-webkit-backdrop-filter:blur(10px) saturate(1.25);backdrop-filter:blur(10px) saturate(1.25);--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);
   --sl-ui:var(--hz-font-ui);--sans:var(--hz-font-ui);--helv:var(--hz-font-ui);--disp:var(--hz-font-ui);--sl-ink:var(--sx-ink);--sl-ink2:var(--sx-ink2);--sl-ink3:var(--sx-meta);
   --sl-hair:rgba(255,255,255,.08);--sl-hair2:rgba(255,255,255,.14);--sl-line:rgba(255,255,255,.22);--sl-glass:var(--sx-s2);--sl-spec:transparent;
   --text:var(--sx-ink);--dim:var(--sx-ink2);--faint:var(--sx-meta);--line:rgba(255,255,255,.14);--line-soft:rgba(255,255,255,.08)}
@@ -57246,14 +57372,16 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
 @keyframes sxFadeOut{from{opacity:1}to{opacity:0}}
 @keyframes sxSink{from{transform:none}to{transform:translateY(6px)}}
 .hz #about-veil.sx-out{animation:sxFadeOut .18s var(--sx-e) both;pointer-events:none}
-.hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);
-  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+.hz #about-veil #about-card{position:relative;width:min(720px,calc(100vw - 32px));height:auto;min-height:min(420px,calc(100vh - 48px));max-height:min(600px,calc(100vh - 48px));
+  grid-template-columns:208px minmax(0,1fr);grid-template-rows:minmax(0,1fr);
+  background:rgba(26,26,30,.88);border:var(--sx-hl) solid rgba(255,255,255,.09);border-radius:16px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 24px 70px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(40px) saturate(1.5);backdrop-filter:blur(40px) saturate(1.5);
   font:450 13px/1.4 var(--hz-font-ui);color:var(--sx-ink2);animation:sxRise .2s var(--sx-e) both}
 .hz #about-veil.sx-out #about-card{animation:sxSink .18s var(--sx-e) both}
-/* the rail: "Settings" in 11 px caps at 50 %, rows 13 px and 30 high, the machine's facts at its foot */
-.hz #about-veil #set-rail{display:flex;flex-direction:column;gap:0;padding:16px 8px;background:none;border-right:var(--sx-hl) solid rgba(255,255,255,.08);overflow-y:auto}
+/* the rail (night edition): no eyebrow; rows 13 px and 28 high, each with its line icon; a filled selection */
+.hz #about-veil #set-rail{display:flex;flex-direction:column;gap:0;padding:44px 10px 12px;background:rgba(255,255,255,.025);border-right:var(--sx-hl) solid rgba(255,255,255,.06);overflow-y:auto}
 .hz #about-veil #set-brand{display:none}
-.hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}
+.hz #about-veil .sx-slab{display:none}
 html:not(.hz) .sx-slab{display:none}
 .hz #about-veil #set-nav{order:1;display:flex;flex-direction:column;gap:2px}
 .hz #about-veil #set-spec{order:2;margin:auto 0 0;padding:12px 10px 0;border:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08);
@@ -57262,19 +57390,19 @@ html:not(.hz) .sx-slab{display:none}
 .hz #about-veil #set-spec dt{color:var(--sx-meta)}
 .hz #about-veil #set-spec dt::first-letter{text-transform:uppercase}
 .hz #about-veil #set-spec dd{color:var(--sx-ink2)}
-.hz #about-veil .snav{height:30px;flex:none;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);
+.hz #about-veil .snav{display:flex;align-items:center;gap:9px;height:28px;flex:none;padding:0 8px;border:0;border-radius:7px;background:none;color:rgba(255,255,255,.78);font:450 13px/1 var(--hz-font-ui);
   letter-spacing:0;text-align:left;white-space:nowrap;transition:background .15s var(--sx-e),color .15s var(--sx-e)}
-.hz #about-veil .snav:hover{background:var(--sx-s2);color:var(--sx-ink)}
-.hz #about-veil .snav.on{background:var(--sx-s3);color:var(--sx-ink);font-weight:450}
+.hz #about-veil .snav:hover{background:rgba(255,255,255,.05);color:var(--sx-ink)}
+.hz #about-veil .snav.on{background:rgba(255,255,255,.1);color:#fff;font-weight:450}
 .hz #about-veil .snav.on::after{display:none}
-.hz #about-veil .snav-kid{padding-left:28px}
+.hz #about-veil .snav-kid{padding-left:20px}
 .hz #about-veil .snav-chev{width:5px;height:5px;margin:0 3px 0 1px}
 .hz:not(.hz-kb) #about-veil .snav:focus-visible{box-shadow:none}
 .hz.hz-kb #about-veil .snav:focus-visible{outline:1px solid var(--hz-ember);outline-offset:-1px;box-shadow:none}
-/* the pane: its heading 15/600, the body scrolls above a slim foot */
-.hz #about-veil #set-main{display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;min-height:0}
+/* the pane: its heading 20/500, the body scrolls; no foot (the × closes, and Esc) */
+.hz #about-veil #set-main{display:grid;grid-template-rows:minmax(0,1fr);overflow:hidden;min-height:0}
 .hz #about-veil #about-body{overflow-y:auto;min-height:0;padding:24px 24px 32px;scrollbar-width:thin}
-.hz #about-veil #about-foot{display:flex;align-items:center;padding:10px 24px;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil #about-foot{display:none}
 .hz #about-veil #about-site{font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);text-decoration:none}
 .hz #about-veil #about-site:hover{color:var(--sx-ink)}
 .hz #about-veil .spane{animation:none}
@@ -57298,11 +57426,11 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #sugg-note,.hz #about-veil #autoclean-note{margin:-8px 0 0;padding:0 0 12px;
   font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
 /* the controls: segmented on #1a1a1d with the choice on #2a2a2f; squared switches; 28 px buttons; 32 px inputs on #0e0e10 */
-.hz #about-veil .sl-seg{height:30px;padding:2px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s2);box-shadow:none}
+.hz #about-veil .sl-seg{height:28px;padding:2px;border-radius:8px;border:0;background:rgba(0,0,0,.28);box-shadow:none}
 .hz #about-veil .sl-seg button{min-width:0;height:24px;padding:0 10px;border-radius:6px;font:450 12px/1 var(--hz-font-ui);letter-spacing:0;color:rgba(255,255,255,.7);
   transition:color .15s var(--sx-e)}
 .hz #about-veil .sl-seg button:hover,.hz #about-veil .sl-seg button[aria-checked="true"]{color:var(--sx-ink)}
-.hz #about-veil .sl-hi{top:2px;bottom:2px;left:2px;width:calc((100% - 4px) / var(--n,3));border-radius:6px;background:var(--sx-s4);box-shadow:none;transition:transform .18s var(--sx-e)}
+.hz #about-veil .sl-hi{top:2px;bottom:2px;left:2px;width:calc((100% - 4px) / var(--n,3));border-radius:6px;background:rgba(255,255,255,.16);box-shadow:none;transition:transform .18s var(--sx-e)}
 .hz #about-veil .sl-menu{height:28px;padding:0 8px 0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s2);box-shadow:none;
   font:450 12px/1 var(--hz-font-ui);color:var(--sx-ink)}
 .hz #about-veil .sl-menu:hover,.hz #about-veil .sl-menu[aria-expanded="true"]{background:#222226;border-color:rgba(255,255,255,.22)}
@@ -57312,25 +57440,23 @@ html:not(.hz) #sx-build{display:none}
 .hz #sl-pop button[aria-selected="true"]{background:var(--sx-s3);color:var(--sx-ink);font-weight:450}
 .hz #sl-pop button[aria-selected="true"]::after{display:none}
 .hz #sl-pop .sl-pop-h{padding:8px 10px 4px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}
-.hz #about-veil .switch{width:32px;height:18px;border-radius:5px;background:var(--sx-s2);box-shadow:inset 0 0 0 var(--sx-hl) rgba(255,255,255,.22);transition:background .18s var(--sx-e)}
-.hz #about-veil .switch::after{top:3px;left:3px;width:12px;height:12px;border-radius:3px;background:#8d919b;box-shadow:none;transition:transform .18s var(--sx-e),background .18s var(--sx-e)}
-.hz #about-veil .toggle-row.on .switch{background:#d9dde6;box-shadow:inset 0 0 0 var(--sx-hl) #d9dde6}
-.hz #about-veil .toggle-row.on .switch::after{transform:translateX(14px);background:var(--sx-s1)}
-.hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 12px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.2);background:var(--sx-s2);box-shadow:none;
+.hz #about-veil .switch{width:34px;height:20px;border-radius:6px;background:rgba(255,255,255,.14);box-shadow:none;transition:background .18s var(--sx-e)}
+.hz #about-veil .switch::after{top:2px;left:2px;width:16px;height:16px;border-radius:4px;background:#fff;box-shadow:none;transition:transform .18s var(--sx-e),background .18s var(--sx-e)}
+.hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 13px;border-radius:14px;border:0;background:rgba(255,255,255,.1);box-shadow:none;
   color:var(--sx-ink);font:500 12px/1 var(--hz-font-ui);transition:background .15s var(--sx-e)}
-.hz #about-veil .about-btn.slim,.hz #about-veil .bm-btn{height:28px;padding:0 12px;font-size:12px}
-.hz #about-veil .about-btn:hover,.hz #about-veil .bm-btn:hover{background:#222226;border-color:rgba(255,255,255,.26);color:var(--sx-ink)}
-.hz #about-veil .about-btn:active,.hz #about-veil .bm-btn:active{transform:none;background:#26262a}
-.hz #about-veil .about-btn.primary{padding:0 14px;background:var(--sx-s2);border-color:rgba(255,255,255,.2)}
+.hz #about-veil .about-btn.slim,.hz #about-veil .bm-btn{height:28px;padding:0 13px;font-size:12px}
+.hz #about-veil .about-btn:hover,.hz #about-veil .bm-btn:hover{background:rgba(255,255,255,.16);color:var(--sx-ink)}
+.hz #about-veil .about-btn:active,.hz #about-veil .bm-btn:active{transform:none;background:rgba(255,255,255,.2)}
+.hz #about-veil .about-btn.primary{padding:0 14px;background:rgba(255,255,255,.1)}
 .hz #about-veil .about-btn.danger{color:#f0566c;border-color:rgba(232,65,90,.45);background:transparent}
 .hz #about-veil .about-btn.quiet{height:28px;border:0;background:none;color:var(--sx-meta)}
 .hz:not(.hz-kb) #about-veil .about-btn:focus-visible,.hz:not(.hz-kb) #about-veil .bm-btn:focus-visible,.hz:not(.hz-kb) #about-veil .sl-seg button:focus-visible,
 .hz:not(.hz-kb) #about-veil .sl-menu:focus-visible,.hz:not(.hz-kb) #about-veil .toggle-row:focus-visible .switch{box-shadow:none}
 .hz #about-veil input[type=text],.hz #about-veil input[type=password],.hz #about-veil input[type=search],.hz #about-veil input[type=number],.hz #about-veil input:not([type]){
-  height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);color:var(--sx-ink);font:450 13px/1 var(--hz-font-ui)}
-.hz #about-veil textarea{min-height:72px;padding:8px 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);color:var(--sx-ink);font:450 13px/1.45 var(--hz-font-ui);resize:none}
+  height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);color:var(--sx-ink);font:450 13px/1 var(--hz-font-ui);letter-spacing:0}
+.hz #about-veil textarea{min-height:72px;padding:8px 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);letter-spacing:0;color:var(--sx-ink);font:450 13px/1.45 var(--hz-font-ui);resize:none}
 .hz #about-veil input::placeholder,.hz #about-veil textarea::placeholder{color:rgba(255,255,255,.4)}
-.hz #about-veil input:focus,.hz #about-veil textarea:focus{outline:1px solid var(--hz-ember);outline-offset:-1px;border-color:rgba(255,255,255,.14)}
+.hz #about-veil input:focus,.hz #about-veil textarea:focus{outline:0;border-color:rgba(159,192,255,.55);box-shadow:0 0 0 3px rgba(159,192,255,.18)}
 .hz #about-veil .ctlrow>input,.hz #about-veil .ctlrow>.about-btn.slim{height:32px}
 /* the cards (Usage, Cloud, Servers, Manage, the plans): flat, a hairline, radius 10 */
 .hz #about-veil .us-card,.hz #about-veil #cloudkey-box,.hz #about-veil #srv-add,.hz #about-veil .srv-card,.hz #about-veil #manage-box,.hz #about-veil .plan-card,
@@ -57435,12 +57561,10 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil .sx-grey{margin:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
 .hz #about-veil .sx-chips{display:flex;flex-wrap:wrap;gap:6px}
 .hz #about-veil .sx-chip{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;border:var(--sx-hl) solid rgba(255,255,255,.14);font:450 12px/1 var(--hz-font-ui);color:var(--sx-ink2)}
-.hz #about-veil input[type=checkbox].sx-sw{-webkit-appearance:none;appearance:none;display:block;position:relative;flex:none;width:32px;height:18px;margin:0;border:0;border-radius:5px;background:var(--sx-s2);
+.hz #about-veil input[type=checkbox].sx-sw{-webkit-appearance:none;appearance:none;display:block;position:relative;flex:none;width:34px;height:20px;margin:0;border:0;border-radius:6px;background:rgba(255,255,255,.14);
   box-shadow:inset 0 0 0 var(--sx-hl) rgba(255,255,255,.22);cursor:pointer;transition:background .18s var(--sx-e)}
-.hz #about-veil input[type=checkbox].sx-sw::after{content:"";display:block;position:absolute;top:3px;left:3px;width:12px;height:12px;border:0;border-radius:3px;background:#8d919b;opacity:1;transform:none;
+.hz #about-veil input[type=checkbox].sx-sw::after{content:"";display:block;position:absolute;top:2px;left:2px;width:16px;height:16px;border:0;border-radius:4px;background:#fff;opacity:1;transform:none;
   transition:transform .18s var(--sx-e),background .18s var(--sx-e)}
-.hz #about-veil input[type=checkbox].sx-sw:checked{background:#d9dde6;box-shadow:inset 0 0 0 var(--sx-hl) #d9dde6}
-.hz #about-veil input[type=checkbox].sx-sw:checked::after{transform:translateX(14px);background:var(--sx-s1)}
 .hz:not(.hz-kb) #about-veil .sx-sw:focus-visible{outline:0}
 .hz.hz-kb #about-veil .sx-sw:focus-visible{outline:1px solid var(--hz-ember);outline-offset:2px}
 .hz #about-veil .sx-srv .srv-msg:empty{display:none}
@@ -57458,12 +57582,12 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil .sx-rm:hover{color:#ff7b8c}
 .hz #about-veil #srv-add{display:none}
 .hz #about-veil #srv-add.sx-open{display:block}
-.hz #about-veil #sx-srv-pair{align-self:flex-start;margin:4px 0 0;background:none}
+.hz #about-veil #sx-srv-pair{align-self:flex-start;margin:4px 0 0}
 .hz #about-veil #sx-srv-pair[hidden]{display:none}
 html:not(.hz) #sx-srv-pair{display:none}
 @media (prefers-reduced-motion:reduce){.hz #about-veil .sx-sw,.hz #about-veil .sx-sw::after{transition:none}}
 .hz #about-veil #snav-models-kids{display:flex;flex-direction:column;gap:2px}
-.hz #about-veil #snav-models{padding-left:10px}
+.hz #about-veil #snav-models{padding-left:8px}
 /* a phone: the dialog is the screen; the rail runs along the top */
 @media (max-width:640px){
   .hz #about-veil{align-items:stretch;padding:0}
@@ -57670,6 +57794,138 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz .imp-sw button[aria-checked="true"]{background:#d9dde6!important}
 .hz #imp-veil button:focus-visible,.hz #imp-veil [tabindex]:focus-visible,.hz #imp-veil input:focus-visible,.hz #imp-ask button:focus-visible{box-shadow:0 0 0 1px var(--hz-ember)}
 .hz:not(.hz-kb) #imp-veil button:focus-visible,.hz:not(.hz-kb) #imp-veil [tabindex]:focus-visible{box-shadow:none}
+/* TIGHT (6b625, per Patrick: "very concise, very tight"): every row one line and 40 high, label left and control right;
+   24 px pane padding; no helper sentences; no boxed sub-cards but the server cards; What's new behind one link */
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row,.hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}
+.hz #about-veil label.sx-line{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:16px;margin:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08);cursor:pointer}
+.hz #about-veil label.sx-line>span{font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sx-rowt b,.hz #about-veil .toggle-row>span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hz #about-veil .sx-ctls{display:flex;align-items:center;gap:16px;flex:none}
+.hz #about-veil .sx-link{height:28px;padding:0;border:0;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);cursor:pointer}
+.hz #about-veil .sx-link:hover{color:var(--sx-ink)}
+.hz #about-veil .sx-link:focus-visible{outline:1px solid rgba(255,255,255,.5);outline-offset:2px;border-radius:4px}
+.hz #about-veil #sx-ver-row #up-reldate:not(.sx-news){display:none}
+.hz #about-veil #sx-p-general:not(.sx-notes)>#up-notes{display:none}
+.hz #about-veil #sx-p-general:has(>#up-notes[hidden]) #sx-whatsnew{display:none}
+.hz #about-veil #sx-p-general>#up-notes{margin:0 0 8px;padding:4px 0 12px;max-height:240px;border:0;border-radius:0;background:none}
+.hz #about-veil .sx-aboutline{margin:0;font:450 13px/20px var(--hz-font-ui);color:var(--sx-ink2);font-variant-numeric:tabular-nums}
+.hz #about-veil #p-about>.sx-site{margin:8px 0 0}
+.hz #about-veil #about-body{padding:20px 24px 24px}
+.hz #about-veil .set-h{margin:0 0 16px;font:500 20px/28px var(--hz-font-ui);letter-spacing:-.01em;color:#fff}
+.hz #about-veil .us-card,.hz #about-veil #cloudkey-box,.hz #about-veil #manage-box,.hz #about-veil .plan-card,.hz #about-veil .mu,.hz #about-veil #acct-card,.hz #about-veil .set-card{border:0;border-radius:0;background:none;padding-left:0;padding-right:0}
+.hz #about-veil .set-card.on{background:none}
+.hz #about-veil .sx-cline{margin:-4px 0 12px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-cline .sx-link{height:auto;font-size:12px;line-height:16px}
+.hz #about-veil #p-cloud:not(.sx-more)>.sx-cfull{display:none}
+.hz #about-veil #p-cloud.sx-more>.sx-cfull{display:block;margin:-8px 0 12px}
+.hz #about-veil #p-persona>#p-know.sx-know{display:flex;flex-direction:column;margin:16px 0 0}
+.hz #about-veil #p-know .kn-forget{color:var(--sx-meta);font:450 12px/16px var(--hz-font-ui)}
+.hz #about-veil #p-know .kn-forget:hover{color:var(--sx-ink)}
+.hz #about-veil #p-know .kn-folder,.hz #about-veil #p-know .kn-empty{min-height:40px;margin:0;display:flex;align-items:center;border-top:var(--sx-hl) solid rgba(255,255,255,.08);font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #about-veil #p-know .kn-add{margin:8px 0 0}
+.hz #about-veil .sx-advc .kn-line,.hz #about-veil .sx-advc .kn-engine{margin:8px 0 0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-advc .kn-nums{display:flex;gap:12px;margin:4px 0 8px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-advc .kn-nums b{font:500 12px/16px var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #about-veil .sx-advc #len-row{margin:0;padding:8px 0;border-top:0}
+/* the roster: one line a model (the name, what it is for in grey, its size, its action) */
+.hz #about-veil .ros-row{grid-template-columns:14px max-content minmax(0,1fr) auto auto;grid-template-rows:auto;row-gap:0;min-height:40px;padding:4px 0}
+.hz #about-veil .ros-row .rs{grid-row:1}
+.hz #about-veil .ros-row .rn{grid-column:2;grid-row:1}
+.hz #about-veil .ros-row .rd{grid-column:3;grid-row:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz #about-veil .ros-row .rg{grid-column:4;grid-row:1}
+.hz #about-veil .ros-row .rg:not(:empty)::after{content:none}
+.hz #about-veil .ros-row .rrm,.hz #about-veil .ros-row .rin,.hz #about-veil .ros-row .rgo{grid-column:5;grid-row:1}
+/* NIGHT EDITION (6b625, Pat's pick A, 2026-11-11: "Apple System Settings, night edition"): a translucent graphite sheet
+   on a softened sky, line icons in a compact rail, grouped inset lists (radius 12, hairlines inset 14 from the left),
+   small grey group labels, ice switches with squared knobs, pill buttons, a quiet × and no footer, a 150 ms pane fade,
+   the page behind stepping back while it is open */
+.hz #about-veil .snav .sx-ico{width:16px;height:16px;flex:none;color:rgba(255,255,255,.6)}
+.hz #about-veil .snav.on .sx-ico{color:#cfe0ff}
+.hz #about-veil #sx-x{position:absolute;top:12px;right:12px;z-index:2;display:flex;align-items:center;justify-content:center;width:28px;height:28px;padding:5px;border:0;border-radius:7px;
+  background:none;color:rgba(255,255,255,.55);cursor:pointer;transition:background .15s var(--sx-e),color .15s var(--sx-e)}
+.hz #about-veil #sx-x svg{width:18px;height:18px}
+.hz #about-veil #sx-x:hover{background:rgba(255,255,255,.08);color:#fff}
+.hz.hz-kb #about-veil #sx-x:focus-visible{outline:1px solid rgba(159,192,255,.7);outline-offset:0}
+.hz #about-veil .set-h+.sx-sub2{margin:-14px 0 18px}
+.hz #about-veil .sx-sub2,.hz #about-veil #p-servers .srv-about{font:450 13px/18px var(--hz-font-ui);color:rgba(255,255,255,.5)}
+.hz #about-veil #p-servers .srv-about{margin:-14px 0 18px}
+.hz #about-veil .sx-glab{margin:16px 0 6px 14px;font:500 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.5)}
+.hz #about-veil .sx-sub2+.sx-glab{margin-top:0}
+/* the group: rows 40 high, 14 in from each side, a hairline between them inset from the left */
+.hz #about-veil .sx-group{display:flex;flex-direction:column;margin:0 0 12px;padding:0;border-radius:12px;border:var(--sx-hl) solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);overflow:hidden}
+.hz #about-veil .sx-group[hidden]{display:none}
+.hz #about-veil .sx-group>*{margin:0;padding-left:14px;padding-right:14px;border:0}
+.hz #about-veil .sx-group>*+*{background-image:linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07));background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}
+.hz #about-veil .sx-group>.toggle-row:hover,.hz #about-veil .sx-group>label.sx-line:hover{background-color:rgba(255,255,255,.025)}
+.hz #about-veil .sx-group>#sx-ver-row,.hz #about-veil .sx-group>#beta-row,.hz #about-veil .sx-group>#look-row,.hz #about-veil .sx-group>#fx-level-row,.hz #about-veil .sx-group>.toggle-row{padding-left:14px;padding-right:14px;border-top:0}
+.hz #about-veil #sx-ver-row #up-reldate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hz #about-veil #sx-p-general>#up-notes{margin:-4px 0 12px;padding:12px 14px;border-radius:12px;background:rgba(0,0,0,.2)}
+.hz #about-veil .sx-link{color:#a9c6fb}
+.hz #about-veil .sx-link:hover{color:#d3e2ff}
+/* About: the line and the site, one group */
+.hz #about-veil #sx-g-about>*{display:flex;align-items:center;min-height:40px;margin:0}
+.hz #about-veil #sx-g-about>.sx-site{font:450 13px/18px var(--hz-font-ui);color:#a9c6fb;text-decoration:none}
+/* You: the fields stacked in their rows; Save right under them */
+.hz #about-veil .sx-field{display:flex;flex-direction:column;gap:6px;padding-top:12px;padding-bottom:12px}
+.hz #about-veil .sx-field .sx-lab{margin:0}
+.hz #about-veil .sx-field input,.hz #about-veil .sx-field textarea{margin:0;width:100%}
+.hz #about-veil #p-persona #user-name{margin-bottom:0}
+.hz #about-veil #p-persona>#persona-save{align-self:flex-end;margin:-4px 0 16px}
+.hz #about-veil #sx-g-know>#know-folders>*{background:none;border-top:0;padding:0}
+.hz #about-veil #sx-g-know>.ctlrow{padding-top:8px;padding-bottom:8px}
+.hz #about-veil #p-persona>#p-know.sx-know{margin:0}
+/* Advanced: its contents one group */
+.hz #about-veil .sx-advc.sx-group{margin:0 0 12px}
+.hz #about-veil .sx-advc.sx-group>*{padding-top:8px;padding-bottom:8px}
+.hz #about-veil .sx-adv{border-top:0;margin:4px 0 0}
+.hz #about-veil .sx-advb{height:36px;padding:0 0 0 14px;color:rgba(255,255,255,.55)}
+/* switches: ice when on, the knob a rounded square */
+.hz #about-veil .toggle-row.on .switch,.hz #about-veil input[type=checkbox].sx-sw:checked{background:#8fb3f5;box-shadow:none}
+.hz #about-veil .toggle-row.on .switch::after,.hz #about-veil input[type=checkbox].sx-sw:checked::after{transform:translateX(14px);background:#fff}
+/* servers: each card a group; the state a word with its glyph (a moon asleep, a small ice square awake) */
+.hz #about-veil .sx-srv{margin:0 0 12px;padding:0;border-radius:12px;border:var(--sx-hl) solid rgba(255,255,255,.07);background:rgba(255,255,255,.045)}
+.hz #about-veil .sx-srv-top{min-height:56px;padding:0 14px}
+.hz #about-veil .sx-srv-id b{font:500 14px/19px var(--hz-font-ui);color:#fff}
+.hz #about-veil .sx-srv-st{display:inline-flex;align-items:center;gap:6px;font:500 12.5px/16px var(--hz-font-ui);color:rgba(255,255,255,.6)}
+.hz #about-veil .sx-srv-st::before{content:"";width:7px;height:7px;border-radius:2px;background:currentColor}
+.hz #about-veil .sx-srv.awake .sx-srv-st{color:#b9d1ff}
+.hz #about-veil .sx-srv.asleep .sx-srv-st::before{width:12px;height:12px;border-radius:0;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z'/%3E%3C/svg%3E") center/contain no-repeat}
+.hz #about-veil .sx-srv>.sx-srow,.hz #about-veil .sx-srv>.sx-advb,.hz #about-veil .sx-srv>.srv-msg,.hz #about-veil .sx-srv>.sx-srv-adv{margin:0;padding-left:14px;padding-right:14px;border-top:0;
+  background-image:linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07));background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}
+.hz #about-veil .sx-srv>.srv-msg:empty{display:none}
+.hz #about-veil .sx-srv>.sx-advb{width:100%;height:40px}
+.hz #about-veil .sx-srv>.sx-srv-adv{padding-bottom:12px;background-image:none}
+.hz #about-veil .sx-chip{height:22px;padding:0 8px;border-radius:6px;border:var(--sx-hl) solid rgba(159,192,255,.28);background:rgba(159,192,255,.08);color:#d3e2ff;font:500 11.5px/1 var(--hz-font-ui)}
+.hz #about-veil #srv-add.sx-open{padding:12px 14px;border-radius:12px;border:var(--sx-hl) solid rgba(255,255,255,.07);background:rgba(255,255,255,.045)}
+/* Local: the roster's rows one group under each grey heading */
+.hz #about-veil .ros-gh{margin:16px 0 6px 14px;font:500 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.5)}
+.hz #about-veil .ros-row{padding:4px 14px;border:0;border-left:var(--sx-hl) solid rgba(255,255,255,.07);border-right:var(--sx-hl) solid rgba(255,255,255,.07);background-color:rgba(255,255,255,.045)}
+.hz #about-veil .ros-row+.ros-row{background-image:linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07));background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}
+.hz #about-veil .ros-gh+.ros-row,.hz #about-veil #roster>.ros-row:first-child{border-top:var(--sx-hl) solid rgba(255,255,255,.07);border-top-left-radius:12px;border-top-right-radius:12px}
+.hz #about-veil .ros-row:has(+.ros-gh),.hz #about-veil #roster>.ros-row:last-child{border-bottom:var(--sx-hl) solid rgba(255,255,255,.07);border-bottom-left-radius:12px;border-bottom-right-radius:12px}
+/* Cloud and Usage: their boxes are groups */
+.hz #about-veil #cloudkey-box,.hz #about-veil .us-grid,.hz #about-veil .us-card.us-chart,.hz #about-veil #manage-box{padding:12px 14px;border-radius:12px;border:var(--sx-hl) solid rgba(255,255,255,.07);background:rgba(255,255,255,.045)}
+.hz #about-veil .us-grid{margin:0 0 12px}
+.hz #about-veil #p-cloud .sx-cline{margin:-14px 0 18px;font-size:13px;line-height:18px;color:rgba(255,255,255,.5)}
+/* pills; inputs 32 high with normal tracking and a soft ice ring */
+.hz #about-veil input::placeholder,.hz #about-veil textarea::placeholder,.hz #about-veil .srv-code{letter-spacing:0}
+.hz #about-veil .about-btn.danger{border:var(--sx-hl) solid rgba(232,65,90,.45)}
+/* the pane fades in; the page behind steps back while Settings is open */
+.hz #about-veil .spane.on{animation:sxPaneIn .15s var(--sx-e) both}
+@keyframes sxPaneIn{from{opacity:0}to{opacity:1}}
+.hz.sx-setopen #main>:not(#hz-sky){opacity:0;transition:opacity .18s var(--sx-e)}
+@media (prefers-reduced-motion:reduce){.hz #about-veil .spane.on{animation:none}.hz.sx-setopen #main>:not(#hz-sky){transition:none}}
+.hz #about-veil #about-card .sx-advc.sx-group>*{padding-left:14px;padding-right:14px}
+.hz #about-veil #sx-g-about>.sx-site{justify-content:flex-start;align-self:stretch;margin:0;text-align:left}
+.hz #about-veil #about-card .sx-advc.sx-group>button{align-self:flex-start;margin:8px 14px;padding-left:13px;padding-right:13px}
+.hz #about-veil #p-servers .srv-none{display:flex;align-items:center;min-height:44px;margin:0 0 12px;padding:0 14px;border-radius:12px;border:var(--sx-hl) solid rgba(255,255,255,.07);background:rgba(255,255,255,.045);color:rgba(255,255,255,.5)}
+.hz #about-veil #p-usage>.us-head:first-child{padding-right:36px}
+.hz #about-veil #p-usage>.us-head:first-child .us-ico{display:none}
+.hz #about-veil #p-usage>.us-head:first-child .us-title{font:500 20px/28px var(--hz-font-ui);letter-spacing:-.01em;color:#fff}
+.hz #about-veil #ck-models{font:450 12px/18px var(--hz-font-ui);color:rgba(255,255,255,.6)}
+@media (max-width:640px){.hz #about-veil #set-rail{padding:12px 52px 12px 12px;background:none}.hz #about-veil #sx-x{top:12px;right:10px}}
 /* ==== THE POLISH (6b625): end ==== */
 /* ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have enough VFX going on
    right now. But also, it's very important that the chat page and also obviously the code page and all that looks really
@@ -60398,7 +60654,7 @@ function modeShow(which){
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
   if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes, and the home's rows (beta 4)
-  (typeof sxLaneSoon==="function"&&sxLaneSoon());                          // the lane's placeholder, home line, host chip, funnel form (6b625)
+  if(typeof sxLaneSoon==="function")sxLaneSoon();                          // the lane's placeholder, home line, host chip, funnel form (6b625)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -60483,7 +60739,7 @@ function setAgent(name,guess){
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
   if(typeof remoteRefresh==="function")remoteRefresh();
-  (typeof sxLaneSoon==="function"&&sxLaneSoon());                          // 6b625
+  if(typeof sxLaneSoon==="function")sxLaneSoon();                          // 6b625
 }
 
 /* -------------------------------------------------- task library (6b250) */
@@ -60621,7 +60877,7 @@ async function remoteRefresh(){
         :"Key-only SSH. On a new server, install your key first: "+keyCopyCmd("user","host");
     }
   }catch(e){}
-  (typeof sxLaneSoon==="function"&&sxLaneSoon());                        // the host chip says the saved host (6b625)
+  if(typeof sxLaneSoon==="function")sxLaneSoon();                        // the host chip says the saved host (6b625)
 }
 // the key-install command for this computer (6b317): Windows has no
 // ssh-copy-id, so a PC gets the PowerShell line that does the same
@@ -65328,7 +65584,7 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
   if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
-  (typeof sxLaneSoon==="function"&&sxLaneSoon());                               // the lane's home (6b625)
+  if(typeof sxLaneSoon==="function")sxLaneSoon();                               // the lane's home (6b625)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -66150,7 +66406,7 @@ function fnHzReady(box,d){
   if(!box.classList.contains("hz-stage"))return;
   box.classList.remove("wait");
   const p=box.querySelector(".fpath");if(p)p.textContent="Stage "+d.stage+" of "+d.total;
-  sxFnProg(box,(d.stage-1)/Math.max(1,d.total));(typeof sxLaneSoon==="function"&&sxLaneSoon());   // stage N of M on the trail; "Or type your own answer" (6b625)
+  if(typeof sxFnProg==="function")sxFnProg(box,(d.stage-1)/Math.max(1,d.total));if(typeof sxLaneSoon==="function")sxLaneSoon();   // stage N of M on the trail; "Or type your own answer" (6b625)
 }
 // a pick (a card, or words typed in the box): the stage is done, its choice flies into the trail
 function fnHzPick(box,d,label){
@@ -66173,7 +66429,7 @@ function fnHzPick(box,d,label){
 function fnHzDone(box,d){
   if(!box.classList.contains("hz-stage"))return false;
   const c=box.closest(".hz-fn"),w=c&&c.querySelector(":scope>.who");if(w)w.textContent="Funnel · done";
-  sxFnProg(box,1);(typeof sxLaneSoon==="function"&&sxLaneSoon());   // 6b625
+  if(typeof sxFnProg==="function")sxFnProg(box,1);if(typeof sxLaneSoon==="function")sxLaneSoon();   // 6b625
   box.className="hz-stage verdict";box.setAttribute("role","listitem");
   box.querySelector(".body").innerHTML='<span class="fn-k">The pick</span>'+renderMD(d.summary||"");
   return true;
@@ -75582,6 +75838,7 @@ function sxSetWire(){
   let want=v.hasAttribute("hidden"),t=0;
   Object.defineProperty(v,"hidden",{configurable:true,get(){return want;},set(x){
     x=!!x;if(x===want)return;want=x;clearTimeout(t);v.classList.remove("sx-out");
+    document.documentElement.classList.toggle("sx-setopen",!x&&sxHz());   // the page behind steps back (6b625, night edition)
     if(!x){sxSetPrev=document.activeElement;D.set.call(v,false);
       if(sxHz())setTimeout(()=>{if(want)return;const r=v.querySelector(".snav.on:not(.snav-grp)")||v.querySelector(".snav");if(r&&!v.contains(document.activeElement))r.focus({preventScroll:true});},0);
       return;}
@@ -75756,64 +76013,133 @@ function sxLabel(forId,text){const l=document.createElement("label");l.className
 var sxSimple=false;
 function sxSetSimplify(){
   if(sxSimple||!sxHz())return;const v=$("#about-veil");if(!v)return;sxSimple=true;
-  const g=s=>v.querySelector(s);
-  // the rail: Account is part of You
-  const ra=g('.snav[data-pane="p-account"]');if(ra)ra.classList.add("sx-gone");
+  const g=s=>v.querySelector(s),gone=n=>{if(n)n.classList.add("sx-gone");};
+  // TIGHT (6b625, per Patrick: "very concise, very tight"): five panes, General · Appearance · Models (Local, Cloud,
+  // Servers, Usage) · You · About; every row one line, label left and control right; no helper sentences
+  gone(g('.snav[data-pane="p-account"]'));gone(g('.snav[data-pane="p-know"]'));
   const rp=g('.snav[data-pane="p-persona"]');if(rp)rp.textContent="You";
-  // You: two optional fields with their questions, the length; the account and the rare things under Advanced
-  const pp=g("#p-persona"),pa=g("#p-account");
+  // You: what to call you and anything to keep in mind, then your chats and folders (Your stuff, nested so its own
+  // code and styles still find it); the length, the cloud switch, the index, the account and erasing under Advanced
+  const pp=g("#p-persona"),pa=g("#p-account"),pk=g("#p-know");
   if(pp){const h=pp.querySelector(".set-h");if(h)h.textContent="You";
-    pp.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+    pp.querySelectorAll(":scope>.tdesc").forEach(gone);
     const nm=g("#user-name"),ps=g("#persona");
     if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should we call you?"));}
     if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
-    sxAdv(pp,[g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
-  if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(x=>x.classList.add("sx-gone"));
-  // About was four things at once: it splits into General, Appearance, Voice and About (Pat, 2026-11-11)
+    const sh=g("#know-share"),rx=g("#know-reindex"),line=n=>{const l=n&&n.closest("label");if(l){n.classList.add("sx-sw");l.classList.add("sx-line");}return l;};
+    if(pk){pk.classList.remove("spane");pk.classList.add("sx-know");pk.querySelectorAll(":scope>.set-h,:scope>.tdesc,:scope>.kn-hint").forEach(gone);
+      const kl=line(g("#know-chats")),sp=kl&&kl.querySelector("span");if(sp)sp.textContent="Use my chats in answers";
+      const sv=g("#persona-save");(sv||ps||pp.lastElementChild).after(pk);}
+    const shl=line(sh);
+    sxAdv(pp,[g("#len-row"),shl,g("#know-line"),g("#know-nums"),rx&&rx.parentNode,g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),
+      g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
+  if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(gone);
   sxSetPanes(v,g);
-  // Your stuff: the privacy line stays, the long paragraph goes; the cloud switch and re-reading under Advanced
-  const pk=g("#p-know");
-  if(pk){const td=pk.querySelector(":scope>.tdesc"),pv=g("#know-privacy");if(td&&pv){td.before(pv);pv.classList.add("sx-priv");td.classList.add("sx-gone");}
-    const hints=[...pk.querySelectorAll(":scope>.kn-hint")],sh=g("#know-share"),rx=g("#know-reindex");
-    sxAdv(pk,[sh&&sh.closest("label"),hints[1],hints[0],rx&&rx.parentNode]);}
-  // Servers: "Servers", one short line for what leaves (the cloud compositor), the guide under each card's Advanced
+  // Servers: Patrick's approved copy (one line; the guide under each card's Advanced)
   const ps=g("#p-servers");
-  if(ps){const h=ps.querySelector(".set-h");if(h)h.textContent="Servers";ps.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+  if(ps){const h=ps.querySelector(".set-h");if(h)h.textContent="Servers";ps.querySelectorAll(":scope>.tdesc").forEach(gone);
     const ab2=ps.querySelector(":scope>.srv-about");if(ab2)ab2.textContent="Drafts leave your machines only when a cloud model combines them.";}
-  // Local models: the line that repeats the heading goes
-  const pm=g("#p-models");if(pm)pm.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+  // Local: no paragraph under the heading. Cloud: six words on the face, the whole of what leaves one click away
+  const pm=g("#p-models");if(pm)pm.querySelectorAll(":scope>.tdesc").forEach(gone);
+  const pc=g("#p-cloud"),td=pc&&pc.querySelector(":scope>.tdesc");
+  if(td){const p=document.createElement("p");p.className="sx-cline";p.textContent="While on, prompts leave your machines. ";
+    const b=document.createElement("button");b.type="button";b.className="sx-link";b.id="sx-cloud-more";b.textContent="Details";b.setAttribute("aria-expanded","false");
+    b.addEventListener("click",()=>{const on=!pc.classList.contains("sx-more");pc.classList.toggle("sx-more",on);b.setAttribute("aria-expanded",on?"true":"false");});
+    p.appendChild(b);td.before(p);td.classList.add("sx-cfull");}
+  sxNight(v,g);
 }
-// ONE DESIGN LANGUAGE (6b625, per Patrick: "something about a lot of this doesn't feel cohesive"): About's mix becomes
-// four clear panes. General: the version with its date and Check now on one row, the update channel, automatic checks,
-// What's new. Appearance: Look and Effects. Voice: keeping the microphone ready. About: a quiet two-column list
-// (Version with its build, Chip, Memory, Models) and the site link. The page's own nodes move (ids and handlers kept).
+// FIVE PANES (6b625, per Patrick): General is the updates and the microphone (the version with What's new and Check
+// now on one row, the channel, automatic checks, keeping the microphone ready); Appearance is Look and Effects; About is
+// one quiet line and the site. The page's own nodes move (ids and handlers kept).
 function sxPane(id,title){const s=document.createElement("section");s.className="spane";s.id=id;s.setAttribute("aria-label",title);
   const h=document.createElement("div");h.className="set-h";h.textContent=title;s.appendChild(h);return s;}
 function sxRow(label,sub,ctl){const r=document.createElement("div");r.className="sx-row";const t=document.createElement("div");t.className="sx-rowt";
   const b=document.createElement("b");b.textContent=label;t.appendChild(b);if(sub)t.appendChild(sub);r.appendChild(t);if(ctl)r.appendChild(ctl);return r;}
+function sxAboutLine(v){
+  const t=id=>((v.querySelector(id)||{}).textContent||"").trim(),l=v.querySelector("#sx-aboutline");if(!l)return;
+  const mem=t("#spec-mem"),bits=["ConcordeAI "+t("#about-ver"),t("#spec-chip"),mem&&mem!=="—"?mem:""].filter(Boolean);
+  const s=bits.join(" · ");if(l.textContent!==s)l.textContent=s;
+}
 function sxSetPanes(v,g){
   const body=g("#about-body"),ab=g("#p-about"),nav=g("#set-nav");if(!body||!ab||!nav||g("#sx-p-general"))return;
-  const gen=sxPane("sx-p-general","General"),look=sxPane("sx-p-look","Appearance"),voice=sxPane("sx-p-voice","Voice");
+  const gen=sxPane("sx-p-general","General"),look=sxPane("sx-p-look","Appearance");
   const ver=((g("#up-version")||{}).textContent||"").trim();
-  const vr=sxRow(ver?"Version "+ver:"Version",g("#up-reldate"),g("#about-check"));vr.id="sx-ver-row";
-  [vr,g("#beta-row"),g("#autochk-toggle"),g("#up-notes")].forEach(n=>{if(n)gen.appendChild(n);});
-  const fl=g("#fx-level-note");if(fl)fl.textContent="How much the sky moves.";
-  [g("#look-row"),g("#fx-level-row"),fl].forEach(n=>{if(n)look.appendChild(n);});
-  [g("#dictlang-row"),g("#micwarm-toggle"),g("#micwarm-note")].forEach(n=>{if(n)voice.appendChild(n);});   // the dictation language with the microphone (6b641)
-  // About: the list, then the site
+  const ctl=document.createElement("div");ctl.className="sx-ctls";
+  const wn=document.createElement("button");wn.type="button";wn.id="sx-whatsnew";wn.className="sx-link";wn.textContent="What’s new";wn.setAttribute("aria-expanded","false");
+  wn.addEventListener("click",()=>{const on=!gen.classList.contains("sx-notes");gen.classList.toggle("sx-notes",on);wn.setAttribute("aria-expanded",on?"true":"false");});
+  ctl.appendChild(wn);const ck=g("#about-check");if(ck)ctl.appendChild(ck);
+  const rd=g("#up-reldate");
+  const vr=sxRow(ver?"Version "+ver:"Version",rd,ctl);vr.id="sx-ver-row";
+  // the date line shows only when it has news (an update is ready, another release is out, or checks are off)
+  if(rd&&window.MutationObserver){const f=()=>rd.classList.toggle("sx-news",/available|checks are off| released on/.test(rd.textContent));f();new MutationObserver(f).observe(rd,{childList:true,characterData:true,subtree:true});}
+  [vr,g("#up-notes"),g("#beta-row"),g("#autochk-toggle"),g("#micwarm-toggle"),g("#dictlang-row")].forEach(n=>{if(n)gen.appendChild(n);});
+  [g("#micwarm-note"),g("#fx-level-note")].forEach(n=>{if(n)n.classList.add("sx-gone");});
+  [g("#look-row"),g("#fx-level-row")].forEach(n=>{if(n)look.appendChild(n);});
+  // About: one quiet line, then the site
   const up=g("#up-version"),bd=g("#sx-build"),sp=g("#set-spec"),site=g("#about-site");
-  if(up)up.classList.add("sx-gone");if(bd)bd.classList.add("sx-gone");
-  const acc=g("#spec-accel");if(acc&&acc.parentNode)acc.parentNode.classList.add("sx-gone");
+  [up,bd].forEach(n=>{if(n)n.classList.add("sx-gone");});
   const av=g("#about-ver"),bn=bd&&(/\d+/.exec(bd.textContent)||[])[0];if(av&&bn&&av.textContent.indexOf("build")<0)av.textContent=av.textContent.trim()+" (build "+bn+")";
-  const h=ab.querySelector(".set-h");if(sp)(h?h.after(sp):ab.prepend(sp));if(site){site.classList.add("sx-site");ab.appendChild(site);}
-  body.insertBefore(gen,ab);body.insertBefore(look,ab);body.insertBefore(voice,ab);
-  // the rail: General, Appearance, Voice first; About last
+  const line=document.createElement("p");line.id="sx-aboutline";line.className="sx-aboutline";
+  const h=ab.querySelector(".set-h");(h?h.after(line):ab.prepend(line));if(sp){sp.classList.add("sx-gone");ab.appendChild(sp);}
+  if(site){site.classList.add("sx-site");ab.appendChild(site);}
+  sxAboutLine(v);if(sp&&window.MutationObserver)new MutationObserver(()=>sxAboutLine(v)).observe(sp,{childList:true,characterData:true,subtree:true});
+  body.insertBefore(gen,ab);body.insertBefore(look,ab);
+  // the rail: General, Appearance, then Models (Local, Cloud, Servers, Usage), You, About last
   const mk=(id,t)=>{const b=document.createElement("button");b.type="button";b.className="snav";b.dataset.pane=id;b.textContent=t;b.addEventListener("click",()=>settingsPane(id));return b;};
-  const first=nav.firstElementChild;[mk("sx-p-general","General"),mk("sx-p-look","Appearance"),mk("sx-p-voice","Voice")].forEach(b=>nav.insertBefore(b,first));
+  const first=nav.firstElementChild;[mk("sx-p-general","General"),mk("sx-p-look","Appearance")].forEach(b=>nav.insertBefore(b,first));
+  const mg=g("#snav-models"),mk2=g("#snav-models-kids"),ru=nav.querySelector('.snav[data-pane="p-usage"]');
+  if(mg&&mk2){mk2.hidden=false;if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}
+    nav.insertBefore(mg,nav.querySelector('.snav[data-pane="p-persona"]')||null);nav.insertBefore(mk2,mg.nextSibling);
+    mg.addEventListener("click",e=>{e.stopImmediatePropagation();settingsPane("p-models");},true);}
+  const rp=nav.querySelector('.snav[data-pane="p-persona"]');if(rp&&mk2)nav.insertBefore(rp,mk2.nextSibling);
   const ra=nav.querySelector('.snav[data-pane="p-about"]');if(ra)nav.appendChild(ra);
-  // Models: its three panes always listed under it, indented; the row itself opens the first (no lone chevron)
-  const mg=g("#snav-models"),mk2=g("#snav-models-kids");
-  if(mg&&mk2){mk2.hidden=false;mg.addEventListener("click",e=>{e.stopImmediatePropagation();settingsPane("p-models");},true);}
+}
+// ---- NIGHT EDITION (6b625, Pat's pick A of two directions, 2026-11-11: "Apple System Settings, night edition"): a line
+// icon by each section in the rail, a quiet × in place of the Close footer, and the rows in grouped inset lists. The
+// page's own nodes move into the groups (ids and handlers kept); Servers, Local, Cloud and Usage are grouped by css.
+var SX_RAIL_ICO={
+  "sx-p-general":'<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M8 9.5h8M8 14.5h5"/>',
+  "sx-p-look":'<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 4v16"/><path d="M12 4h4.5A3.5 3.5 0 0 1 20 7.5v9a3.5 3.5 0 0 1-3.5 3.5H12z" fill="currentColor" stroke="none" opacity=".45"/>',
+  "models":'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M10 3.5V7M14 3.5V7M10 17v3.5M14 17v3.5M3.5 10H7M3.5 14H7M17 10h3.5M17 14h3.5"/>',
+  "p-models":'<rect x="5" y="5.5" width="14" height="9.5" rx="1.5"/><path d="M3 18.5h18"/>',
+  "p-cloud":'<path d="M7.5 18h9a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.2 11.2 3.4 3.4 0 0 0 7.5 18z"/>',
+  "p-servers":'<rect x="4" y="4.5" width="16" height="6.5" rx="1.5"/><rect x="4" y="13" width="16" height="6.5" rx="1.5"/><path d="M7.5 7.75h2M7.5 16.25h2"/>',
+  "p-usage":'<path d="M5 19.5V14M10 19.5V9M15 19.5V12M20 19.5V5"/>',
+  "p-persona":'<path d="M12 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM5 20c1.3-3.4 4-5 7-5s5.7 1.6 7 5"/>',
+  "p-about":'<rect x="4" y="4" width="16" height="16" rx="3.5"/><path d="M12 11v5.5M12 7.8v.4"/>'
+};
+function sxSvg(d,cls){return '<svg class="'+cls+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>';}
+// a group: the nodes in one rounded inset list, where the first of them stood; an optional small grey label above it
+function sxGroup(nodes,label,id){
+  nodes=nodes.filter(Boolean);if(!nodes.length)return null;
+  const g=document.createElement("div");g.className="sx-group";if(id)g.id=id;nodes[0].before(g);
+  if(label){const l=document.createElement("p");l.className="sx-glab";l.textContent=label;g.before(l);}
+  nodes.forEach(n=>g.appendChild(n));return g;
+}
+function sxField(input){const l=input&&input.previousElementSibling;if(!input)return null;const f=document.createElement("div");f.className="sx-field";
+  input.before(f);if(l&&l.classList.contains("sx-lab"))f.appendChild(l);f.appendChild(input);return f;}
+function sxNight(v,g){
+  if(!v||v.querySelector("#sx-x"))return;
+  v.querySelectorAll("#set-nav .snav").forEach(b=>{const k=b.id==="snav-models"?"models":b.dataset.pane;
+    if(SX_RAIL_ICO[k]&&!b.querySelector(".sx-ico"))b.insertAdjacentHTML("afterbegin",sxSvg(SX_RAIL_ICO[k],"sx-ico"));});
+  const card=g("#about-card"),x=document.createElement("button");
+  x.id="sx-x";x.type="button";x.setAttribute("aria-label","Close");x.title="Close (Esc)";
+  x.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg>';
+  x.addEventListener("click",()=>{const c=g("#about-close");if(c)c.click();});if(card)card.appendChild(x);
+  // General: one grey line, then Updates and Microphone (Pat approved the three, 2026-11-11)
+  const gen=g("#sx-p-general");
+  if(gen){const h=gen.querySelector(".set-h"),sub=document.createElement("p");sub.className="sx-sub2";sub.textContent="Updates and the microphone.";if(h)h.after(sub);
+    const g1=sxGroup([g("#sx-ver-row"),g("#beta-row"),g("#autochk-toggle")],"Updates","sx-g-updates");
+    const n=g("#up-notes");if(g1&&n)g1.after(n);
+    sxGroup([g("#micwarm-toggle"),g("#dictlang-row")],"Microphone","sx-g-mic");}   // the dictation language too (6b641)
+  sxGroup([g("#look-row"),g("#fx-level-row")],"","sx-g-look");
+  sxGroup([g("#sx-aboutline"),g("#p-about .sx-site")],"","sx-g-about");
+  // You: the two fields in one group; your chats and folders in another; Save under the first
+  const nm=g("#user-name"),ps=g("#persona");
+  if(nm&&ps){const gy=sxGroup([sxField(nm),sxField(ps)],"","sx-g-you"),sv=g("#persona-save");if(gy&&sv)gy.after(sv);}
+  const kc=g("#know-chats"),kp=g("#know-path");
+  sxGroup([kc&&kc.closest("label"),g("#know-folders"),kp&&kp.closest(".ctlrow")],"","sx-g-know");
+  v.querySelectorAll(".sx-advc").forEach(c=>c.classList.add("sx-group"));
 }
 // where Settings opens: General (the old About pane's first purpose, updates)
 function sxSetFirst(){return sxSimple&&$("#sx-p-general")?"sx-p-general":"p-about";}
@@ -75853,7 +76179,7 @@ function sxSrvCard(s){
   }
   if(!s.paired||srvPairOpen[s.id])h+='<div class="srv-pair sx-srow"><input class="srv-code" data-k="code" maxlength="20" placeholder="Code from the server’s screen" '
     +'aria-label="Pairing code" autocomplete="off" spellcheck="false" autocapitalize="characters"><button class="about-btn slim" data-a="pair">Pair</button></div>';
-  h+='<div class="srv-msg'+(srvMsgKind[s.id]?" "+srvMsgKind[s.id]:"")+'">'+esc(srvMsgs[s.id]||"")+'</div>';
+  h+='<div class="srv-msg'+(srvMsgKind[s.id]?' '+srvMsgKind[s.id]:'')+'">'+esc(srvMsgs[s.id]||"")+'</div>';
   // Advanced: everything else, once
   h+='<button type="button" class="sx-advb" data-a="sxadv" aria-expanded="'+(open?"true":"false")+'">Advanced</button>';
   if(open){
@@ -75896,7 +76222,14 @@ function sxSrvWire(){
     b.addEventListener("click",()=>{add.classList.add("sx-open");b.hidden=true;const u=$("#srv-url");if(u)u.focus();});add.before(b);}
 }
 // a pane asked for by name that now lives inside another (the account is You's)
-function sxSetRedirect(id){if(id==="p-account"&&sxSimple){const a=$("#sx-adv-p-persona");const b=a&&a.previousElementSibling;if(a&&a.hidden&&b)b.click();return "p-persona";}return id;}
+function sxSetRedirect(id){
+  if(!sxSimple)return id;
+  if(id==="p-account"){const a=$("#sx-adv-p-persona");const b=a&&a.previousElementSibling;if(a&&a.hidden&&b)b.click();id="p-persona";}
+  else if(id==="p-know")id="p-persona";   // your chats and folders are You's (6b625, tight)
+  // Your stuff, nested in You, is "on" while You is, so its own refresh and polling run exactly as before
+  const k=$("#p-know.sx-know");if(k){k.classList.toggle("on",id==="p-persona");if(id==="p-persona")setTimeout(()=>{try{knowRefresh();}catch(e){}},0);}
+  return id;
+}
 // ⌘, (Ctrl+, on a PC) opens Settings from the page itself: the shell's menu has the key, a page without that menu
 // (a dev copy, the browser) had nothing (6b625)
 function sxComma(e){const m=(typeof IS_PC!=="undefined"&&IS_PC)?(e.ctrlKey&&!e.metaKey):(e.metaKey||e.ctrlKey);
