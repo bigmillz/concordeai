@@ -57201,6 +57201,53 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil .spane>.sx-site:hover{color:var(--sx-ink)}
 .hz #about-veil #about-foot:not(:has(#about-site)){justify-content:flex-end}
 .hz #about-veil .snav-chev{display:none}
+/* Servers, much cleaner (6b625): one flat card a server, one status word, one switch row, chips, one Advanced */
+.hz #about-veil #p-servers .srv-about{margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-srv{display:flex;flex-direction:column;margin:0 0 12px;padding:4px 16px 8px;border-radius:10px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s0);box-shadow:none}
+.hz #about-veil .sx-srv-top{display:flex;align-items:center;gap:12px;min-height:52px}
+.hz #about-veil .sx-srv-id{flex:1;min-width:0}
+.hz #about-veil .sx-srv-id b{display:block;font:600 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sx-srv-host{display:block;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz #about-veil .sx-srv-st{flex:none;font:500 12px/16px var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #about-veil .sx-srv.awake .sx-srv-st{color:var(--sx-ink)}
+.hz #about-veil .sx-srv.unreach .sx-srv-st{color:#f0566c}
+.hz #about-veil .sx-pri{flex:none;align-self:center;background:#e9ebf0;color:#141416;border-color:#e9ebf0}
+.hz #about-veil .sx-pri:hover{background:#fff;color:#141416}
+.hz #about-veil .sx-srow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:6px 0;margin:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08);
+  font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sx-sleep{font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sx-sleep input[type=number]{width:56px;height:28px;min-height:0;margin:0 6px;padding:0 8px;text-align:right;font-variant-numeric:tabular-nums;-moz-appearance:textfield}
+.hz #about-veil .sx-sleep input[type=number]::-webkit-inner-spin-button,.hz #about-veil .sx-sleep input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.hz #about-veil .sx-grey{margin:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.hz #about-veil .sx-chip{display:inline-flex;align-items:center;height:24px;padding:0 8px;border-radius:6px;border:var(--sx-hl) solid rgba(255,255,255,.14);font:450 12px/1 var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #about-veil input[type=checkbox].sx-sw{-webkit-appearance:none;appearance:none;display:block;position:relative;flex:none;width:32px;height:18px;margin:0;border:0;border-radius:5px;background:var(--sx-s2);
+  box-shadow:inset 0 0 0 var(--sx-hl) rgba(255,255,255,.22);cursor:pointer;transition:background .18s var(--sx-e)}
+.hz #about-veil input[type=checkbox].sx-sw::after{content:"";display:block;position:absolute;top:3px;left:3px;width:12px;height:12px;border:0;border-radius:3px;background:#8d919b;opacity:1;transform:none;
+  transition:transform .18s var(--sx-e),background .18s var(--sx-e)}
+.hz #about-veil input[type=checkbox].sx-sw:checked{background:#d9dde6;box-shadow:inset 0 0 0 var(--sx-hl) #d9dde6}
+.hz #about-veil input[type=checkbox].sx-sw:checked::after{transform:translateX(14px);background:var(--sx-s1)}
+.hz:not(.hz-kb) #about-veil .sx-sw:focus-visible{outline:0}
+.hz.hz-kb #about-veil .sx-sw:focus-visible{outline:1px solid var(--hz-ember);outline-offset:2px}
+.hz #about-veil .sx-srv .srv-msg:empty{display:none}
+.hz #about-veil .sx-srv .srv-msg{margin:4px 0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-srv .srv-msg.bad{color:#f0566c}
+.hz #about-veil .sx-srv>.sx-advb{height:40px;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil .sx-srv-adv{display:flex;flex-direction:column;gap:10px;padding:0 0 8px}
+.hz #about-veil .sx-btns{display:flex;flex-wrap:wrap;gap:8px}
+.hz #about-veil .sx-sub{margin:4px 0 -2px;font:500 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .sx-srv .srv-tokf{display:flex;flex-wrap:wrap;gap:8px}
+.hz #about-veil .sx-srv .srv-tokf input{flex:1 1 160px}
+.hz #about-veil .sx-links{display:flex;gap:16px;font:450 12px/16px var(--hz-font-ui)}
+.hz #about-veil .sx-links a{color:var(--sx-ink2);text-decoration:none;border-bottom:var(--sx-hl) solid rgba(255,255,255,.3)}
+.hz #about-veil .sx-rm{align-self:flex-start;height:28px;padding:0;border:0;background:none;color:#f0566c;font:500 12px/1 var(--hz-font-ui);cursor:pointer}
+.hz #about-veil .sx-rm:hover{color:#ff7b8c}
+.hz #about-veil #srv-add{display:none}
+.hz #about-veil #srv-add.sx-open{display:block}
+.hz #about-veil #sx-srv-pair{align-self:flex-start;margin:4px 0 0;background:none}
+.hz #about-veil #sx-srv-pair[hidden]{display:none}
+html:not(.hz) #sx-srv-pair{display:none}
+@media (prefers-reduced-motion:reduce){.hz #about-veil .sx-sw,.hz #about-veil .sx-sw::after{transition:none}}
 .hz #about-veil #snav-models-kids{display:flex;flex-direction:column;gap:2px}
 .hz #about-veil #snav-models{padding-left:10px}
 /* a phone: the dialog is the screen; the rail runs along the top */
@@ -68221,7 +68268,7 @@ function paintServers(){
     c.querySelectorAll("input[data-k]").forEach(i=>{k[i.dataset.k]=i.value;
       if(i===act)foc=[c.dataset.id,i.dataset.k,i.selectionStart,i.selectionEnd];});
   });
-  box.innerHTML=srvList.map(srvCard).join("")
+  box.innerHTML=srvList.map(typeof isHz==="function"&&isHz()&&typeof sxSrvCard==="function"?sxSrvCard:srvCard).join("")   // Horizon: the cleaner card (6b625)
     ||'<p class="srv-none">No servers</p>';
   box.querySelectorAll(".srv").forEach(c=>{
     const k=keep[c.dataset.id]||{};
@@ -75213,6 +75260,10 @@ function sxSetSimplify(){
   if(pk){const td=pk.querySelector(":scope>.tdesc"),pv=g("#know-privacy");if(td&&pv){td.before(pv);pv.classList.add("sx-priv");td.classList.add("sx-gone");}
     const hints=[...pk.querySelectorAll(":scope>.kn-hint")],sh=g("#know-share"),rx=g("#know-reindex");
     sxAdv(pk,[sh&&sh.closest("label"),hints[1],hints[0],rx&&rx.parentNode]);}
+  // Servers: "Servers", one short line for what leaves (the cloud compositor), the guide under each card's Advanced
+  const ps=g("#p-servers");
+  if(ps){const h=ps.querySelector(".set-h");if(h)h.textContent="Servers";ps.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+    const ab2=ps.querySelector(":scope>.srv-about");if(ab2)ab2.textContent="Drafts leave your machines only when a cloud model combines them.";}
   // Local models: the line that repeats the heading goes
   const pm=g("#p-models");if(pm)pm.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
 }
@@ -75250,6 +75301,84 @@ function sxSetPanes(v,g){
 }
 // where Settings opens: General (the old About pane's first purpose, updates)
 function sxSetFirst(){return sxSimple&&$("#sx-p-general")?"sx-p-general":"p-about";}
+// ---- SERVERS, MUCH CLEANER (6b625, per Patrick: "It still looks like way too much for me, bud. Like, we can make this
+// much cleaner."). One card a server: its name, the host in small grey, ONE status word (Awake, Asleep, Can't reach; a
+// server the relay or Wake-on-LAN can wake is Asleep, never an error), Wake when asleep, "Use for answers", the models
+// as chips when awake (one grey line when not), "Sleeps after N min idle"; everything else (what the switch covers,
+// Test, Pair again, Change token, the wake relay, the model sets, the guide, Remove) under one Advanced at the card's
+// foot. The same data-a and data-k as srvCard, so every handler is the one that was there; the server's own error
+// sentence is never printed (it was said three times). Horizon only.
+var sxSrvAdv={},sxSrvWaking={};
+function sxSrvState(s){
+  const st=(s&&s.status)||{};if(!s||!s.paired)return "unpaired";
+  if(st.at&&!st.err)return "awake";
+  if((typeof srvAsleep==="function"&&srvAsleep(s))||s.wakeable||(s.relay&&s.relay.url))return "asleep";
+  return "unreach";
+}
+var SX_SRV_WORD={awake:"Awake",asleep:"Asleep",unreach:"Can’t reach",unpaired:"Not paired"};
+function sxSrvCard(s){
+  const st=sxSrvState(s),open=!!sxSrvAdv[s.id],armed=srvArmed[s.id]&&Date.now()-srvArmed[s.id]<6000;
+  const z=typeof srvSleepView==="function"?srvSleepView(srvSleep[s.id]):{unknown:true};
+  const chips=(s.models||[]).map(m=>'<span class="sx-chip">'+esc(m.name)+'</span>').join("")
+    +((s.gen&&s.gen.image)?'<span class="sx-chip">Images</span>':"")+((s.gen&&s.gen.video)?'<span class="sx-chip">Video</span>':"");
+  const waking=sxSrvWaking[s.id]&&Date.now()-sxSrvWaking[s.id]<90000;
+  let h='<div class="srv sx-srv '+st+'" data-id="'+esc(s.id)+'">'
+    +'<div class="sx-srv-top"><div class="sx-srv-id"><b>'+esc(s.name)+'</b><span class="sx-srv-host">'+esc(s.host||"")+'</span></div>'
+    +'<span class="sx-srv-st">'+esc(waking&&st!=="awake"?"Waking…":SX_SRV_WORD[st])+'</span>'
+    +(st==="asleep"&&!waking?'<button type="button" class="about-btn slim sx-pri" data-a="sxwake">Wake</button>':"")+'</div>'
+    +(typeof srvWakeNote==="function"?srvWakeNote(s):"");
+  if(s.paired){
+    h+='<label class="sx-srow"><span>Use for answers</span><input type="checkbox" class="sx-sw" data-a="prefer"'+(s.prefer!==false?" checked":"")+'></label>';
+    h+='<div class="sx-srow sx-models">'+(st==="awake"?(chips?'<div class="sx-chips">'+chips+'</div>':'<span class="sx-grey">No chat models</span>')
+      :'<span class="sx-grey">Models show when it’s awake.</span>')+'</div>';
+    if(!z.unknown&&!z.disabled)h+='<div class="sx-srow"><span class="sx-sleep">Sleeps after <input type="number" min="5" max="1440" step="1" inputmode="numeric" '
+      +'data-a="sleepmin" data-k="smin" value="'+esc(String(z.minutes))+'" aria-label="Minutes idle before sleep"> min idle</span>'
+      +'<input type="checkbox" class="sx-sw" data-a="sleepon" aria-label="Sleep when idle"'+(z.checked?" checked":"")+'></div>';
+  }
+  if(!s.paired||srvPairOpen[s.id])h+='<div class="srv-pair sx-srow"><input class="srv-code" data-k="code" maxlength="20" placeholder="Code from the server’s screen" '
+    +'aria-label="Pairing code" autocomplete="off" spellcheck="false" autocapitalize="characters"><button class="about-btn slim" data-a="pair">Pair</button></div>';
+  h+='<div class="srv-msg'+(srvMsgKind[s.id]?" "+srvMsgKind[s.id]:"")+'">'+esc(srvMsgs[s.id]||"")+'</div>';
+  // Advanced: everything else, once
+  h+='<button type="button" class="sx-advb" data-a="sxadv" aria-expanded="'+(open?"true":"false")+'">Advanced</button>';
+  if(open){
+    const r=s.relay||{},links=[...$$("#p-servers .srv-link")];
+    h+='<div class="sx-srv-adv">'
+      +(s.paired?'<p class="sx-grey">Answers in Fast, Thinking, Pro and Code. Code agents may send a folder you choose to this server.</p>':"")
+      +'<div class="sx-btns"><button class="about-btn slim" data-a="test">Test</button>'
+      +(s.paired&&!srvPairOpen[s.id]?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
+      +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change token</button>')+'</div>'
+      +(srvTokOpen[s.id]?'<div class="srv-tokf"><input type="password" data-k="aid" autocomplete="off" placeholder="Access Client ID" aria-label="Access Client ID">'
+        +'<input type="password" data-k="asec" autocomplete="off" placeholder="Access Client Secret" aria-label="Access Client Secret">'
+        +'<button class="about-btn slim" data-a="toksave">Save</button><button class="about-btn slim" data-a="tokcancel">Cancel</button></div>':"")
+      +(s.paired?'<div class="sx-sub">Wake relay</div><div class="srv-tokf srv-relayf"><input type="text" data-k="rurl" autocomplete="off" spellcheck="false" placeholder="http://10.0.0.5:8080" aria-label="Wake relay address" value="'+esc(r.url||"")+'">'
+        +'<input type="password" data-k="rtok" autocomplete="off" placeholder="'+(r.has_token?"Token saved":"Token")+'" aria-label="Wake relay token"></div>'
+        +'<div class="sx-btns"><button class="about-btn slim" data-a="relaysave">Save</button><button class="about-btn slim" data-a="relayclear"'+(r.url||r.has_token?"":" disabled")+'>Clear</button>'
+        +'<button class="about-btn slim" data-a="relaytest"'+(r.url&&r.has_token?"":" disabled")+'>Test relay</button></div>':"")
+      +(s.paired&&st==="awake"&&typeof srvSetsHtml==="function"?srvSetsHtml(s,srvSets[s.id]):"")   // the model sets only when it can answer
+      +(links.length?'<div class="sx-links">'+links.map(a=>'<a href="'+esc(a.href)+'" target="_blank" rel="noopener">'+esc(a.textContent.trim())+'</a>').join("")+'</div>':"")
+      +'<button type="button" class="sx-rm'+(armed?" armed":"")+'" data-a="rm">'+(armed?"Remove this server and its key? Click again.":"Remove server")+'</button>'
+      +'</div>';
+  }
+  return h+'</div>';
+}
+// the two the card owns: its Advanced, and Wake (said once: "Waking…" on the card, then the status itself)
+function sxSrvWire(){
+  const box=$("#srv-list");if(!box||box._sx)return;box._sx=true;
+  box.addEventListener("click",async ev=>{
+    if(!sxHz())return;const b=ev.target.closest&&ev.target.closest('button[data-a="sxadv"],button[data-a="sxwake"]');if(!b)return;
+    ev.stopImmediatePropagation();const id=b.closest(".srv").dataset.id;
+    if(b.dataset.a==="sxadv"){sxSrvAdv[id]=!sxSrvAdv[id];paintServers();const nb=box.querySelector('.srv[data-id="'+id+'"] [data-a="sxadv"]');if(nb)nb.focus();return;}
+    sxSrvWaking[id]=Date.now();srvMsg(id,"");paintServers();let d=null;
+    try{d=await srvPost("wake-test",{id:id});}catch(e){d={ok:false};}
+    const s=srvList.find(x=>x.id===id);if(s)s.lan_blocked=!!(d&&d.blocked);
+    if(!(d&&d.ok)){delete sxSrvWaking[id];paintServers();srvMsg(id,d&&d.blocked?SRV_LAN_BLOCKED:"Couldn’t wake it. Try again.","bad");return;}
+    paintServers();
+    [20000,45000,80000].forEach(t=>setTimeout(()=>{if(srvSetsShown())loadServers(true).then(()=>{const x=srvList.find(y=>y.id===id);if(x&&sxSrvState(x)==="awake"){delete sxSrvWaking[id];paintServers();srvSleepLoadAll();srvSetsLoadAll();}});},t));
+  },true);
+  // "Pair a server": the add form only when asked
+  const add=$("#srv-add");if(add&&!$("#sx-srv-pair")){const b=document.createElement("button");b.type="button";b.id="sx-srv-pair";b.className="about-btn slim";b.textContent="Pair a server";
+    b.addEventListener("click",()=>{add.classList.add("sx-open");b.hidden=true;const u=$("#srv-url");if(u)u.focus();});add.before(b);}
+}
 // a pane asked for by name that now lives inside another (the account is You's)
 function sxSetRedirect(id){if(id==="p-account"&&sxSimple){const a=$("#sx-adv-p-persona");const b=a&&a.previousElementSibling;if(a&&a.hidden&&b)b.click();return "p-persona";}return id;}
 // ⌘, (Ctrl+, on a PC) opens Settings from the page itself: the shell's menu has the key, a page without that menu
@@ -75257,7 +75386,7 @@ function sxSetRedirect(id){if(id==="p-account"&&sxSimple){const a=$("#sx-adv-p-p
 function sxComma(e){const m=(typeof IS_PC!=="undefined"&&IS_PC)?(e.ctrlKey&&!e.metaKey):(e.metaKey||e.ctrlKey);
   if(!m||e.altKey||e.shiftKey||e.key!==",")return;e.preventDefault();const v=$("#about-veil");if(v&&v.hidden&&typeof openAbout==="function")openAbout();}
 function sxBoot(){
-  sxSetWire();sxPhWire();sxHostWire();sxLanePaint();sxSetSimplify();
+  sxSetWire();sxPhWire();sxHostWire();sxLanePaint();sxSetSimplify();sxSrvWire();
   addEventListener("keydown",sxComma,true);
   const ci=$("#chat-inner");
   if(ci&&window.MutationObserver&&!ci._sx){ci._sx=true;let q=false;
