@@ -48338,7 +48338,8 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
     out.dDone = await ev(`({approvals:window.__pxApprovals,runs:[...document.querySelectorAll(".msg.ai.hz-coderun li.hz-run")].map(l=>l.dataset.id+"|"+l.className.replace("hz-run ",""))})`);
     await ev(`(()=>{window.__pxPlan="";const n=document.querySelector("#newchat");if(n)n.click();return 1;})()`); await sleep(400);
     // ---- Funnels: the goal form is the lane's home; the stage hairline; the answer's cue
-    await ev(`(()=>{switchLane("funnel");return 1;})()`); await sleep(500);
+    // (beta 4) a fresh funnel: a copy that ran a funnel earlier would reopen it (6b628's lane memory, by design)
+    await ev(`(()=>{switchLane("funnel","fresh");return 1;})()`); await sleep(500);
     out.fnHome = await ev(`(()=>{const f=document.querySelector("#funnel-wrap");return {parent:f.parentNode.id,shown:getComputedStyle(f).display!=="none",composer:getComputedStyle(document.querySelector("#composer")).display,
       go:(()=>{const b=document.querySelector("#fn-go"),r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!h&&(h===b||b.contains(h));})(),
       label:getComputedStyle(f.querySelector(".fq")).fontFamily.split(",")[0].replace(/["']/g,""),caps:getComputedStyle(f.querySelector(".fq")).textTransform};})()`);
@@ -50978,7 +50979,8 @@ def _u628_lanes_ok(r, wide=True):
             and g("f").get("title") == "Code question one" and S.get("fGen") is True
             and g("g").get("title") == "Code question one" and g("g").get("unread") == ["Chat question one"]           # the answer landed in its own chat, unread
             and g("h").get("title") == "Chat question one" and g("h").get("msgs") == ["user", "ai", "user", "ai"] and g("h").get("unread") == []
-            and g("i").get("cur") is None and g("i").get("lane") == "code" and g("j").get("lane") == "funnel" and g("j").get("cur") is None
+            and g("i").get("cur") is None and g("i").get("lane") == "code" and g("j").get("lane") == "funnel" and (g("j").get("cur") is None   # (beta 4) or the funnel lane's own newest chat,
+                                                                   or str(g("j").get("title") or "").startswith("Funnel"))   # a copy that ran one
             and g("k").get("cur") is None and g("k").get("lane") == "code" and g("k").get("hero") is True                 # left fresh, back fresh
             and (not wide or (bool(S.get("mt")) and g("m").get("lane") == "ai" and g("m").get("title") == "Chat question one"))   # a mode picked in Code: Chat's own chat
             and r.get("lanesSent") == [["ai", "Chat question one"], ["code", "Code question one"], ["ai", "Chat question two"]]
