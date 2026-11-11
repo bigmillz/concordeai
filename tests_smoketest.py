@@ -47656,20 +47656,36 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       caps:leaves.filter(e=>getComputedStyle(e).textTransform==="uppercase"&&getComputedStyle(e).display!=="none").map(e=>e.textContent.trim().slice(0,16)),
       sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE},
       rows:[...v.querySelectorAll("#set-nav>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
-      aboutCtl:[...v.querySelectorAll("#p-about .toggle-row,#p-about .sl-seg,#p-about .sl-menu")].filter(e=>e.offsetParent!==null&&!e.closest(".sx-advc")).length,
-      adv:["#p-about","#p-persona","#p-know"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]"))};})()`);
+      genCtl:[...v.querySelectorAll("#sx-p-general .toggle-row,#sx-p-general .sl-seg,#sx-p-general .sl-menu,#sx-p-general .about-btn")].filter(e=>e.offsetParent!==null).length,
+      panes:["#sx-p-general","#sx-p-look","#sx-p-voice","#p-about"].map(s=>{const p=v.querySelector(s);return p?[...p.querySelectorAll("#beta-row,#autochk-toggle,#about-check,#up-notes,#look-row,#fx-level-row,#micwarm-toggle,#set-spec,#about-site")].map(e=>e.id).join(","):null;}),
+      about:[...v.querySelectorAll("#p-about #set-spec>div:not(.sx-gone) dt")].map(e=>getComputedStyle(e).textTransform==="none"&&/Inter|apple|system/i.test(getComputedStyle(e).fontFamily)?e.textContent:"X"),
+      adv:["#p-persona","#p-know"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]")),
+      look:(()=>{const n=["#fx-level-note","#micwarm-note"].map(s=>getComputedStyle(v.querySelector(s)).color),
+          st=document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#about-veil .switch,#about-veil .switch::after{transition:none!important}"})),k=["#autochk-toggle","#micwarm-toggle"].map(s=>{const e=v.querySelector(s);const was=e.classList.contains("on");e.classList.remove("on");const c=getComputedStyle(e.querySelector(".switch"),"::after").backgroundColor;if(was)e.classList.add("on");return c;}),stx=st.remove(),
+          segs=[...v.querySelectorAll(".sl-seg")].map(e=>[getComputedStyle(e).height,getComputedStyle(e).borderTopLeftRadius].join(" "));
+        return {notes:n,knobs:k,segs:[...new Set(segs)],title:getComputedStyle(v.querySelector("#sx-p-general .set-h")).textAlign,chev:getComputedStyle(v.querySelector(".snav-chev")).display,
+          kids:getComputedStyle(v.querySelector("#snav-models-kids")).display};})()};})()`);
   await press("ArrowDown", "ArrowDown", 40); await sleep(150);
   out.arrow = [await ev(AE), await ev(`document.querySelector("#about-veil .spane.on").id`)];
+  await ev(`(()=>{settingsPane("p-persona");return 1;})()`); await sleep(150);
   out.you = await ev(`(()=>{const p=document.querySelector("#about-veil #p-persona");const f=[...p.querySelectorAll("input[type=text],input:not([type]),textarea")].filter(e=>e.offsetParent!==null&&!e.closest(".sx-advc"));
     const words=[...p.querySelectorAll("label,.set-h,.tdesc,input,textarea")].filter(e=>e.offsetParent!==null).map(e=>(e.textContent||"")+" "+(e.placeholder||"")).join(" | ");
     return {head:p.querySelector(".set-h").textContent,fields:f.map(e=>e.id),labels:[...p.querySelectorAll(".sx-lab")].map(e=>e.textContent),
-      personal:/\b(where (do )?you live|city|town|home|location|address|zip|postcode|job|work in|units?|metric)\b/i.test(words),
+      personal:/\\b(where (do )?you live|city|town|home|location|address|zip|postcode|job|work in|units?|metric)\\b/i.test(words),
       account:!!p.querySelector(".sx-advc #acct-card")&&!!p.querySelector(".sx-advc #about-forget")};})()`);
   out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
   await press("Escape", "Escape", 27); await sleep(40);
   out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
   await sleep(320);
   out.closed = [await ev(`document.querySelector("#about-veil").hasAttribute("hidden")`), await ev(AE)];
+  // the header's right: the status dot kept, a clean line gear for Settings, no light/dark button; ⌘, opens Settings
+  out.head = await ev(`(()=>{const r=document.querySelector("#hz-right"),g=document.querySelector("#hz-settings"),m=document.querySelector("#hz-machines");
+    return {dot:!!m&&r.contains(m)&&m.getClientRects().length>0,gear:!!g&&r.contains(g)&&g.getAttribute("aria-label")==="Settings"&&/^Settings \\((⌘|Ctrl\\+),\\)$/.test(g.title)&&/^M12\\.22 2h/.test((g.querySelector("svg path")||{getAttribute:()=>""}).getAttribute("d")),
+      theme:[...document.querySelectorAll("#hz-top button,#hz-top [role=button]")].filter(e=>/light|dark|theme|sun\\b|moon/i.test((e.getAttribute("aria-label")||"")+" "+(e.title||"")+" "+e.id)).length};})()`);
+  await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 });
+  await send("Input.dispatchKeyEvent", { type: "keyUp", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 }); await sleep(300);
+  out.comma = await ev(`!document.querySelector("#about-veil").hidden`);
+  await press("Escape", "Escape", 27); await sleep(320);
   if (MODE === "full") {
     // ---- the palette: a Code chat says Code; the return arrow is a character
     await ev(`(()=>{chats.unshift({id:"px-code-1",lane:"code",title:"Fix the nginx config",ts:Date.now(),messages:[]});palOpen();return 1;})()`); await sleep(200);
@@ -47737,14 +47753,21 @@ def _px_set_ok(r, phone=False):
                  else s_.get("w") == 672 and s_.get("h") == 640 and s_.get("radius") == "14px" and s_.get("rail") == 184 and s_.get("railDir") == "column"
                  and s_.get("lab") == ["Settings", "11px", "600", "uppercase", "block"] and s_.get("caps") == ["Settings"])
             and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
-            and (s_.get("focus") or "").startswith("button.snav|About")
-            and r.get("arrow") == [r.get("arrow", [""])[0], "p-persona"] and (r.get("arrow") or [""])[0].startswith("button.snav|You")
-            and s_.get("rows") == ["About", "You", "Your stuff", "Models", "Usage"] and s_.get("aboutCtl") == 1 and s_.get("adv") == [True, True, True]
+            and (s_.get("focus") or "").startswith("button.snav|General")
+            and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
+            and s_.get("rows") == ["General", "Appearance", "Voice", "You", "Your stuff", "Models", "Usage", "About"]
+            and s_.get("genCtl") == 3 and s_.get("adv") == [True, True]
+            and s_.get("panes") == ["about-check,beta-row,autochk-toggle,up-notes", "look-row,fx-level-row", "micwarm-toggle", "set-spec,about-site"]
+            and s_.get("about") == ["version", "chip", "memory", "models"]
+            and (s_.get("look") or {}).get("notes") == ["rgba(255, 255, 255, 0.55)"] * 2 and (s_.get("look") or {}).get("knobs") == ["rgb(141, 145, 155)"] * 2
+            and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
+            and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
             and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona"]
             and (r.get("you") or {}).get("labels") == ["What should Concorde call you?", "Anything to keep in mind?"]
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
+            and r.get("head") == {"dot": True, "gear": True, "theme": 0} and r.get("comma") is True
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
             and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
 def _px_full_ok(r):
@@ -47765,7 +47788,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings simpler (About, You, Your stuff, Models, Usage; About's first screen one control, Effects; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings simpler and in one language (General, Appearance, Voice, You, Your stuff, Models with its three under it, Usage, About; General the updates, Appearance Look and Effects, Voice the microphone, About a quiet Inter list without Accel; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -47775,6 +47798,9 @@ _px_mw = [
     ("the goal form left in the sidebar", [['const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="funnel"&&!!$("#hero");', "const on=false;"]]),
     ("no host chip", [["b.hidden=!on;if(!on)return;", "b.hidden=true;return;"]]),
     ("Settings not simplified (every switch on About's first screen, Account its own section)", [["sxHostWire();sxLanePaint();sxSetSimplify();", "sxHostWire();sxLanePaint();"]]),
+    ("About left as four things at once (no General, Appearance or Voice)", [["  sxSetPanes(v,g);\n", ""]]),
+    ("⌘, opens nothing in the page", [['  addEventListener("keydown",sxComma,true);\n', ""]]),
+    ("the job-shaped prompt back in You", [["ps.placeholder=\"Short answers, and say what you're unsure of.\";", ""]]),
 ]
 _px_mr = []
 for d_, m_ in _px_mw:

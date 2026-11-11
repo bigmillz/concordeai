@@ -21746,8 +21746,7 @@ every id and handler kept, the served HTML unchanged, so Classic and the static 
   keep in mind?", then the answer length and Save. The placeholder that asked for a job ("I work in finance") is gone.
   Under **Advanced**: the account card, Bring your chats, Erase everything (a request for the Account pane opens You
   with Advanced open, `sxSetRedirect`).
-- **About**'s first screen is the version, the build, What's new, Check now and Effects (one control); Update channel,
-  Check for updates, Look and Keep microphone ready are under Advanced; the Effects note goes.
+- **About** split into four panes in the next pass (One design language, below).
 - **Your stuff** keeps the privacy line and your chats and folders; the cloud switch, its note, the formats note and
   "Read everything again" are under Advanced; the paragraph that repeated the section goes. Local models: the line under
   the heading goes.
@@ -21755,6 +21754,26 @@ every id and handler kept, the served HTML unchanged, so Classic and the static 
   home-area field went before 7.0). A `home_area` saved by an older build is still read on the server (weather "here",
   the local clock, Classic's greeting town; profiles, sync and Add carry it); dropping it is a server change pinned by
   about six checks, left for a decision (see Left).
+
+**One design language** (Patrick, 2026-11-11 ~04:30, on Settings › About: "something about a lot of this doesn't feel
+cohesive if we're going to spend the time building in C++"). Same structure, one language (`sxSetPanes`, Horizon only,
+the page's own nodes moved):
+- **About's four jobs, four panes:** General (a "Version 7.0 beta 2" row with its date and Check now on the right, the
+  update channel, Check for updates, What's new), Appearance (Look, Effects, one plain line), Voice (Keep microphone
+  ready) and About (a quiet two-column Inter list, Version with its build, Chip, Memory, Models, tabular figures, then
+  the site link). "Accel MLX" is gone (jargon); the spec list left the rail. Settings opens on General.
+- **The rail:** General · Appearance · Voice · You · Your stuff · Models (Local, Cloud, Servers always listed under it,
+  indented, no chevron; the Models row opens Local) · Usage · About. One active style: the filled row, no glyph.
+- **Controls:** one switch (off: graphite track, #8d919b knob; on: silver track, dark knob; no lavender), one segmented
+  size everywhere (30 high, radius 8, 24 px choices), every control on the same right edge; Close is a 28 px button like
+  the others; secondary lines neutral grey (55 % white), never blue-tinted; titles left-aligned in every pane.
+- **The header's right** (Patrick ~04:45: "focus on having the settings available instead of light or dark mode"): the
+  status dot is kept as it is; the button beside it was already Settings, but its old feather gear (a ring of lobes at
+  17 px) read as a sun, so it is now the clean line cog (1.5 px, the demo's), aria-label "Settings", tooltip "Settings
+  (⌘,)". ⌘, (Ctrl+, on a PC) now opens Settings from the page itself too (`sxComma`); the shell's menu already had it.
+  There is no light theme in the app (and there was no theme button), so no Dark/Light/Auto control was added: a Light
+  that does nothing would be dishonest; a real light theme is its own piece of work (see Left). The web demo already
+  has the cog and ⌘, (its working copy carries another helper's uncommitted edits, so it was not touched).
 
 **One type system.** In Horizon `--sans` is Inter (the system's sans until the file is bundled), so everything that
 fell to Space Grotesk by default is Inter; the greeting keeps Space Grotesk by name, the wordmark Michroma. Mono is
@@ -21838,7 +21857,8 @@ and the answer cue; 5 mutants); suggLoad asking nothing in Horizon and once in C
 whose notes (1 mutant); About's version and build from the constants; run_remote_agent lifted and driven with
 stand-ins (5 scenarios, 2 mutants); live headless Chromium at 1440 and 390 (Settings by the gear with real keys, the
 palette, the dictation level, the host chip and sheet, a danger command's card under its line, Funnels' home and
-hairline, no /api/suggest, the simpler Settings), with 7 mutants served in place of the page. Re-pinned at the same
+hairline, no /api/suggest, the simpler Settings in one language, the header's dot and gear, ⌘,), with 9 mutants
+served in place of the page. Re-pinned at the same
 strength: 6b551's What's new pin follows the new header (a nightly still never says "in"). Proven on a trimmed copy on 9984–9986.
 
 **Copy, new or changed (for Patrick's approval), Horizon only unless said:**
@@ -21856,6 +21876,10 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
   before it asks you is up to you."
 - Funnels: the composer during a funnel "Ask anything" → "Or type your own answer"; the "Funnel" byline hidden.
 - Settings: the "Personal suggestions" switch hidden in Horizon.
+- One language: rail "About" (first) → "General", "Appearance", "Voice" (new, first) and "About" (last); General's row
+  "Version 7.0 beta 2" (new label over the existing date and Check now); About's list labels "VERSION/CHIP/MEMORY/MODELS"
+  → "Version/Chip/Memory/Models", "ACCEL" removed, the version reads "7.0 beta 2 (build 279)"; the Effects note
+  "Balanced is the default. Full is the whole show." → "How much the sky moves." (Calm, Balanced, Full kept).
 - Settings, simpler: rail "Account" + "Personality" → "You" (heading too); new labels "What should Concorde call you?"
   and "Anything to keep in mind?"; placeholders "Name" → "Optional", "Be direct. I work in finance; assume I know the
   vocabulary." → "Short answers, and say what you're unsure of."; new "Advanced" disclosure in About, You and Your stuff;
@@ -21865,6 +21889,7 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
   file they used." (its privacy line kept).
 
 **Left / worth knowing.**
+- Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
   schema and ADD_SETTINGS lose the key, the client's `CITY`, and the pins at weather "home", the prefs echo, profiles'
   Add, sync's set and the 6b390 hide words follow. Weather "what's the weather" with no place would then search or ask.
