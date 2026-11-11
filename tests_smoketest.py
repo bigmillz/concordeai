@@ -20422,7 +20422,13 @@ check("benchmark (live): a run on the stand-in engine gives the known figures an
       and _brows["Gemma 4 E2B"].get("src") == "engine" and _brows["Gemma 4 E2B"].get("load_s") == 1.5
       and _brows.get("GPT-OSS 120B", {}).get("status") == "skipped"
       and "the limit here is 38 GB" in _brows["GPT-OSS 120B"].get("note", "")
-      and all(isinstance(r.get("mem_rise"), int) for l_, r in _brows.items() if l_ != "GPT-OSS 120B"),
+      # every measured row has its memory rise, unless this machine's real memory was crowded by other work while
+      # that model ran (the stand-in engine runs on the real machine): then the row says so and claims no rise
+      # (6b555: other gauntlets on the same machine at 69 % pressure)
+      and all(isinstance(r.get("mem_rise"), int)
+              or (r.get("crowded") is True and r.get("mem_rise") is None and r.get("note") == "Other apps were using memory.")
+              for l_, r in _brows.items() if l_ != "GPT-OSS 120B")
+      and any(isinstance(r.get("mem_rise"), int) for l_, r in _brows.items() if l_ != "GPT-OSS 120B"),
       "%r" % [_bs1, _brun])
 check("benchmark (live): while it runs a second start, a chat and a funnel are refused, and nothing is saved",
       _bs2 == (409, {"err": "A benchmark is already running."})
