@@ -21378,6 +21378,61 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
   stuff's "Answers can draw on your own chats and the folders you choose, found on this computer, and say which chat or
   file they used." (its privacy line kept).
 
+**Settings, tight (per Patrick, 2026-11-11 09:25: "let's clean up the settings a lot, make them very concise, very
+tight, all that").** A second pass after 9051f4b, Horizon only, the page's own nodes moved once at boot (ids and
+handlers kept), Classic untouched:
+- Five sections instead of eight: General · Appearance · Models (Local, Cloud, Servers, Usage under it) · You · About.
+  Voice folds into General (Keep microphone ready); Your stuff folds into You; Usage moves under Models.
+- General: the version row carries What's new (a quiet link that opens the notes in place) and Check now; under it the
+  channel, Check for updates and Keep microphone ready. The date line under the version shows only when it is news
+  (an update is ready, another release is out, or checks are off). The notes are no longer on the face.
+- Appearance: Look and Effects, no note. About: one quiet line, "ConcordeAI 7.0 beta 2 (build 279) · M4 PRO · 48 GB" on this Mac,
+  then the site. The facts list is hidden (its nodes stay; the line reads them and follows their updates).
+- You: the two optional fields and Save, then your chats and folders ("Use my chats in answers", the folder list,
+  Add folder); under Advanced the answer length, the cloud switch for your stuff, the index line and counts, Read
+  everything again, the account, bringing chats and Erase everything. Your stuff is nested in You, not copied: it loses
+  `.spane` and is "on" while You is, so `knowRefresh()` and its polling run exactly as before; `settingsPane("p-know")`
+  (a source chip's link) now opens You.
+- Cloud: the 46-word paragraph becomes "While on, prompts leave your machines." with a Details link that shows the
+  whole paragraph in place (what goes to Google and to the search engine stays one click away).
+- Rows: 40 high and one line (label left, control right); the roster one line a model (name, what it is for in grey,
+  size, its action); pane padding 24; the boxed sub-cards (Usage's four, the key box, the account card) unboxed; the
+  server cards keep their box. Helper sentences gone from every face (the micwarm and Effects notes, Your stuff's
+  hints and privacy line, the persona paragraph); Pat's approved Servers line kept.
+- Dictation language: the app has no such setting (Whisper picks the language itself), so none was invented.
+- GPU badge: "GPU sky on · 119 fps · Apple GPU" (beta-4's `hzGpuBadge`, `?hz=gpu=1`) is a dev copy's only. Pinned:
+  `hz_debug_spec` answers None outside a dev copy (exec'd from the source), test hooks are empty there, the page's
+  HZ_DEBUG is `json.dumps(_hz_spec)`, every `hzGpuBadge()` call sits behind `hzS.debug.gpu`, and the live page has no
+  badge; 4 source mutants and 1 live mutant. Proven on this branch and on beta-4's source (where the badge exists).
+
+**Tests (tight):** the live check's Settings probe follows the five sections (rows, Models' four, General's four
+controls, the panes' members, About's one line with the build, the notes hidden) and a new tight probe (What's new
+none → block → none with aria-expanded, every pane's rows 40, no visible helper over six words, no boxed sub-card,
+the roster ≤ 44 high, padding 24, the version label one line); `You` now has the folder field; the header has no GPU
+badge. Seven new live mutants: rows 48 again, What's new on the face, Your stuff its own section, Usage outside
+Models, the roster two lines, a long helper back under Cloud, a badge on a page with no debug spec. The pure GPU pin
+with four mutants. The 390 check's "no sideways scroll" now asks whether the reader can scroll (the body clips with
+overflow-x hidden, carried to the viewport); scrollWidth alone counted the sky's drifting layers (the moon's glow, the
+wash) 24 px past the edge, so the check passed or failed with the time of day, at 9051f4b as well.
+
+**Copy, tight (old → new, for Patrick's approval):**
+- Rail: "Voice" → removed (its switch in General); "Your stuff" → removed (inside You); "Usage" → under Models.
+- General: "7.0 beta 3 released on …"/"Released on …" under the version → shown only when it is news; the notes box
+  "What's new in …" → behind a new "What's new" link on the version row; "On for 15 seconds after you dictate." →
+  removed.
+- Appearance: "How much the sky moves." → removed.
+- About: the list "Version / Chip / Memory / Models" → one line "ConcordeAI 7.0 beta 2 (build 279) · <chip> ·
+  <memory>"; the models count is no longer shown.
+- You: "Include my chats" → "Use my chats in answers"; "Stays on your machines. Cloud only if you allow it." → removed;
+  "Notes, text, PDF (text only), Word, web pages and mail files in the folders you add. Nothing outside them is read."
+  → removed; "Off: answers that use your stuff stay on your machines. On: a cloud model may read it too, and the answer
+  says so." → removed (the switch "Let cloud models read my stuff too" kept, under Advanced); "Response length" →
+  under Advanced.
+- Cloud: "Optional. While on, cloud models answer and your prompts leave your machines. Gemini pictures and video go
+  to Google whenever a Gemini key is saved. Keys stay saved when off. A question that needs the web goes, as typed, to
+  a search engine; weather and place questions send the place name." → "While on, prompts leave your machines." +
+  new "Details" link (the full text behind it, unchanged).
+
 **Left / worth knowing.**
 - Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
@@ -21394,3 +21449,6 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
 - The command output is still not on the wire (6b622), so a danger card shows the command, not a preview of what it
   will delete.
 - Checked in an offscreen WKWebView and headless Chromium, not in the shipped window.
+- Tight: the hidden Your-stuff hint said which file types are read; it is gone from the face. If people ask "why
+  wasn't my .pages file used", it may want to come back as a Details link like Cloud's.
+- Tight: the About line drops the installed-models count ("models" fact); Local lists them.

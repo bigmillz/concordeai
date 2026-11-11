@@ -46967,13 +46967,14 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       rowH:Math.round(rr.height),rowBg:getComputedStyle(row).backgroundColor,lab:[lab.textContent,ls.fontSize,ls.fontWeight,ls.textTransform,getComputedStyle(lab).display],
       mono:leaves.filter(e=>/mono/i.test(getComputedStyle(e).fontFamily.split(",")[0])).map(e=>e.textContent.trim().slice(0,16)),
       caps:leaves.filter(e=>getComputedStyle(e).textTransform==="uppercase"&&getComputedStyle(e).display!=="none").map(e=>e.textContent.trim().slice(0,16)),
-      sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE},
+      sw:(()=>{const h=getComputedStyle(document.documentElement).overflowX,y=getComputedStyle(document.body).overflowX,clip=v=>v==="hidden"||v==="clip",locked=clip(h)||(h==="visible"&&clip(y));return [locked?innerWidth:document.documentElement.scrollWidth,innerWidth];})(),focus:${AE},
       rows:[...v.querySelectorAll("#set-nav>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
       genCtl:[...v.querySelectorAll("#sx-p-general .toggle-row,#sx-p-general .sl-seg,#sx-p-general .sl-menu,#sx-p-general .about-btn")].filter(e=>e.offsetParent!==null).length,
-      panes:["#sx-p-general","#sx-p-look","#sx-p-voice","#p-about"].map(s=>{const p=v.querySelector(s);return p?[...p.querySelectorAll("#beta-row,#autochk-toggle,#about-check,#up-notes,#look-row,#fx-level-row,#micwarm-toggle,#set-spec,#about-site")].map(e=>e.id).join(","):null;}),
-      about:[...v.querySelectorAll("#p-about #set-spec>div:not(.sx-gone) dt")].map(e=>getComputedStyle(e).textTransform==="none"&&/Inter|apple|system/i.test(getComputedStyle(e).fontFamily)?e.textContent:"X"),
-      adv:["#p-persona","#p-know"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]")),
-      look:(()=>{const n=["#fx-level-note","#micwarm-note"].map(s=>getComputedStyle(v.querySelector(s)).color),
+      panes:["#sx-p-general","#sx-p-look","#p-about"].map(s=>{const p=v.querySelector(s);return p?[...p.querySelectorAll("#beta-row,#autochk-toggle,#about-check,#up-notes,#look-row,#fx-level-row,#micwarm-toggle,#set-spec,#about-site,#sx-aboutline,#sx-whatsnew")].map(e=>e.id).join(","):null;}),
+      about:[(v.querySelector("#sx-aboutline")||{}).textContent||"",getComputedStyle(v.querySelector("#set-spec")).display],
+      kids:[...v.querySelectorAll("#snav-models-kids>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
+      adv:["#p-persona"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]")),
+      look:(()=>{const n=["#fx-level-note","#micwarm-note"].map(s=>getComputedStyle(v.querySelector(s)).display),
           st=document.head.appendChild(Object.assign(document.createElement("style"),{textContent:"#about-veil .switch,#about-veil .switch::after{transition:none!important}"})),k=["#autochk-toggle","#micwarm-toggle"].map(s=>{const e=v.querySelector(s);const was=e.classList.contains("on");e.classList.remove("on");const c=getComputedStyle(e.querySelector(".switch"),"::after").backgroundColor;if(was)e.classList.add("on");return c;}),stx=st.remove(),
           segs=[...v.querySelectorAll(".sl-seg")].map(e=>[getComputedStyle(e).height,getComputedStyle(e).borderTopLeftRadius].join(" "));
         return {notes:n,knobs:k,segs:[...new Set(segs)],title:getComputedStyle(v.querySelector("#sx-p-general .set-h")).textAlign,chev:getComputedStyle(v.querySelector(".snav-chev")).display,
@@ -46986,6 +46987,19 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
     return {head:p.querySelector(".set-h").textContent,fields:f.map(e=>e.id),labels:[...p.querySelectorAll(".sx-lab")].map(e=>e.textContent),
       personal:/\\b(where (do )?you live|city|town|home|location|address|zip|postcode|job|work in|units?|metric)\\b/i.test(words),
       account:!!p.querySelector(".sx-advc #acct-card")&&!!p.querySelector(".sx-advc #about-forget")};})()`);
+  // tight (6b625): What's new behind its link; every pane's rows 40 high, no helper sentence over six words, no boxed
+  // sub-card, the roster one line a model, the pane padding 24
+  out.tight = await ev(`(()=>{const v=document.querySelector("#about-veil"),o={long:[],rosH:0,cards:[],rows:[]};
+    settingsPane("sx-p-general");const n=v.querySelector("#up-notes"),w=v.querySelector("#sx-whatsnew");
+    if(n.hidden||!n.textContent.trim()){n.innerHTML="<p><b>What is new</b></p><p>Stand-in notes.</p>";n.hidden=false;}
+    o.ver=Math.round(v.querySelector("#sx-ver-row b").getBoundingClientRect().height);o.wn=[getComputedStyle(n).display];w.click();o.wn.push(getComputedStyle(n).display,w.getAttribute("aria-expanded"));w.click();o.wn.push(getComputedStyle(n).display);
+    for(const id of ["sx-p-general","sx-p-look","p-models","p-cloud","p-servers","p-usage","p-persona","p-about"]){settingsPane(id);const p=v.querySelector("#"+id);
+      p.querySelectorAll(".tdesc,.kn-hint,.sx-cline,#fx-level-note,#micwarm-note,#sugg-note,#know-privacy,#turbo-note").forEach(e=>{if(e.offsetParent!==null&&!e.closest(".sx-advc")){const t=e.textContent.replace(/Details$/,"").trim();if(t.split(/ +/).length>6)o.long.push(id+": "+t.slice(0,48));}});
+      if(id==="p-models")o.rosH=Math.max(0,...[...p.querySelectorAll(".ros-row")].filter(e=>e.offsetParent!==null).map(e=>Math.round(e.getBoundingClientRect().height)));
+      p.querySelectorAll(".us-card,#cloudkey-box,#manage-box,.plan-card,.set-card").forEach(e=>{if(e.offsetParent!==null){const c=getComputedStyle(e);if(c.borderTopWidth!=="0px"||c.backgroundColor!=="rgba(0, 0, 0, 0)")o.cards.push(id+" "+(e.id||e.className));}});
+      p.querySelectorAll(":scope>.toggle-row,:scope>#beta-row,:scope>#look-row,:scope>#fx-level-row,:scope>.sx-row:not(#sx-ver-row)").forEach(e=>{if(e.offsetParent!==null)o.rows.push(Math.round(e.getBoundingClientRect().height));});}
+    o.pad=getComputedStyle(v.querySelector("#about-body")).paddingLeft;
+    o.nrows=o.rows.length;o.rows=[...new Set(o.rows)];settingsPane("p-persona");return o;})()`);
   out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
   await press("Escape", "Escape", 27); await sleep(40);
   out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
@@ -46994,7 +47008,8 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
   // the header's right: the status dot kept, a clean line gear for Settings, no light/dark button; ⌘, opens Settings
   out.head = await ev(`(()=>{const r=document.querySelector("#hz-right"),g=document.querySelector("#hz-settings"),m=document.querySelector("#hz-machines");
     return {dot:!!m&&r.contains(m)&&m.getClientRects().length>0,gear:!!g&&r.contains(g)&&g.getAttribute("aria-label")==="Settings"&&/^Settings \\((⌘|Ctrl\\+),\\)$/.test(g.title)&&/^M12\\.22 2h/.test((g.querySelector("svg path")||{getAttribute:()=>""}).getAttribute("d")),
-      theme:[...document.querySelectorAll("#hz-top button,#hz-top [role=button]")].filter(e=>/light|dark|theme|sun\\b|moon/i.test((e.getAttribute("aria-label")||"")+" "+(e.title||"")+" "+e.id)).length};})()`);
+      theme:[...document.querySelectorAll("#hz-top button,#hz-top [role=button]")].filter(e=>/light|dark|theme|sun\\b|moon/i.test((e.getAttribute("aria-label")||"")+" "+(e.title||"")+" "+e.id)).length,
+      gpu:!!document.getElementById("hz-gpub")||/GPU sky| fps/.test(document.body.innerText)};})()`);
   await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 }); await sleep(300);
   out.comma = await ev(`!document.querySelector("#about-veil").hidden`);
@@ -47057,6 +47072,10 @@ def _px_live(width, mode="full", mutation=None):
         return json.loads(r_.stdout)
     except Exception as e_:
         return {"err": repr(e_)}
+def _px_tight_ok(t):
+    return (t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
+            and t.get("rows") == [40] and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
+            and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px")
 def _px_set_ok(r, phone=False):
     s_, o_, c_ = r.get("set") or {}, r.get("open") or {}, r.get("closing") or {}
     return (not r.get("err") and not r.get("errs") and r.get("suggest") == 0
@@ -47068,19 +47087,20 @@ def _px_set_ok(r, phone=False):
             and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
             and (s_.get("focus") or "").startswith("button.snav|General")
             and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
-            and s_.get("rows") == ["General", "Appearance", "Voice", "You", "Your stuff", "Models", "Usage", "About"]
-            and s_.get("genCtl") == 3 and s_.get("adv") == [True, True]
-            and s_.get("panes") == ["about-check,beta-row,autochk-toggle,up-notes", "look-row,fx-level-row", "micwarm-toggle", "set-spec,about-site"]
-            and s_.get("about") == ["version", "chip", "memory", "models"]
-            and (s_.get("look") or {}).get("notes") == ["rgba(255, 255, 255, 0.55)"] * 2 and (s_.get("look") or {}).get("knobs") == ["rgb(141, 145, 155)"] * 2
+            and s_.get("rows") == ["General", "Appearance", "Models", "You", "About"] and s_.get("kids") == ["Local", "Cloud", "Servers", "Usage"]
+            and s_.get("genCtl") == 4 and s_.get("adv") == [True]
+            and s_.get("panes") == ["sx-whatsnew,about-check,up-notes,beta-row,autochk-toggle,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,set-spec,about-site"]
+            and bool(re.match(r"ConcordeAI \d.* \(build \d+\)", (s_.get("about") or [""])[0])) and (s_.get("about") or ["", ""])[1] == "none"
+            and _px_tight_ok(r.get("tight") or {})
+            and (s_.get("look") or {}).get("notes") == ["none", "none"] and (s_.get("look") or {}).get("knobs") == ["rgb(141, 145, 155)"] * 2
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
-            and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona"]
+            and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona", "know-path"]
             and (r.get("you") or {}).get("labels") == ["What should Concorde call you?", "Anything to keep in mind?"]
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
-            and r.get("head") == {"dot": True, "gear": True, "theme": 0} and r.get("comma") is True
+            and r.get("head") == {"dot": True, "gear": True, "theme": 0, "gpu": False} and r.get("comma") is True
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
             and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
 def _px_full_ok(r):
@@ -47101,7 +47121,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings simpler and in one language (General, Appearance, Voice, You, Your stuff, Models with its three under it, Usage, About; General the updates, Appearance Look and Effects, Voice the microphone, About a quiet Inter list without Accel; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -47114,11 +47134,18 @@ _px_mw = [
     ("About left as four things at once (no General, Appearance or Voice)", [["  sxSetPanes(v,g);\n", ""]]),
     ("⌘, opens nothing in the page", [['  addEventListener("keydown",sxComma,true);\n', ""]]),
     ("the job-shaped prompt back in You", [["ps.placeholder=\"Short answers, and say what you're unsure of.\";", ""]]),
+    ("rows 48 high again", [[".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}", ".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:48px;padding:8px 0}"]]),
+    ("What's new back on General's face", [[".hz #about-veil #sx-p-general:not(.sx-notes)>#up-notes{display:none}", ""]]),
+    ("Your stuff its own section again", [["gone(g('.snav[data-pane=\"p-know\"]'));", ""]]),
+    ("Usage outside Models", [['if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}', ""]]),
+    ("the roster two lines a model", [[".hz #about-veil .ros-row .rd{grid-column:3;grid-row:1;", ".hz #about-veil .ros-row .rd{grid-column:2/4;grid-row:2;"]]),
+    ("a long helper sentence back under Cloud", [['p.textContent="While on, prompts leave your machines. ";', 'p.textContent="Optional. While on, cloud models answer and your prompts leave your machines. ";']]),
+    ("the GPU badge on a page with no debug spec", [["function sxBoot(){\n", "function sxBoot(){\n  setTimeout(()=>{const b=document.createElement(\"div\");b.id=\"hz-gpub\";b.textContent=\"GPU sky on \\u00b7 119 fps \\u00b7 Apple GPU\";document.body.appendChild(b);},0);\n"]]),
 ]
 _px_mr = []
 for d_, m_ in _px_mw:
     r_ = _px_live(1440, "full", m_)
-    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "errs", "mutated")}))
+    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "tight", "head", "errs", "mutated")}))
 check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
       all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
 # (6) Servers, much cleaner (Patrick: "It still looks like way too much for me, bud"): the page's own sxSrvState and
@@ -47170,6 +47197,35 @@ _px_s6m = [("an error shown as the status", 'esc(waking&&st!=="awake"?"Waking…
 _px_s6r = [(d_, _px_srv_ok(_px_srv(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _px_s6m]
 check("6b625 Servers, much cleaner (the page's sxSrvState and sxSrvCard, in node): one status word (Awake, Asleep, Can't reach), a server the relay or Wake-on-LAN can wake Asleep never an error, the server's error sentence never printed, Wake only when asleep, Use for answers, chips when awake and one grey line when not, Sleeps after N min idle, and Test, Pair again, Change token, the wake relay, the guide and Remove server only under Advanced; four mutants caught",
       _px_srv_ok(_px_s6) and all(r_ is False for _, r_ in _px_s6r), "%r %r" % (_px_s6, _px_s6r))
+# (7) The GPU badge ("GPU sky on · 119 fps · Apple GPU", ?hz=gpu=1) is a dev copy's only: the release page's HZ_DEBUG is
+# null because hz_debug_spec answers None outside a dev copy and every test hook is empty there; any call of hzGpuBadge
+# sits behind hzS.debug.gpu. Run on hz_debug_spec itself (exec'd from the source) and on the source text.
+def _px_gpu_ok(src):
+    try:
+        ns_ = {"re": re, "urllib": urllib}
+        a_ = src.index("_HZ_DEBUG_RX = re.compile(")
+        e_ = src.index("\n\n\n", src.index("def hz_debug_spec(path: str, dev: bool):"))
+        exec(src[a_:e_], ns_)
+        f_ = ns_["hz_debug_spec"]
+        fn_ok = (f_("/?hz=gpu=1", False) is None and f_("/", False) is None and f_("/?hz=gpu=1", True) == "gpu=1")
+    except Exception as ex_:
+        return "spec: %r" % ex_
+    page_ = src[src.index("HTML_CONTENT"):]
+    calls_ = [m_.start() for m_ in re.finditer(r"(?<!function )hzGpuBadge\(\)", page_)]
+    guarded = all(page_[max(0, c_ - 60):c_].rstrip().endswith('if(hzS.debug&&hzS.debug.gpu==="1")') for c_ in calls_)
+    return (fn_ok and guarded
+            and "if x.strip()) if DEV_HOME else frozenset()" in src
+            and "_hz_spec = hz_debug_spec(self.path, bool(DEV_HOME))" in src
+            and '.replace("__HZ_DEBUG__", json.dumps(_hz_spec))' in src
+            and "HZ_DEBUG=__HZ_DEBUG__" in src) or "calls %d guarded %r fn %r" % (len(calls_), guarded, fn_ok)
+_px_g7 = _px_gpu_ok(_MILLENAI_SRC)
+_px_g7m = [("the debug spec served outside a dev copy", "    if not dev:\n        return None\n    m = _HZ_DEBUG_RX", "    m = _HZ_DEBUG_RX"),
+           ("test hooks outside a dev copy", "if x.strip()) if DEV_HOME else frozenset()", "if x.strip())"),
+           ("a badge call with no debug guard", "HZ_DEBUG=__HZ_DEBUG__", "HZ_DEBUG=__HZ_DEBUG__;setTimeout(()=>{if(typeof hzGpuBadge===\"function\")hzGpuBadge();},0)"),
+           ("the page's HZ_DEBUG a fixed spec", '.replace("__HZ_DEBUG__", json.dumps(_hz_spec))', '.replace("__HZ_DEBUG__", json.dumps("gpu=1"))')]
+_px_g7r = [(d_, _px_gpu_ok(_MILLENAI_SRC.replace(a_, b_, 1)) if a_ in _MILLENAI_SRC else "anchor missing") for d_, a_, b_ in _px_g7m]
+check("6b625 the GPU badge (\"GPU sky on · 119 fps · Apple GPU\") is a dev copy's only: outside one hz_debug_spec answers None for /?hz=gpu=1 and the test hooks are empty, so the page's HZ_DEBUG is null, and every hzGpuBadge() call is behind hzS.debug.gpu; the live page (no debug spec) has no badge; four mutants caught",
+      _px_g7 is True and all(r_ is not True for _, r_ in _px_g7r), "%r %r" % (_px_g7, _px_g7r))
 # ==== 6b625 the polish: end ====
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
