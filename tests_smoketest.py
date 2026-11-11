@@ -47283,6 +47283,42 @@ _px_n8m = [("another release's whole sentence", 'return m[1]+" is out";', "retur
 _px_n8r = [(d_, _px_news(page.replace(a_, b_, 1)) == _PX_NEWS_WANT if a_ in page else "anchor missing") for d_, a_, b_ in _px_n8m]
 check("6b625 fewer words: the version's news in four words or fewer (\"7.0 beta 3 is available\", \"7.0 beta 3 is out\", \"Automatic checks are off\"), this version's own date not at all; three mutants caught",
       _px_n8 == _PX_NEWS_WANT and all(r_ is False for _, r_ in _px_n8r), "%r %r" % (_px_n8, _px_n8r))
+# (9) Manage's image and video tiers in the current palette (Patrick, via the coordinator: "green and amber from the old
+# design"): silver where a tier runs well, the ice accent on the chosen one, amber only for the real caution (fits when
+# the computer is clear), graphite when too big; no green or red in Horizon; each tier's tooltip says what its colour
+# means (the legend went with the fewer words). The css from the source; sxTierTips in node on stand-in notches.
+def _px_tiers_css_ok(css):
+    r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules = [l for l in r_.split("\n") if "#studio-row" in l]
+    return (".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}" in r_
+            and ".hz #about-veil #studio-row .stnotch.amber i{background:#c9a15e}" in r_
+            and ".hz #about-veil #studio-row .stnotch.red i{background:rgba(255,255,255,.14)}" in r_
+            and ".hz #about-veil #studio-row .stnotch.sel.green i{background:#a9c6fb}" in r_
+            and ".hz #about-veil #studio-row .sttier u{color:#c9a15e}" in r_
+            and not any(re.search(r"#4fae6a|#c9584c|#d9a95a|#e8415a|#f0566c|pink|rose", l, re.I) for l in rules))
+_PX_TIPS = r"""
+const mk=(c,t)=>{const a={title:t};return {classList:{contains:x=>x===c},getAttribute:k=>a[k],setAttribute:(k,v)=>{a[k]=v;},a};};
+const ns=[mk("green","Quick · 4.6 GB"),mk("amber","Accurate · 9 GB"),mk("red","Finest · 40 GB")];
+const r={querySelectorAll:()=>ns};sxTierTips(r);sxTierTips(r);
+process.stdout.write(JSON.stringify(ns.map(n=>n.a.title)));
+"""
+_PX_TIPS_WANT = ["Quick · 4.6 GB · Runs well", "Accurate · 9 GB · Fits when the Mac is clear", "Finest · 40 GB · Too big"]
+def _px_tips(pg):
+    try:
+        js_ = pg[pg.index("// ==== polish-js (6b625): begin ===="):pg.index("// ==== polish-js (6b625): end ====")]
+        return _node_json(_px_line(js_, "var SX_FIT=") + _jsfn(js_, "function sxTierTips(r){") + _PX_TIPS, "tips625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_px_t9 = _px_tips(page)
+_px_t9c = [("the green back", ".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}", ".hz #about-veil #studio-row .stnotch.green i{background:#4fae6a}"),
+           ("a too-big tier red", ".hz #about-veil #studio-row .stnotch.red i{background:rgba(255,255,255,.14)}", ".hz #about-veil #studio-row .stnotch.red i{background:#c9584c}"),
+           ("amber on every tier", ".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}", ".hz #about-veil #studio-row .stnotch.green i{background:#c9a15e}")]
+_px_t9cr = [(d_, _px_tiers_css_ok(_px_css.replace(a_, b_, 1)) if a_ in _px_css else "anchor missing") for d_, a_, b_ in _px_t9c]
+_px_t9m = [("no meaning in the tooltip", 'if(w&&t.indexOf(w)<0)n.setAttribute("title",t+" \\u00b7 "+w);', "")]
+_px_t9mr = [(d_, _px_tips(page.replace(a_, b_, 1)) == _PX_TIPS_WANT if a_ in page else "anchor missing") for d_, a_, b_ in _px_t9m]
+check("6b625 Manage's image and video tiers in the current palette: silver where a tier runs well, ice on the chosen one, amber only for \"fits when the Mac is clear\", graphite when too big, no green or red; each tier's tooltip says what its colour means, once; four mutants caught",
+      _px_tiers_css_ok(_px_css) and _px_t9 == _PX_TIPS_WANT and all(r_ is False for _, r_ in _px_t9cr + _px_t9mr),
+      "%r %r %r" % (_px_t9, _px_t9cr, _px_t9mr))
 # ==== 6b625 the polish: end ====
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

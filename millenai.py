@@ -55340,6 +55340,15 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #about-veil .ros-row .rg{grid-column:3;justify-self:end}
 .hz #about-veil #studio-row .stdesc,.hz #about-veil #studio-row .stlegend,.hz #about-veil #studio-row .sttier i{display:none}
 .hz #about-veil #studio-row .stnotch span{text-transform:none;letter-spacing:0}
+/* the tier bars (6b625): silver where it runs well, the ice accent on the chosen one, amber only where it is a real
+   caution (fits when the computer is clear), graphite where it is too big; no green, no red */
+.hz #about-veil #studio-row .stnotch i{height:3px;border-radius:2px}
+.hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}
+.hz #about-veil #studio-row .stnotch.amber i{background:#c9a15e}
+.hz #about-veil #studio-row .stnotch.red i{background:rgba(255,255,255,.14)}
+.hz #about-veil #studio-row .stnotch.sel.green i{background:#a9c6fb}
+.hz #about-veil #studio-row .stnotch.sel{background:rgba(255,255,255,.08)}
+.hz #about-veil #studio-row .sttier u{color:#c9a15e}
 .hz #about-veil #autoclean-toggle .ac-txt{display:flex;flex-direction:column;gap:2px;overflow:visible;white-space:normal}
 .hz #about-veil #autoclean-toggle .ac-txt>span{display:block;font-size:13px;line-height:18px}
 .hz #about-veil #autoclean-toggle #autoclean-note{margin:0;padding:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
@@ -71962,8 +71971,14 @@ function sxRosterTerse(r){
   r.querySelectorAll(":scope>.ros-gh").forEach(h=>{const t=SX_GH[h.textContent.trim()];if(t)h.textContent=t;});
   r.querySelectorAll(":scope>.ros-row").forEach(w=>{const d=w.querySelector(".rd:not(.rerr)"),t=d&&d.textContent.trim();if(t)w.title=t;});
 }
+var SX_FIT={green:"Runs well",amber:"Fits when the Mac is clear",red:"Too big"};
+function sxTierTips(r){
+  r.querySelectorAll(".stnotch").forEach(n=>{const k=["green","amber","red"].find(c=>n.classList.contains(c)),w=k&&SX_FIT[k],t=n.getAttribute("title")||"";
+    if(w&&t.indexOf(w)<0)n.setAttribute("title",t+" \u00b7 "+w);});
+}
 function sxTerse(v,g){
   const r=g("#roster");if(r&&window.MutationObserver){sxRosterTerse(r);new MutationObserver(()=>sxRosterTerse(r)).observe(r,{childList:true});}
+  const sr=g("#studio-row");if(sr&&window.MutationObserver){sxTierTips(sr);new MutationObserver(()=>sxTierTips(sr)).observe(sr,{childList:true,subtree:true});}
   const nl=g("#nolimits-row span");if(nl){nl.parentNode.title=nl.textContent.trim();nl.textContent="No limits: may crash this computer";}
   const bd=g("#bm-desc");if(bd&&window.MutationObserver){const f=()=>bd.classList.toggle("sx-cost",/cost money/i.test(bd.textContent));f();new MutationObserver(f).observe(bd,{childList:true,characterData:true,subtree:true});}
 }

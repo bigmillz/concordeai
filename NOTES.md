@@ -21520,6 +21520,17 @@ models, You's long labels back). `sxNews` in node on paintUpdatesPane's four lin
   "Details", "Models show when it's awake.", and Servers' "Drafts leave your machines only when a cloud model combines
   them." (offered shorter: "Drafts leave only for cloud merging." — Pat to choose).
 
+**Manage's tiers in the current palette (per Patrick via the coordinator, for beta 5: "green and amber from the old
+design").** Horizon only; Classic's studio keeps its colours. A tier that runs well is a silver bar (#c9ced8), the
+chosen one ice (#a9c6fb); amber (#c9a15e, muted) only where it is a real caution, "fits when the Mac is clear"; a tier
+too big for this computer is graphite (14 % white), never red; the "More memory than this computer has" line amber, not
+rose. Bars 3 px with 2 px corners. With the legend gone (fewer words), each tier's tooltip says what its colour means
+("Quick · 4.6 GB · Runs well", "… · Fits when the Mac is clear", "… · Too big"), added once per paint by
+`sxTierTips` on the studio row. Checked in WKWebView at 1440 and 760 (computed: chosen rgb(169,198,251), others
+rgb(201,206,216), cautions rgb(201,161,94)). **Tests:** the css pinned with no green, red, rose or pink in any
+#studio-row rule, sxTierTips in node on stand-in notches (twice, so once only); four mutants (the green back, a too-big
+tier red, amber on every tier, no meaning in the tooltip). No new copy (the three meanings are the old legend's).
+
 **Left / worth knowing.**
 - Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
