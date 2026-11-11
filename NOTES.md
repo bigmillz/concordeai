@@ -22929,6 +22929,56 @@ dragged from the background in one go): Pat's call. The sidebar's shut state and
 Attach after the mode and the effort slider, and the header last. About shows the chip as "M4 PRO". Search never
 ran here by rule (the search engines are rate-limiting this Mac's address).
 
+## 6b644 — half a screen: the Mac shell down to 640 pt, the sidebar folds itself (7.0 beta 5, per Patrick: "allow half-screen")
+
+Patrick, on 6b643's report (via the lead): yes to half-screen; lower the minimum below 864 pt, aim about 640, and make
+the top bar, the composer, the sidebar (auto-collapsing), Settings and answers hold up there; no first-click-through
+(the first click on a background window still only brings it forward). A new commit on `quirks-1` for beta 5.
+
+**Why.** The shell's window was never under 940 × 620 pt, wider than half of every Mac screen at its default scaling
+(16-inch 1728 → 864, 15-inch Air 855, 14-inch 756, 13-inch Air 735), so Split View and the half-screen tiles could not
+take ConcordeAI on any of Patrick's Macs.
+
+**What changed.**
+- `shell/src-tauri/src/main.rs`: `MIN_W` 640, `MIN_H` 620 (unchanged); the window's minimum and a restored place's
+  clamp both read them.
+- The header at 760 and under (the sidebar a drawer there): in the Mac shell it keeps the lights' 96 px on both sides
+  whatever the sidebar's setting, unless the drawer is open over it. Before, with the sidebar "open" by setting, the
+  menu key sat under the traffic lights at 720 and 640.
+- Settings at 640 fills the window (its phone layout); in the Mac shell its tabs start right of the lights (they sat
+  under them).
+- The sidebar folds itself: under 900 px a conversation's open sidebar is folded (`sbhide`, the saved setting untouched,
+  `hzSidebarAuto` on resize and at start) and comes back at 900 px or wider. The menu key opens it while narrow and that
+  holds until the window is wide again; a sidebar shut by hand stays shut. The home's own sidebar is unchanged.
+  6b643's home open (clearing an earlier shut) leaves the fold's state consistent too.
+
+**Measured** (a windowless dev copy of this branch with the search stand-in and a stand-in engine; never the real app,
+never a window on Patrick's screen). Headless Chromium, html.tl, at 1100, 940, 864, 800, 760, 720, 680 and 640: home
+and a conversation with a markdown answer (code, a table, links), the sidebar open and shut: every header control, the
+composer's controls and the answer's keys hit by `elementFromPoint` at their centres, none overlapping, nothing
+interactive under the lights (a 6 px grid of `elementFromPoint` over the 88 × 56 zone), nothing outside the window or
+sideways; Settings and each of its twelve panes, the palette, find and Bring your chats the same: 0 problems in 32
+cases (was 4 header cases and Settings at 640). The fold: open at 1100, folded at 864 with the setting still "0", back
+at 1100, opened by the menu key at 864, held at 820, folded again after a wide spell. A real WKWebView (a Swift
+harness, a borderless window at −30000, −30000, never on a screen) at the same widths: 0 problems; with the two narrow
+rules removed it finds the menu key under the lights at 720 and 640 and Settings' tabs under them at 640. 6b555's
+header harness with the shell's 864, 720 and 640 added: 52 cases, none bad (centred lanes included). Screenshots:
+scratchpad `qt/narrow/shots-after/`.
+
+**Not measured here.** The real shell window at 640 (it would have opened on Patrick's screen): the size rule is the
+constant above; the page is the measured part. macOS's own tiling was not exercised.
+
+**Gauntlet.** New `# ==== 6b644 half a screen` (4 checks): MIN_W by source (2 mutants); the fold in node on the page's
+own functions (3 mutants); the page as the Mac shell in headless Chromium at six widths with the overlays, Settings
+and the fold (one mutated page: the header's narrow rule, Settings' tab rule and the fold's wiring removed); the same
+in a real WKWebView built with swiftc (the two narrow rules removed, caught). Re-pinned at a greater strength: 6b555's
+header check runs the shell's cases at 864, 720 and 640 too (52 cases, was 40). Found on the way and fixed: that check's
+static half was red on beta-4 itself: it looked for 6b624's `.hz #hz-top{display:grid;…}` in the Horizon CSS slice,
+which ends before 6b624's block; it reads the served page for that rule now. Run standalone on a dev copy (6b555's
+header check, 6b643's block and this one; the shell's two re-pinned checks): 13/13. Never the full gauntlet.
+
+**Copy.** None.
+
 ## 6b650 — funnels-1: the pick honours every choice, has a shape, cites what it found; the wait says what it's doing (7.0 beta 5, per Patrick)
 
 Per Patrick: "I want the queries that come back to be perfect, like Fable level, and the funnels to be just as
