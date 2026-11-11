@@ -54918,6 +54918,26 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil #roster:not(.managing) .rrm{display:none}
 /* Personal suggestions: Horizon's home shows none (6b555), so it asks for none; the switch is Classic's */
 .hz #about-veil #sugg-toggle,.hz #about-veil #sugg-note{display:none}
+/* Settings, simpler (6b625): Advanced, one per pane; the questions over the two You fields */
+.hz #about-veil .sx-gone{display:none!important}
+.hz #about-veil .sx-adv{margin:16px 0 0;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil .sx-advb{display:flex;align-items:center;gap:8px;width:100%;height:44px;padding:0;border:0;background:none;color:var(--sx-ink2);
+  font:500 13px/1 var(--hz-font-ui);text-align:left;cursor:pointer}
+.hz #about-veil .sx-advb::after{content:"";width:6px;height:6px;margin:-3px 0 0 2px;border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:rotate(45deg);
+  transition:transform .18s var(--sx-e)}
+.hz #about-veil .sx-advb[aria-expanded="true"]::after{transform:translate(0,3px) rotate(-135deg)}
+.hz #about-veil .sx-advb:hover{color:var(--sx-ink)}
+.hz:not(.hz-kb) #about-veil .sx-advb:focus-visible{outline:0}
+.hz.hz-kb #about-veil .sx-advb:focus-visible{outline:1px solid var(--hz-ember);outline-offset:2px}
+.hz #about-veil .sx-advc[hidden]{display:none}
+.hz #about-veil .sx-advc{display:flex;flex-direction:column}
+.hz #about-veil .sx-advc>.toggle-row:first-child,.hz #about-veil .sx-advc>label:first-child{border-top:0}
+.hz #about-veil .sx-advc #acct-card{margin:0 0 16px}
+.hz #about-veil .sx-advc #imp-settings-row{padding:0 0 16px;border:0}
+.hz #about-veil .sx-lab{display:block;margin:0 0 8px;font:500 12px/16px var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #about-veil #p-persona #user-name{margin-bottom:16px}
+.hz #about-veil #p-know .sx-priv{display:block;margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+@media (prefers-reduced-motion:reduce){.hz #about-veil .sx-advb::after{transition:none}}
 /* a phone: the dialog is the screen; the rail runs along the top */
 @media (max-width:640px){
   .hz #about-veil{align-items:stretch;padding:0}
@@ -54985,6 +55005,11 @@ html:not(.hz) #sx-host{display:none}
 .hz #sx-host .sx-hd{width:6px;height:6px;flex:none;border-radius:2px;background:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
 .hz #sx-host.set .sx-hd{background:#d9dde6;box-shadow:none}
 .hz #crow:has(#sx-host:not([hidden])) #mic{margin-left:0}
+.hz #sx-host .sx-hico{display:none;width:16px;height:16px;flex:none}
+@media (max-width:1100px){.hz #sx-host:not([hidden]){width:36px;padding:0;justify-content:center;position:relative}
+  .hz #sx-host span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .hz #sx-host .sx-hico{display:block}
+  .hz #sx-host .sx-hd{position:absolute;top:6px;right:6px;width:5px;height:5px}}
 .hz #main:not(:has(#hero)) #sx-host:not([hidden]){order:2;margin-left:auto;height:32px}
 /* the Code lane's Run key: neutral silver with words in it, never the ember and never a hue */
 .hz.hz-sx-code #composer.hastext #send:not(:disabled):not(.stop){background:#e9ebf0;color:#141416;box-shadow:none}
@@ -55652,7 +55677,7 @@ __CODE_ROWS__
           <path d="M21.4 11.05 12.2 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.2a1.83 1.83 0 0 1-2.6-2.6l8.5-8.48"/>
         </svg>
       </button>
-      <button type="button" id="sx-host" hidden title="Server connection"><i class="sx-hd" aria-hidden="true"></i><span>Connect a server</span></button>
+      <button type="button" id="sx-host" hidden title="Server connection"><i class="sx-hd" aria-hidden="true"></i><svg class="sx-hico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/></svg><span>Connect a server</span></button>
       <button class="cbtn" id="mic" title="Dictate">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -60357,7 +60382,7 @@ function paintChips(){
   w.innerHTML=pendingImages.map((d,i)=>
     '<span class="imgchip"><img src="'+d+'">'+
     '<b data-k="i" data-i="'+i+'" title="Remove">×</b></span>').join("")
-   +pendingDocs.map((d,i)=>(d.busy||d.err)&&isHz()?docChipHz(d,i)   // plain words and one action, flat (6b625)
+   +pendingDocs.map((d,i)=>(d.busy||d.err)&&typeof isHz==="function"&&isHz()&&typeof docChipHz==="function"?docChipHz(d,i)   // plain words and one action, flat (6b625)
     :d.busy||d.err
     // a PDF still being read, or one that can't be (6b546): never sent
     ?'<span class="docchip dloc dpdf'+(d.err?' dbad dperr':' dpbusy')+'" title="'+esc(d.name+(d.err?"\n"+d.err:""))+'">📄 '
@@ -66491,6 +66516,7 @@ function modelsGroup(open){
   g.setAttribute("aria-expanded",open?"true":"false");k.hidden=!open;
 }
 function settingsPane(id){
+  if(typeof sxSetRedirect==="function")id=sxSetRedirect(id);   // the account lives in You now (6b625)
   $$(".snav").forEach(x=>x.classList.toggle("on",x.dataset.pane===id));
   // a pane under Models opens the group and marks it (6b350)
   const kid=!!$('#snav-models-kids .snav[data-pane="'+id+'"]');
@@ -71561,8 +71587,51 @@ function sxLanePaint(){
 // deferred a tick, as modeShow's own repaint is: a hook can run during boot, before the chat's state is declared
 function sxLaneSoon(){setTimeout(()=>{try{sxLanePaint();}catch(e){}},0);}
 function sxHostEsc(){const v=document.getElementById("sx-host-veil");if(!v||v.hidden)return false;sxHostClose();return true;}
+// ---- SETTINGS, SIMPLER (6b625, per Patrick: "let's clean up the settings a lot ... let's simplify"): fewer sections and
+// fewer switches on each first screen. Horizon only, once, by moving the page's own nodes (every id and handler kept):
+// Account folds into "You" (what to call you, anything to keep in mind, the answer length; the account, bringing chats
+// and erasing under Advanced); About keeps the version, What's new, Check now and Effects, the rest under Advanced; Your
+// stuff keeps your chats and folders, the cloud switch and re-reading under Advanced; paragraphs that repeat a label go.
+function sxAdv(pane,nodes){
+  if(!pane||pane.querySelector(":scope>.sx-adv"))return null;
+  const w=document.createElement("div");w.className="sx-adv";
+  const b=document.createElement("button");b.type="button";b.className="sx-advb";b.setAttribute("aria-expanded","false");b.textContent="Advanced";
+  const c=document.createElement("div");c.className="sx-advc";c.hidden=true;c.id="sx-adv-"+pane.id;b.setAttribute("aria-controls",c.id);
+  b.addEventListener("click",()=>{const on=c.hidden;c.hidden=!on;b.setAttribute("aria-expanded",on?"true":"false");});
+  nodes.filter(Boolean).forEach(n=>c.appendChild(n));w.appendChild(b);w.appendChild(c);pane.appendChild(w);return w;
+}
+function sxLabel(forId,text){const l=document.createElement("label");l.className="sx-lab";l.htmlFor=forId;l.textContent=text;return l;}
+var sxSimple=false;
+function sxSetSimplify(){
+  if(sxSimple||!sxHz())return;const v=$("#about-veil");if(!v)return;sxSimple=true;
+  const g=s=>v.querySelector(s);
+  // the rail: Account is part of You
+  const ra=g('.snav[data-pane="p-account"]');if(ra)ra.classList.add("sx-gone");
+  const rp=g('.snav[data-pane="p-persona"]');if(rp)rp.textContent="You";
+  // You: two optional fields with their questions, the length; the account and the rare things under Advanced
+  const pp=g("#p-persona"),pa=g("#p-account");
+  if(pp){const h=pp.querySelector(".set-h");if(h)h.textContent="You";
+    pp.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+    const nm=g("#user-name"),ps=g("#persona");
+    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should Concorde call you?"));}
+    if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
+    sxAdv(pp,[g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
+  if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(x=>x.classList.add("sx-gone"));
+  // About: the version, What's new, Check now and Effects; the rest under Advanced
+  const ab=g("#p-about");const fn=g("#fx-level-note");if(fn)fn.classList.add("sx-gone");
+  if(ab)sxAdv(ab,[g("#beta-row"),g("#autochk-toggle"),g("#look-row"),g("#micwarm-toggle"),g("#micwarm-note")]);
+  // Your stuff: the privacy line stays, the long paragraph goes; the cloud switch and re-reading under Advanced
+  const pk=g("#p-know");
+  if(pk){const td=pk.querySelector(":scope>.tdesc"),pv=g("#know-privacy");if(td&&pv){td.before(pv);pv.classList.add("sx-priv");td.classList.add("sx-gone");}
+    const hints=[...pk.querySelectorAll(":scope>.kn-hint")],sh=g("#know-share"),rx=g("#know-reindex");
+    sxAdv(pk,[sh&&sh.closest("label"),hints[1],hints[0],rx&&rx.parentNode]);}
+  // Local models: the line that repeats the heading goes
+  const pm=g("#p-models");if(pm)pm.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
+}
+// a pane asked for by name that now lives inside another (the account is You's)
+function sxSetRedirect(id){if(id==="p-account"&&sxSimple){const a=$("#sx-adv-p-persona");const b=a&&a.previousElementSibling;if(a&&a.hidden&&b)b.click();return "p-persona";}return id;}
 function sxBoot(){
-  sxSetWire();sxPhWire();sxHostWire();sxLanePaint();
+  sxSetWire();sxPhWire();sxHostWire();sxLanePaint();sxSetSimplify();
   const ci=$("#chat-inner");
   if(ci&&window.MutationObserver&&!ci._sx){ci._sx=true;let q=false;
     new MutationObserver(()=>{if(q)return;q=true;setTimeout(()=>{q=false;sxLanePaint();},0);}).observe(ci,{childList:true});}

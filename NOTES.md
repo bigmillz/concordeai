@@ -21194,6 +21194,24 @@ and the rail a scrolling top row. About: the version from APP_VERSION and the be
 new in 7.0 beta 3", "7.0 beta 3 released on ..."), which is what a dev build ahead of the channel showed wrongly.
 Usage: "1 request" (the card's label follows the number; Intl.PluralRules, `sxPl`).
 
+**Settings, simpler** (Patrick, relayed 2026-11-11: "let's clean up the settings a lot. Like, it's asking like where
+people live and stuff ... let's simplify"). Horizon only, once at boot, by moving the page's own nodes (`sxSetSimplify`;
+every id and handler kept, the served HTML unchanged, so Classic and the static pins are as they were):
+- **The rail** is About · You · Your stuff · Models › · Usage (Account folded into You; six sections to five).
+- **You** asks two optional things, each with its question over it: "What should Concorde call you?" and "Anything to
+  keep in mind?", then the answer length and Save. The placeholder that asked for a job ("I work in finance") is gone.
+  Under **Advanced**: the account card, Bring your chats, Erase everything (a request for the Account pane opens You
+  with Advanced open, `sxSetRedirect`).
+- **About**'s first screen is the version, the build, What's new, Check now and Effects (one control); Update channel,
+  Check for updates, Look and Keep microphone ready are under Advanced; the Effects note goes.
+- **Your stuff** keeps the privacy line and your chats and folders; the cloud switch, its note, the formats note and
+  "Read everything again" are under Advanced; the paragraph that repeated the section goes. Local models: the line under
+  the heading goes.
+- **Where you live:** no field in Settings, Personality, Your stuff or the wizard asks for a place on this branch (the
+  home-area field went before 7.0). A `home_area` saved by an older build is still read on the server (weather "here",
+  the local clock, Classic's greeting town; profiles, sync and Add carry it); dropping it is a server change pinned by
+  about six checks, left for a decision (see Left).
+
 **One type system.** In Horizon `--sans` is Inter (the system's sans until the file is bundled), so everything that
 fell to Space Grotesk by default is Inter; the greeting keeps Space Grotesk by name, the wordmark Michroma. Mono is
 for code only: the table heads are 12/600 sentence case, the ordered-list numbers, citations, the flow's numbers, the
@@ -21220,7 +21238,8 @@ its note are hidden in Horizon's Settings (they did nothing visible there).
 
 **The Code lane.** Drawn 1.5 px icons in place of colour emoji (Coding `</>`, Workspace folder, Remote server; the
 autonomy cards' lock, play, fast-forward; the agents' hover card drops its emoji). The SSH form left the sidebar: in
-Remote, a compact host chip sits in the composer row ("Connect a server", or the saved `user@host` with a silver dot)
+Remote, a compact host chip sits in the composer row ("Connect a server", or the saved `user@host` with a silver dot; under 1100 px only a drawn server icon and the dot,
+so the send key keeps its row)
 and opens a flat sheet ("Your server") holding the very same `#remote-bar` (moved in while open and put back after,
 so every id, the `/api/remote/config` wire, Save, Test connection and Forget old key are the originals). Each lane
 has its placeholder (Coding "Describe the code you need", Workspace "Ask about your project folder", Remote "What
@@ -21264,6 +21283,10 @@ no model run; Chromium headless shell and a real WKWebView, 1440 and 760, Settin
 - The dictation level: 1,047 lit pixels in the 80 × 32 canvas after 1.6 s of the stand-in mic; the send key
   transparent while listening (before: rgb(232,65,90)).
 
+- Settings, simpler (Chromium live, 1440 and 390): the rail's rows About, You, Your stuff, Models, Usage; About's first
+  screen 1 control (before 5); You 2 text fields with their questions and no place, job or units words; an Advanced
+  per pane, closed.
+
 **Tests:** `== the polish ... (6b625) ==`: the css (the dialog's numbers, the rail, rows, controls, the phone, Inter
 for the mono caps, the danger outline, no light blue, the import over black, every rule Horizon's, no glow; 5 mutants);
 pure in node on the page's functions (plurals, the palette's lane, the PDF chip's words and key, the lane placeholders
@@ -21271,7 +21294,8 @@ and the answer cue; 5 mutants); suggLoad asking nothing in Horizon and once in C
 whose notes (1 mutant); About's version and build from the constants; run_remote_agent lifted and driven with
 stand-ins (5 scenarios, 2 mutants); live headless Chromium at 1440 and 390 (Settings by the gear with real keys, the
 palette, the dictation level, the host chip and sheet, a danger command's card under its line, Funnels' home and
-hairline, no /api/suggest), with 6 mutants served in place of the page. Proven on a trimmed copy on 9984–9986.
+hairline, no /api/suggest, the simpler Settings), with 7 mutants served in place of the page. Re-pinned at the same
+strength: 6b551's What's new pin follows the new header (a nightly still never says "in"). Proven on a trimmed copy on 9984–9986.
 
 **Copy, new or changed (for Patrick's approval), Horizon only unless said:**
 - Settings rail: new label "SETTINGS"; the facts "VERSION / CHIP / MEMORY / ACCEL / MODELS" → "Version / Chip / Memory /
@@ -21288,8 +21312,20 @@ hairline, no /api/suggest), with 6 mutants served in place of the page. Proven o
   before it asks you is up to you."
 - Funnels: the composer during a funnel "Ask anything" → "Or type your own answer"; the "Funnel" byline hidden.
 - Settings: the "Personal suggestions" switch hidden in Horizon.
+- Settings, simpler: rail "Account" + "Personality" → "You" (heading too); new labels "What should Concorde call you?"
+  and "Anything to keep in mind?"; placeholders "Name" → "Optional", "Be direct. I work in finance; assume I know the
+  vocabulary." → "Short answers, and say what you're unsure of."; new "Advanced" disclosure in About, You and Your stuff;
+  removed lines: "Your name, answer length, and standing instructions.", "Your name here, and the way out.", "Balanced is
+  the default. Full is the whole show.", "What's installed, what's loaded, and what each model is for.", and Your
+  stuff's "Answers can draw on your own chats and the folders you choose, found on this computer, and say which chat or
+  file they used." (its privacy line kept).
 
 **Left / worth knowing.**
+- A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
+  schema and ADD_SETTINGS lose the key, the client's `CITY`, and the pins at weather "home", the prefs echo, profiles'
+  Add, sync's set and the 6b390 hide words follow. Weather "what's the weather" with no place would then search or ask.
+- Settings, simpler is applied once at boot in Horizon; switching the look to Classic without a reload keeps the
+  folded layout until the next launch.
 - The task picker (`#task-veil`) still shows its colour emoji per task; Horizon has no way to open it (the task chips
   have been hidden since 6b555), so it was left. The Code lane home is one line, no chips (Patrick called the chips
   tacky in 6b555).

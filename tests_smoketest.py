@@ -44681,7 +44681,7 @@ check("6b551 a nightly's What's new never lists commit subjects: the last releas
       and all("gauntlet" not in (x.get("notes") or "") and "(build 278)" not in (x.get("notes") or "") for x in (_sl_n1, _sl_n2, _sl_w1, _sl_w2))
       and 'rels = ([dict(x, _human_notes=human) for x in rels\n                     if x.get("tag_name") == "nightly"] or rels)' in _MILLENAI_SRC
       and 'cmp_ = _get("compare/' not in _MILLENAI_SRC and '"- " + x for x in subs' not in _MILLENAI_SRC
-      and '+(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")' in page,
+      and '+(r.tag!=="nightly"&&r.latest&&(r.available||r.latest!==r.current)?" in "+esc(r.latest):"")' in page,   # re-pinned in 6b625: a nightly still never says "in"; another version's notes now say whose
       "%r" % [_sl_n1.get("notes"), _sl_n2.get("notes"), _sl_w1.get("notes"), _sl_w2.get("notes")])
 # ==== settings-look (6b551): end ====
 # ==== beta-3 the chrome (6b555): begin ====
@@ -46709,8 +46709,7 @@ def _px_css_ok(css):
     return (_hz_scoped(css)
             and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|[^-]blur\(|box-shadow:0 0 [1-9]", r_)
             and ".hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;" in r_
-            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);" in r_
-            and "background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;" in r_
+            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;" in r_
             and "--sx-s0:#0e0e10;--sx-s1:#141416;--sx-s2:#1a1a1d;--sx-s3:#1f1f22;--sx-s4:#2a2a2f" in r_ and "--sx-lab:rgba(255,255,255,.5)" in r_
             and ".hz #about-veil:not([hidden]){animation:sxFade .18s var(--sx-e) both}" in r_ and "@keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}" in r_
             and ".hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}" in r_
@@ -46736,7 +46735,7 @@ def _px_css_ok(css):
             and "@media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card," in r_)
 check("6b625 the css: Settings in the demo's dialog (672 x 640, #141416, a 10 % hairline, radius 14, a 55 % backdrop, the 180 ms fade and 6 px rise), its rail (184, 11 px caps at 50 %, rows 13 px / 30 high on #1a1a1d / #1f1f22), 48 px rows, the #1a1a1d / #2a2a2f segmented control, 32 x 18 squared switches, 32 px inputs on #0e0e10, 28 px buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; five mutants caught",
       _px_css_ok(_px_css)
-      and not _px_css_ok(_px_css.replace("border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;", "border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:18px;box-shadow:none;", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css.replace("minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;", "minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:18px;", 1))   # a rounder dialog
       and not _px_css_ok(_px_css + "\n.hz #about-veil .snav.on{box-shadow:0 0 12px rgba(255,255,255,.3)}")                      # a glow on the rail
       and not _px_css_ok(_px_css.replace(".hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;", ".hz .msg.ai .body th{font:500 11px/16px var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;", 1))   # mono caps heads
       and not _px_css_ok(_px_css + "\n#about-card{color:red}")                                                                  # a rule outside Horizon
@@ -46968,9 +46967,17 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       rowH:Math.round(rr.height),rowBg:getComputedStyle(row).backgroundColor,lab:[lab.textContent,ls.fontSize,ls.fontWeight,ls.textTransform,getComputedStyle(lab).display],
       mono:leaves.filter(e=>/mono/i.test(getComputedStyle(e).fontFamily.split(",")[0])).map(e=>e.textContent.trim().slice(0,16)),
       caps:leaves.filter(e=>getComputedStyle(e).textTransform==="uppercase"&&getComputedStyle(e).display!=="none").map(e=>e.textContent.trim().slice(0,16)),
-      sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE}};})()`);
+      sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE},
+      rows:[...v.querySelectorAll("#set-nav>.snav")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim()),
+      aboutCtl:[...v.querySelectorAll("#p-about .toggle-row,#p-about .sl-seg,#p-about .sl-menu")].filter(e=>e.offsetParent!==null&&!e.closest(".sx-advc")).length,
+      adv:["#p-about","#p-persona","#p-know"].map(s=>!!v.querySelector(s+">.sx-adv>.sx-advb[aria-expanded=false]")&&!!v.querySelector(s+">.sx-adv>.sx-advc[hidden]"))};})()`);
   await press("ArrowDown", "ArrowDown", 40); await sleep(150);
   out.arrow = [await ev(AE), await ev(`document.querySelector("#about-veil .spane.on").id`)];
+  out.you = await ev(`(()=>{const p=document.querySelector("#about-veil #p-persona");const f=[...p.querySelectorAll("input[type=text],input:not([type]),textarea")].filter(e=>e.offsetParent!==null&&!e.closest(".sx-advc"));
+    const words=[...p.querySelectorAll("label,.set-h,.tdesc,input,textarea")].filter(e=>e.offsetParent!==null).map(e=>(e.textContent||"")+" "+(e.placeholder||"")).join(" | ");
+    return {head:p.querySelector(".set-h").textContent,fields:f.map(e=>e.id),labels:[...p.querySelectorAll(".sx-lab")].map(e=>e.textContent),
+      personal:/\b(where (do )?you live|city|town|home|location|address|zip|postcode|job|work in|units?|metric)\b/i.test(words),
+      account:!!p.querySelector(".sx-advc #acct-card")&&!!p.querySelector(".sx-advc #about-forget")};})()`);
   out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
   await press("Escape", "Escape", 27); await sleep(40);
   out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
@@ -47044,7 +47051,11 @@ def _px_set_ok(r, phone=False):
                  and s_.get("lab") == ["Settings", "11px", "600", "uppercase", "block"] and s_.get("caps") == ["Settings"])
             and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
             and (s_.get("focus") or "").startswith("button.snav|About")
-            and r.get("arrow") == [r.get("arrow", [""])[0], "p-account"] and (r.get("arrow") or [""])[0].startswith("button.snav|Account")
+            and r.get("arrow") == [r.get("arrow", [""])[0], "p-persona"] and (r.get("arrow") or [""])[0].startswith("button.snav|You")
+            and s_.get("rows") == ["About", "You", "Your stuff", "Models", "Usage"] and s_.get("aboutCtl") == 1 and s_.get("adv") == [True, True, True]
+            and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona"]
+            and (r.get("you") or {}).get("labels") == ["What should Concorde call you?", "Anything to keep in mind?"]
+            and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
@@ -47067,7 +47078,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings simpler (About, You, Your stuff, Models, Usage; About's first screen one control, Effects; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -47076,11 +47087,12 @@ _px_mw = [
     ("no level while dictating", [['  if(typeof dictMeter==="function")dictMeter(e.inputBuffer.getChannelData(0));   // the live level (6b625)\n', ""]]),
     ("the goal form left in the sidebar", [['const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="funnel"&&!!$("#hero");', "const on=false;"]]),
     ("no host chip", [["b.hidden=!on;if(!on)return;", "b.hidden=true;return;"]]),
+    ("Settings not simplified (every switch on About's first screen, Account its own section)", [["sxHostWire();sxLanePaint();sxSetSimplify();", "sxHostWire();sxLanePaint();"]]),
 ]
 _px_mr = []
 for d_, m_ in _px_mw:
     r_ = _px_live(1440, "full", m_)
-    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "errs", "mutated")}))
+    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "errs", "mutated")}))
 check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
       all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
 # ==== 6b625 the polish: end ====
