@@ -46385,6 +46385,307 @@ check("6b590 the chat (page): %d mutants served in place of the page, each caugh
       all(x_[1] for x_ in _c590m), "%r" % [x_ for x_ in _c590m if not x_[1]])
 # (the 6b425 follow rule's own node check, earlier in the run, drives the block with chatBulk and chatUnseen in it)
 # ==== 6b590 the chat: end ====
+# ==== 6b622 lanes: begin ====
+print("== the Code lane's runs and approval card, Funnels on a hairline, in the flat chrome (6b622) ==")
+# THE CODE LANE AND FUNNELS IN THE FLAT CHROME (6b622, per Patrick: "the code page and all that looks really dialed in ...
+# I want this UI to be perfect"; the web demo's Code and Funnels views). Four parts, each with mutants the same predicate
+# catches. (1) Pure, in node, on the page's own runRow: each STEP frame of the Remote agent becomes a run with its risk
+# tag, the command in mono (a batch's plan in prose), and a state line (Running, Waiting for you, Done, Failed · exit N,
+# Stopped, Skipped). (2) The saved record: turn_record keeps a command's risk (r) and a batch's size (n) from the frames
+# before its result, and keeps every step of a Code run. (3) The css: flat #151517 cards with a hairline, radius 10 cards
+# and 8 keys 32 tall, the silver sweep, every rule Horizon's, no circle or glow, Calm and reduced motion still. (4) Live,
+# headless Chromium on the copy's own page with stand-in streams (the agent's frames, /api/remote/approve, /api/funnel):
+# the runs, the approval card under its run, Approve by a real click, no flow or proof line for a Code run, a funnel's
+# picks (done, a check, the others at 45 % and inert, the trail, a typed answer as the chosen card, the verdict), the
+# chip's flight only outside Calm, nothing sideways; mutants served in place of the page.
+def _ln_pure_js(pg):
+    js = "const esc=s=>String(s==null?'':s).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));\n"
+    for h in ("var RUN_RX=", "function runSteps(st){", "function runRisk(d){"):
+        i_ = pg.index(h); js += pg[i_:pg.index("\n", i_) + 1]
+    return js + _jsfn(pg, "function runRow(s,x){")
+_LN_PURE = r'''
+const R=(s,x)=>{const r=runRow(s,x||{});const tag=(/<span class="hz-risk[^"]*">([^<]*)</.exec(r.html)||[])[1];
+  return [r.cls.split(" ")[1],r.txt,tag===undefined?null:tag,/<code class="hz-cmd">/.test(r.html)];};
+const out={
+ conn:R({id:"conn",l:"Connected to vps",s:"done",d:"Linux vps x86_64"}),
+ run:R({id:"cmd1",l:"df -h /",s:"run",d:"reading"}),
+ wait:R({id:"cmd2",l:"sudo ufw enable",s:"wait",d:"Waiting for you",r:"write"}),
+ waitOk:R({id:"cmd2",l:"sudo ufw enable",s:"wait",d:"Waiting for you",r:"write"},{ok:true}),
+ done:R({id:"cmd2",l:"sudo ufw enable",s:"done",d:"exit 0",r:"write"}),
+ failed:R({id:"cmd3",l:"make",s:"done",d:"failed",r:"read"}),
+ subFail:R({id:"cmd4_2",l:"sudo nginx -t",s:"done",d:"Failed, exit 1"},{sub:true}),
+ batchStop:R({id:"cmd4",l:"Restart the web stack",s:"done",d:"2 of 3 ran",r:"write",n:3}),
+ batchDone:R({id:"cmd4",l:"Restart the web stack",s:"done",d:"3 of 3 ran",r:"write",n:3}),
+ batchWait:R({id:"cmd4",l:"Restart the web stack",s:"wait",d:"Waiting for you",r:"write",n:3}),
+ skip:R({id:"cmd5",l:"sudo rm -rf /x",s:"skip",d:"Skipped",r:"danger"}),
+ expired:R({id:"cmd5",l:"sudo rm -rf /x",s:"skip",d:"No answer. Nothing ran.",r:"danger"}),
+ savedSkip:R({id:"cmd5",l:"sudo rm -rf /x",s:"done",d:"Skipped",r:"danger"},{rest:true}),
+ restRun:R({id:"cmd6",l:"apt-get upgrade",s:"done",d:"changes",r:"write"},{rest:true}),
+ restWait:R({id:"cmd6",l:"apt-get upgrade",s:"wait",d:"Waiting for you",r:"write"},{rest:true}),
+ reboot:R({id:"reboot7",l:"Back up after reboot",s:"done",d:"up 1 minute"}),
+ rebootFail:R({id:"reboot7",l:"Reboot",s:"done",d:"Not back after 8 min"}),
+ risk:[runRisk("reading"),runRisk("changes · 2 steps"),runRisk("irreversible"),runRisk("exit 0")],
+ ids:runSteps([{id:"conn"},{id:"cmd1"},{id:"cmd12_3"},{id:"reboot2"},{id:"search"},{id:"polish"},{id:"cmdx"},null]).map(s=>s.id),
+ esc:runRow({id:"cmd1",l:"echo <b>&",s:"run",d:"reading"},{}).html.indexOf("<b>")<0};
+process.stdout.write(JSON.stringify(out));
+'''
+def _ln_pure(pg):
+    try:
+        return _node_json(_ln_pure_js(pg) + _LN_PURE, "lanes622.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _ln_pure_ok(o):
+    return (o.get("conn") == ["done", "Linux vps x86_64", "ssh", False]
+            and o.get("run") == ["live", "Running", "read", True]
+            and o.get("wait") == ["wait", "Waiting for you", "write", True]                  # waits until the card is answered
+            and o.get("waitOk") == ["live", "Running", "write", True]                        # approved: running, before the server says so
+            and o.get("done") == ["done", "Done", "write", True]                             # the risk survives the result's frame
+            and o.get("failed") == ["fail", "Failed", "read", True]
+            and o.get("subFail") == ["fail", "Failed · exit 1", None, True]                  # a batch's line: no tag, its exit code
+            and o.get("batchStop") == ["stop", "Stopped · 2 of 3 ran", "write", False]       # a batch's plan in prose, not mono
+            and o.get("batchDone") == ["done", "Done · 3 of 3 ran", "write", False]
+            and o.get("batchWait") == ["wait", "Waiting for you", "write", False]
+            and o.get("skip") == ["skip", "Skipped", "danger", True]
+            and o.get("expired") == ["skip", "No answer. Nothing ran.", "danger", True]
+            and o.get("savedSkip") == ["skip", "Skipped", "danger", True]
+            and o.get("restRun") == ["skip", "Stopped", "write", True]                       # a reopened run that never finished is not "Done"
+            and o.get("restWait") == ["skip", "Stopped", "write", True]
+            and o.get("reboot") == ["done", "Done · up 1 minute", "reboot", False]
+            and o.get("rebootFail") == ["fail", "Not back after 8 min", "reboot", False]
+            and o.get("risk") == ["read", "write", "danger", ""]
+            and o.get("ids") == ["conn", "cmd1", "cmd12_3", "reboot2"] and o.get("esc") is True)
+_ln_o = _ln_pure(page)
+check("6b622 the Code lane's runs, pure (the page's runRow): the connection, each command with its risk tag (kept from its first frame), the command in mono and a batch's plan in prose, Running while live and before the server confirms an approved one, Waiting for you until the card is answered, Done, Failed and a batch line's exit code, Stopped for a batch cut short or a reopened run that never finished, Skipped, the reboot",
+      _ln_pure_ok(_ln_o), "%r" % (_ln_o,))
+_ln_m = [
+    ("the risk lost once the result arrives", "const risk=s.r||runRisk(d),live=!x.rest;", "const risk=runRisk(d),live=!x.rest;"),
+    ("a waiting run shown running", "if(x.ok){st=\"live\";txt=\"Running\";}else{st=\"wait\";", "if(true){st=\"live\";txt=\"Running\";}else{st=\"wait\";"),
+    ("a reopened unfinished run called Done", "else if(runRisk(d)||/^waiting for you$/i.test(d)||s.s===\"run\"||s.s===\"wait\"){st=\"skip\";txt=\"Stopped\";}", ""),
+    ("a batch's plan set in mono", "const what=(kind===\"cmd\"&&!batch)?", "const what=(kind===\"cmd\")?"),
+    ("a batch cut short shown as done", "if(mm[1]===mm[2])txt=\"Done · \"+d;else{st=\"stop\";", "if(true)txt=\"Done · \"+d;else{st=\"stop\";"),
+]
+_ln_mr = [(d_, _ln_pure_ok(_ln_pure(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _ln_m]
+check("6b622 the runs' mutants are each caught: %s" % "; ".join(d_ for d_, _ in _ln_mr), all(r_ is False for _, r_ in _ln_mr), "%r" % (_ln_mr,))
+
+# (2) the saved record: turn_record lifted from the source (as the store's checks do), on a Code run's frames
+def _ln_turn(src):
+    import ast as _ast
+    want = {"_TURN_TAGS", "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP", "turn_text", "turn_record", "_places_worth_showing"}
+    ns_ = {"re": re, "json": json}
+    for node in _ast.parse(src).body:
+        nm = [node.name] if isinstance(node, _ast.FunctionDef) else [t.id for t in getattr(node, "targets", []) if isinstance(t, _ast.Name)]
+        if set(nm) & want:
+            exec(compile(_ast.Module([node], []), "turn622", "exec"), ns_)
+    N_ = "\x00"
+    st_ = lambda i, l, s, d="": N_ + "STEP:" + json.dumps({"id": i, "l": l, "s": s, "d": d}) + N_
+    raw = "".join([st_("conn", "Connected to vps", "done", "Linux"), st_("cmd1", "df -h", "run", "reading"), st_("cmd1", "df -h", "done", "exit 0"),
+                   st_("cmd2", "Restart", "run", "changes · 3 steps"), st_("cmd2", "Restart", "wait", "Waiting for you"),
+                   st_("cmd2_1", "a", "done", "exit 0"), st_("cmd2", "Restart", "done", "1 of 3 ran"),
+                   st_("cmd3", "rm -rf /x", "run", "irreversible"), st_("cmd3", "rm -rf /x", "skip", "Skipped")]
+                  + [st_("cmd%d" % k, "ls", "run", "reading") + st_("cmd%d" % k, "ls", "done", "exit 0") for k in range(4, 34)]
+                  + ["All done."])
+    try:
+        rec = ns_["turn_record"](raw)
+        plain = ns_["turn_record"]("".join(st_("s%d" % k, "x", "done") for k in range(30)) + "Answer.")
+    except Exception as e_:
+        return {"err": repr(e_)}
+    by = {s_["id"]: s_ for s_ in rec.get("steps") or []}
+    return {"r": [by.get(k, {}).get("r") for k in ("conn", "cmd1", "cmd2", "cmd3", "cmd2_1")], "n": by.get("cmd2", {}).get("n"),
+            "last": [by.get("cmd2", {}).get("d"), by.get("cmd3", {}).get("s")], "count": len(rec.get("steps") or []), "plain": len(plain.get("steps") or [])}
+def _ln_turn_ok(o):
+    return (o.get("r") == [None, "read", "write", "danger", None] and o.get("n") == 3
+            and o.get("last") == ["1 of 3 ran", "skip"] and o.get("count") == 35 and o.get("plain") == 24)
+_ln_t = _ln_turn(_MILLENAI_SRC)
+_ln_tm = [_ln_turn(_MILLENAI_SRC.replace('                if _rk or _prev.get("r"):\n                    st[d["id"]]["r"] = _rk or _prev["r"]\n', '                if _rk:\n                    st[d["id"]]["r"] = _rk\n', 1)),
+          _ln_turn(_MILLENAI_SRC.replace('        rec["steps"] = _sv[:160] if any(', '        rec["steps"] = _sv[:24] if any(', 1))]
+check("6b622 a Code run saved: turn_record keeps each command's risk (r) and a batch's size (n) from the frames before its result, the last state (a skip stays a skip), and every step of the run (35 here; any other answer its first 24); two mutants caught",
+      _ln_turn_ok(_ln_t) and not any(_ln_turn_ok(m_) for m_ in _ln_tm), "%r" % ([_ln_t] + _ln_tm,))
+
+# (3) the css
+_ln_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE CODE LANE AND FUNNELS (6b622"):_MILLENAI_SRC.index("/* ==== the Code lane and Funnels (6b622): end ==== */")]
+def _ln_css_ok(css):
+    r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return (_hz_scoped(css) and _ch554_round(css)
+            and not re.search(r"text-shadow:(?!none)|blur\(|glow|drop-shadow|box-shadow:(?!none|inset 0 0 0 1px var\(--hz-ember\))", r_)
+            and ".hz .msg .apcard.hz-ap{margin:0;padding:16px;border-radius:10px;overflow:visible;background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.1);" in r_
+            and ".hz .msg .apcard.hz-ap .apbtn{flex:none;width:auto;height:32px;padding:0 14px;border-radius:8px;border:var(--chat-hw) solid" in r_
+            and ".hz .hz-fn .hz-stage .fopt{background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.14);border-radius:10px;" in r_
+            and ".hz .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:translateY(-1px);" in r_
+            and ".hz .hz-fn .hz-stage .fopt.off{opacity:.45}" in r_
+            and ".hz .hz-stage.verdict>.body{padding:16px 18px;border-radius:10px;background:var(--chat-surface);" in r_
+            and "animation:lnSweep 2.4s linear infinite" in r_ and "@keyframes lnIn{from{opacity:0;transform:translateY(6px)}" in r_
+            and ".hz .hz-run{display:grid;grid-template-columns:60px minmax(0,1fr);" in r_ and "animation:lnIn .4s var(--ln-e) both" in r_
+            and "width:12px;height:12px;" in r_ and "--ln-e:cubic-bezier(.2,.7,.2,1)" in r_
+            and ".hz.hz-flow .msg.ai.hz-coderun{grid-template-columns:minmax(0,640px)}" in r_
+            # Calm and reduced motion: no slide, no sweep
+            and ".hz.hz-calm .hz-run,.hz.hz-calm .hz-apli,.hz.hz-calm .hz-stage,.hz.hz-calm .fstage,\n.hz.hz-calm .hz-run.live>.hz-rst,.hz.hz-calm .hz-stage.cur .fsq,.hz.hz-calm .hz-stage.wait .fn-wait{animation:none}" in r_
+            and "@media (prefers-reduced-motion:reduce){\n  .hz .hz-run,.hz .hz-apli,.hz .hz-stage,.hz .fstage,.hz .hz-run.live>.hz-rst,.hz .hz-stage.cur .fsq,.hz .hz-stage.wait .fn-wait{animation:none!important}" in r_)
+check("6b622 the css: flat cards (#151517, a hairline, radius 10), quiet keys 32 tall at radius 8, option cards lifting 1 px, the others at 45 %, the verdict card, the 2.4 s silver sweep, runs and stages arriving 6 px in 400 ms on one easing, the 12 px check, a Code run in one column; every rule Horizon's, no circle, glow, blur or shadow; Calm and reduced motion still; the mutants are caught",
+      _ln_css_ok(_ln_css)
+      and not _ln_css_ok(_ln_css.replace("border-radius:10px;overflow:visible;background:var(--chat-surface)", "border-radius:14px;overflow:visible;background:var(--chat-surface)", 1))   # a rounder card
+      and not _ln_css_ok(_ln_css + "\n.hz .hz-ap .apbtn.ok{box-shadow:0 0 12px rgba(255,255,255,.3)}")                                                      # a glow on a key
+      and not _ln_css_ok(_ln_css.replace(".hz.hz-calm .hz-run.live>.hz-rst,", ".hz.hz-calm .hz-run.idle>.hz-rst,", 1))                                    # Calm keeps the sweep
+      and not _ln_css_ok(_ln_css + "\n#chat-inner li code{color:red}")                                                                                       # a rule outside Horizon
+      and not _ln_css_ok(_ln_css.replace(".hz .hz-fn .hz-stage .fopt.off{opacity:.45}", ".hz .hz-fn .hz-stage .fopt.off{display:none}", 1)), "")     # the others removed
+
+# (4) live, in headless Chromium: the copy's own page, stand-in streams for the agent and the funnel
+_LN_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000);") + r'''  const W = +process.argv[9] || 1440;
+  function stub(cfg) {
+    const real = window.fetch.bind(window), N = String.fromCharCode(0), enc = new TextEncoder(), gates = {};
+    window.__approvals = []; window.__errs = [];
+    addEventListener("error", e => window.__errs.push(String(e.message)));
+    const F = (t, o) => N + t + ":" + JSON.stringify(o) + N, st = (i, l, s, d) => F("STEP", { id: i, l: l, s: s, d: d || "" });
+    const plan = [[0, N + "STATUS:Connecting to vps" + N], [200, st("conn", "Connected to vps", "done", "Linux vps x86_64")],
+      [300, st("cmd1", "df -h /", "run", "reading")], [900, st("cmd1", "df -h /", "done", "exit 0")],
+      [1000, st("cmd2", "sudo journalctl --vacuum-size=500M", "run", "changes")], [1050, st("cmd2", "sudo journalctl --vacuum-size=500M", "wait", "Waiting for you")],
+      [1100, F("APPROVE", { jid: "j1", cmd: "sudo journalctl --vacuum-size=500M", risk: "write" })], ["gate", "j1"],
+      [600, st("cmd2", "sudo journalctl --vacuum-size=500M", "done", "exit 0")],
+      [700, st("cmd3", "Restart the web stack", "run", "changes · 2 steps")], [750, st("cmd3", "Restart the web stack", "wait", "Waiting for you")],
+      [800, F("APPROVE", { jid: "j2", cmd: "sudo systemctl restart php8.3-fpm\nsudo nginx -t", risk: "write" })], ["gate", "j2"],
+      [300, st("cmd3_1", "sudo systemctl restart php8.3-fpm", "done", "exit 0")], [500, st("cmd3_2", "sudo nginx -t", "done", "Failed, exit 1")],
+      [550, st("cmd3", "Restart the web stack", "done", "1 of 2 ran")], [800, "Stand-in run complete: nginx has a syntax error."]];
+    const chat = () => { let c; const body = new ReadableStream({ start(x) { c = x; } });
+      (async () => { let b = performance.now(); for (const [at, s] of plan) { if (at === "gate") { await new Promise(r => { gates[s] = r; }); b = performance.now(); continue; }
+        const w = b + at - performance.now(); if (w > 0) await new Promise(r => setTimeout(r, w)); c.enqueue(enc.encode(s)); } setTimeout(() => c.close(), 100); })();
+      return new Response(body, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Models": "stand-in", "X-Web-Search": "0" } }); };
+    const FN = [["How should it be served?", ["Shared, on the table", "Plated courses", "A buffet"]], ["Which direction?", ["Mediterranean", "Mexican", "Indian"]], ["How hands-on?", ["In the oven", "Some stovetop", "The day before"]]];
+    const J = o => new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } });
+    window.fetch = (u, o) => { const p = String(u && u.url || u).split("?")[0];
+      if (p.endsWith("/api/chat")) return Promise.resolve(chat());
+      if (p.endsWith("/api/remote/approve")) { const d = JSON.parse(o.body); window.__approvals.push(d); const g = gates[d.jid]; if (g) { delete gates[d.jid]; setTimeout(g, 10); } return new Promise(r => setTimeout(() => r(J({ ok: !!g })), 60)); }
+      if (p.endsWith("/api/funnel/image")) return Promise.resolve(J({ none: true }));
+      if (p.endsWith("/api/funnel")) { const d = JSON.parse(o.body), n = (d.picks || []).length;
+        return new Promise(r => setTimeout(() => r(n >= FN.length ? J({ done: true, summary: "**A Mediterranean traybake.** Stand-in verdict." })
+          : J({ stage: n + 1, total: FN.length, q: FN[n][0], options: FN[n][1].map(l => ({ label: l, why: "Why " + l })) })), 250)); }
+      return real(u, o); };
+  }
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");}catch(e){}
+    (${stub.toString()})({});`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  const until = async (x, ms) => { for (let i = 0; i < (ms || 15000) / 100; i++) { if (await ev(x)) return true; await new Promise(r => setTimeout(r, 100)); } return false; };
+  const click = async sel => { const p = await ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e)return null;e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,h=document.elementFromPoint(x,y);return {x,y,hit:!!h&&(h===e||e.contains(h))};})()`);
+    if (!p) return { hit: false, none: true };
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", clickCount: 1 }); return p; };
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&typeof switchLane==="function"&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await new Promise(r => setTimeout(r, 1000));
+  const runsOf = `[...document.querySelectorAll(".msg.ai.hz-coderun li.hz-run")].map(li=>li.dataset.id+"|"+li.className.replace("hz-run ","")+"|"+((li.querySelector(":scope>.hz-risk")||{}).textContent||"")+"|"+((li.querySelector(":scope>.hz-rst")||{}).textContent||""))`;
+  // ---- Code: the Remote agent
+  await ev(`(()=>{switchLane("code");setAgent("Remote");const i=document.querySelector("#input");i.focus();i.value="Free up disk space";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+  await until(`!!document.querySelector(".msg.ai .hz-run.live")`, 8000);
+  out.live = await ev(`(()=>{const e=document.querySelector(".hz-run.live>.hz-rst"),cs=e&&getComputedStyle(e);return e?{t:e.textContent,anim:cs.animationName,clip:cs.webkitBackgroundClip||cs.backgroundClip,row:getComputedStyle(e.parentElement).animationName}:null;})()`);
+  await until(`!!document.querySelector(".apcard:not(.decided)")`, 10000);
+  out.card = await ev(`(()=>{const c=document.querySelector(".apcard:not(.decided)"),li=c.closest("li"),cs=getComputedStyle(c),k=c.querySelector(".apbtn.ok"),ks=getComputedStyle(k),m=c.closest(".msg");
+    return {hz:c.classList.contains("hz-ap"),under:li&&li.previousElementSibling?li.previousElementSibling.dataset.id:null,bg:cs.backgroundColor,radius:cs.borderTopLeftRadius,shadow:cs.boxShadow,
+      keys:[...c.querySelectorAll(".apbtn")].map(b=>b.textContent),keyH:Math.round(k.getBoundingClientRect().height),keyR:ks.borderTopLeftRadius,cmd:(c.querySelector(".apcmd")||{}).textContent,
+      waitRow:${runsOf}.find(r=>r.startsWith("cmd2|")),flow:!!m.querySelector(":scope>aside.behind"),runs:${runsOf}};})()`);
+  out.hit1 = await click(".apcard:not(.decided) .apbtn.ok");
+  await until(`window.__approvals.length>=1&&!!document.querySelector(".hz-run.live[data-id='cmd2'],.hz-run.done[data-id='cmd2']")`, 5000);
+  out.afterOk = await ev(`({runs:${runsOf},verdict:(document.querySelector(".apcard.decided .apverdict")||{}).textContent})`);
+  await until(`document.querySelectorAll(".apcard").length>=2&&!!document.querySelector(".apcard:not(.decided)")`, 10000);
+  out.batchCard = await ev(`(()=>{const c=document.querySelector(".apcard:not(.decided)");return {n:(c.querySelector(".apn")||{}).textContent,cmd:(c.querySelector(".apcmd")||{}).textContent,under:c.closest("li").previousElementSibling.dataset.id};})()`);
+  out.hit2 = await click(".apcard:not(.decided) .apbtn.ok");
+  await until(`!generating`, 15000); await new Promise(r => setTimeout(r, 800));
+  out.code = await ev(`(()=>{const m=[...document.querySelectorAll(".msg.ai")].pop();return {runs:${runsOf},subs:[...m.querySelectorAll(".hz-subruns>li")].map(l=>l.dataset.id),approvals:window.__approvals,
+    flow:!!m.querySelector(":scope>aside.behind"),proof:!!m.querySelector(".hz-proof"),text:/Stand-in run complete/.test(m.textContent),sw:[document.documentElement.scrollWidth,innerWidth]};})()`);
+  // ---- Funnels: three stages, a click, a typed answer, a click, the verdict
+  await ev(`(()=>{const n=document.querySelector("#newchat");if(n)n.click();switchLane("funnel");document.querySelector("#fn-goal").value="What to cook for six";document.querySelector("#fn-go").click();return 1;})()`);
+  await until(`document.querySelectorAll(".hz-stage:not(.wait) .fopt:not(:disabled)").length>=3`, 8000);
+  out.fn1 = await ev(`(()=>{const s=document.querySelector(".hz-stage.cur"),q=s&&s.querySelector(".fsq"),o=s&&s.querySelector(".fopt"),cs=o&&getComputedStyle(o);
+    return {path:(s.querySelector(".fpath")||{}).textContent,qAnim:q?getComputedStyle(q).animationName:null,bg:cs&&cs.backgroundColor,radius:cs&&cs.borderTopLeftRadius,
+      hits:[...s.querySelectorAll(".fopt")].map(b=>{const r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!h&&(h===b||b.contains(h));})};})()`);
+  // the chip's flight, read as the chip lands in the trail (a pick first asks whether a benchmark is running)
+  await ev(`(()=>{window.__fly=null;const t=document.querySelector(".hz-fn>.ftrail");new MutationObserver((l,o)=>{const c=t.lastElementChild;if(!c)return;window.__fly={chip:c.textContent,anims:c.getAnimations?c.getAnimations().length:-1};o.disconnect();}).observe(t,{childList:true});return 1;})()`);
+  out.pick1 = await click(".hz-stage.cur .fopt");
+  await until(`!!window.__fly`, 5000);
+  out.fly = await ev(`window.__fly`);
+  await new Promise(r => setTimeout(r, 450));   // the others' step back (300 ms) has settled
+  out.done1 = await ev(`(()=>{const s=document.querySelector(".hz-stage.done");if(!s)return null;const b=[...s.querySelectorAll(".fopt")];
+    return {on:b.filter(x=>x.classList.contains("on")).map(x=>x.textContent.replace(/Why.*/,"")),off:b.filter(x=>x.classList.contains("off")).map(x=>+getComputedStyle(x).opacity),disabled:b.every(x=>x.disabled),
+      check:getComputedStyle(s,"::before").width+" "+/svg/.test(getComputedStyle(s,"::before").backgroundImage)};})()`);
+  await until(`document.querySelectorAll(".hz-stage:not(.wait) .fopt:not(:disabled)").length>=3`, 8000);
+  await ev(`(()=>{const i=document.querySelector("#input");i.focus();i.value="Something with lots of vegetables";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+  await until(`document.querySelectorAll(".hz-stage.done").length>=2&&document.querySelectorAll(".hz-stage:not(.wait) .fopt:not(:disabled)").length>=3`, 8000);
+  out.typed = await ev(`(()=>{const s=document.querySelectorAll(".hz-stage.done")[1];const t=s&&s.querySelector(".fopt.typed");return {typed:t?t.textContent:null,on:!!t&&t.classList.contains("on"),
+    bubbles:[...document.querySelectorAll("#chat-inner>.msg.user>.body")].map(m=>m.textContent.trim().slice(0,40))};})()`);
+  out.pick3 = await click(".hz-stage.cur .fopt");
+  await until(`!!document.querySelector(".hz-stage.verdict")`, 8000); await new Promise(r => setTimeout(r, 500));
+  out.fn = await ev(`(()=>{const c=document.querySelector(".hz-fn"),v=c.querySelector(".hz-stage.verdict");return {who:c.querySelector(":scope>.who").textContent,trail:[...c.querySelectorAll(".ftrail .ftc")].map(x=>x.textContent),
+    stages:c.querySelectorAll(".hz-stage.done").length,verdict:!!v&&/Stand-in verdict/.test(v.textContent),vbg:v&&getComputedStyle(v.querySelector(".body")).backgroundColor,msgs:document.querySelectorAll("#chat-inner>.msg.ai").length,
+    sw:[document.documentElement.scrollWidth,innerWidth]};})()`);
+  out.errs = out.errs.concat(await ev(`window.__errs`) || []);
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _ln_live(fx, width, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="ln622-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_LN_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, fx,
+            os.path.join(d_, "mut.json") if mutation else "", str(width)]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=130)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _ln_code_ok(r):
+    c_, k_, o_ = r.get("card") or {}, r.get("code") or {}, r.get("afterOk") or {}
+    return (not r.get("err") and not r.get("errs")
+            and (r.get("live") or {}).get("t") == "Running" and (r.get("live") or {}).get("row") == "lnIn"
+            and c_.get("hz") is True and c_.get("under") == "cmd2" and c_.get("bg") == "rgb(21, 21, 23)" and c_.get("radius") == "10px" and c_.get("shadow") == "none"
+            and c_.get("keys") == ["Skip", "Approve"] and c_.get("keyH") == 32 and c_.get("keyR") == "8px" and c_.get("cmd") == "sudo journalctl --vacuum-size=500M"
+            and c_.get("waitRow") == "cmd2|wait|write|Waiting for you" and c_.get("flow") is False
+            and (c_.get("runs") or [])[:2] == ["conn|done conn|ssh|Linux vps x86_64", "cmd1|done|read|Done"]
+            and (r.get("hit1") or {}).get("hit") is True and (r.get("hit2") or {}).get("hit") is True
+            and o_.get("verdict") == "You approved this"
+            and (r.get("batchCard") or {}).get("n") == "2 commands" and (r.get("batchCard") or {}).get("under") == "cmd3"
+            and (r.get("batchCard") or {}).get("cmd") == "sudo systemctl restart php8.3-fpm\nsudo nginx -t"
+            and k_.get("runs") == ["conn|done conn|ssh|Linux vps x86_64", "cmd1|done|read|Done", "cmd2|done|write|Done", "cmd3|stop batch|write|Stopped · 1 of 2 ran",
+                                   "cmd3_1|done sub||Done", "cmd3_2|fail sub||Failed · exit 1"]
+            and k_.get("subs") == ["cmd3_1", "cmd3_2"] and k_.get("approvals") == [{"jid": "j1", "ok": True}, {"jid": "j2", "ok": True}]
+            and k_.get("flow") is False and k_.get("proof") is False and k_.get("text") is True
+            and (k_.get("sw") or [0, 1])[0] == (k_.get("sw") or [0, 1])[1])
+def _ln_fn_ok(r, calm=False):
+    f1, d1, fn = r.get("fn1") or {}, r.get("done1") or {}, r.get("fn") or {}
+    return (not r.get("err") and not r.get("errs")
+            and f1.get("path") == "Stage 1 of 3" and f1.get("qAnim") == ("none" if calm else "lnSweep") and f1.get("bg") == "rgb(21, 21, 23)" and f1.get("radius") == "10px"
+            and f1.get("hits") == [True, True, True] and (r.get("pick1") or {}).get("hit") is True
+            and (r.get("fly") or {}).get("chip") == "Shared, on the table" and (r.get("fly") or {}).get("anims") == (0 if calm else 1)
+            and d1.get("on") == ["Shared, on the table"] and d1.get("off") == [0.45, 0.45] and d1.get("disabled") is True and d1.get("check") == "12px true"
+            and (r.get("typed") or {}).get("typed") == "Something with lots of vegetables" and (r.get("typed") or {}).get("on") is True
+            and (r.get("typed") or {}).get("bubbles") == ["Funnel: What to cook for six"]
+            and fn.get("who") == "Funnel · done" and fn.get("trail") == ["Shared, on the table", "Something with lots of vegetables", "In the oven"]
+            and fn.get("stages") == 3 and fn.get("verdict") is True and fn.get("vbg") == "rgb(21, 21, 23)" and fn.get("msgs") == 1
+            and (fn.get("sw") or [0, 1])[0] == (fn.get("sw") or [0, 1])[1])
+_ln_w = _ln_live("balanced", 1440); _ln_n = _ln_live("balanced", 760); _ln_c = _ln_live("calm", 1440)
+check("6b622 live (headless Chromium, the copy's page, stand-in streams): the agent's commands as runs with their tags and states, the approval card flat under its run with Skip and Approve (32 tall, radius 8), Approve by a real click answers /api/remote/approve and the run goes on, a batch's lines under its plan, no flow and no proof line for a Code run; a funnel's stages on the hairline, the question in its sweep, flat cards that are hit, a pick done with a 12 px check, the others at 45 % and inert, the choice flying into the trail (not in Calm), a typed answer as the chosen card with no bubble, the verdict card; at 1440 and 760, Balanced and Calm, nothing sideways",
+      _ln_code_ok(_ln_w) and _ln_fn_ok(_ln_w) and _ln_code_ok(_ln_n) and _ln_fn_ok(_ln_n) and _ln_fn_ok(_ln_c, calm=True)
+      and (_ln_c.get("live") or {}).get("anim") == "none",
+      json.dumps({"w": _ln_w, "n": _ln_n, "c": _ln_c})[:1500])
+_ln_mw = [
+    ("the Classic card in Horizon", [["if(isHz())return apHzCard(host,d);", "if(false)return apHzCard(host,d);"]], "balanced", lambda r: not _ln_code_ok(r)),
+    ("the runs never drawn (the empty flow back)", [["if(isHz()&&(root.classList.contains(\"hz-coderun\")||runSteps(steps).length)){", "if(false){"]], "balanced", lambda r: not _ln_code_ok(r)),
+    ("the other options left live", [["btns.forEach(el=>{el.disabled=true;el.tabIndex=-1;", "btns.forEach(el=>{"]], "balanced", lambda r: not _ln_fn_ok(r)),
+    ("the flight in Calm", [["function fnHzMotion(){return typeof hzMotionOK", "function fnHzMotion(){return true||typeof hzMotionOK"]], "calm", lambda r: not _ln_fn_ok(r, calm=True)),
+    ("a typed answer as a bubble", [["if(!isHz())addMsg(\"user\",text);", "addMsg(\"user\",text);"]], "balanced", lambda r: not _ln_fn_ok(r)),
+]
+_ln_mr2 = []
+for d_, m_, fx_, caught_ in _ln_mw:
+    r_ = _ln_live(fx_, 1440, m_)
+    _ln_mr2.append((d_, r_.get("mutated") == 1 and caught_(r_), {k: r_.get(k) for k in ("card", "fly", "done1", "typed", "errs", "mutated")}))
+check("6b622 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _ln_mr2),
+      all(ok_ for _, ok_, _ in _ln_mr2), json.dumps(_ln_mr2)[:1500])
+# ==== 6b622 lanes: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
