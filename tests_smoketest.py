@@ -26287,10 +26287,14 @@ check("server only (live): the real gateway's models and card give one row, the 
       and _so_t.get("available") is True and _so_t.get("models") == [_SVN + " · " + _so_want]
       and _so_t.get("server") == _SVN and _so_t.get("desc") == "strongest that fits its card"
       and _so_dry in _so_t.get("note", "") and "ollama1" not in json.dumps(_so_t).lower()
-      # the owner left every stub model GPU-only, so the card's size is what rules out the big ones
-      and {m["name"] for m in _so_ms if m["placement"] == "gpu"} >= {"small:8b", "huge:70b", "sneaky:14b"}
+      # the owner left every stub model GPU-only, so the card's size is what rules out the big ones. huge:70b can't
+      # fit the 16 GB card: if an earlier live chat asked for it, the card refused it (gpu_fit) and the app lists it
+      # as not fitting whole ("gpu+ram" with nofit, 6b516), which is still the owner's GPU-only model; an owner's RAM
+      # flag (gpu+ram without nofit) still fails here (6b555: that refusal depends on when a background pass lands)
+      and {m["name"] for m in _so_ms if m["placement"] == "gpu" or (m["placement"] == "gpu+ram" and m.get("nofit") is True)} >= {"small:8b", "huge:70b", "sneaky:14b"}
+      and not any(m["placement"] == "gpu+ram" and not m.get("nofit") for m in _so_ms if m["name"] in ("small:8b", "huge:70b", "sneaky:14b"))
       and _so_want == "sneaky:14b",
-      "%r" % [_so_want, _so_vram, [(m["name"], m["placement"], m.get("size")) for m in _so_ms],
+      "%r" % [_so_want, _so_vram, [(m["name"], m["placement"], m.get("size"), m.get("nofit")) for m in _so_ms],
               _so_l.get("only"), _so_t])
 # the mode is kept like a tier: prefs, and (below) a restart
 _svq("/api/prefs", "POST", {"tier": _so_tier})
@@ -26510,7 +26514,7 @@ const { chromium } = require(cfg.pw);
     await page.waitForFunction(() => typeof send === "function" && document.querySelector("#input"), null, { timeout: 30000 });
     await page.waitForTimeout(1500);
     const ais = () => page.evaluate(() => [...document.querySelectorAll("#chat-inner .msg.ai")].map(a => ({
-      live: a.classList.contains("live"), text: (a.querySelector(":scope>.body") || {}).innerText || "",
+      live: a.classList.contains("live"), text: (b => { if (!b) return ""; const sr = b.querySelector(".srcrow"); return sr ? b.innerText.replace(sr.innerText, "") : b.innerText; })(a.querySelector(":scope>.body")), srcs: !!a.querySelector(":scope>.body .srcrow"),   // the prose alone: the sources row (your own chats cited, 6b530) is not the answer's words (6b555)
       who: (a.querySelector(":scope>.who") || {}).innerText || "",
       stopped: !!a.querySelector(":scope>.liveline.stopped"), done: (a.querySelector(":scope>.liveline em") || {}).textContent || "" })));
     const landed = n => page.waitForFunction(n => { const a = [...document.querySelectorAll("#chat-inner .msg.ai")];
