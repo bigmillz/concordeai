@@ -48411,7 +48411,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # previous entity and searches WITH it
             p2 = strip_greeting(prompt)
             p2 = _PREAMBLE_RX.sub("", p2, count=1).strip() or p2
-            if p2 and len(p2.split()) <= 10 and _FOLLOWUP_RX.search(p2):
+            # (6b650) never small talk, a feeling, a sum or the chat itself: "feeling kind of down today" after the
+            # weather took "today" for a follow-up and searched "brooklyn feeling down today"
+            if (p2 and len(p2.split()) <= 10 and _FOLLOWUP_RX.search(p2)
+                    and answer_kind(p2) not in ("arith", "chat", "social", "personal")):
                 prev = _thread_terms(messages, avoid=p2)
                 if prev:
                     query = prev + " " + p2

@@ -49760,6 +49760,10 @@ def _e650_ok(r, src):
         '        if _triage == "full" and answer_kind(prompt) in ("social", "personal"):\n            _triage = "short"' in h
         and '        elif _kind == "personal":\n            dated_system["content"] += PERSONAL_RULE' in h
         and h.count('answer_kind(prompt) not in ("chat", "arith", "social", "personal")') == 3)
+    out["the handler: a short turn that says 'today' borrows the last search's subject only when it isn't small talk, "
+        "a feeling, a sum or the chat itself"] = (
+        '                    and answer_kind(p2) not in ("arith", "chat", "social", "personal")):\n'
+        '                prev = _thread_terms(messages, avoid=p2)' in h)
     out["the handler: small talk and how they feel look through the person's chats only when asked to (a strong cue)"] = (
         '            if _kn_want == 1 and answer_kind(prompt) in ("social", "personal", "arith"):\n                _kn_want = 0\n' in h)
     out["PERSONAL_RULE: a warm line, plain ideas, no jargon or headings, no assumption opener, the same size at every effort"] = all(
@@ -49809,6 +49813,8 @@ _C650_MUT = [
      '                          and answer_kind(prompt) not in ("chat", "arith")\n'),
     ("an old chat cited for 'I'm tired'", '            if _kn_want == 1 and answer_kind(prompt) in ("social", "personal", "arith"):\n                _kn_want = 0\n', ""),
     ("the assumption opener kept", "    m = _ANS_ASSUME_RX.match(t)            # (6b650)", "    m = None            # (6b650)"),
+    ("'down today' borrows the weather", '                    and answer_kind(p2) not in ("arith", "chat", "social", "personal")):\n',
+     '                    and True):\n'),
     ("effort buys words", "more effort means more care, not more words", "more effort means more depth"),
 ]
 _c650_caught = []
