@@ -20273,3 +20273,26 @@ reboot to the afternoon, 10–15 min sleep at night, a night quiet mode in the k
   the new fields; 26 `quiet:` mutants in `tests/mutate.py`, all killed. Full kit suite: 2378 tests, two timing tests (test_fancal.TestQueryLoad, test_quickburn abort, untouched here) failed in the full run and pass alone.
 - Not verified on the hardware: OpenRGB honouring the detector switch (0.9+git20251009), liquidctl then working,
   the Hydro Platinum's `set led color off`, and the night fan level's temperatures under load.
+
+## 6b660 — the gateway's fit check counts the K/V cache the way llama.cpp keeps it (per Patrick)
+
+Measured on Ollama1 (2026-11-11, RTX 5070 Ti 16 GB, Ollama 0.40.15): `kv_cache_bytes` counted every layer at
+the full context, so the gateway refused gemma4:12b past about 11k tokens (it "needed" 18.3 GiB at 16k; the
+card held 9.6 GB, and 10.6 GB at 64k) and gpt-oss:20b past about 31k (64k really fits in 14.3 GB). That is why
+the app's server context stayed at 8,192 and gemma4's reasoning ran out of room (6b570). Patrick approved the fix
+from the server tuning report.
+
+- `lib/o1ollama.py`: a sliding-window layer counts `min(n_ctx, window + 1,024)` cells rounded up to 256 (Ollama
+  0.40 starts llama-server with `-ub 1024`); Gemma's windowed layers use `key_length_swa`/`value_length_swa` and
+  their own K/V head counts; the last `shared_kv_layers` layers (Gemma 4 E2B) and recurrent layers (Qwen 3.5,
+  MiMo: `recurrent_layers` or `full_attention_interval`) hold no cache, and a recurrent layer's fixed f32 state
+  is added. Which layers are windowed comes from `sliding_window_pattern`, else a per-architecture rule
+  (gpt-oss, gemma2: every other; gemma3: five of six; cohere2: three of four); a window with neither still counts
+  every layer in full.
+- Checked to the byte against the server's own log lines (`llama_kv_cache: size = ...`, `RS buffer size`):
+  gemma4:12b at 16k 896 MiB, gemma4:e2b at 16k 114 MiB, mimo-v2.6:9b at 16k 512 + 50.25 MiB; gpt-oss:20b at 32k
+  768 MiB + windowed layers counted at 1,280 cells where that run used 768 (over, never under).
+- Tests: `tests/test_kvcache.py` (13: the measured sizes, the safe fallbacks, what now fits a 16 GB card, the
+  estimate against nvidia-smi); 7 `kv:` mutants in `tests/mutate.py`, all killed.
+- Not changed: the 5% weights margin (gpt-oss's estimate still sits ~1.4 GiB over what the card holds), the K/V
+  type (f16 assumed; the server runs f16), the app's `SRV_CTX_DEFAULT` (beta-5 integrator).
