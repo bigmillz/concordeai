@@ -5063,7 +5063,7 @@ check("giants: never in Light or Recommended; an Ollama giant is never seated fo
       and "and model_fits_memory(l) and not slow_giant(l))" in _rt_src
       and "and not slow_giant(l)]" in _mt_src
       and _MILLENAI_SRC.count("and not slow_giant(l)\n                                and model_cached(l)") == 1
-      and "and answer_kind(prompt) not in (\"chat\", \"arith\")\n                          and not slow_giant(lbl))" in _MILLENAI_SRC   # 6b626's skip sits between
+      and "and answer_kind(prompt) not in (\"chat\", \"arith\", \"social\", \"personal\")   # (6b651) no reviser\n                          and not slow_giant(lbl))" in _MILLENAI_SRC   # 6b626's skip sits between (6b651's kinds too)
       # (6b334) or a model of one of the profile's own servers
       and "if (m in MODEL_ROUTES and SUPPORTED.get(m))\n                       or server_pick(m, self.ctx)[0] is not None]" in _MILLENAI_SRC
       and 'step("draft", "Loading %s (%d GB). Can take minutes." % (' in _MILLENAI_SRC,
@@ -23733,7 +23733,7 @@ def _p2c_pins(src):
         and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
             "                            and _is_substantive(prompt)\n"
-            "                            and answer_kind(prompt) not in (\"chat\", \"arith\"))   # (6b626)" in ch   # 6b626's skip
+            "                            and answer_kind(prompt) not in (\"chat\", \"arith\", \"social\", \"personal\"))   # (6b626, 6b651)" in ch   # 6b626's skip, 6b651's kinds
         and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
         # a picture in a mode goes to the vision ladder, not a server seat
         # (6b357) unless the person's server reads pictures: then it takes the picture as the mode's seat
