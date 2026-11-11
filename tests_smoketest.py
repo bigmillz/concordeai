@@ -2832,6 +2832,7 @@ _PAGE_HOST |= {"HTMLSelectElement"}  # 6b551: Settings' controls watch a select'
 # beta 4 (6b640): the GPU sky's buffers (Float64Array, Uint16Array) and the prototypes beta 4's controls read
 # (HTMLElement, HTMLTextAreaElement): all four on window in WKWebView, WebView2 and Qt
 _PAGE_HOST |= {"Float64Array", "Uint16Array", "HTMLElement", "HTMLTextAreaElement"}
+_PAGE_HOST |= {"console"}   # 6b621 (f76348a): the GPU sky says why it could not start (console.error), never silent
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -4616,7 +4617,7 @@ try:
 except Exception as _e:
     _pout = "ERR %s" % _e
 check("a place pin's location test reads the whole address, not its first 80 characters",
-      _gk and set(_gk) == {"lat", "lon", "name", "full"}
+      _gk and set(_gk) == {"lat", "lon", "name", "full", "town"}   # 6b626: the town rides along (the landmark's search)
       and _gk["full"] == _NOM["katz's delicatessen"][2]
       and _gk["name"] == _gk["full"][:80] and "york" not in _gk["name"].lower()
       # Katz's and Russ & Daughters pin in New York, Brain (France) drops
@@ -5028,7 +5029,7 @@ check("giants: never in Light or Recommended; an Ollama giant is never seated fo
       and "and model_fits_memory(l) and not slow_giant(l))" in _rt_src
       and "and not slow_giant(l)]" in _mt_src
       and _MILLENAI_SRC.count("and not slow_giant(l)\n                                and model_cached(l)") == 1
-      and "and _is_substantive(prompt)\n                          and not slow_giant(lbl))" in _MILLENAI_SRC
+      and "and answer_kind(prompt) not in (\"chat\", \"arith\")\n                          and not slow_giant(lbl))" in _MILLENAI_SRC   # 6b626's skip sits between
       # (6b334) or a model of one of the profile's own servers
       and "if (m in MODEL_ROUTES and SUPPORTED.get(m))\n                       or server_pick(m, self.ctx)[0] is not None]" in _MILLENAI_SRC
       and 'step("draft", "Loading %s (%d GB). Can take minutes." % (' in _MILLENAI_SRC,
@@ -9139,8 +9140,8 @@ check("Settings: the channel between Stable and Nightly is called Beta (its valu
 # the slice ends at openAbout's own call)
 _oa0 = page.index("async function openAbout(){")
 _oa = page[_oa0:page.index("paintAccount();", _oa0)]
-check("Settings reopens on About, whatever pane it was closed on",
-      'if(aboutVeil.hidden)settingsPane("p-about");' in _oa
+check("Settings reopens on its first pane (About in Classic, General in Horizon), whatever pane it was closed on",
+      'if(aboutVeil.hidden)settingsPane(typeof sxSetFirst==="function"?sxSetFirst():"p-about");' in _oa   # 6b625: Horizon's first pane is General
       and _oa.index("settingsPane") < _oa.index("aboutVeil.hidden=false")
       and 'b.addEventListener("click",()=>settingsPane(b.dataset.pane))' in page
       and page.count('.classList.toggle("on",p.id===') == 1,
@@ -9667,7 +9668,7 @@ check("review: funnel Try again, deferred rewinds, refused requests, Cmd+Q",
 # now stops the answer as Stop does and opens the edit once send() has
 # finished saving, so the partial answer and the rewind land in order.
 _er = page[page.index("function editResend(text){"):page.index("function addMsg(")]
-_sd = page[page.index("const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);"):][:700]
+_sd = page[page.index("const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);"):][:1100]   # (beta 4) 6b626's title lines sit before the edit's
 _nc = page[page.index('function chatFresh(){'):][:200]   # New chat's body (6b628), re-pinned
 def _edit_ok(er, sd, nc, decl):
     return ("let pendingEdit=null," in decl
@@ -12294,7 +12295,7 @@ check("review fixes: the glitch checks and rests under the lock, `off` removes u
       and "_last_cloud.get((self.ctx.name, _tcid))" in _MILLENAI_SRC
       and '$("#turbo").checked=!on;' in _MILLENAI_SRC
       and "Cloud models are off. Turn them on in Settings > Models > Cloud." in _MILLENAI_SRC
-      and "and your saved key reads \"\n                        \"pictures now." in _MILLENAI_SRC
+      and "Settings > Models > Cloud and your saved key reads pictures now." in _MILLENAI_SRC   # one line since 6b628 (vision_offer)
       and _sn_mac == ("Add a Gemini key in Settings > Models > Cloud, or add image generation in Settings > Models.",
                       "Add a Gemini key in Settings > Models > Cloud, or add video generation in Settings > Models.")
       and _sn_pc.startswith("Pictures on this computer need Apple silicon. Add"),
@@ -21158,7 +21159,7 @@ def _svc_pins(src):
                          "                council = [\"Qwen 3.5 Vision 9B\"]" in ch
         and "                      if images and not _srv_lbl else [])" in ch
         and "        _vis_local = bool(images) and not _srv_lbl and model_cached(" in ch
-        and "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
+        and "                and not _srv_lbl and _vis_srv is None):\n            try:\n                # a Claude or Gemini key would read it with the switch on" in ch and "                vision_offer(emit, _vkey)" in ch,   # 6b628: asked, never started
         # (review) making a picture, a video or a file takes the hold
         "making held": "        if (img_subject or vid_subject or export_req or edit_req) and not self._bench_held:\n"
                        "            if not bench_hold():\n                emit(AppText(BENCH_BUSY))" in ch
@@ -21994,7 +21995,7 @@ _SVT_MUT = [
     ("an error shown as OK", "  if(st.err)return {kind:\"bad\",text:st.err};\n  if(!st.at)", "  if(!st.at)"),
     ("not paired shown as OK", "  if(!s.paired)return {kind:\"warn\",", "  if(false)return {kind:\"warn\","),
     ("held for ever", "if(srvTestSeq[id]===seq&&srvMsgs[id]===r.text)srvMsg(id,\"\");", "if(false)srvMsg(id,\"\");"),
-    ("the colour not on the card", "'<div class=\"srv-msg'+(srvMsgKind[s.id]?\" \"+srvMsgKind[s.id]:\"\")+'\">'", "'<div class=\"srv-msg\">'"),
+    ("the colour not on the card", "    +'<div class=\"srv-msg'+(srvMsgKind[s.id]?\" \"+srvMsgKind[s.id]:\"\")+'\">'", "    +'<div class=\"srv-msg\">'"),
 ]
 _svtm = []
 for _d67, _o67, _nw67 in _SVT_MUT:
@@ -22804,7 +22805,7 @@ _SO_MUT = [
     ("a row never greyed", '!ok,"srvmode","",tier===t+":"+k)', 'false,"srvmode","",tier===t+":"+k)'),
     ("a server's sub-menu without Max", '  [\"pro\",\"Pro\",\"\\u2728\"],[\"max\",\"Max\",\"\\ud83d\\ude80\"]];}',
      '  [\"pro\",\"Pro\",\"\\u2728\"]];}'),
-    ("the mode not going back to Fast", '  if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}\n  else setTier("Fast");',
+    ("the mode not going back to Fast", '  if(agent){tier="Fast";paintModels();}\n  else setTier("Fast",true);',
      '  if(agent){}\n  else{}'),
     ("an off server dropped", 'if(!srvLoaded||!isSrvMode(tier)||srvModeOf(tier))return;',
      'if(!srvLoaded||!isSrvMode(tier)||(srvModeOf(tier)&&srvModeOf(tier).only.ok))return;'),
@@ -23694,7 +23695,8 @@ def _p2c_pins(src):
                          "                    hb_stop.set()\n                    return" in ch
         and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
-            "                            and _is_substantive(prompt))" in ch
+            "                            and _is_substantive(prompt)\n"
+            "                            and answer_kind(prompt) not in (\"chat\", \"arith\"))   # (6b626)" in ch   # 6b626's skip
         and "REVISE_INSTRUCTION + \"QUESTION: \" + _sq" in ch,
         # a picture in a mode goes to the vision ladder, not a server seat
         # (6b357) unless the person's server reads pictures: then it takes the picture as the mode's seat
@@ -24292,7 +24294,7 @@ def _p7c_pins(src):
                     "                _seat_fb = {_vis_srv[\"label\"]: _vfb}\n" in ch,
         "cloud, then the server": "            if cloud_only or (not _vis_local and _vis_srv is None):\n" in ch
         and "            return cloud_only or (not _vis_local and _vis_srv is None)" in ch,
-        "no download": "                and not _srv_lbl and _vis_srv is None):\n            try:\n                start_model_downloads" in ch,
+        "no download": "                and not _srv_lbl and _vis_srv is None):\n            try:\n                # a Claude or Gemini key would read it with the switch on" in ch and "                vision_offer(emit, _vkey)" in ch,   # 6b628: asked, never started
         "memory": "            out = (None if server_label(label) or cloud_only\n                   else server_side_text(ask, base))\n" in src,
         "pins": "                                _ps = (None if server_label(small)\n"
                 "                                       else server_side_text(_pin_ask, user_base))\n" in ch,
@@ -32678,6 +32680,16 @@ process.stdout.write(JSON.stringify(R));
     return all(out.values()), [out, p.stderr[:300]]
 
 
+def _l31c_both(src):
+    """The relay fields live in two cards since 6b625 (Classic's srvCard and Horizon's sxSrv card): every token
+    input is a password field, every address value goes through esc(), and each card has one of each (6b640)."""
+    import re as _re31
+    toks = _re31.findall(r'<input type="([a-z]+)" data-k="rtok"', src)
+    vals = _re31.findall(r'aria-label="Wake relay address" value="\'\+([a-z]*)\(?r\.url', src)
+    return (len(toks) == 2 and set(toks) == {"password"} and len(vals) == 2 and set(vals) == {"esc"},
+            {"token types": toks, "address wrappers": vals})
+
+
 _L31_CHECKS = [
     ("wake relay: the address is http or https with a host and a port 1 to 65535, no login, path or query; nothing else is saved", _l31c_url),
     ("wake relay: off by default; set, replaced and cleared in servers.json; the token write-only (a blank keeps it, no reply, repr or "
@@ -32689,6 +32701,8 @@ _L31_CHECKS = [
     ("wake relay: Wake up server asks the relay as well; the relay-only test sends no broadcast, works off the Mac and answers in the card's words", _l31c_test),
     ("wake relay: the route, the one place the token is used, the words, the page's calls, and nothing of it in the kit, its docs or the wizard", _l31c_text),
     ("wake relay: the card's Advanced section is collapsed, neutral, write-only for the token and escapes what it shows (node)", _l31c_ui),
+    ("wake relay: both Servers cards (srvCard and Horizon's cleaner card, 6b625) keep the token a password field and escape the "
+     "address they show (6b640)", _l31c_both),
 ]
 
 
@@ -32730,8 +32744,12 @@ _L31_MUT = [
     ("the token left in the log scrub", '("access_id", "access_secret", "seed", "relay_token")\n                if self.e.get(k)]', '("access_id", "access_secret", "seed")\n                if self.e.get(k)]'),
     ("an old address not revalidated", '        url, why = _srv_relay_url(rel.get("url"))\n        if why or not tok:', '        url, why = rel.get("url"), ""\n        if why or not tok:'),
     ("the relay open to any id", '        e = _srv_find(entries, sid)\n        if e is None:\n            return {"err": SRV_GONE}\n        if clear:', '        e = _srv_find(entries, sid) or entries[0]\n        if e is None:\n            return {"err": SRV_GONE}\n        if clear:'),
-    ("the token field readable", 'type="password" data-k="rtok"', 'type="text" data-k="rtok"'),
-    ("the address shown unescaped", "value=\"'+esc(r.url||\"\")+'\">'", "value=\"'+(r.url||\"\")+'\">'"),
+    ("the token field readable", "\n      +'<input type=\"password\" data-k=\"rtok\"", "\n      +'<input type=\"text\" data-k=\"rtok\""),
+    ("the token field readable (Horizon's card)", "\n        +'<input type=\"password\" data-k=\"rtok\"", "\n        +'<input type=\"text\" data-k=\"rtok\""),
+    ("the address shown unescaped", "\n      +'aria-label=\"Wake relay address\" value=\"'+esc(r.url||\"\")+'\">'",
+     "\n      +'aria-label=\"Wake relay address\" value=\"'+(r.url||\"\")+'\">'"),
+    ("the address shown unescaped (Horizon's card)", " aria-label=\"Wake relay address\" value=\"'+esc(r.url||\"\")+'\">'",
+     " aria-label=\"Wake relay address\" value=\"'+(r.url||\"\")+'\">'"),
     ("the box open by default", "const r=s.relay||{},open=!!srvRelayOpen[s.id];", "const r=s.relay||{},open=true;"),
 ]
 _l31m = []
@@ -36285,7 +36303,7 @@ def _mc_server(src):
     got["comps is this profile's, checked"] = ('"cloud_balance", "comps", "dict_lang"))' in src and cn["comps_ok"]({"Thinking": "gemini", "srv:a1b2c3d4:max": "Desk · q"})
                                               and not cn["comps_ok"]({"Thinking": 3}) and not cn["comps_ok"](["x"]) and not cn["comps_ok"]({"": "x"})
                                               and not cn["comps_ok"]({"k%d" % i: "x" for i in range(65)})
-                                              and '                k == "comps" and not comps_ok(v)):' in src)
+                                              and '                k == "comps" and not comps_ok(v)) or (\n' in src)   # fx_level (6b621) and dict_lang (6b641) follow
     # the handler: read for a tier, handed to every path that blends
     got["the request's mode_comp reaches run_council and Cloud Only"] = (
         '        mode_pen = req_json.get("mode_comp")\n        mode_pen = mode_pen[:160] if isinstance(mode_pen, str) and tier else ""\n' in src
@@ -37599,8 +37617,8 @@ check("sidebar search UI: every lane while searching, the excerpt built from nod
       and "const i=findAtMsg(findHitEls,el);" in page
       and 'scroller.style.scrollBehavior="auto";\n    t.scrollIntoView({block:"center"});' in page
       and "chatPinned=false;chatGlideTo=0;" in page
-      and "function findOpen(){\n  const again=!fb.hidden;\n  fb.hidden=false;\n  fq.focus();fq.select();\n"
-          "  if(again)return;\n  findWatch();\n  findRun(true);\n}" in page)
+      and "function findOpen(){\n  const again=!fb.hidden;\n  fb.hidden=false;findPlace();\n  fq.focus();fq.select();\n"
+          "  if(again)return;\n  findWatch();\n  findRun(true);\n}" in page)   # (6b640) placed under the header before it shows
 
 # --- 6b471: unread dot ---------------------------------------------------
 _uj = os.path.join(_SMOKE_TMP, "unread471.js")
@@ -38862,11 +38880,13 @@ exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("
 _pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
 _turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
 _c16a = _q16["ground_clip"](_turn16, 5000)
-_c16b = _q16["ground_clip"](_turn16, 12000)
+_c16b = _q16["ground_clip"](_turn16, len(_turn16))   # (beta 4) the rules grew past 12 KB with 6b626/6b560; a cut that fits leaves it whole
+_c16c = _q16["ground_clip"](_turn16, 12000)            # and the checker's 12 KB cut keeps the rules and the question
 check("a clipped grounded turn keeps the rules and the question, and the evidence's head",
       len(_turn16) > 9000 and len(_c16a) <= 5000 and _c16a.endswith("PROMPT: most powerful GPU now")
       and "GROUNDING RULES:" in _c16a and _c16a.startswith("What you just found on the web")
       and "[1] page 1" in _c16a and _c16b == _turn16 and _q16["ground_clip"]("short", 10) == "short"
+      and len(_c16c) <= 12000 and _c16c.endswith("PROMPT: most powerful GPU now") and "GROUNDING RULES:" in _c16c and "[1] page 1" in _c16c
       and _q16["ground_clip"]("y" * 9000, 3000).endswith("y" * 1000) and len(_q16["ground_clip"]("y" * 9000, 3000)) <= 3000,
       "%d %d" % (len(_turn16), len(_c16a)))
 check("the checker and Fast's second passes cut the question with ground_clip, never a bare slice",
@@ -43511,7 +43531,9 @@ check("6b531 the system prompt's clock names the hour, not the minute, and still
       and '_venue_stamp("%A, %B %-d, %Y, %-I:%M%p")' not in _MILLENAI_SRC
       and "%-I:%M" not in _ck31[_i_clk31 - 1200:_i_clk31 + 900], "")
 check("6b531 the minute still rides the question for searched answers, after the hour went into the system prompt",
-      _ck31.index('_venue_stamp("%A %-I:%M%p")') > _i_clk31
+      # (beta 4) since 6b626 the minute's stamp is clock_line()'s, called by the handler after the hour went in
+      '_venue_stamp("%A %-I:%M%p")' in _MILLENAI_SRC[_MILLENAI_SRC.index("def clock_line() -> str:"):_MILLENAI_SRC.index("def clock_line() -> str:") + 300]
+      and _ck31.index("_clock_line = clock_line()") > _i_clk31
       and "messages[-1][\"content\"] = _clock_line + str(messages[-1][\"content\"])" in _ck31, "")
 # the mutant: the minute back in the system prompt must fail the first check
 _mut31 = _ck31.replace('around %-I%p")', '%-I:%M%p")', 1)

@@ -96,6 +96,8 @@ MACHINE_STATE = frozenset((
     # retry clock, the disk's free space, the crash journal's ticker and the
     # folders it has been recovered for
     "_HW_MEMSIZE", "_search_hits", "_pending_timer", "_disk_seen",
+    # (6b627) the models found damaged, the engines' load times, the loads already said
+    "_DMG_SEEN", "_LOADS", "_LOAD_SAID",
     "_journal_run", "_journal_done",
     # the instance, the window, the boot code, the updater
     "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
@@ -909,6 +911,8 @@ class _StubDDGS:
     @staticmethod
     def _hits(query, n, kind):
         q = " ".join(str(query or "").split())[:80] or "the question"
+        if re.search(r"\b[b-df-hj-np-tv-xz]{5,}\b", q, re.I):
+            return []                    # a made-up word with no vowel (the gauntlet's "qzxvbn cafe"): no index knows it
         out = []
         for i in range(1, max(1, min(int(n or 5), 8)) + 1):
             url = "http://127.0.0.1:9/stand-in/%s/%d" % (kind, i)
@@ -14636,6 +14640,8 @@ MACHINE_IO = frozenset((
     # import time: the dev folder, the crash log and the logs, the
     # subprocess recorder (a dev copy's hook)
     "<module>",
+    # 6b627: a damaged model's files removed from the machine's model cache, and the engines' load times (run/engine-loads.json)
+    "mlx_repair", "engine_load_note",
     # 6b497: the MLX engine self-update: its record, the pip run's temp files, the unpacked wheels
     "_mlx_engine_record", "_mlx_engine_pip", "_ensure_mlx_engine",
     # 6b546: the PDF reader: its install record, a PDF's 0600 stage file under run/ and the
@@ -55464,6 +55470,8 @@ html:not(.hz) .ctok,html:not(.hz) .ctot{font-family:var(--mono);font-size:10.5px
 html:not(.hz) #sb-foot{display:flex;align-items:center;gap:8px;padding:10px 0 0}
 html:not(.hz) #sb-foot #settings-btn{display:inline-flex;align-items:center;gap:8px;background:none;border:0;font:inherit;font-size:13px;cursor:pointer}
 html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
+/* the update check's line under Check now, Classic's (6b627; outside the Horizon slice, which is .hz-scoped) */
+#up-checked{margin:6px 0 0;font-size:12px;color:var(--dim)}
 /* ============================================================ HORIZON (6b526) */
 /* THE HORIZON LOOK (6b526, per Patrick). Everything below applies only under
    html.hz (Settings > About > Look); Classic keeps every rule above this line
@@ -57040,7 +57048,6 @@ html.hz #sidebar{background:var(--chat-panel);-webkit-backdrop-filter:none;backd
 .hz:not(.hz-kb) .rob-go:focus-visible{outline:0;box-shadow:none}
 .hz .msg.ai>.robquiet{grid-column:1;margin:8px 0 0;font:450 13px/18px var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink-3);
   font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased}
-#up-checked{margin:6px 0 0;font-size:12px;color:var(--dim)}
 .hz #about-veil #up-checked{margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta,var(--dim))}
 /* ==== ROBUST (6b627): css end ==== */
 /* ==== THE CODE LANE AND FUNNELS (6b622, per Patrick: "the code page and all that looks really dialed in ... I want
@@ -59343,7 +59350,8 @@ const KEEP_LS=["millen.model","millen.council","millen.video","millen.perf",
   "millen.look","millen.sbhide","millen.hz.lastday","millen.hz.salt","millen.fxlevel","millen.effort",
   // the sidebar's Recents range and folds (6b467, 6b470) and the Usage pane's range: per machine.
   // Left off this list they were read at launch, then swept here, so the next launch forgot them
-  "millen.recentsDays","millen.foldPinned","millen.foldRecents","millen.usage.range"];
+  "millen.recentsDays","millen.foldPinned","millen.foldRecents","millen.usage.range",
+  "millen.hz_greet_last"];   // the headline shown last, so the next visit picks another (beta 4)
 let P={};                        // the person's settings, as prefs.json holds them
 const prefMine=new Set();        // set here before prefs.json answered
 let prefQ=Promise.resolve();
@@ -70304,7 +70312,7 @@ function paintUsage(d,err){
   const T=(d&&d.totals)||{},dash="\u2014";
   $("#us-req").textContent=d?uInt(T.requests):dash;
   $("#us-ans").textContent=d?uInt(T.answers)+" "+sxPl(T.answers,"answer"):"";
-  {const rk=$("#us-req").parentNode.querySelector(".us-k");if(rk)rk.textContent=d&&+T.requests===1?"Request":"Requests";}   // plural rules (6b625)
+  {const up=$("#us-req").parentNode,rk=up&&up.querySelector?up.querySelector(".us-k"):null;if(rk)rk.textContent=d&&+T.requests===1?"Request":"Requests";}   // plural rules (6b625)
   $("#us-in").textContent=d?uTok(T.input):dash;
   $("#us-cached").textContent=d&&T.cached?uTok(T.cached)+" cached":"";
   $("#us-out").textContent=d?uTok(T.output):dash;
