@@ -45021,18 +45021,18 @@ def _sl549_field(css, js, pg):
     # home only; every star in the band between the greeting (+14) and the composer (-8), the composer's width plus 30 px
     hb, cb = r["hb"], r["cb"]
     inside = lambda p, b: b["x0"] <= p["x"] <= b["x1"] and b["y0"] <= p["y"] <= b["y1"]
-    home_ok = (len(r["home"]) == 90 and len(r["half"]) == 45 and sum(p["big"] for p in r["home"]) == 6 and sum(p["big"] for p in r["half"]) == 3   # (6b621, per Patrick: "more stars") 60 + a deeper 30 in Full, half in Balanced; six glints, three
+    home_ok = (len(r["home"]) == 180 and len(r["half"]) == 90 and sum(p["big"] for p in r["home"]) == 8 and sum(p["big"] for p in r["half"]) == 4   # (6b621, per Patrick: "more stars", twice) 90 + a deeper 50 + 40 pin-points in Full, half in Balanced; eight glints, four
                and hb == {"x0": 290, "x1": 1150, "y0": 284, "y1": 342}
                and all(inside(p, hb) and clear(p, r["c"]) and r["g"]["bottom"] < p["y"] < r["c"]["top"] for p in r["home"] + r["half"])
-               and 16 <= sum(p["grid"] for p in r["home"]) <= 56)                                 # some sit on the dot matrix's 11 px grid: one system
-    chat_ok = (len(r["chat"]) == 30 and not any(p["big"] for p in r["chat"]) and cb["y0"] == r["cc"]["top"] - 34 and cb["y1"] == r["cc"]["top"] - 8
+               and 40 <= sum(p["grid"] for p in r["home"]) <= 110)                                 # some sit on the dot matrix's 11 px grid: one system
+    chat_ok = (len(r["chat"]) == 45 and not any(p["big"] for p in r["chat"]) and cb["y0"] == r["cc"]["top"] - 34 and cb["y1"] == r["cc"]["top"] - 8
                and all(inside(p, cb) and clear(p, r["cc"]) for p in r["chat"]))
     return (home_ok and chat_ok and r["none"] is None                                           # no room: no field
             and '<div id="hz-scrim"></div>\n  </div>' in pg and 'id="hz-ufield"' not in pg         # no DOM field: the sky draws it, behind everything
             and "drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,hmOn);" in js   # 6b580: the star signs are the home's
             and "#hz-fxgl{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:40}" in css   # the burst's canvas never takes a pointer
             and ".hz.hz-calm #hz-fxgl,.hz .novideo #hz-fxgl{display:none}" in css
-            and "const n=Math.round((full?60:30)*(home?1:.5)),P=[];let glints=home?(full?6:3):0;" in js
+            and "const n=Math.round((full?90:45)*(home?1:.5)),P=[];let glints=home?(full?8:4):0;" in js
             and 'plan=hzUFieldPlan(hm,R(greetEl()),cb,innerWidth,skyMode==="full",Math.random);' in js
             and 'const lift=()=>ultraWant&&!hzS.reduced&&skyMode!=="calm";' in js                       # off in Calm and reduced motion
             and "if(on&&lift()&&!smash){" in js and "const f=field,on=f&&!hzS.reduced&&skyMode!==\"calm\"" in js
@@ -45112,9 +45112,9 @@ check("6b552 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       and not _sl549(_hz_css.replace(".hz.hz-ultra .hz-sl-halo{background:#a9c6ff}", ".hz.hz-ultra .hz-sl-halo{background:#a58bff}"), _hz_js, page)
       # the stars above the box: a field reaching into the composer, Balanced at full count, the field on in Calm, the track's stars back
       and not _sl549(_hz_css, _hz_js.replace(",y1=c.top-8;", ",y1=c.top+60;"), page)                                                                  # into the composer
-      and not _sl549(_hz_css, _hz_js.replace("const n=Math.round((full?60:30)*(home?1:.5))", "const n=Math.round(60*(home?1:.5))"), page)                # Balanced at full count
+      and not _sl549(_hz_css, _hz_js.replace("const n=Math.round((full?90:45)*(home?1:.5))", "const n=Math.round(90*(home?1:.5))"), page)                # Balanced at full count
       and not _sl549(_hz_css, _hz_js.replace('const lift=()=>ultraWant&&!hzS.reduced&&skyMode!=="calm";', 'const lift=()=>ultraWant&&!hzS.reduced;'), page)   # the field on in Calm
-      and not _sl549(_hz_css, _hz_js.replace("let glints=home?(full?6:3):0;", "let glints=full?6:3;"), page)                                             # glints in a conversation's strip
+      and not _sl549(_hz_css, _hz_js.replace("let glints=home?(full?8:4):0;", "let glints=full?8:4;"), page)                                             # glints in a conversation's strip
       and not _sl549(_hz_css, _hz_js, page.replace('<div id="hz-scrim"></div>\n  </div>', '<div id="hz-scrim"></div>\n    <div id="hz-ufield"></div>\n  </div>'))   # the DOM field back
       and not _sl549(_hz_css, _hz_js, page.replace('<i class="hz-sl-fill"></i>', '<i class="hz-sl-fill"><i class="hz-sl-tst"></i></i>'))
       # the greeting's afterglow (6b552; 6b555 the preview's ::before bloom and close glow): the rainbow bloom back, a gold glow, a breathing loop, an offset (double) shadow
@@ -45476,7 +45476,7 @@ def _b3_sky(js, css, pg):
             and "nextSign=nowT+14000+Math.random()*6000;" in sky and "nextSign=n+1800+Math.random()*800;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
             and "const P=pts.slice(0,4+Math.floor(Math.random()*3)),inT=[0],edges=[];" in sky and "per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;" in sky
             # meteor showers: every 60-90 s in Full (110-130 s in Balanced), 3-5 from one radiant
-            and 'nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);' in sky and "n=3+Math.floor(Math.random()*3);" in sky
+            and 'nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);' in sky and "n=landing?5+Math.floor(Math.random()*4):3+Math.floor(Math.random()*3);landing=false;" in sky
             # all of it paused while the page is hidden or a minute unfocused
             and "const fxLive=()=>!document.hidden&&!hzS.blurred;" in sky and "if(on&&fxLive()&&!sign&&nowT>nextSign)" in sky)
 check("6b555 the sky: the near-black ground with the hour in the footage's grade (eased, never a step), three layers of stars with cores and halos, the vignette, the toe and the dither, the slow drift, the real stars kept, moonlight with no disc; the aurora level and sliding only, wandering 10-25 %, its wavy edge kept off the composer and the greeting, Balanced slower and half, Calm still; the dot matrix's linear sweeps; the star signs and the showers on their clocks; paused with the page; the mutants are caught",
@@ -46770,10 +46770,23 @@ def _u621_aur(js):
         aur = sky[sky.index("  const AUR=\"precision highp float;"):sky.index("  let pF,pS,pA,pB;")]
     except ValueError:
         return False
-    return ('uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws;' in aur
+    return ('uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws,sgx,sga;' in aur
             and '+fa*.06*sin(p.x*4.-ft*.13+fk*1.3);"' in aur                                       # the fold wave, about 30 px/s
             and '"float xn=x+fa*(.35*sin(ft*.045)+.2*sin(ft*.071+1.3+fk));"' in aur                 # the rays' pattern slides and back
-            and "*(1.-.4*fa+.4*fa*(.5+.5*sin(x*3.5-ft*.2+fk*2.)));" in aur                          # the travelling pulse, about 50 px/s
+            and "*(1.-.4*fa+.4*fa*(.5+.5*sin(x*3.5-ft*.2+fk*2.)))" in aur                           # the travelling pulse, about 50 px/s
+            # THE LIVING RAYS (per Patrick: "some sort of creative and dynamic effect to those Northern Light streaks"):
+            # ripples running sideways through the rays (about 35 px/s, the mean kept, richer at Ultra), each ray's height
+            # breathing on its own (about 14 s), and every 20-40 s a section that brightens and lifts (2 s in, 1.5 s held,
+            # 2.5 s out); all on the continuous clock, so still in Calm and reduced motion
+            and '"float rp=fa*(1.+.4*min(cool,1.)),sgv=sga*exp(-pow((uv.x-sgx)/.12,2.));"' in aur
+            and "*(1.+.35*rp*(2.67*pow(.5+.5*sin(xn*9.-ft*.35+fk*1.7),2.)-1.))*(1.+.6*sgv);" in aur
+            and "hb*mix(1.,.7+.6*nz(vec2(xn*(9.+fk*3.5),ft*.07+fk*7.)),fa)*(1.+.3*sgv)" in aur
+            and "AW.sgN-=d;if(AW.sgN<=0&&AW.sgU<0){AW.sgU=0;AW.sgX=AW.cx+(arnd()-.5)*.36;AW.sgN=20+arnd()*20;}" in sky
+            and "AW.sga=(u<2?ss5(u/2):u<3.5?1:u<6?1-ss5((u-3.5)/2.5):0)*A;" in sky and "if(still)AW.sga=0;" in sky
+            # LESS BLUE AT REST (per Patrick: "the rest looks awfully blue"): the curtain at .55 of its chroma until Ultra,
+            # its rays in the band above the greeting (1.35 x the falloff at rest), the footage's blue excess cut
+            and "(1.+.45*rich)*mix(.55,1.,min(cool,1.))" in aur and "*(1.35-.35*min(cool,1.))/" in aur
+            and '"earth.b-=max(earth.b-.5*(earth.r+earth.g),0.)*dbl;"' in sky and "gl.uniform1f(pS.U.dbl,.65-.3*(lift()?ultraE:0));" in sky
             and '"float o=spl*.1,env=' in aur                                                        # the lobes +-10 %: one curtain widening, no gap
             and "cl=mix(" not in aur and "/(1.+lk/.06)" not in aur and "gm" not in aur              # no crest cap, no knee
             and "gb=grt.z>grt.x?1.-smoothstep(gh,gh+.22,abs(uv.y-gc)):0." in aur and '"col*=1.-.3*gb;"' in aur   # the greeting's band, full width
@@ -46789,14 +46802,18 @@ def _u621_aur(js):
             and "const aTw=[1+ATW_AMP*surgeNow,twDir*ATW_PH*surgeNow,lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0];" in sky
             and bool(re.search(r"const ATW_AMP=\.6,ATW_PH=\.25,ATW_SH=\.35,ATW_REST=\.28;", sky))
             and "gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);" in sky)
-check("6b621 the aurora's shader: the travelling fold wave, the pulse and the sliding rays on the continuous clock; no dent (no crest cap, no knee: a soft full-width band at the greeting's height, the Ultra lift withheld in it); the lobes +-10 %; the wavy edge kept; the dev hooks; the mutants are caught",
+check("6b621 the aurora's shader: the travelling fold wave, the pulse and the sliding rays on the continuous clock; the living rays (ripples, breathing heights, a surge now and then); silver at rest; no dent (no crest cap, no knee: a soft full-width band at the greeting's height, the Ultra lift withheld in it); the lobes +-10 %; the wavy edge kept; the dev hooks; the mutants are caught",
       _u621_aur(_hz_js)
       and not _u621_aur(_hz_js.replace('"float hs=clamp(.5+.5*(b0-fl)/.08,0.,1.)', '"float cl=mix(2.,grt.y-.025,1.);float hs=clamp(.5+.5*(b0-fl)/.08,0.,1.)'))   # the crest cap back
       and not _u621_aur(_hz_js.replace('"col*=1.-.3*gb;"', '"col*=mix(1.,1./(1.+dot(col,lw)/.06),gb);"'))                                             # the knee back
       and not _u621_aur(_hz_js.replace('"float o=spl*.1,env=', '"float o=spl*.17,env='))                                                                  # the split's gap back
       and not _u621_aur(_hz_js.replace('"float xn=x+fa*(.35*sin(ft*.045)+.2*sin(ft*.071+1.3+fk));"', '"float xn=x;"'))
       and not _u621_aur(_hz_js.replace("lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0", "ATW_SH*(ATW_REST*ultraE*amp_+surgeNow)"))      # the twist in Calm
-      and not _u621_aur(_hz_js.replace("const ATW_AMP=.6,ATW_PH=.25,", "const ATW_AMP=.6,ATW_PH=1.5,")), "")                          # a spin, not a lean                           # the rays parked
+      and not _u621_aur(_hz_js.replace("const ATW_AMP=.6,ATW_PH=.25,", "const ATW_AMP=.6,ATW_PH=1.5,"))
+      and not _u621_aur(_hz_js.replace("AW.sga=(u<2?ss5(u/2):u<3.5?1:", "AW.sga=(u<.1?1:u<3.5?1:"))                                     # a surge that flashes on
+      and not _u621_aur(_hz_js.replace("    if(still)AW.sga=0;", ""))                                                                    # a surge in Calm
+      and not _u621_aur(_hz_js.replace("(1.+.45*rich)*mix(.55,1.,min(cool,1.))", "(1.+.45*rich)"))                                     # the blue back at rest
+      and not _u621_aur(_hz_js.replace("sin(xn*9.-ft*.35+fk*1.7)", "sin(xn*9.-ft*3.5+fk*1.7)")), "")                                   # ripples ten times faster                          # a spin, not a lean                           # the rays parked
 # THE WORKING VIEWS' SKY (THE GOVERNING RULE): the field in a conversation is the short light version (pure, in node):
 # half the stars, centred over the composer's top edge (.18-.82 of the band, the grid's half pitch either way), each
 # living 2-4 s; the home's live on
@@ -46815,7 +46832,7 @@ process.stdout.write(JSON.stringify({n:C.P.length,lo:Math.min(...C.P.map(p=>(p.x
         return {"err": repr(e_)}
 def _u621_field_ok(o):
     li = o.get("life") or [0, 0]
-    return (o.get("n") == 30 and o.get("hn") == 90 and o.get("lo", 0) >= .18 - o.get("pad", 0) - 1e-9 and o.get("hi", 1) <= .82 + o.get("pad", 0) + 1e-9
+    return (o.get("n") == 45 and o.get("hn") == 180 and o.get("lo", 0) >= .18 - o.get("pad", 0) - 1e-9 and o.get("hi", 1) <= .82 + o.get("pad", 0) + 1e-9
             and 2000 <= li[0] <= li[1] <= 4000 and o.get("home") == 0)
 _u621_f = _u621_field(_hz_js)
 check("6b621 the conversation's field (node, the page's plan): half the home's stars, centred over the composer's top edge, each living 2-4 s; the home's live on; the mutants are caught",
@@ -46859,7 +46876,8 @@ def _u621_css(css, js, pg):
     spawn = _jsfn(js, "function hzMoteSpawn(){")
     return (".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit{opacity:1;--hz-urev:360deg;transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}" in nc
             and "transition:--hz-urev .9s var(--hz-ease-in-out),opacity .1s linear .9s}" in nc                       # drains back the way it came
-            and "{animation:hzURimTurn 6s linear infinite}" in nc and nc.count("infinite") == 1                       # the one loop: the rim's turn
+            and "{animation:hzURimTurn 6s linear infinite}" in nc and nc.count("infinite") == 2                       # two loops: the rim's turn at Ultra, the fill's shimmer only while the slider is held
+            and ".hz:not(.hz-calm) .hz-sl.dragging .hz-sl-led::after{opacity:.6;animation:hzMarquee 1.6s cubic-bezier(.45,0,.25,1) infinite;" in nc   # held only, never at rest
             and ".hz #composer>.hz-ulit>b{position:absolute;inset:0;filter:blur(3px);" in nc and "#composer>.hz-ulit>b{opacity:.75;" in nc
             and ".hz.hz-ignite:not(.hz-calm) #composer>.hz-ulit>i.h{animation:hzUHead 1.4s linear both}" in nc
             and ".hz.hz-calm #composer>.hz-ulit,.hz.hz-ring-static #composer>.hz-ulit,.hz .novideo #composer>.hz-ulit{display:none}" in nc
@@ -46871,19 +46889,24 @@ def _u621_css(css, js, pg):
             and '<i class="hz-sl-spark"></i><i class="hz-sl-rays"></i><span class="hz-sl-thumb">' in js
             and ".hz .hz-elevel::after{content:\"\";position:absolute;left:-24px;top:50%;width:80px;height:34px;margin-top:-17px;z-index:-1;" in nc
             and max(float(x) for x in re.findall(r"rgba\(3,3,5,([.\d]+)\)", nc)) <= .6                              # the label's shade: shade, not a shape
-            and "hzS.moteI=setInterval(hzMoteSpawn,170);" in js and "if(box.childElementCount>=(work?20:40))return;" in spawn
+            and "hzS.moteI=setInterval(hzMoteSpawn,130);" in js and "if(box.childElementCount>=(work?20:60))return;" in spawn
             and "if(work&&(hzS.moteOdd=!hzS.moteOdd))return;" in spawn and 'hzFxLevel()==="calm"' in spawn and "!hzMotionOK()" in spawn and "document.hidden" in spawn
             and ".hz.hz-calm #hz-motes,.hz .novideo #hz-motes{display:none}" in nc
             and "@media (prefers-reduced-motion:reduce){" in nc and ".hz .hz-sl-rays,.hz #hz-motes{display:none}}" in nc
+            and ".hz #hz-aurw{filter:saturate(.55)}" in nc and ".hz #hz-wash{filter:saturate(.25)}" in nc and ".hz.hz-ultra:not(.hz-calm) #hz-aurw{filter:none}" in nc   # silver at rest
+            and ".hz #hz-sky{background:#050506}" in nc
+            and "mask-image:radial-gradient(ellipse 52% 32% at 50% 30%,#000 30%,rgba(0,0,0,0) 100%);" in css                            # the rays in the band above the greeting
+            and "box-shadow:0 24px 70px rgba(150,154,166,.14),0 2px 30px rgba(200,204,214,.08);" in css                                 # the composer's glow silver at rest, its ice at Ultra
             and _arr553_colours_ok(nc) and _arr553_shapes_ok(nc) and _knob_plain553(css, js))
-check("6b621 Ultra at full strength, its css: the lit glass edge (the line of light from +400 ms in 600 ms, the rim turning once per 6 s with a 3 px glow, draining back in 900 ms; the still rim kept for Calm and effects off), the tint, the horizon line, the knob's settle and flash, the eight rays, the label's shade, the motes (170 ms, at most 40, half in a working view, none in Calm); ice, violet and white; no circles; the mutants are caught",
+check("6b621 Ultra at full strength, its css: the lit glass edge (the line of light from +400 ms in 600 ms, the rim turning once per 6 s with a 3 px glow, draining back in 900 ms; the still rim kept for Calm and effects off), the tint, the horizon line, the knob's settle and flash, the eight rays, the label's shade, the motes (130 ms, at most 60, half in a working view, none in Calm); ice, violet and white; no circles; the mutants are caught",
       _u621_css(_hz_css, _hz_js, page)
       and not _u621_css(_hz_css.replace("transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}", "transition:none}"), _hz_js, page)                      # the rim at once
       and not _u621_css(_hz_css.replace(".hz.hz-calm #composer>.hz-ulit,", ".hz.hz-full #composer>.hz-ulit,"), _hz_js, page)                                                     # the lit edge in Calm
       and not _u621_css(_hz_css.replace("{animation:hzURimTurn 6s linear infinite}", "{animation:hzURimTurn 1.2s linear infinite}"), _hz_js, page)                                # a spinning rim
       and not _u621_css(_hz_css.replace("@keyframes hzKnobSettle{from{transform:scale(1)}to{transform:scale(.97)}}", "@keyframes hzKnobSettle{from{transform:scale(1)}to{transform:scale(1.08)}}"), _hz_js, page)   # the knob bouncing
       and not _u621_css(_hz_css.replace("rgba(143,183,255,.13),rgba(165,139,255,.06) 38%", "rgba(242,166,180,.13),rgba(165,139,255,.06) 38%"), _hz_js, page)                  # a rose tint
-      and not _u621_css(_hz_css, _hz_js.replace("if(box.childElementCount>=(work?20:40))return;", "if(box.childElementCount>=400)return;"), page), "")                          # a flood of motes
+      and not _u621_css(_hz_css, _hz_js.replace("if(box.childElementCount>=(work?20:60))return;", "if(box.childElementCount>=400)return;"), page)
+      and not _u621_css(_hz_css.replace(".hz #hz-aurw{filter:saturate(.55)}", ".hz #hz-aurw{filter:none}"), _hz_js, page), "")                              # the ice rays blue at rest again                          # a flood of motes
 # LIVE (headless Chromium over the DevTools protocol, the copy's page, Full at 1440): the curtain read back over 8
 # minutes of aurora time (aurspeed=40): its centre of mass about the middle, one hump; the arrival: the held breath (the
 # knob's settle), the release, the rim's reveal from +400 ms; the motes; then a conversation at Ultra: the sky at 60 %
@@ -46965,17 +46988,17 @@ def _u621_push_ok(r):
     tw = [x.get("atw") or [1, 0, 0] for x in sk]
     peak = max((t for t in tw), key=lambda t: t[2], default=[1, 0, 0])
     return (bool(sk) and peak[0] >= 1.3 and abs(peak[1]) >= .15 and .3 <= peak[2] <= .5      # the twist in the swell: folds deeper, a lean of ~24 deg, a phase push
-            and max(x.get("births", 0) for x in sk) >= 6 and any(x.get("shower", 0) > 0 for x in sk)   # stars born in the hang, a shower on landing
-            and rs.get("deep") == 30 and .05 <= (rs.get("atw") or [0, 0, 0])[2] <= .14 and abs((rs.get("atw") or [1, 1, 0])[0] - 1) < .05)   # the resting twist, and the deeper layer
+            and max(x.get("births", 0) for x in sk) >= 9 and any(x.get("shower", 0) > 0 for x in sk)   # stars born in the hang, a shower on landing
+            and rs.get("deep") == 90 and .05 <= (rs.get("atw") or [0, 0, 0])[2] <= .14 and abs((rs.get("atw") or [1, 1, 0])[0] - 1) < .05)   # the resting twist, and the deeper layer
 def _u621_conv_ok(r):
     c, st = r.get("conv") or {}, r.get("rest") or {}
     box, fs = c.get("box") or [0, 0, 1, 1], c.get("fspan") or [0, 9e9]
     w = box[2] - box[0]
-    return (st.get("motes", 0) > 0 and st.get("field") == 98 and st.get("lit") is True and st.get("after") == "none"
+    return (st.get("motes", 0) > 0 and st.get("field") == 192 and st.get("lit") is True and st.get("after") == "none"
             and c.get("work") is True and abs(c.get("scrim", 0) - .4) < .02 and c.get("scrimBg") == "rgb(14, 14, 16)"
             and c.get("band") == 1 and "rgba(14, 14, 16, 0.93)" in (c.get("bandImg") or "") and abs((c.get("bcx") or 0) - (c.get("colCx") or 1e9)) <= 2
             and c.get("sign") == 0 and c.get("shoot") is False and c.get("shower") == 0 and c.get("cons") == 0
-            and c.get("field") == 30 and fs[0] >= box[0] + .18 * w - 6 and fs[1] <= box[0] + .82 * w + 6 and 2000 <= c.get("flife", 0) <= 4000
+            and c.get("field") == 45 and fs[0] >= box[0] + .18 * w - 6 and fs[1] <= box[0] + .82 * w + 6 and 2000 <= c.get("flife", 0) <= 4000
             and (c.get("sw") or [0, 1])[0] == (c.get("sw") or [0, 1])[1]
             and len(r.get("homeSw") or []) == 2 and len(r.get("convSw") or []) == 2 and all(a == b for a, b in (r.get("homeSw") or []) + (r.get("convSw") or [])))   # no sideways scroll at 760 or 1440 (390's home is 19 px wide at every level before 6b621 too)
 _u621_l = _u621_live()

@@ -53107,7 +53107,7 @@ __HZ_FONTS__
 .hz.hz-novfx #hz-vid{opacity:1;filter:brightness(.7) saturate(.85) contrast(1.08);transition:opacity 2.8s var(--hz-ease-out)}
 .hz.hz-novfx #hz-gl{display:none}
 .hz #hz-moonglow{position:absolute;top:-6%;right:-4%;width:min(760px,70vw);height:min(760px,70vw);border-radius:50%;
-  background:radial-gradient(circle,rgba(246,241,228,.5) 0%,rgba(222,230,255,.2) 16%,rgba(159,192,255,.07) 42%,rgba(159,192,255,0) 68%);
+  background:radial-gradient(circle,rgba(246,241,228,.5) 0%,rgba(228,230,236,.2) 16%,rgba(196,200,212,.07) 42%,rgba(196,200,212,0) 68%);   /* neutral moonlight (6b621: was ice) */
   mix-blend-mode:screen;opacity:.3;transition:opacity 2s var(--hz-ease-in-out)}
 .hz #hz-moonglow.left{right:auto;left:-4%}
 /* the wash: four blooms on a small canvas (its upscale is the softness), screened,
@@ -53122,8 +53122,8 @@ __HZ_FONTS__
 @keyframes hzSwell{from{opacity:.75}to{opacity:1}}
 /* the ice rays (canvases drawn at a quarter size), over the GPU sky at .42; .85 while an answer runs */
 .hz #hz-aurw{position:absolute;left:50%;top:8vh;width:1800px;height:640px;margin-left:-900px;transform:none;transform-origin:50% 60%;   /* level (6b555): never turned; the sky slides it with the wander */
-  -webkit-mask-image:radial-gradient(ellipse 54% 44% at 50% 52%,#000 30%,rgba(0,0,0,0) 100%);
-          mask-image:radial-gradient(ellipse 54% 44% at 50% 52%,#000 30%,rgba(0,0,0,0) 100%);
+  -webkit-mask-image:radial-gradient(ellipse 52% 32% at 50% 30%,#000 30%,rgba(0,0,0,0) 100%);   /* the band above the greeting, not full-height rain (6b621, per Patrick's target picture; was 54% 44% at 50% 52%) */
+          mask-image:radial-gradient(ellipse 52% 32% at 50% 30%,#000 30%,rgba(0,0,0,0) 100%);
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;opacity:.42;transition:opacity 2.6s var(--hz-ease-out)}
 .hz.hz-busy #hz-aurw{opacity:.85}
 .hz .hz-aur{position:absolute;inset:-40px 0;will-change:transform}
@@ -53232,7 +53232,8 @@ __HZ_FONTS__
 /* the glass (NORTHSTAR 12): lit from below; its glow a separate breathing layer */
 .hz #composer{position:relative;max-width:none;margin:0}   /* the glass, its size and its states: BETA 3 CHROME (6b555) */
 .hz #hz-cglow{position:fixed;left:0;top:0;z-index:0;pointer-events:none;border-radius:28px;
-  box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite}
+  box-shadow:0 24px 70px rgba(150,154,166,.14),0 2px 30px rgba(200,204,214,.08);animation:hzBreathe var(--hz-t-breathe) ease-in-out infinite;transition:box-shadow 1s var(--hz-ease-in-out)}   /* silver at rest (6b621, per Patrick: "awfully blue"; was 80,130,255), its ice at Ultra */
+.hz.hz-ultra:not(.hz-calm) #hz-cglow{box-shadow:0 24px 70px rgba(80,130,255,.22),0 2px 30px rgba(159,192,255,.12)}
 .hz #hz-cglow[hidden]{display:none}
 .hz #input{font:17px/26px var(--hz-font-ui);color:var(--hz-ink);padding:0 2px;min-height:26px;max-height:156px;overflow-y:auto}   /* one line at rest; typed text grows it to 156 px, then it scrolls (6b555) */
 .hz #input::placeholder{color:var(--hz-ink-2);opacity:1}
@@ -54830,6 +54831,26 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
   .hz #composer>.hz-ulit>i.r::before,.hz #composer>.hz-ulit>b>i::before,.hz #composer>.hz-ulit>i.h,.hz .hz-sl-core,.hz .hz-sl-rays{animation:none!important}
   .hz #composer>.hz-ulit>b,.hz #composer>.hz-ulit>i.h,.hz .hz-sl-rays,.hz #hz-motes{display:none}}
 .hz.hz-pause #composer>.hz-ulit>i.r::before,.hz.hz-pause #composer>.hz-ulit>b>i::before{animation-play-state:paused}
+/* LESS BLUE AT REST (per Patrick: "the rest looks awfully blue"): the ice rays and the wash are silver with a faint ice cast until Ultra
+   brings their colour back; the rays (GPU and CSS) live in the band above the greeting, fading 1.35 x faster with height at rest (the GPU curtain and the footage are de-blued in the sky's shaders); the ground is near-black */
+.hz #hz-sky{background:#050506}
+.hz #hz-aurw{filter:saturate(.55)}
+.hz #hz-wash{filter:saturate(.25)}
+.hz.hz-ultra:not(.hz-calm) #hz-aurw{filter:none}
+.hz.hz-ultra:not(.hz-calm) #hz-wash{filter:saturate(.8)}
+/* THE SLIDER'S FEEL (per Patrick: "more like Astra ... where it just seems magical"): hovered or held, the track
+   thickens a touch (x1.12, 150 ms); held, the fill's dots shimmer drifting through it (the marquee, quicker) and fade on
+   release; from Extra up the fill takes the ice-violet pair (Extra at half). Nothing glows at rest; Calm and reduced
+   motion: no shimmer, no thickening. */
+.hz .hz-sl-track,.hz .hz-sl-fill,.hz .hz-sl-bloom{transform-origin:50% 50%}
+.hz:not(.hz-calm) .hz-sl:hover .hz-sl-track,.hz:not(.hz-calm) .hz-sl:hover .hz-sl-fill,.hz:not(.hz-calm) .hz-sl.dragging .hz-sl-track,.hz:not(.hz-calm) .hz-sl.dragging .hz-sl-fill{transform:scaleY(1.12)}
+.hz .hz-sl-track{transition:transform .15s var(--hz-ease-out)}
+.hz:not(.hz-calm) .hz-sl.dragging .hz-sl-led::before{opacity:.16}
+.hz:not(.hz-calm) .hz-sl.dragging .hz-sl-led::after{opacity:.6;animation:hzMarquee 1.6s cubic-bezier(.45,0,.25,1) infinite;
+  -webkit-mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px,linear-gradient(90deg,transparent 40%,#000 50%,transparent 60%) 150% 0/250% 100% no-repeat;-webkit-mask-composite:source-in;
+  mask:linear-gradient(0deg,#000 1px,transparent 1px) 0 1px/4px 4px,linear-gradient(90deg,transparent 40%,#000 50%,transparent 60%) 150% 0/250% 100% no-repeat;mask-composite:intersect}
+.hz .hz-sl[data-lv="3"] .hz-sl-fill::after,.hz .hz-sl[data-lv="3"] .hz-sl-bloom::after{opacity:.5}
+@media (prefers-reduced-motion:reduce){.hz .hz-sl-track,.hz .hz-sl-fill,.hz .hz-sl-bloom{transform:none!important}.hz .hz-sl.dragging .hz-sl-led::after{animation:none!important;opacity:0}}
 /* ==== ultra at full strength (6b621): end ==== */
 /* ============================================================ HORIZON end */
 
@@ -68499,9 +68520,11 @@ function hzUFieldStar(p,b,glint,home,rnd){
 }
 function hzUFieldPlan(home,g,c,vw,full,rnd){
   const b=hzUFieldBox(home,g,c,vw);if(!b)return null;
-  const n=Math.round((full?60:30)*(home?1:.5)),P=[];let glints=home?(full?6:3):0;   // (6b621, per Patrick: "more stars": was 40 and 20, four glints and two)
+  const n=Math.round((full?90:45)*(home?1:.5)),P=[];let glints=home?(full?8:4):0;   // (6b621, per Patrick: "more stars", twice: was 40 and 20, four glints and two)
   for(let i=0;i<n;i++)P.push(hzUFieldStar({},b,glints-->0,home,rnd));
-  if(home)for(let i=0,m=full?30:15;i<m;i++){const p=hzUFieldStar({},b,false,home,rnd);p.s=.9+rnd()*.6;p.a=.18+rnd()*.17;p.deep=1;P.push(p);}   // the deeper layer (6b621): tiny (.9-1.5 px), dim (.18-.35), drifting at half the pace
+  if(home)for(let i=0,m=full?50:25;i<m;i++){const p=hzUFieldStar({},b,false,home,rnd);p.s=.9+rnd()*.6;p.a=.18+rnd()*.17;p.deep=1;P.push(p);}
+  // the pin-points (6b621, round 3): a third layer, tiny (.6-.9 px) and sharp-twinkling, 40 (20)
+  if(home)for(let i=0,m=full?40:20;i<m;i++){const p=hzUFieldStar({},b,false,home,rnd);p.s=.6+rnd()*.3;p.a=.25+rnd()*.2;p.sh=true;p.amp=.55;p.w=2*Math.PI/(1.6+rnd()*2.4);p.deep=1;P.push(p);}   // the deeper layer (6b621): tiny (.9-1.5 px), dim (.18-.35), drifting at half the pace
   return {box:b,P};
 }
 function hzSkyBoot(){
@@ -68522,7 +68545,7 @@ function hzSkyBoot(){
     +"vec3 lit=min(c*hi,p.rgb*decay+vec3(atk));"
     +"gl_FragColor=vec4(max(lit,p.rgb*decay-1.5/255.),max(e,p.a*edecay-2./255.));}";
   const SHOW=HEAD+"uniform sampler2D vid,trail,bl1,bl2,stk,aur,hold,stars;uniform vec2 px,res,mpos,ctw,cam,mup;uniform vec4 mrect,mw0,mw1,marr;"
-    +"uniform float mon,time,boost,expo,moon,mrad,dscale,foot,rise,calm,fw,tw,twist,arc,starB,glint,wa,ww,vg,hiT,hmix,lim,starsOn;uniform vec3 gS,gM,gH,gx,skyTop,skyMid,skyLow,wv;"
+    +"uniform float mon,time,boost,expo,moon,mrad,dscale,foot,rise,calm,fw,tw,twist,arc,starB,glint,wa,ww,vg,hiT,hmix,lim,starsOn,dbl;uniform vec3 gS,gM,gH,gx,skyTop,skyMid,skyLow,wv;"
     // the edge tint at Ultra: ice to violet only
     +"vec3 spec(float t){t=fract(t)*4.;vec3 a=vec3(.86,.91,1.),b=vec3(.56,.72,1.),c=vec3(.65,.55,1.),d=vec3(.78,.8,1.);"
     +"if(t<1.)return mix(a,b,t);if(t<2.)return mix(b,c,t-1.);if(t<3.)return mix(c,d,t-2.);return mix(d,a,t-3.);}"
@@ -68570,6 +68593,7 @@ function hzSkyBoot(){
     +"float ef=smoothstep(0.,.08,uv.x)*smoothstep(1.,.92,uv.x)*smoothstep(0.,.12,uv.y);"
     +"vec3 earth=(base*wf*fw+(gradeL(tc.rgb*.42+g1*.9+g2*1.1+vec3(.55,.7,1.)*sk*.45)*boost*wl+gH*tc.a*.1*wl)*(1.-calm))*ef;"
     +"earth=mix(earth,.45+(earth-.45)/(1.+(earth-.45)*2.5),step(.45,earth));"
+    +"earth.b-=max(earth.b-.5*(earth.r+earth.g),0.)*dbl;"   // less blue (6b621, per Patrick: "awfully blue"): the footage's blue excess cut, more at rest than at Ultra
     +"vec3 col=screen(screen(screen(sky*(1.-gx.z*wf*fw*ef),earth),moonL),texture2D(aur,uv).rgb);"
     +"if(wr>.001){vec3 wc=mix(vec3(.98,.99,1.),mix(vec3(.56,.72,1.),vec3(.65,.55,1.),uv.x),smoothstep(.2*ww,1.4*ww,abs(dw)));col=screen(col,wc*wr*.6);}"
     +"if(vg>.001){vec2 e=(uv-.5)*2.;float ed=smoothstep(.78,1.,max(abs(e.x),abs(e.y)));col=screen(col,spec(atan(e.y,e.x)*.159+time*.03)*ed*vg);}"
@@ -68597,13 +68621,15 @@ function hzSkyBoot(){
   // motion's amplitude (Full 1, Balanced .6, Calm and reduced motion 0). NO DENT: the crest cap and the soft knee behind
   // the greeting are gone; the whole curtain dims by up to 30 % in a soft full-width band at the greeting's height
   // (feathered over 22 % of the height), where Ultra's 20 % lift is withheld.
-  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws;uniform vec4 grt;"
+  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws,sgx,sga;uniform vec4 grt;"
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
     +"vec3 pal(float t){vec3 a=vec3(.56,.68,1.),b=vec3(.66,.56,1.),c=vec3(.8,.86,1.),d=vec3(.6,.62,1.);t=fract(t)*4.;"
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
     +"void main(){vec2 p=vec2(uv.x*asp,uv.y);float t=time;vec3 col=vec3(0.);"
+    // the rays' life (6b621): rp the ripples' depth (richer at Ultra), sgv the passing surge here (a Gaussian section)
+    +"float rp=fa*(1.+.4*min(cool,1.)),sgv=sga*exp(-pow((uv.x-sgx)/.12,2.));"
     +"for(int k=0;k<2;k++){if(k==1&&c2<.005)break;float fk=float(k);"
     // the folded ribbon, and the fold wave travelling sideways on the continuous clock
     +"float x=p.x+tam*(.12*sin(p.x*2.2-tph)+.05*sin(p.x*5.1+tph*1.7+fk))+fa*.06*sin(p.x*4.-ft*.13+fk*1.3);"
@@ -68618,14 +68644,14 @@ function hzSkyBoot(){
     +"float hs=clamp(.5+.5*(b0-fl)/.08,0.,1.),base=mix(fl,b0,hs)+.08*hs*(1.-hs);"
     +"float d=p.y-base;"
     +"float rays=smoothstep(.25,.95,fbm(vec2(xn*(18.+fk*7.)+wave*2.+t*(1.2+fk*.5),d*.9+t*.2)));"
-    +"float body=smoothstep(-(.014+.085*rays),0.,d)*smoothstep(flo-.01,flo+.03,p.y)*exp(-max(d,0.)*(4.+fk*2.)/hb),fringe=exp(-abs(d)*55.);"
+    +"float body=smoothstep(-(.014+.085*rays),0.,d)*smoothstep(flo-.01,flo+.03,p.y)*exp(-max(d,0.)*(4.+fk*2.)*(1.35-.35*min(cool,1.))/(hb*mix(1.,.7+.6*nz(vec2(xn*(9.+fk*3.5),ft*.07+fk*7.)),fa)*(1.+.3*sgv))),fringe=exp(-abs(d)*55.);"   // each ray's height breathes on its own (about 14 s), a surge lifts its section
     // the travelling pulse of brightness across the rays (about 50 px/s)
-    +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk)*(.7+.3*nz(vec2(xn*1.3+fk*5.,lt)))*(.72+.28*nz(vec2(xn*16.+fk*9.,d*5.-lt*1.4)))*(1.-.4*fa+.4*fa*(.5+.5*sin(x*3.5-ft*.2+fk*2.)));"
+    +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk)*(.7+.3*nz(vec2(xn*1.3+fk*5.,lt)))*(.72+.28*nz(vec2(xn*16.+fk*9.,d*5.-lt*1.4)))*(1.-.4*fa+.4*fa*(.5+.5*sin(x*3.5-ft*.2+fk*2.)))*(1.+.35*rp*(2.67*pow(.5+.5*sin(xn*9.-ft*.35+fk*1.7),2.)-1.))*(1.+.6*sgv);"   // ripples running through the rays (about 35 px/s, the mean kept) and the surge's light
     +"vec3 c=mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d));c=mix(c,pal(x*.35+t*.15+fk*.3),.18);"
     +"col+=c*a*(k==1?c2:1.);}"
     +"float o=spl*.1,env=max(smoothstep(awd,awd*.3,abs(uv.x-acx+o)),smoothstep(awd,awd*.3,abs(uv.x-acx-o)));"
     +"col*=env*smoothstep(0.,.05,uv.x)*smoothstep(1.,.95,uv.x)*smoothstep(.99,.8,uv.y);"
-    +"float lu=dot(col,vec3(.299,.587,.114));col=max(mix(vec3(lu),col,1.+.45*rich),0.);"
+    +"float lu=dot(col,vec3(.299,.587,.114));col=max(mix(vec3(lu),col,(1.+.45*rich)*mix(.55,1.,min(cool,1.))),0.);"   // silver at rest, the pair at Ultra (6b621)
     +"vec3 bv=mix(vec3(.56,.72,1.),vec3(.65,.55,1.),clamp(smoothstep(.45,.85,uv.y)+.25*cool,0.,1.));"
     // at resting Ultra the light leans blue-violet and is exactly 20 % stronger (its measured luminance), never more,
     // except in the greeting's band, which dims the whole width by up to 30 % (AA, and never a local notch)
@@ -68723,7 +68749,7 @@ function hzSkyBoot(){
       if(sx<x0||sx>x1||sy<y0||sy>y1)continue;pts.push({qx,qy,b:(h-.84)/.16,sx,sy});}
     return pts;}
   const pfx=hzPfxProgram(gl),ICE=hzHexRGB("#cfe0ff"),WHITE=[1,1,1],ptr={x:-999,y:-999};
-  let cons=null,shoot=null,nextShoot=0,rain=[],nextRain=0,chand=null,chandOff=0,field=null,fieldChk=0,sign=null,nextSign=0,signPlace=Math.floor(Math.random()*4),nextShower=0,workF=1;const shower=[];
+  let landing=false,cons=null,shoot=null,nextShoot=0,rain=[],nextRain=0,chand=null,chandOff=0,field=null,fieldChk=0,sign=null,nextSign=0,signPlace=Math.floor(Math.random()*4),nextShower=0,workF=1;const shower=[];
   // THE CONSTELLATION on arrival: 7-12 of the sky's brightest stars near the composer, joined by their minimum spanning
   // tree in hairlines drawing in over 260 ms each; it holds to 1.1 s and fades over 1.2 s. Lines, no circles.
   function buildCons(t){const cb=R(cbox());if(!cb)return null;const ex=rects(),g=R(greetEl());
@@ -68775,7 +68801,7 @@ function hzSkyBoot(){
     const b=plan.box,P=plan.P,now=performance.now(),n=P.length;
     if(launch&&hm){const far=new Set();while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))far.add(Math.floor(Math.random()*n));
       P.forEach((p,i)=>{if(p.deep){p.born=now+400;return;}p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1700+Math.random()*400;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});   // a longer float (6b621: was 1.3-1.6 s)
-      for(let k=0,m=skyMode==="full"?8:4;k<m;k++){const q=hzUFieldStar({},b,k<2,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
+      for(let k=0,m=skyMode==="full"?12:6;k<m;k++){const q=hzUFieldStar({},b,k<3,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
     else P.forEach(p=>{p.born=now;});
     // in a conversation the field is the short, light version (6b580, per Patrick: "we don't have to litter the place with
     // stars"; 6b621 the preview's): half the stars, centred over the composer's top edge, each living 2-4 s (hzUFieldStar)
@@ -68860,7 +68886,7 @@ function hzSkyBoot(){
     if(hmOn&&ultraE>.9&&fxLive()){if(!nextShower)nextShower=nowT+(skyMode==="full"?20000:50000);
       if(nowT>nextShower){nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);const hd=R($("#hz-top")),g=R(greetEl()),hm=home();
         const y0=(hd?hd.bottom:64)+18,y1=hm&&g?Math.max(y0+60,g.top-18):Math.min(innerHeight*.3,y0+160),s_=side(),x0=s_?s_.right+20:20,x1=innerWidth-20;
-        if(y1-y0>=50&&x1-x0>300){const dir=Math.random()<.5?1:-1,ang=(16+Math.random()*12)*Math.PI/180,n=3+Math.floor(Math.random()*3);let tt=nowT;
+        if(y1-y0>=50&&x1-x0>300){const dir=Math.random()<.5?1:-1,ang=(16+Math.random()*12)*Math.PI/180,n=landing?5+Math.floor(Math.random()*4):3+Math.floor(Math.random()*3);landing=false;let tt=nowT;   // the landing's shower is bigger (5-8, round 3)
           for(let k=0;k<n;k++){tt+=120+Math.random()*260;const L=110+Math.random()*90,dx=Math.cos(ang)*L*dir,dy=Math.sin(ang)*L,x=x0+Math.random()*(x1-x0-Math.abs(dx))+(dir<0?Math.abs(dx):0),y=y0+Math.random()*Math.max(1,y1-y0-dy);
             shower.push({x0:x,y0:y,dx,dy,t0:tt,d:480+Math.random()*120});}}}}
     for(let i=shower.length-1;i>=0;i--)if(!streak(shower[i],nowT,.45,3.8,.9))shower.splice(i,1);
@@ -68883,7 +68909,7 @@ function hzSkyBoot(){
   // pins the centre, aurlow=1 holds the reach low, aurspeed=N runs the aurora's clocks N times faster (S.aurProfile reads it back).
   const arnd=hzRng((Math.random()*4294967296)>>>0);
   const AURSPD=Math.max(1,+(hzS.debug&&hzS.debug.aurspeed)||1);
-  const AW={wt0:0,ft:0,fa:0,p1:arnd()*6.2832,p2:arnd()*6.2832,p3:arnd()*6.2832,rf:0,rt:0,rT:0,rD:20,rch:0,hb:1,hbT:0,cx:.5,w:.3,wf:.3,wt:.3,wT:0,wD:40,tph:0,tT:30,tam:0,lt:0,spl:0,splT:-1,nextSplit:120+arnd()*120};
+  const AW={sgN:12+arnd()*14,sgU:-1,sgX:.5,sga:0,wt0:0,ft:0,fa:0,p1:arnd()*6.2832,p2:arnd()*6.2832,p3:arnd()*6.2832,rf:0,rt:0,rT:0,rD:20,rch:0,hb:1,hbT:0,cx:.5,w:.3,wf:.3,wt:.3,wT:0,wD:40,tph:0,tT:30,tam:0,lt:0,spl:0,splT:-1,nextSplit:120+arnd()*120};
   let aurPx=null,aurFlo=.2,aurFloAt=0,aurGr=[0,0,0,0];
   function aurWander(dt){const still=hzS.reduced||skyMode==="calm",k=skyMode==="bal"?1/1.6:1,A=skyMode==="bal"?.5:1;
     if(!still&&fxLive()){const d=dt*k*AURSPD;AW.wt0+=d;AW.ft+=dt*AURSPD;
@@ -68891,7 +68917,12 @@ function hzSkyBoot(){
       AW.tph+=d*2*Math.PI/AW.tT;if(AW.tph>2*Math.PI){AW.tph-=2*Math.PI;AW.tT=20+arnd()*20;}
       AW.lt+=d*.05;AW.hbT+=d;AW.rT+=d;if(AW.rT>=AW.rD){AW.rf=AW.rt;AW.rt=arnd()<.45?.35+arnd()*.65:0;AW.rD=30+arnd()*30;AW.rT=0;}
       AW.nextSplit-=d;if(AW.nextSplit<=0&&AW.splT<0){AW.splT=0;AW.nextSplit=120+arnd()*120;}
-      if(AW.splT>=0){AW.splT+=d;const u=AW.splT;AW.spl=u<6?ss5(u/6):u<14?1:u<20?1-ss5((u-14)/6):0;if(u>=20){AW.splT=-1;AW.spl=0;}}}
+      if(AW.splT>=0){AW.splT+=d;const u=AW.splT;AW.spl=u<6?ss5(u/6):u<14?1:u<20?1-ss5((u-14)/6):0;if(u>=20){AW.splT=-1;AW.spl=0;}}
+      // A SURGE (6b621): every 20-40 s (on the wander's clock, so Balanced's is 1.6 x slower) a section of the curtain
+      // brightens and lifts: 2 s in on the smootherstep, 1.5 s held, 2.5 s out; never a flash
+      AW.sgN-=d;if(AW.sgN<=0&&AW.sgU<0){AW.sgU=0;AW.sgX=AW.cx+(arnd()-.5)*.36;AW.sgN=20+arnd()*20;}
+      if(AW.sgU>=0){AW.sgU+=d;const u=AW.sgU;AW.sga=(u<2?ss5(u/2):u<3.5?1:u<6?1-ss5((u-3.5)/2.5):0)*A;if(u>=6){AW.sgU=-1;AW.sga=0;}}}
+    if(still)AW.sga=0;
     const wt=AW.wt0,raw=.5+.11*Math.sin(2*Math.PI*wt/140+AW.p1)+.07*Math.sin(2*Math.PI*wt/210+AW.p2)+.03*Math.sin(2*Math.PI*wt/85+AW.p3),pin=hzS.debug&&hzS.debug.aur!=null?+hzS.debug.aur:-1;
     AW.fa=still?0:skyMode==="bal"?.6:1;
     AW.cx=pin>=0&&pin<=1?pin:still?.5:.5+(raw-.5)*A+AW.fa*.015*Math.sin(2*Math.PI*AW.ft/25);AW.w=still?.3:.3+((AW.wf+(AW.wt-AW.wf)*ss5(Math.min(1,AW.wT/AW.wD)))-.3)*A;AW.tam=still?0:.45*A;
@@ -68953,7 +68984,7 @@ function hzSkyBoot(){
       aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);}   // the edge never comes within 36 px of the composer, never crosses the greeting
     if(neon>.002||lastAur>.002){gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
       gl.uniform1f(pA.U.time,auT);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,neon);gl.uniform1f(pA.U.c2,Math.max(c2E,skyMode==="bal"?rich:0));gl.uniform1f(pA.U.rich,rich);gl.uniform1f(pA.U.cool,Math.min(1.3,ultraE*(1+.3*surgeNow)));
-      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
+      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);gl.uniform1f(pA.U.sgx,AW.sgX);gl.uniform1f(pA.U.sga,AW.sga);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
       gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow));gl.uniform1f(pA.U.rch,AW.rch);gl.uniform1f(pA.U.ft,AW.ft);gl.uniform1f(pA.U.fa,AW.fa);gl.uniform1f(pA.U.wam,skyMode==="full"&&!hzS.reduced?1:.5);gl.uniform1f(pA.U.flo,aurFlo);
       gl.uniform4f(pA.U.grt,aurGr[0],aurGr[1],aurGr[2],aurGr[3]);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
@@ -68977,7 +69008,7 @@ function hzSkyBoot(){
     const hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255);
     gl.uniform3f(pS.U.skyTop,SK[1],SK[2],SK[3]);gl.uniform3f(pS.U.skyMid,SK[4],SK[5],SK[6]);gl.uniform3f(pS.U.skyLow,SK[7],SK[8],SK[9]);
     gl.uniform1f(pS.U.boost,S.boost);gl.uniform1f(pS.U.calm,calm);gl.uniform1f(pS.U.fw,fw);gl.uniform1f(pS.U.tw,tw);gl.uniform1f(pS.U.twist,twistNow);gl.uniform1f(pS.U.arc,arcNow);
-    gl.uniform1f(pS.U.starB,starB);gl.uniform1f(pS.U.glint,ultraE*(1+1.6*flareNow));
+    gl.uniform1f(pS.U.starB,starB);gl.uniform1f(pS.U.glint,ultraE*(1+1.6*flareNow));gl.uniform1f(pS.U.dbl,.65-.3*(lift()?ultraE:0));
     gl.uniform3f(pS.U.wv,waveX,waveR,0);gl.uniform1f(pS.U.wa,waveA);gl.uniform1f(pS.U.ww,7);gl.uniform1f(pS.U.vg,vg);gl.uniform2f(pS.U.ctw,innerWidth*.5,innerHeight*.12);
     gl.uniform1f(pS.U.expo,G[4]*(.92+.16*lit)*(1+.08*ultraE)*.9*br[0]);   // a touch darker (the beauty pass); the held breath dims it
     camX=still?0:4*Math.sin(t*2*Math.PI/97);camY=still?0:3*Math.sin(t*2*Math.PI/131+1.3);gl.uniform2f(pS.U.cam,camX,camY);   // a barely-there drift of the whole sky
@@ -69002,14 +69033,14 @@ function hzSkyBoot(){
     else{if(chand&&!chandOff)chandOff=n;if(uTwAt||uTwFrom){uTwFrom=uTwDeg(n);uTwTo=0;uTwAt=n;}}
     if(on&&lift()&&!smash){if(!field)setTimeout(()=>{if(ultraWant&&!field)field=buildField(false);},16);}
     else if(on&&lift()){surgeAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
-      nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1800+Math.random()*800;sign=null;nextShower=n+1300;   // (6b621) a star sign and a shower in the landing
+      nextShoot=n+700+Math.random()*500;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1800+Math.random()*800;sign=null;nextShower=n+1300;landing=true;   // (6b621) a shooting star in the hang (was 4-7 s), a star sign and a bigger shower in the landing
       if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
       requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
     shoot:!!shoot,shower:shower.length,rain:rain.length,aur:{cx:+AW.cx.toFixed(3),w:+AW.w.toFixed(3),spl:+AW.spl.toFixed(3),rch:+AW.rch.toFixed(3)},breath:breath(performance.now()),hmix:+hmix.toFixed(3),held,fw:+fw.toFixed(3),calm:+calm.toFixed(3),
     matrix:field?[field.x0,field.y0,field.x1,field.y1].map(v=>Math.round(v)):null,twist:+(twistNow*180/Math.PI).toFixed(2),
-    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
+    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,surge:+AW.sga.toFixed(3),atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
   addEventListener("resize",()=>{S.size();field=null;if(ultraWant)S.ultra(true,null,null,false);if(hzFxLevel()==="calm")S.once();});
   mode(lvKey());c2E=c2To;spd=spdTo;calm=calmTo;fw=fwTo;tw=twTo;neonBase=neonTo;   // the first level is not eased in
   S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
@@ -69551,7 +69582,7 @@ function hzEffortPaint(){
   if(+inp.value!==i)inp.value=String(i);
   inp.setAttribute("aria-valuetext","Effort "+HZ_EFFORT[i]);
   // the label: the name in normal case, or at Ultra the cool tints with the gliding highlight (the ULTRA css, 6b552)
-  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);
+  const en=host.querySelector(".hz-elevel");en.textContent=HZ_EFFORT[i];en.classList.toggle("lum",i===4);hzSlName(en,HZ_EFFORT[i]);
   if(i===4)hzUltraEls();
   const root=document.documentElement,was=hzS.effI;hzS.effI=i;
   root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
@@ -69559,6 +69590,7 @@ function hzEffortPaint(){
   if(i===4&&was!=null&&was!==4)hzIgnite();else if(was===4&&i!==4)hzUltraOut();else if(i===4&&was==null)hzSkyUltra(true,false);   // opening at Ultra: it rests there (6b555)
   if(i===4&&was!==4)hzMotes(true);else if(was===4&&i!==4)hzMotes(false);   // the motes round the composer (6b621)
   if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
+  hzSlFeel(sl,u);   // the spring, the pull and the sky following the hand (6b621)
 }
 // ULTRA (6b544): the one moment the effects perform; the css under ULTRA does the drawing, these
 // only set html.hz-ignite (2 s: the moment is 900 ms, the aurora's breath settles within 2 s) and
@@ -69642,7 +69674,7 @@ function hzUltraLitEls(cb){
   l.innerHTML='<i class="r"></i><b><i></i></b><i class="h"></i>';cb.appendChild(l);
   for(const k of ["hz-uitint","hz-uline"]){const e=document.createElement("i");e.className=k;e.setAttribute("aria-hidden","true");cb.appendChild(e);}
 }
-// THE MOTES (the preview's): at Ultra a tiny four-point star every 170 ms (at most 40) drifts up from the composer's top
+// THE MOTES (the preview's; round 3 denser): at Ultra a tiny four-point star every 130 ms (at most 60; three in ten the larger glints) drifts up from the composer's top
 // edge, its outer thirds mostly (the centre stays clear so no text is covered), or from a side, 30-130 px over 5.2-7.6 s
 // with a calm twinkle; in a working view every other one (at most 20), centred over the top edge, 10-24 px over
 // 1.8-3 s. Leaving Ultra they drift 24 px up and fade (800 ms). Calm, reduced motion, effects off and a hidden or long
@@ -69650,13 +69682,13 @@ function hzUltraLitEls(cb){
 const HZ_MOTEC=["#ffffff","#eef3ff","#dce8ff","#c6d8ff","#ffffff","#e6efff","#d9d4ff","#ffffff","#eef3ff","#dce8ff","#ffffff","#e6efff"];
 function hzMotes(on){
   const box=$("#hz-motes");if(!box)return;clearInterval(hzS.moteI);clearTimeout(hzS.moteOutT);
-  if(on){box.classList.remove("out");if(hzS.reduced)return;hzS.moteI=setInterval(hzMoteSpawn,170);setTimeout(hzMoteSpawn,500);}
+  if(on){box.classList.remove("out");if(hzS.reduced)return;hzS.moteI=setInterval(hzMoteSpawn,130);setTimeout(hzMoteSpawn,500);}
   else{box.classList.add("out");hzS.moteOutT=setTimeout(()=>{box.textContent="";box.classList.remove("out");},950);}
 }
 function hzMoteSpawn(){
   const box=$("#hz-motes"),cb=$("#composer");
   if(!box||!cb||!box.animate||hzS.effI!==4||hzFxLevel()==="calm"||!hzMotionOK()||document.hidden||hzS.blurred||document.body.classList.contains("novideo"))return;
-  const work=!$("#hero");if(box.childElementCount>=(work?20:40))return;
+  const work=!$("#hero");if(box.childElementCount>=(work?20:60))return;
   if(work&&(hzS.moteOdd=!hzS.moteOdd))return;   // a working view: half as many
   const r=cb.getBoundingClientRect();if(!r.width)return;
   const m=document.createElement("i");hzS.moteK=(hzS.moteK||0)+1;m.style.setProperty("--c",HZ_MOTEC[hzS.moteK%HZ_MOTEC.length]);
@@ -69666,7 +69698,7 @@ function hzMoteSpawn(){
   else{const side=Math.random(),onTop=side<.6,left=side<.8;
     x=onTop?(Math.random()<.5?r.left+24+Math.random()*r.width*.3:r.right-24-Math.random()*r.width*.3):left?r.left-6-Math.random()*20:r.right+6+Math.random()*20;
     y=onTop?r.top+1:r.top+8+Math.random()*(r.height-16);rise=onTop?50+Math.random()*80:30+Math.random()*50;dx=onTop?(Math.random()-.5)*30:(left?-1:1)*(10+Math.random()*24);
-    dur=5200+Math.random()*2400;sc=.7+Math.random()*.5;m.style.setProperty("--g",(Math.random()<.2?10+Math.random()*3:5+Math.random()*4).toFixed(1)+"px");
+    dur=5200+Math.random()*2400;sc=.7+Math.random()*.5;m.style.setProperty("--g",(Math.random()<.3?10+Math.random()*3:5+Math.random()*4).toFixed(1)+"px");
     K=[[0,1,0],[.14,1,.9],[.3,.6,.4],[.46,1.05,.85],[.62,.6,.35],[.78,.9,.7],[1,.7,0]];}
   const tr=(f,k)=>"translate("+(x+dx*f).toFixed(1)+"px,"+(y-rise*f).toFixed(1)+"px) scale("+(sc*k).toFixed(2)+")";
   m.style.transform=tr(0,1);box.appendChild(m);
@@ -69686,6 +69718,26 @@ function hzBandWire(){
   if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzBandFit());["#chat-inner","#chat-scroll"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}
 }
 // ==== ultra at full strength (6b621): end ====
+// THE SLIDER'S FEEL (6b621, per Patrick: "let's get the effort slider and stuff more like Astra does, where it just seems
+// magical"): response, not decoration. Held, the knob and the fill follow the hand through a soft critically damped
+// spring (about 120 ms to settle, no overshoot: the standing "no bounce" rule; an overshoot is Patrick's call) with a
+// gentle magnetic pull toward each level's stop (inside 6 % of the track); the sky answers continuously: the aurora's
+// strength follows the knob's place, not only its level, so sliding feels like turning up the sky. Let go and the
+// 140 ms snap lands it; arriving at Ultra runs the arrival. Calm and reduced motion: the hand, directly.
+function hzSlFeel(sl,u){
+  if(hzS.effDrag==null||!hzMotionOK()||hzFxLevel()==="calm"){hzS.slF=null;return;}
+  const k=Math.round(u*HZ_EMAX)/HZ_EMAX,dd=u-k,m=Math.abs(dd)<.06?k+dd*(.45+.55*Math.abs(dd)/.06):u;   // the magnetic pull
+  const F=hzS.slF||(hzS.slF={x:u,v:0,t:0,raf:0,sl});F.to=m;F.sl=sl;
+  if(!F.raf){F.t=performance.now();const step=now=>{if(hzS.effDrag==null||hzS.slF!==F){F.raf=0;return;}
+      const dt=Math.min(.05,Math.max(0,(now-F.t)/1000)),w=26;F.t=now;F.v+=(w*w*(F.to-F.x)-2*w*F.v)*dt;F.x+=F.v*dt;F.sl.style.setProperty("--hz-eff-u",F.x.toFixed(4));
+      if(Math.abs(F.to-F.x)<.0005&&Math.abs(F.v)<.001){F.raf=0;return;}F.raf=requestAnimationFrame(step);};
+    F.raf=requestAnimationFrame(step);}
+  sl.style.setProperty("--hz-eff-u",F.x.toFixed(4));
+  if(hzS.sky&&hzS.sky.level)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),m*HZ_EMAX);   // the sky follows the knob's place
+}
+// the level's name crossfades in place (the label's width is held: no jump)
+function hzSlName(en,t){if(en.dataset.t===t)return;const had=en.dataset.t!=null;en.dataset.t=t;
+  if(had&&en.animate&&hzMotionOK()&&hzFxLevel()!=="calm")en.animate([{opacity:.15,transform:"translateY(2px)"},{opacity:1,transform:"none"}],{duration:200,easing:"cubic-bezier(.16,1,.3,1)"});}
 // the knob's centre line (the track's middle), where the burst leaves it on the home (6b621)
 function hzKnobY(c){const tr=$("#hz-effort .hz-sl-track"),r=tr?tr.getBoundingClientRect():null;return r&&r.height?r.top+r.height/2:c.top;}
 function hzUltraOut(){
