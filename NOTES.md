@@ -21817,3 +21817,115 @@ under Advanced; true code-only pairing needs the server to advertise itself or c
 ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
 setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
 Chromium and read back from the real WKWebView.
+
+## 6b641 — dictation, polished: the language told, never guessed; it listens as you speak and stops when you do; the C++ shell's own path (7.0 beta 4, per Patrick)
+
+Patrick, in the C++ Preview: he pressed ⌘D, said "What's up, man?", and the composer got **"Hvittar"**; the composer
+went rose and the send key red while it ran. "The voice responsiveness is sorely lacking… let's make it so much more
+polished. And like, in C++." Branch `beta-4-voice` from beta-4 (f969040); the C++ half is `cpp-voice` from cpp-core
+(6b642). The id is the next free one after the beta-4 merges I could see; the release owner may renumber.
+
+**Which recognizer wrote "Hvittar", and why.** Not Apple's. The system recognizer (SpeechAnalyzer, behind
+`concorde-dictate`) is fixed to one language and can't write a Swedish-looking word; whisper can, because
+`mlx_whisper.transcribe` was called with **no language**, so it detected one from the clip, and one or two seconds
+of speech is too little to go on. Whisper only ran because every way the system path failed fell through to it:
+1. **The region, not the language.** The helper took `Locale.current`, i.e. language + REGION. On a Mac whose
+   language is English and region Uruguay that is `en_UY`, which SpeechTranscriber doesn't carry: the helper
+   printed `assets: … unsupported configuration` and exited at launch (reproduced with `-AppleLocale en_UY`, and
+   `es_UY`, `sv_SE`). The server then waited out its 8 s ready timer **at every press** (the reader never set
+   `ready`), took whisper, guessed the language, and `/api/voice/status` still said `"engine": "system"`.
+2. **Utterance numbers drifted.** The server counted an utterance at `begin` and sent its end frame on a cancel; the
+   helper counted one only when audio came. Any session let go with no audio (a microphone that failed, the macOS
+   prompt, a slip, a window closed mid-dictation) put the two one apart, and from then on every helper line was
+   dropped as an old utterance's: no partials, the 4 s final wait, then whisper. Reproduced on the old code: after
+   one empty session, "What's up, man?" had no partials and its final took 4.9–7.0 s (whisper's).
+3. **Segments.** The recognizer finalises an utterance in segments ("What's up?" then " Man."); the server took the
+   first `final` as the end. The old code on a clean run wrote **"What's up?"** for "What's up, man?", and for a
+   two-sentence clip kept only the first sentence; on the page, the second segment's partial replaced the first
+   (the composer read " Man?").
+His Mac reads `en-US` / `en_US` tonight, so (1) didn't bite here; (2) is what the C++ Preview's first press with a
+new bundle id (a microphone prompt, a failed start) sets up. Either way the last step was whisper guessing.
+
+**The fix, the helper** (`shell/dictate/dictate.swift`, still Swift; nothing leaves the computer, the lint holds):
+- `--locale <BCP-47>` from the server; otherwise the system's **preferred languages** in order (never the region),
+  the first the recognizer carries, **en-US** when none does. "ready" says which.
+- **DictationTranscriber** (the keyboard-dictation module) with punctuation, SpeechTranscriber kept for a language
+  only it carries. Same clips: first word **~735 ms** after the audio starts (SpeechTranscriber ~1,050), a partial
+  every ~300 ms, "What's up, man?" punctuated as written (SpeechTranscriber: "What's up? Man."), "Montevideo" (was
+  "Montivity").
+- **BEGIN frames** (`0xFFFFFFFF` + u32): the server names each utterance; the numbers can't drift. A BEGIN with one
+  still open ends that one.
+- Every partial is the **whole utterance so far** (finalised segments + the volatile one); one `final` with all of
+  it, then `done`. An utterance given no audio gets 0.1 s of silence (SpeechAnalyzer otherwise never finishes it:
+  the helper hung there, found by the stand-in test) and finishes as "".
+
+**The server** (`# @dictate-begin` region): the helper started with the page's language (a change restarts it when
+idle); the wait for "ready" ends the moment the helper dies; a helper that died before ready isn't respawned for a
+minute and the status says "whisper" meanwhile; `done` ends the final wait (not the first `final`); "" from the
+helper is "", never a reason to run whisper. **Whisper is always told the language** (`language=` on mlx and
+faster-whisper): the page's, else the system's first preferred language, else English. Routes: `warm?lang=`,
+`start` body `{"lang"}`, `start` answers the `locale` it uses. `MILLENAI_DICT_HELPER` joins `_KNOWN_ENV` (6b543
+documented it, but a dev copy naming it refused to start). Setting `dict_lang` (profile-local, validated).
+
+**The page** (the `@mic` region):
+- **A toggle ends itself**: a tap of ⌘D or the mic listens until the words stop for 1 s (the level under four times
+  the room's floor, the floor the quietest chunk of the last 1.5 s with a prior until then, and no new words for
+  0.6 s), or after 8 s with nothing said. ⌘D again or **Esc** end it sooner (Esc is taken ahead of every other Esc,
+  only while dictating). A hold still ends at the release (6b550).
+- **⌘D is ours everywhere**, a dialog included: `preventDefault` before anything, so a browser's bookmark never opens.
+- **The words land at the caret**, between what was typed before and after; nothing heard puts the composer back.
+  They read as typed text (no dimming; the caret is still while they may change).
+- **Warm at launch** (once the settings are in), not only at the composer's focus, in the chosen language.
+- **The listening state** (Horizon): a still ice hairline on the composer (`#composer.dict-on`, kept through
+  "Finishing…" until the words land), the send key the quiet outline under the words, the mic key and its level in
+  ice (`--hz-ice:#b8d3ec`). No red, rose or ember, no pulse, no blink. Classic: `#mic.rec` silver/ice and its blink
+  gone.
+- **Native when the shell has it**: with `window.pywebview.api.voice` (the C++ shell, 6b642) the page asks the shell
+  to capture and recognize (`warm`/`start`/`stop`/`cancel`) and takes levels, partials and the final from
+  `window.__concordeVoice`; no `/api/dictate/` call. `no-engine` (or no answer) falls back to the server's path;
+  `mic-denied`, `no-mic`, `speech-denied` say why.
+- Settings → About: **Dictation language** ("Same as this computer" + 25 languages).
+
+**Measured** (M4 Pro, macOS 27.2; `say` clips; never a real microphone). Helper alone, 100 ms frames in real time:
+
+| | before | after |
+|---|---|---|
+| first partial after the audio starts | 1,050 ms | **735 ms** |
+| end of audio → final | 20–72 ms | 22–47 ms |
+| "What's up, man?" | "What's up?" (segment lost) | **"What's up, man?"** |
+| region en_UY / es_UY | helper dies; 8–9 s per start; whisper guesses | **en-US** (with es-UY langs and `--locale en-US` too) |
+| after one session with no audio | no partials; final 4.9–7.0 s (whisper) | partials; final 23–39 ms |
+
+The page in headless Chromium with the clip as the fake microphone (Blink; the app is WKWebView), 3 runs, medians:
+
+| | before (beta-4) | after |
+|---|---|---|
+| ⌘D → listening indicator | 1 ms | 1 ms |
+| ⌘D → stream / first sound | 300 / 374 ms | 326 / 379 ms (the fake device's own time) |
+| speech start → first words on screen | 1,255 ms | **817 ms** |
+| hold: release → final | 133 ms | 180 ms (36 ms on the first run) |
+| tap: end of speech → stops by itself | never | **1.2 s** (final 1.47 s) |
+| final | "What's up?"; a tap left " Man?" | "What's up, man?" |
+
+**Gauntlet.** New `# ==== 6b641 dictation polished` (16 checks): nine node scenarios on 6b345's stubs (the language
+rides the start and the warm; auto-stop; a hold never auto-stops; new words keep it listening; no speech; the caret;
+the native path; its fallback and refusals; the native auto-stop) with 19 mutants; Esc and the chord (3 mutants); the
+listening state parsed from the served CSS (no red/rose/ember, no animation, ice hairline, quiet send, ice level;
+6 mutants); the server's helper protocol on a stand-in helper (BEGIN after an empty utterance, "" without whisper,
+the language passed, a quick death, whisper told the language; 5 mutants); the helper's source rules (4 mutants); the
+real helper on this Mac, when built, writes "What's up, man?" under `-AppleLocale es_UY` after an empty utterance;
+the setting and the live start route. Moved pins: 6b338's keydown and toggle words, 6b345/6b550's toggle words in
+three scenarios, 6b543's served-page pins (no dimming, the warm's `?lang=`), 6b429's PROFILE_LOCAL anchor. Run: the
+dictation sections (6b338, 6b345, 6b543, the static part of 6b625, 6b641) on a trimmed copy on 9991/9993, 94/94;
+the full gauntlet after 05:30 (below).
+
+**Copy (for Patrick).** "Listening. Press ⌘D or tap the mic to finish." → **"Listening. Pause or press ⌘D to
+finish."** (a toggle now ends on a pause). New: "Didn’t catch that. Try again." also when nothing was heard (was
+"Ask anything" with an empty composer); "Speech recognition is off. Allow it in System Settings > Privacy &
+Security > Speech Recognition." (C++ shell before macOS 26); "Couldn’t start dictation. Try again."; Settings
+"Dictation language" / "Same as this computer".
+
+**Open.** WKWebView's getUserMedia time and the real microphone are unmeasured (no voice here); in Blink the stream
+takes 300 ms of the fake device's own time, and the pre-roll keeps what is said meanwhile. The send key turns ember
+once the words land (as for typed text, 6b542's rule); during listening and finishing it stays silver. The Python-app
+bundle (`build_macos_app.sh`) still carries no helper (6b543).
