@@ -189,6 +189,10 @@ else
   MAC_SIGNING="ad hoc (no Developer ID): macOS warns on first open"
 fi
 echo "  macOS signing: $MAC_SIGNING"
+# THE DMG'S CHECKSUM RIDES WITH IT (6b620): the updater refuses a download
+# whose SHA-256 doesn't match this asset, and one with no asset at all
+shasum -a 256 "$DMG" | awk -v n="$DMG" '{print $1 "  " n}' > "$DMG.sha256"
+echo "  $DMG.sha256 — $(cut -c1-16 "$DMG.sha256")…"
 
 echo "→ building Windows"
 ./build_windows.sh >/dev/null
@@ -200,7 +204,7 @@ if [[ "$DRY_RUN" == 1 ]]; then
   echo "✓ dry run: built, verified, published nothing"
   ls -la "$DMG" "$ZIP" | awk '{printf "  %s  %.1f MB\n", $NF, $5/1e6}'
   echo "  macOS signing: $MAC_SIGNING"
-  echo "  a real run would: commit, push, gh release create v$BUILD $DMG $ZIP${PRE:+ --prerelease}"
+  echo "  a real run would: commit, push, gh release create v$BUILD $DMG $DMG.sha256 $ZIP${PRE:+ --prerelease}"
   exit 0
 fi
 
@@ -220,7 +224,7 @@ if [[ -s RELEASE_NOTES.md ]]; then
 else
   echo "  (no RELEASE_NOTES.md — the Updates pane will show the boilerplate only)"
 fi
-gh release create "v$BUILD" "$DMG" "$ZIP" \
+gh release create "v$BUILD" "$DMG" "$DMG.sha256" "$ZIP" \
   "${PRE[@]}" \
   --title "$SHOW" \
   --notes "${WHATS_NEW}**macOS** — download the .dmg. Existing installs update themselves.

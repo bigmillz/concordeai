@@ -20492,3 +20492,122 @@ the spine harness (+signMode), three 6b346 mutation anchors that followed the wa
 - The ink's per-word dissolve applies to the final writer's words as before; the provisional draft uses the existing
   swap (hold, dim, shimmer in), not the preview's word-level LCS dissolve (not ported in 6b555 either).
 - Verified in Blink (headless Chromium), not in the app's WKWebView.
+
+## 6b620 — trust-1: a lockout always asks, a cut answer says so, a full disk keeps the answer, the web is named, the updater checks what it installs (7.0 beta, from an under-the-hood audit)
+
+An under-the-hood audit of beta-3 (c5d44c5, evidence in the session scratchpad's `audit/hood/`) found five ways the
+app broke trust, and a handful of cheap ones beside them. Branch `trust-1` from beta-3, server-side, with as little
+in the page as the fixes need (beta 4, the UI and parity, is being integrated beside it). Each fix has gauntlet checks
+and mutants that prove them (`6b620 trust (in process)`, `6b620 trust (live)`).
+
+**1. Full autonomy could lock Patrick out of his server.** He is abroad, the server is on Wi-Fi only and only his mom
+can press its button. The audit fed the classifier 29 commands that cut the owner off (sshd and Tailscale stopped,
+the firewall closed, the Wi-Fi or its driver taken away, `netplan apply`, rescue and sysrq, the keys, the login and
+the ssh server removed); every one came back `write`, which Full runs without asking. Now:
+- `_LOCKOUT_PAT`, a LOCKOUT group at the head of `_DANGER_RX`: stopping, disabling, masking or killing ssh/sshd/
+  tailscaled (pkill, killall, `kill $(pgrep sshd)`, `pkill -u`, loginctl); `tailscale down`/`logout`; ufw, iptables,
+  ip6tables, nft and firewall-cmd changes (their reads, and their names as arguments, stay out: the tools are also
+  parsed by subcommand in `_lockout_seg`, so `systemctl status ufw` and `cat /etc/ufw/user.rules` don't trip it);
+  nmcli/rfkill/wpa_cli/iw Wi-Fi changes, `modprobe -r` and `rmmod`, `netplan apply`, network sysctls; `systemctl
+  isolate`/rescue/emergency/suspend/hibernate, `telinit 1`, sysrq; removing, moving, truncating or overwriting
+  `~/.ssh`, `authorized_keys` or `/etc/ssh` (an append, `>>` or `tee -a`, stays a write; a copy FROM them, a backup,
+  stays a write), `usermod -L`/`-e`, nologin or false shells, `chage -E`, `deluser`, removing openssh-server,
+  Tailscale, NetworkManager, netplan.io, wpasupplicant or the firmware; `swapoff` (all swap gone under a resident
+  model: the box thrashes and nothing answers). Reboot and poweroff were already danger, at every spelling.
+- what the classifier can't read is not let through: `$IFS`, `eval` as a command, any pipe into a shell, `bash <(…)`,
+  `sh -c "$(curl …)"`, and bytes decoded (base64 -d, xxd -r, openssl -d, `\x..`) beside a shell.
+- `danger` asks at every level, Full included (it always did; the commands were simply not danger). `netplan apply`
+  comes with "Safer: netplan try --timeout 120. It undoes itself unless you confirm you can still reach the server."
+  on its approval card (an APPROVE frame's `hint`, one small line in the card), and the driver's rules say the same.
+- Pins moved: `systemctl stop sshd`, `ufw deny 22`, `ufw allow 51820/udp` and `echo x >& /root/.ssh/authorized_keys`
+  are danger now (any firewall change asks), and so is overwriting sshd_config whole (`echo 'Port 2222' >
+  /etc/ssh/sshd_config`: a one-line config behind a firewall that allows 22 is a lockout); `sed -i` on sshd_config
+  stays a write.
+
+**2. A cut answer was saved as finished.** A provider or Ollama stream that ended without its own end mark (`[DONE]`
+or a `finish_reason`; Claude's `message_stop`; Ollama's `done`) landed and was saved like a whole one: the audit's
+stand-in closed the stream at word 30 and the turn said nothing. Each reader (`cloud_stream_conf`,
+`_anthropic_stream`, `stream_ollama`, and MLX's `stream_openai_compat`) now says how it ended (`stream_done`); only a
+stream whose words reached the page counts (the chat handler counts them, `stream_page_mark`: a draft collected for
+a merge doesn't), and a RESET that replaced the answer clears it. The handler sends `CUT` before `DONE`; the page
+draws one calm line, "The connection dropped." with **Continue** (asks "Continue from where you stopped.") and **Try
+again**, in the kind error line's look (beta 4's `.chat-err`, here in its least; only the chat's last answer keeps
+the keys), and the turn is saved with `cut: true`, so a reopened chat says it too.
+
+**3. A full disk lost the answer in silence.** `_turn_finish` swallowed the save's OSError, and `chat_append_turn`'s
+raised unhandled (the question's request died with no reply). Now a refused answer is kept in memory
+(`_turns_pending`) and tried again every 30 s and before the chat's next question; the stream's last frame (`SAVE
+{"fail": "full"|"denied"}`) gives the page its line: "Couldn't save this answer: your disk is full. It's still on
+screen." (or "…ConcordeAI can't write to its folder…"). A question that can't be saved gets 507 and "Couldn't save
+your question: your disk is full. Free up some space, then send it again." Under 1 GB free on the data folder's disk
+(`shutil.disk_usage`, read at most every 10 s) each answer ends with "Your disk is almost full (0.4 GB free). New
+answers may not save." A StaleProfile (also an OSError) is dropped as before, never retried.
+
+**4. "Nothing has left your machines" after a web search.** `_SEARCH_BACKENDS` was `("bing", "auto", "duckduckgo")`,
+but ddgs 9 ships its Bing engine disabled, and a backend it doesn't list silently becomes `auto`: every engine at
+once. One question reached nine hosts (Wikipedia, Grokipedia, Google, Yandex, Brave, Mojeek, Yahoo, Startpage,
+DuckDuckGo); `_ddg_more` asked `auto` by name too. Now `SEARCH_ENGINES = ("duckduckgo", "brave")`: DuckDuckGo, then
+Brave when it has nothing, Brave as the grounding's second list, DuckDuckGo's news by name; an engine ddgs no longer
+lists is skipped (`search_engine_ok`), never replaced. The engines a run asked ride its DONE frame (`web`, from a
+counter, `search_hits_snapshot`/`search_engines_since`) and are saved with the turn; the machines line says
+"Searched the web (DuckDuckGo and Brave)." (and the cloud's line after it), "Searched the web." for an older saved
+answer with a search step, and "Nothing has left your machines." only when nothing searched. Settings' note names
+them. (Funnel pictures still ask Bing's image search, `_fimg_bing`: not a chat question's search; left as it was.)
+
+**5. The updater installed unchecked code.** `_SWAP_SCRIPT` mounted whatever the download was, `rm -rf`'d the app
+before the `mv` (a failed move left no app), stripped the quarantine and relaunched. Now `_do_update` checks
+everything while the app still runs, and a failure leaves it running with the reason in the Updates pane: the
+release's `.sha256` asset (refused when there is none), the download's SHA-256 against it, hdiutil, a staged copy
+beside the app (`<app>.new`), an older CFBundleVersion, `codesign --verify --deep --strict`, and with a Developer ID
+on either side the team (`UPDATE_TEAM_ID`, "ZSKSU6BW5T", for when Apple activates it; a dev copy may set
+`MILLENAI_UPDATE_TEAM`) and `spctl -a`; an ad hoc build offered to a Developer ID install is refused. The helper
+waits for this server and its shell by process id (a `pgrep` from the helper missed the shell, so an open made
+while it still ran handed over to it and went with it), checks the signature again, renames the old bundle aside,
+moves the new one in and puts the old back if anything fails. It always opens an app: Launch Services is told the
+bundle changed first (`touch` and `lsregister -f`: a new build renamed into a path it knew would not open at all,
+"Launchd job spawn failed", error 162, until it was registered again), each open is tried three times until the app
+is seen running, and if the new one is gone 20 s after it opened, the old one comes back. Quarantine is left as it
+came. `release.sh` and the nightly write and publish `<dmg>.sha256` (git-ignored).
+
+**6. Fonts, the map and the CSP: ready, nothing downloaded.** `WEB_FONT_FILES` (Space Grotesk, IBM Plex Mono 400/500/
+600) are served from `fonts/` when every one of them is there, and the Google stylesheet is dropped then
+(`__FONT_LINKS__`); until then it stays, whole. `MAP_LIBS` serve Leaflet, MapLibre and the bridge from `vendor/`
+under `/static/vendor/` when present (build_shell_dmg.sh and build_macos_app.sh carry the folder when it exists),
+else from unpkg, pinned, with SRI where verified: Leaflet 1.9.4's css and js carry the hashes leafletjs.com publishes
+(jsDelivr's listing of the same npm files agrees). MapLibre's and the bridge's have one source only (jsDelivr), so
+they are a TODO in the source with the values to confirm. `PAGE_CSP` narrowed from `default-src 'self' https: data:
+blob: 'unsafe-inline' 'unsafe-eval'` to each kind's hosts: scripts self and unpkg, styles self, Google and unpkg,
+fonts self, data and gstatic, connections self and the map's tiles, the map's worker from a blob, no frames, no eval;
+pictures stay `https:` (a source's photos come from anywhere). Left: `'unsafe-inline'` (the one-file page's inline
+scripts, styles and handlers need nonces first), and the Google and unpkg hosts until their files ship.
+
+**7. The cheap ones.** A quit or SIGTERM mid-answer saves it as `stopped` (it was saved as finished). Every 3 s the
+answers on their way are written to `turns.live.json` in their profile (one small file, not the chat store), marked
+cut; a clean end takes them out, and after a crash the next run puts them in their chats where the question still is
+(the first chat list or question of the run). `hw.memsize` is read once a run (a sysctl process ran on every stats
+poll). A local engine isn't warmed for an answer the cloud ladder will write (`_cloud_first`: one model, a cloud key
+the single path walks first; a 26B engine was read into memory for a Groq answer). Calm holds the aurora's two sways
+still (`.hz.hz-calm #hz-aur1,…{animation:none}`; the audit measured Calm at 33 % CPU with only those running).
+
+**Copy, old -> new (for Patrick's approval):**
+- machines line after a search: "Nothing has left your machines." -> "Searched the web (DuckDuckGo and Brave)." (or
+  the engines it asked; "Searched the web." for an older answer); with the cloud: "Some of this went through Groq."
+  -> "Searched the web (DuckDuckGo). Some of this went through Groq."
+- a cut answer (new): "The connection dropped." with "Continue" and "Try again"; Continue sends "Continue from where
+  you stopped."
+- a refused save (new): "Couldn't save this answer: your disk is full. It's still on screen." / "Couldn't save this
+  answer: ConcordeAI can't write to its folder. It's still on screen." (the second is not in the brief; it is what an
+  unwritable folder honestly is)
+- a refused question (new; it was a dropped connection): "Couldn't save your question: your disk is full. Free up
+  some space, then send it again." / "Couldn't save your question: ConcordeAI can't write to its folder. Nothing was
+  sent."
+- low disk (new): "Your disk is almost full (0.4 GB free). New answers may not save."
+- approval card (new): "Safer: netplan try --timeout 120. It undoes itself unless you confirm you can still reach
+  the server."
+- Settings, the cloud note: "A question that needs the web goes, as typed, to a search engine;" -> "…goes, as typed,
+  to DuckDuckGo, and to Brave when DuckDuckGo has nothing;"
+- the Updates pane's reasons (new): "This update has no checksum, so it wasn't installed", "The download didn't match
+  its checksum, so it wasn't installed", "The update couldn't be opened", "The update holds no app", "The update
+  couldn't be copied next to the app", "The update is older than this app", "Its signature didn't check out, so it
+  wasn't installed", "It isn't signed by ConcordeAI's developer, so it wasn't installed", "macOS didn't accept it, so
+  it wasn't installed".

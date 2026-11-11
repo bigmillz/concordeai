@@ -152,6 +152,9 @@ ditto shell/dictate/concorde-dictate "$BUNDLE/Contents/Resources/concorde-dictat
 codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-dictate"
 ditto shell/pdftext/concorde-pdftext "$BUNDLE/Contents/Resources/concorde-pdftext"
 codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-pdftext"
+# the map's scripts, when they are shipped (vendor/, 6b620): the page serves
+# them from /static/vendor/ and reaches for unpkg only without them
+[[ -d vendor ]] && ditto vendor "$BUNDLE/Contents/Resources/vendor"
 # then the bundle, which signs its main binary (Contents/MacOS/ConcordeAI)
 # as its own; under the hardened runtime that binary carries the entitlements
 if [[ "$SIGN_MODE" == "adhoc" ]]; then
