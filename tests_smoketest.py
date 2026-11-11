@@ -26078,11 +26078,17 @@ def _modes_live39(inst, sid, svn, only=None):
             # moves while Fast and Thinking run: the line-up is held to /api/tiers as it stands now (beta-2, run c)
             tiers = q("/api/tiers")[1]
             pr = run("Pro", "say hello in one word 339p")
+            # (beta 4) and as it stands after: a local model whose fit is decided by free memory can come or go between
+            # the two reads (run E: Muse Glimmer 30B seated though the read before left it out); the run must match
+            # what /api/tiers showed at one of them
+            tiers_after = q("/api/tiers")[1]
+            _same_pro = (sorted(pr["models"]) == sorted(tiers["Pro"]["models"])
+                         or sorted(pr["models"]) == sorted(tiers_after["Pro"]["models"]))
             # (the council puts the merger last, so the line-up is compared by what is the server's)
             got["Pro: all six server models draft"] = (
                 pr["status"] == 200 and len(srv("Pro")) == 6
                 and [m for m in pr["models"] if m.startswith(lab)] == srv("Pro")
-                and sorted(pr["models"]) == sorted(tiers["Pro"]["models"])
+                and _same_pro
                 and {tag(l) for l in srv("Pro")} <= pr["drafted"])
             got["Pro: the merge is written on the server, by a model it already holds, and no local pen writes it"] = (
                 len(pr["merged"]) == 1 and pr["merged"][0] in pr["resident"]
@@ -26094,7 +26100,7 @@ def _modes_live39(inst, sid, svn, only=None):
             got["Pro: no engine warmed here but a seat of its own"] = (
                 {c[1] for c in pr["loc"] if c[0] == "ensure"} <= {m for m in tiers["Pro"]["models"] if not m.startswith(lab)})
             det["pro"] = {"six": len(srv("Pro")) == 6, "order": [m for m in pr["models"] if m.startswith(lab)] == srv("Pro"),
-                          "same": sorted(pr["models"]) == sorted(tiers["Pro"]["models"]), "tiers": tiers["Pro"]["models"],
+                          "same": _same_pro, "tiers": tiers["Pro"]["models"], "after": tiers_after["Pro"]["models"], "ran": pr["models"],
                           "drafted": sorted(pr["drafted"]), "status": pr["status"]}
             det["modes"] = [f["loc"], th["loc"], pr["loc"], f["models"], th["models"], pr["models"], tiers["Pro"].get("srvcap"),
                             th["merged"], th["resident"], pr["merged"], pr["resident"]]
