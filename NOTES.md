@@ -22682,6 +22682,24 @@ is a tripwire (every lookup and connect recorded and refused), with three mutant
 every host called local); nothing reached the tripwire. These fixtures are made up from the services' documented
 shapes, not recorded: recording one would have meant calling the service.
 
+**Run D (63f8234, 1683 passed, 9 failed, then a crash in 6b620's trust section), classified.** The crash:
+`_t620_streams` lifts `stream_ollama`, which since 6b627 reads the engine through `_engine_lines` and raises
+`EngineCut`; neither was in its namespace (the trimmed run had shown the same NameError, and I took it for the trim's
+own artifact: wrong). Both now come along, and the harness reads the cut mark after the raise. Real fixes in the tests,
+none in the app: the place pin's full-address read re-pinned to 6b626's `place_fits`; the clipped grounded turn cut
+at 10 KB (the smallest cut the app makes; 6b626's rules alone now run past 5 KB, so a 5 KB cut kept only the end);
+6b531's minute mutant names `_now_local` (6b626 stamps the hour a second time in the place path); 6b640's small-talk
+check moved after 6b626's block (it reads `_ns626`); the Chromium launch count no longer counts its own pattern;
+6b626's lookup step test accepts a search that finished before the step reader attached (the stand-in answers at
+once; seen once in D) and its venue clock no longer leans on a live call; trust's all-local font set includes Inter
+(a bundled face since beta 4); the CUT-unread mutant takes 6b627's commented line whole; 6b628's lanes red now prints
+the parts that matter (it passed at 1440 and 760 on a fresh home; D's record was cut at 1,500 characters). **The
+made-up cafe:** under the stand-in, Overpass put three venues around the Brooklyn point and the answer listed them
+instead of saying no such place; venues now sit only around the places the stand-in knows, and on a dev copy the
+answer reads "I can't find a spot called Qzxvbn Cafe in Bushwick ... Got the exact spelling or a cross street?". The
+product question stays open for beta 5: a named venue that isn't in the venue list loses the no-match conversation
+(`matched` turns true with any venues).
+
 **Verified.** GAUNTLET_LINE
 
 ## 6b641 — dictation, polished: the language told, never guessed; it listens as you speak and stops when you do; the C++ shell's own path (7.0 beta 4, per Patrick)

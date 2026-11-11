@@ -38901,11 +38901,11 @@ _q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.repl
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
 _pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
 _turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
-_c16a = _q16["ground_clip"](_turn16, 5000)
+_c16a = _q16["ground_clip"](_turn16, 10000)   # (beta 4) the smallest cut the app makes (10 KB; the rules alone now run past 5 KB)
 _c16b = _q16["ground_clip"](_turn16, len(_turn16))   # (beta 4) the rules grew past 12 KB with 6b626/6b560; a cut that fits leaves it whole
 _c16c = _q16["ground_clip"](_turn16, 12000)            # and the checker's 12 KB cut keeps the rules and the question
 check("a clipped grounded turn keeps the rules and the question, and the evidence's head",
-      len(_turn16) > 9000 and len(_c16a) <= 5000 and _c16a.endswith("PROMPT: most powerful GPU now")
+      len(_turn16) > 10000 and len(_c16a) <= 10000 and _c16a.endswith("PROMPT: most powerful GPU now")
       and "GROUNDING RULES:" in _c16a and _c16a.startswith("What you just found on the web")
       and "[1] page 1" in _c16a and _c16b == _turn16 and _q16["ground_clip"]("short", 10) == "short"
       and len(_c16c) <= 12000 and _c16c.endswith("PROMPT: most powerful GPU now") and "GROUNDING RULES:" in _c16c and "[1] page 1" in _c16c
@@ -43558,9 +43558,10 @@ check("6b531 the minute still rides the question for searched answers, after the
       and _ck31.index("_clock_line = clock_line()") > _i_clk31
       and "messages[-1][\"content\"] = _clock_line + str(messages[-1][\"content\"])" in _ck31, "")
 # the mutant: the minute back in the system prompt must fail the first check
-_mut31 = _ck31.replace('around %-I%p")', '%-I:%M%p")', 1)
+# (beta 4) 6b626's place path stamps the same hour again later in the handler, so the mutant names _now_local's own
+_mut31 = _ck31.replace('_now_local = _venue_stamp("%A, %B %-d, %Y, around %-I%p")', '_now_local = _venue_stamp("%A, %B %-d, %Y, %-I:%M%p")', 1)
 check("6b531 mutant: a minute stamp back in the system prompt is caught",
-      '"%A, %B %-d, %Y, around %-I%p"' not in _mut31
+      _mut31 != _ck31 and '_now_local = _venue_stamp("%A, %B %-d, %Y, around %-I%p")' not in _mut31
       and "%-I:%M" in _mut31[_i_clk31 - 1200:_i_clk31 + 900], "")
 
 # ==== bring your chats (6b529): begin ====
@@ -49423,34 +49424,6 @@ def _n640_ok(src):
             and "  noAnswerPaint();                 // a question left with no answer says so (beta 4)\n  fnHzRest(c);" in src)
 check("6b640 a reopened chat whose last turn is an unanswered question shows one line with Try again, never a blank; the mutant is caught",
       _n640_ok(_MILLENAI_SRC) and not _n640_ok(_MILLENAI_SRC.replace("  noAnswerPaint();                 // a question left with no answer says so (beta 4)\n  fnHzRest(c);", "  fnHzRest(c);", 1)), "")
-# SMALL TALK NEVER SEARCHES (6b640, per Patrick in the C++ preview: "What are we up to today?" came back as a news
-# digest; "and what?"): the person's day, plans and how things are going are "social" (answer_kind), never a web
-# question and never a follow-up carrying the last search's evidence, and the writer is told to keep it short and
-# human with one question back (SOCIAL_RULE); a fresh fact (the weather, the news, a race result, TV tonight, stocks)
-# still searches. Run on 6b626's own namespace. Mutant: the social line gone from answer_kind.
-_S640_SOCIAL = ["What are we up to today?", "what should I do today?", "how's it going?", "what's up?", "how are you?",
-                "what should we work on?", "any plans for tonight?", "what's on my plate today?", "hey, what are we doing today?",
-                "how's your day going?", "help me plan my day", "where were we?"]
-_S640_FRESH = ["what's the weather today?", "news today", "who won the F1 race yesterday?", "what's on tv tonight?",
-               "what are the stock prices today"]
-def _s640_run(src):
-    try:
-        g = _ns626(src)
-        K, NS, FU = g["answer_kind"], g["needs_search"], g["grounded_followup"]
-        return {"kind": {q: K(q) for q in _S640_SOCIAL}, "search": {q: NS(q) for q in _S640_SOCIAL + _S640_FRESH},
-                "fu": FU("What are we up to today?", "What is the capital of Australia?")}
-    except Exception as e_:
-        return {"err": repr(e_)[:300]}
-def _s640_ok(r, src):
-    return (not r.get("err") and all(v == "social" for v in r["kind"].values())
-            and not any(r["search"][q] for q in _S640_SOCIAL) and all(r["search"][q] for q in _S640_FRESH) and r["fu"] is False
-            and 'if messages and answer_kind(str(messages[-1].get("content") or "")) == "social":' in src
-            and "dated_system[\"content\"] += SOCIAL_RULE" in src and "never list news, prices or search results" in src)
-_s640_r = _s640_run(_MILLENAI_SRC)
-_s640_msrc = _MILLENAI_SRC.replace('        return "social"            # small talk, the person\'s own day (beta 4)\n', '        pass\n', 1)
-check("6b640 small talk never searches: \"What are we up to today?\" and ten like it are social (no web, no carried evidence, a short human answer with one question back); the weather, the news, a race result, TV tonight and stocks still search; the mutant is caught",
-      _s640_ok(_s640_r, _MILLENAI_SRC) and _s640_msrc != _MILLENAI_SRC and not _s640_ok(_s640_run(_s640_msrc), _s640_msrc),
-      json.dumps(_s640_r)[:900])
 # NO TEST SEARCHES THE REAL WEB (6b640, the rule of 2026-11-11: our traffic got Patrick's address a bot page at
 # DuckDuckGo and 429s at Brave): every copy this run starts carries MILLENAI_SEARCH_STUB=1, honoured only in a dev copy,
 # which swaps DDGS for a stand-in and keeps the offline probe home. Mutants: the stub honoured outside a dev copy; the
@@ -49570,8 +49543,8 @@ check("6b640 the stand-in web: a test copy's geocoder, places and forecast are f
 _sw640_chs = [m.start() for m in re.finditer(r'spawn\(exe, \["--headless"', open(os.path.abspath(__file__)).read())]
 check("6b640 every headless Chromium this run starts keeps the page's own fetches home (tiles, fonts, footage): "
       "--host-resolver-rules maps every public name to nothing",
-      len(_sw640_chs) >= 6 and open(os.path.abspath(__file__)).read().count(
-          '"--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1",') == len(_sw640_chs)
+      len(_sw640_chs) >= 6 and len(re.findall(r'spawn\(exe, \["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP \* ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127\.0\.0\.1",',
+                                               open(os.path.abspath(__file__)).read())) == len(_sw640_chs)
       and 'args: ["--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"]' in open(os.path.abspath(__file__)).read()
       and socket.getaddrinfo.__name__ == "_smoke_getaddrinfo", "%d launches" % len(_sw640_chs))
 # A CUT-OFF KEY SAYS SO, AND HAIKU COSTS HAIKU (6b640, from the App Store spike and answers-1): /api/cloud/set threw
@@ -49665,7 +49638,10 @@ def _pl626(g, osm_sleep=0.0, osm_rows=(), web=True, offline=False):
         return [dict(r) for r in osm_rows]
     g.update(place_search=_ps, osm_places=_osm, closure_notices=lambda q: "",
              _geocode=lambda q: (geo_asked.append(q), _EIFFEL626 if "eiffel" in q.lower() else None)[1],
-             net_offline=lambda probe=None, now=None: offline)
+             net_offline=lambda probe=None, now=None: offline,
+             # (beta 4) the venue's clock came from a live open-meteo call when OpenStreetMap was slow; the
+             # gauntlet makes no live calls now, so the stand-in names the tower's zone
+             _tz_of=lambda lat, lon: "Europe/Paris")
     g["PLACE_OSM_S"] = 0.4
     t0 = time.time()
     pl = g["place_start"]("Find me a good coffee shop near the Eiffel Tower", ("America/New_York", "Bushwick"))
@@ -49787,7 +49763,11 @@ def _c626_all(src):
         steps = [s for s in said if s[0] != "status"]
         out["the lookups run on their own thread with a step per phase, OpenStreetMap capped (a 3 s stall costs "
             "under 2 s), and the results land on the handler's thread"] = (
-            secs < 2.0 and steps[0] == ("search", "Searching the web", "run", "Eiffel Tower")
+            # (beta 4) the stand-in search can finish before the steps' reader is attached; then its run step is
+            # already past and the first said is its done step (seen in run D): either way the search leads
+            secs < 2.0 and (steps[0] == ("search", "Searching the web", "run", "Eiffel Tower")
+                            or (steps[0][:2] == ("search", "Searched the web")
+                                and ("search", "Searching the web", "run", "Eiffel Tower") not in steps))
             and ("search", "Searched the web", "done", "2 sources") in steps
             and ("read", "Checking what\u2019s open nearby", "run", "") in steps
             and steps[-1] == ("read", "No opening hours nearby", "done", "")
@@ -49979,6 +49959,35 @@ for _mn, _ma, _mb in _C626_MUT:
     if all(_c626_all(_ms).values()):
         _c626_caught.append((_mn, "not caught"))
 check("6b626's rules each break a check when broken (%d mutants)" % len(_C626_MUT), not _c626_caught, "%r" % _c626_caught)
+# (beta 4) 6b640's small-talk check reads _ns626, so it runs here, after 6b626's block defines it
+# SMALL TALK NEVER SEARCHES (6b640, per Patrick in the C++ preview: "What are we up to today?" came back as a news
+# digest; "and what?"): the person's day, plans and how things are going are "social" (answer_kind), never a web
+# question and never a follow-up carrying the last search's evidence, and the writer is told to keep it short and
+# human with one question back (SOCIAL_RULE); a fresh fact (the weather, the news, a race result, TV tonight, stocks)
+# still searches. Run on 6b626's own namespace. Mutant: the social line gone from answer_kind.
+_S640_SOCIAL = ["What are we up to today?", "what should I do today?", "how's it going?", "what's up?", "how are you?",
+                "what should we work on?", "any plans for tonight?", "what's on my plate today?", "hey, what are we doing today?",
+                "how's your day going?", "help me plan my day", "where were we?"]
+_S640_FRESH = ["what's the weather today?", "news today", "who won the F1 race yesterday?", "what's on tv tonight?",
+               "what are the stock prices today"]
+def _s640_run(src):
+    try:
+        g = _ns626(src)
+        K, NS, FU = g["answer_kind"], g["needs_search"], g["grounded_followup"]
+        return {"kind": {q: K(q) for q in _S640_SOCIAL}, "search": {q: NS(q) for q in _S640_SOCIAL + _S640_FRESH},
+                "fu": FU("What are we up to today?", "What is the capital of Australia?")}
+    except Exception as e_:
+        return {"err": repr(e_)[:300]}
+def _s640_ok(r, src):
+    return (not r.get("err") and all(v == "social" for v in r["kind"].values())
+            and not any(r["search"][q] for q in _S640_SOCIAL) and all(r["search"][q] for q in _S640_FRESH) and r["fu"] is False
+            and 'if messages and answer_kind(str(messages[-1].get("content") or "")) == "social":' in src
+            and "dated_system[\"content\"] += SOCIAL_RULE" in src and "never list news, prices or search results" in src)
+_s640_r = _s640_run(_MILLENAI_SRC)
+_s640_msrc = _MILLENAI_SRC.replace('        return "social"            # small talk, the person\'s own day (beta 4)\n', '        pass\n', 1)
+check("6b640 small talk never searches: \"What are we up to today?\" and ten like it are social (no web, no carried evidence, a short human answer with one question back); the weather, the news, a race result, TV tonight and stocks still search; the mutant is caught",
+      _s640_ok(_s640_r, _MILLENAI_SRC) and _s640_msrc != _MILLENAI_SRC and not _s640_ok(_s640_run(_s640_msrc), _s640_msrc),
+      json.dumps(_s640_r)[:900])
 # ==== 6b626 answers: end ====
 # ==== 6b627 robust: begin ====
 print("== usable when things go wrong: Stop only in the answering chat, a cut answer says so, a damaged model falls through with Download again, a load and a long silence said, offline said plainly (6b627) ==")
@@ -50998,7 +51007,13 @@ os.makedirs(os.path.join(_u628_proj, "src"))
 open(os.path.join(_u628_proj, "src", "app.py"), "w").write("print('hi')\n"); open(os.path.join(_u628_proj, "README.md"), "w").write("# p\n")
 _u628_L = _u628_live("lanes", 1440); _u628_Ln = _u628_live("lanes", 760)
 check("6b628 live (headless Chromium, the copy's page, a stand-in stream and the store's half of a turn): Code opens fresh, a code question goes to a Code chat, back in Chat its chat, back in Code its chat; a slow answer left for Code lands in its own chat, unread, and is there on return; a lane left fresh comes back fresh; a mode picked in Code goes to Chat with Chat's own chat; at 1440 and 760, nothing sideways",
-      _u628_lanes_ok(_u628_L) and _u628_lanes_ok(_u628_Ln, wide=False), json.dumps({"w": _u628_L, "n": _u628_Ln})[:1500])
+      _u628_lanes_ok(_u628_L) and _u628_lanes_ok(_u628_Ln, wide=False),
+      # (beta 4) the parts a red needs, not the first 1,500 characters of the whole record
+      json.dumps({w_: {"ok": _u628_lanes_ok(r_, wide=(w_ == "w")), "err": r_.get("err"), "errs": (r_.get("errs") or [])[:3],
+                       "tabs": r_.get("tabs"), "sw": r_.get("sw"), "sent": r_.get("lanesSent"), "fGen": (r_.get("s") or {}).get("fGen"),
+                       "mt": (r_.get("s") or {}).get("mt"),
+                       "s": {k_: {x_: v_ for x_, v_ in ((r_.get("s") or {}).get(k_) or {}).items() if x_ != "cur"}
+                             for k_ in "abcdefghijkm"}} for w_, r_ in (("w", _u628_L), ("n", _u628_Ln))})[:6000])
 _u628_P = _u628_live("pick", 1440, extra=_u628_proj)
 check("6b628 live: the Workspace's Choose folder… hidden with no bridge (the typed path works as before); with the Mac shell's pick_folder a real click picks, a cancel changes nothing, the folder is set through /api/workspace/set and its files counted; with this server's window (pywebview) the same, and a server with no window takes the key away",
       _u628_pick_live_ok(_u628_P, _u628_proj), json.dumps(_u628_P)[:1500])
@@ -51214,8 +51229,19 @@ def _t620_streams(src):
           "MuseChannels": None, "MUSE_ROWS": (), "muse_level": lambda t: t, "GIANT_CTX": 0, "OLLAMA_THINK_OFF": (),
           "GIANT_KEEP_ALIVE": "1m", "GIANT_LOAD_TIMEOUT": 30, "ollama_url": lambda p: _T620_SB + p}
     exec(src[src.index("_stream_end = profile_cache("):src.index("_HW_MEMSIZE = [None]")], ns)
-    for h in ("def _anthropic_stream(", "def cloud_stream_conf(", "def stream_ollama("):
+    # (beta 4) since 6b627 stream_ollama reads the engine through _engine_lines and raises EngineCut on a cut, after
+    # stream_done has marked it (the answer's cut line is the same); both come along, with what they read
+    import http.client
+    import http as _http620
+    ns.update(socket=socket, http=_http620)
+    for h in ("class EngineCut(", "def _engine_lines(", "def _anthropic_stream(", "def cloud_stream_conf(", "def stream_ollama("):
         exec(_t620_def(src, h), ns)
+
+    def _run(f, em):
+        try:
+            f(em)
+        except ns["EngineCut"]:
+            pass                                   # the engine's own death is raised (6b627); its mark is what's read
     conf = {"base": _T620_SB + "/v1", "key": "k", "model": "m", "name": "Groq"}
     aconf = {"base": _T620_SB + "/anthropic.com/v1", "key": "k", "model": "m"}
     runs = {"cloud": lambda em: ns["cloud_stream_conf"](conf, [{"role": "user", "content": "q"}], em),
@@ -51233,12 +51259,12 @@ def _t620_streams(src):
                 if t:
                     ns["stream_page_mark"](len(t))
                     got.append(t)
-            f(em)
+            _run(f, em)
             r.append((ns["stream_was_cut"](), len("".join(got).split())))
         # a draft collected for a merge (its words never reach the page) says nothing about the answer
         _T620Stream.mode["cut"] = True
         ns["stream_end_clear"]()
-        f(lambda t: None)
+        _run(f, lambda t: None)
         r.append(ns["stream_was_cut"]())
         out[k] = r
     return out
@@ -51270,7 +51296,8 @@ _t620_r1 = _t620_tr("word0 word1\x00CUT:{\"w\": \"Groq\"}\x00\x00DONE:{\"t\":1}\
 _t620_r2 = _t620_tr("word0 word1\x00CUT:{}\x00", aborted=True)
 _t620_r3 = _t620_tr("the whole answer\x00DONE:{\"t\":1,\"web\":[\"DuckDuckGo\"]}\x00")
 _t620_ctm = {"re": re, "json": json, "threading": _th620}
-_t620_tm = _t620_src.replace('        elif tag == "CUT":\n            got["CUT"] = True\n', "", 1)
+# (beta 4) the merge kept 6b627's comment on the line; the mutant takes it out whole
+_t620_tm = _t620_src.replace('        elif tag == "CUT":\n            got["CUT"] = True                # the answer was cut off (6b627)\n', "", 1)
 exec(_t620_tm[_t620_tm.index("_TURN_TAGS = ("):_t620_tm.index("def _turn_rec(t):")], _t620_ctm)
 check("trust: a cut answer is saved with cut: true and the run's engines with it; a stopped one stays stopped, not cut; "
       "the page draws one calm line, \"The connection dropped.\" with Continue and Try again, live and on reopen (only the "
@@ -51278,7 +51305,7 @@ check("trust: a cut answer is saved with cut: true and the run's engines with it
       _t620_r1 and _t620_r1.get("cut") is True and _t620_r1["content"] == "word0 word1"
       and _t620_r2 and _t620_r2.get("stopped") is True and "cut" not in _t620_r2
       and _t620_r3 and "cut" not in _t620_r3 and _t620_r3["run"].get("web") == ["DuckDuckGo"]
-      and not (_t620_ctm["turn_record"]("a\x00CUT:{}\x00") or {}).get("cut")
+      and _t620_tm != _t620_src and not (_t620_ctm["turn_record"]("a\x00CUT:{}\x00") or {}).get("cut")
       and "|CUT|SAVE" in _t620_ct["_TURN_TAGS"] and "|OFFER|CUT|SAVE\";" in page
       and 'if(cutInfo&&full&&!wasAborted&&!isErr)trustLine(aiDiv,"cut");' in page
       and 'if(role!=="user"&&m.role&&m.cut&&!m.stopped)trustLine(div,"cut");' in page
@@ -51636,7 +51663,8 @@ def _t620_assets(src, files):
 
 
 _T620_FONTS = ["fonts/Michroma-Regular.ttf", "fonts/SpaceGrotesk-Variable.woff2", "fonts/IBMPlexMono-Regular.woff2",
-               "fonts/IBMPlexMono-Medium.woff2", "fonts/IBMPlexMono-SemiBold.woff2"]
+               "fonts/IBMPlexMono-Medium.woff2", "fonts/IBMPlexMono-SemiBold.woff2",
+               "fonts/InterVariable.woff2"]   # (beta 4) Inter is one of the bundled faces now (not shipped: system-ui stands in)
 _t620_a0 = _t620_assets(_t620_src, _T620_FONTS[:1])
 _t620_a1 = _t620_assets(_t620_src, _T620_FONTS[:3])
 _t620_a2 = _t620_assets(_t620_src, _T620_FONTS + ["vendor/leaflet.js", "vendor/maplibre-gl.css"])
