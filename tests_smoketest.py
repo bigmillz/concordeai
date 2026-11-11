@@ -46687,6 +46687,403 @@ check("6b622 live mutants, served in place of the page, are each caught: %s" % "
       all(ok_ for _, ok_, _ in _ln_mr2), json.dumps(_ln_mr2)[:1500])
 # ==== 6b622 lanes: end ====
 
+# ==== 6b625 the polish: begin ====
+print("== the polish: Settings in the demo's dialog, one type system, the palette, dictation, the PDF chip, no hidden suggestions call, the Code lane, Funnels (6b625) ==")
+# THE POLISH (6b625, per Patrick: "I want this UI to be perfect"; the web demo's Settings, ddfdf72, and DESIGN.md's governing
+# rule). Five parts, each with mutants the same predicate catches. (1) The css: the demo's dialog values (672 x 640,
+# #141416, a hairline at 10 %, radius 14, a 55 % backdrop, the 180 ms fade and 6 px rise), the rail (184, the 11 px caps
+# label at 50 %, rows 13 px and 30 high, #1a1a1d / #1f1f22), 48 px rows, the segmented #1a1a1d / #2a2a2f, squared
+# switches 32 x 18, 32 px inputs on #0e0e10, 28 px buttons; Inter where mono caps were; the ember outline for danger; no
+# light blue key; the import sheet over black; every rule Horizon's; no glow. (2) Pure, in node, on the page's own
+# functions: plural rules, the palette's lane, the PDF chip's words and action, the lane placeholders, suggLoad asking
+# nothing in Horizon, What's new saying whose notes they are. (3) About's version and build from the source's constants.
+# (4) The server: run_remote_agent lifted and driven with stand-ins: a batch with danger commands asks once per danger
+# command, just before it runs; a no stops the batch there. (5) Live, headless Chromium on the copy's page with stand-in
+# streams: Settings by the gear (fade, rise, focus on the rail, arrows, Tab kept inside, Esc fades and gives focus back,
+# the metrics, no mono), the palette's lane and arrow, the dictation level, the host chip and sheet, a danger command's
+# own ember card under its line, Funnels' form as the home and the stage hairline, no /api/suggest on load; mutants
+# served in place of the page.
+_px_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE POLISH (6b625"):_MILLENAI_SRC.index("/* ==== THE POLISH (6b625): end ==== */")]
+def _px_css_ok(css):
+    r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return (_hz_scoped(css)
+            and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|[^-]blur\(|box-shadow:0 0 [1-9]", r_)
+            and ".hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;" in r_
+            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);" in r_
+            and "background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;" in r_
+            and "--sx-s0:#0e0e10;--sx-s1:#141416;--sx-s2:#1a1a1d;--sx-s3:#1f1f22;--sx-s4:#2a2a2f" in r_ and "--sx-lab:rgba(255,255,255,.5)" in r_
+            and ".hz #about-veil:not([hidden]){animation:sxFade .18s var(--sx-e) both}" in r_ and "@keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}" in r_
+            and ".hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}" in r_
+            and ".hz #about-veil .snav{height:30px;flex:none;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);" in r_
+            and ".hz #about-veil .snav:hover{background:var(--sx-s2);" in r_ and ".hz #about-veil .snav.on{background:var(--sx-s3);" in r_
+            and "min-height:48px;padding:8px 0;margin:0;\n  border-top:var(--sx-hl) solid rgba(255,255,255,.08)" in r_
+            and ".hz #about-veil .sl-seg{height:30px;padding:2px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s2);box-shadow:none}" in r_
+            and "border-radius:6px;background:var(--sx-s4);box-shadow:none;" in r_
+            and ".hz #about-veil .switch{width:32px;height:18px;border-radius:5px;" in r_
+            and "height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);" in r_
+            and ".hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 12px;border-radius:8px;" in r_
+            and "@media (max-width:640px){" in r_ and ".hz #about-veil #set-rail{flex-direction:row;" in r_
+            # one type system: no mono caps in Settings, the tables, the palette
+            and "--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);" in r_ and "--sans:var(--hz-font-ui)}" in r_
+            and ".hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;" in r_
+            and "font:450 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-meta)}" in r_
+            # dictation: no ember send while listening; the danger card's ember outline; no light blue key; the import over black
+            and ".hz #composer.hastext:has(#mic.rec) #send:not(:disabled):not(.stop)" in r_
+            and ".hz .msg .apcard.hz-ap.danger:not(.decided){border-color:rgba(232,65,90,.6)}" in r_
+            and ".hz .apbtn.ok{background:transparent;" in r_ and "#9fc0ff" not in r_ and "hz-accent" not in r_
+            and ".hz #imp-sheet{border-radius:14px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:none;" in r_
+            and ".hz #about-veil #sugg-toggle,.hz #about-veil #sugg-note{display:none}" in r_
+            and "@media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card," in r_)
+check("6b625 the css: Settings in the demo's dialog (672 x 640, #141416, a 10 % hairline, radius 14, a 55 % backdrop, the 180 ms fade and 6 px rise), its rail (184, 11 px caps at 50 %, rows 13 px / 30 high on #1a1a1d / #1f1f22), 48 px rows, the #1a1a1d / #2a2a2f segmented control, 32 x 18 squared switches, 32 px inputs on #0e0e10, 28 px buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; five mutants caught",
+      _px_css_ok(_px_css)
+      and not _px_css_ok(_px_css.replace("border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;", "border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:18px;box-shadow:none;", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css + "\n.hz #about-veil .snav.on{box-shadow:0 0 12px rgba(255,255,255,.3)}")                      # a glow on the rail
+      and not _px_css_ok(_px_css.replace(".hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;", ".hz .msg.ai .body th{font:500 11px/16px var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;", 1))   # mono caps heads
+      and not _px_css_ok(_px_css + "\n#about-card{color:red}")                                                                  # a rule outside Horizon
+      and not _px_css_ok(_px_css.replace("background:var(--sx-s1);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}\n.hz #imp-sheet .imp-sky", "background:linear-gradient(180deg,rgba(6,8,18,.9),rgba(8,14,34,.88));box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}\n.hz #imp-sheet .imp-sky", 1)), "")   # navy back
+
+# (2) pure, in node, on the page's own functions
+_px_js = page[page.index("// ==== polish-js (6b625): begin ===="):page.index("// ==== polish-js (6b625): end ====")]
+def _px_line(src, head):
+    i_ = src.index(head); return src[i_:src.index("\n", i_) + 1]
+def _px_pure_js(pg):
+    js_ = pg[pg.index("// ==== polish-js (6b625): begin ===="):pg.index("// ==== polish-js (6b625): end ====")]
+    out_ = "const esc=s=>String(s==null?'':s).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));\nfunction sxHz(){return true;}\n"
+    for h in ("var SX_PR=", "function sxPl(", "var SX_PK=", "function palKind(", "function palLabel(", "var SX_PDF_WORDS=", "var SX_FILE_SVG="):
+        out_ += _px_line(js_, h)
+    i_ = js_.index("var SX_PH="); out_ += js_[i_:js_.index("function sxPhWire(", i_)]
+    return out_ + _jsfn(js_, "function docChipHz(d,i){")
+_PX_PURE = r'''
+var uiMode="ai",agent="",fnState=null;const o={};
+o.pl=[sxPl(1,"request"),sxPl(0,"answer"),sxPl(2,"command"),sxPl(1,"answer"),sxPl(21,"step")];
+o.kind=[palKind({lane:"code"}),palKind({lane:"funnel"}),palKind({}),palKind({lane:"ai"})];
+o.label=[palLabel("code"),palLabel("chat"),palLabel("go"),palLabel("tier")];
+const c=docChipHz({name:"report.pdf",err:"PDF needs an update on this computer."},0),b=docChipHz({name:"a.pdf",busy:true},1);
+const vis=c.replace(/ title="[^"]*"/g,"");
+o.chip=[/<i class="sx-pw dcm">This computer can’t read PDFs yet\.<\/i>/.test(c),/<button type="button" class="sx-pa" data-k="d" data-i="0">Remove<\/button>/.test(c),/📄|PDF needs an update/.test(vis),/Reading…/.test(b),/<svg/.test(c)];
+const ph=[];ph.push(sxPh());uiMode="code";agent="Remote";ph.push(sxPh());agent="Coding";ph.push(sxPh());agent="";ph.push(sxPh());
+uiMode="funnel";fnState={};ph.push(sxPh());fnState=null;ph.push(sxPh());o.ph=ph;
+process.stdout.write(JSON.stringify(o));
+'''
+def _px_pure(pg):
+    try:
+        return _node_json(_px_pure_js(pg) + _PX_PURE, "polish625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _px_pure_ok(o):
+    return (o.get("pl") == ["request", "answers", "commands", "answer", "steps"]
+            and o.get("kind") == ["code", "funnel", "chat", "chat"] and o.get("label") == ["Code", "Chat", "Open", "Mode"]
+            and o.get("chip") == [True, True, False, True, True]
+            and o.get("ph") == ["Ask anything", "What should happen on the server?", "Describe the code you need", "Describe the code you need",
+                                "Or type your own answer", "What are you deciding?"])
+_px_o = _px_pure(page)
+_px_pm = [("plural by n<=1, so 0 answer", 'return k==="one"?one:(many||one+"s");', 'return n<=1?one:(many||one+"s");'),
+          ("a Code chat called Chat", 'return l==="code"?"code":l==="funnel"?"funnel":"chat";', 'return "chat";'),
+          ("the PDF chip's server words kept", "SX_PDF_WORDS[d.err]||d.err", "d.err"),
+          ("one placeholder for every lane", 'return SX_PH[typeof agent!=="undefined"&&SX_PH[agent]?agent:"Coding"];', "return SX_PH.chat;"),
+          ("no answer cue in a funnel", 'return typeof fnState!=="undefined"&&fnState?SX_PH.answer:SX_PH.funnel;', "return SX_PH.funnel;")]
+_px_pmr = [(d_, _px_pure_ok(_px_pure(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _px_pm]
+check("6b625 pure (the page's own functions): plural rules (1 request, 0 answers), the palette's lane (a Code chat says Code), the PDF chip in plain words with a Remove key and no emoji, each lane's placeholder and the funnel's \"Or type your own answer\"; five mutants caught",
+      _px_pure_ok(_px_o) and all(r_ is False for _, r_ in _px_pmr), "%r %r" % (_px_o, _px_pmr))
+# the hidden suggestions call: suggLoad asks nothing in Horizon, and still asks in Classic
+_PX_SUGG = r'''
+let hz=true,calls=0;const document={documentElement:{classList:{contains:c=>c==="hz"&&hz}}};
+const api=u=>{calls++;return Promise.resolve({json:()=>({on:false,chips:[]})});};
+var suggFlight=false,suggAsked=0,suggOwn=[],suggFresh=false,suggWaits=0,suggGot=false,uiMode="ai",generating=false;
+function suggOk(){return true;}function suggPane(){}function paintSuggest(){}const $=()=>null;
+suggLoad();const a=calls;hz=false;suggFlight=false;suggLoad();
+setTimeout(()=>process.stdout.write(JSON.stringify({hz:a,classic:calls})),20);
+'''
+def _px_sugg(pg):
+    try:
+        return _node_json(_jsfn(pg, "function suggLoad(){") + _PX_SUGG, "sugg625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_px_s = _px_sugg(page)
+_px_sm = _px_sugg(page.replace('  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', "", 1))
+check("6b625 no hidden suggestions call: in Horizon suggLoad never asks /api/suggest (the home shows no chips, so Gemma 26B is not loaded for nothing); Classic still asks; the Personal suggestions switch is Classic's; the mutant without the guard is caught",
+      _px_s == {"hz": 0, "classic": 1} and _px_sm == {"hz": 1, "classic": 2}, "%r %r" % (_px_s, _px_sm))
+# What's new says whose notes they are: this version's, the one on offer, or another release's by name
+_PX_NOTES = r'''
+const els={};const $=s=>els[s]||(els[s]={textContent:"",innerHTML:"",hidden:true});let R;
+const api=u=>Promise.resolve({json:()=>Promise.resolve(R)});
+async function run(r){R=r;for(const k in els)delete els[k];await paintUpdatesPane();
+  return [(els["#up-reldate"]||{}).textContent||"",((/<b>([^<]*)<\/b>/.exec((els["#up-notes"]||{}).innerHTML||""))||[])[1]||""];}
+(async()=>{const P="2026-11-10T12:00:00Z",o={};
+  o.same=await run({latest:"7.0 beta 2",current:"7.0 beta 2",tag:"v279",published:P,notes:"Hello"});
+  o.other=await run({latest:"7.0 beta 3",current:"7.0 beta 4",tag:"v281",published:P,notes:"Hello"});
+  o.avail=await run({latest:"7.0 beta 5",current:"7.0 beta 4",tag:"v283",available:true,published:P,notes:"Hello"});
+  o.nightly=await run({latest:"7.0 beta 3",current:"7.0 nightly abc1234",tag:"nightly",published:P,notes:"Hello"});
+  process.stdout.write(JSON.stringify(o));})();
+'''
+def _px_notes(pg):
+    try:
+        return _node_json("const esc=s=>String(s);\n" + _jsfn(pg, "function notesHTML(md){") + _jsfn(pg, "async function paintUpdatesPane(){") + _PX_NOTES, "notes625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _px_notes_ok(o):
+    return (o.get("same") == ["Released on November 10, 2026", "What’s new"]
+            and o.get("other") == ["7.0 beta 3 released on November 10, 2026", "What’s new in 7.0 beta 3"]
+            and o.get("avail") == ["7.0 beta 5 is available", "What’s new in 7.0 beta 5"]
+            and o.get("nightly") == ["Released on November 10, 2026", "What’s new"])
+_px_n = _px_notes(page)
+_px_nm = _px_notes(page.replace('+(r.tag!=="nightly"&&r.latest&&(r.available||r.latest!==r.current)?" in "+esc(r.latest):"")', '+(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")', 1))
+check("6b625 About's What's new is this version's, or says whose: the running version's notes are \"What's new\", another release's are \"What's new in 7.0 beta 3\" with its own date, an update's \"What's new in\" it, a nightly's the last release's; the old header (another version's notes as this one's) is caught",
+      _px_notes_ok(_px_n) and not _px_notes_ok(_px_nm), "%r %r" % (_px_n, _px_nm))
+
+# (3) About's version and build: from APP_VERSION, the beta or RC number, the nightly and APP_BUILD, never typed in
+_px_c = dict(re.findall(r'^APP_(VERSION|BETA|RC|NIGHTLY|BUILD) = "?([^"\n]*?)"?\s*(?:#.*)?$', _MILLENAI_SRC, re.M))
+def _px_ver(c):
+    v = c.get("VERSION", "")
+    v = v[:-2] if v.count(".") >= 2 and v.endswith(".0") else v
+    if c.get("NIGHTLY"):
+        return v + " nightly " + c["NIGHTLY"].split()[-1]
+    if int(c.get("RC") or 0):
+        return v + " RC%d" % int(c["RC"])
+    return v + (" beta %d" % int(c["BETA"]) if int(c.get("BETA") or 0) else "")
+check("6b625 About says the version and the build the app was cut as: \"%s\" and \"Build %s\" from APP_VERSION, APP_BETA/APP_RC and APP_BUILD (template tokens, not typed numbers), the rail's \"Settings\" label and the slab id once"
+      % (_px_ver(_px_c), _px_c.get("BUILD")),
+      ('<div id="up-version">%s' % _px_ver(_px_c)) in page and ('<div id="sx-build">Build %s</div>' % _px_c.get("BUILD")) in page
+      and '<div id="up-version">__APP_VER__</div>\n      <div id="sx-build">Build __APP_BUILD__</div>' in _MILLENAI_SRC
+      and '.replace("__APP_BUILD__", str(APP_BUILD))' in _MILLENAI_SRC
+      and page.count('<p class="sx-slab" id="sx-set-title">Settings</p>') == 1
+      and "&#8617; open" in _MILLENAI_SRC and "\\u21a9 open" not in _MILLENAI_SRC, "%r" % (_px_c,))
+
+# (4) the server: a danger command in a batch gets an approval of its own, asked just before it runs
+def _px_remote(src, autonomy, answers, cmds):
+    import ast as _ast
+    fn_ = next(n for n in _ast.parse(src).body if isinstance(n, _ast.FunctionDef) and n.name == "run_remote_agent")
+    acts = [{"plan": "Clean up", "cmds": cmds}, {"done": True, "summary": "Finished."}]
+    asked, ran, frames, said = [], [], [], []
+    ns_ = {"remote_driver": lambda: ("local", "stand-in"), "cloud_allowed": lambda: True, "work_ladder": lambda k: [], "AppText": str,
+           "REMOTE_SYSTEM": "", "REMOTE_CAP": 4, "_fence_output": lambda o_, n_=0: o_, "_SSH_HOSTKEY_RX": re.compile("x^"),
+           "claude_refusal_conf": lambda c_: None, "ssh_wait_back": lambda *a_, **k_: (True, ""), "time": time,
+           "_agent_turn": lambda d_, c_, budget=0: json.dumps(acts.pop(0)) if acts else "", "_parse_action": lambda t_: json.loads(t_) if t_ else {},
+           "classify_cmd": lambda c_: "danger" if re.search(r"\brm -rf|\bmkfs|\bdd ", c_) else "write" if re.search(r"\b(apt|systemctl)\b", c_) else "read"}
+    def _ssh(conf, c_, timeout=0):
+        if "__ok__" in c_:
+            return 0, "__ok__\nLinux vps"
+        ran.append(c_); return 0, "fine"
+    ns_["ssh_run"] = _ssh; ns_["ssh_run_long"] = lambda conf, c_, emit_status=None: _ssh(conf, c_)
+    exec(compile(_ast.Module([fn_], []), "remote625", "exec"), ns_)
+    q_ = list(answers)
+    def _ap(cmd, risk):
+        asked.append([cmd, risk]); return q_.pop(0) if q_ else True
+    try:
+        ns_["run_remote_agent"]([{"role": "user", "content": "go"}], {"host": "vps"}, autonomy, said.append, lambda *_: None,
+                                lambda i_, l_, s_, d_="": frames.append([i_, s_, d_]), _ap)
+    except Exception as e_:
+        return {"err": repr(e_)}
+    last = {}
+    for i_, s_, d_ in frames:
+        last[i_] = [s_, d_]
+    return {"asked": asked, "ran": ran, "last": last, "said": said}
+_PX_B = ["ls /", "rm -rf /srv/old", "echo ok", "mkfs.ext4 /dev/sdb"]
+def _px_remote_ok(src):
+    a_ = _px_remote(src, "auto", [True, True], _PX_B); b_ = _px_remote(src, "auto", [False], _PX_B)
+    c_ = _px_remote(src, "manual", [True, True], ["apt update", "rm -rf /x", "echo ok"]); d_ = _px_remote(src, "auto", ["expired"], _PX_B)
+    e_ = _px_remote(src, "auto", [True], ["rm -rf /x"])
+    ok_ = (a_.get("asked") == [["rm -rf /srv/old", "danger"], ["mkfs.ext4 /dev/sdb", "danger"]] and a_.get("ran") == _PX_B
+           and a_.get("last", {}).get("cmd1_2") == ["done", "exit 0"] and a_.get("last", {}).get("cmd1") == ["done", "4 of 4 ran"]
+           and b_.get("asked") == [["rm -rf /srv/old", "danger"]] and b_.get("ran") == ["ls /"]
+           and b_.get("last", {}).get("cmd1_2") == ["skip", "Skipped"] and b_.get("last", {}).get("cmd1") == ["done", "1 of 4 ran"]
+           and c_.get("asked") == [["apt update\necho ok", "write"], ["rm -rf /x", "danger"]] and c_.get("ran") == ["apt update", "rm -rf /x", "echo ok"]
+           and d_.get("ran") == ["ls /"] and d_.get("last", {}).get("cmd1_2") == ["skip", "No answer. Nothing ran."]
+           and any("Paused after 10 minutes" in x for x in d_.get("said", []))
+           and e_.get("asked") == [["rm -rf /x", "danger"]] and e_.get("ran") == ["rm -rf /x"])
+    return ok_, [a_, b_, c_, d_, e_]
+_px_r, _px_rd = _px_remote_ok(_MILLENAI_SRC)
+_px_rm = [_px_remote_ok(_MILLENAI_SRC.replace('        own = batch and "danger" in risks\n', '        own = False\n', 1))[0],
+          _px_remote_ok(_MILLENAI_SRC.replace('                if _cok is not True:\n', '                if _cok is False:\n', 1))[0]]
+check("6b625 the Remote agent: a batch's danger commands each get an approval of their own, just before they run (the batch's one card covers the rest, priced at their riskiest, and only when they need it); a Skip stops the batch there (1 of 4 ran, the line Skipped), no answer pauses the run, a lone command is as it was; the wire is the same APPROVE; two mutants caught (one card for the whole batch; an expired answer read as a yes)",
+      _px_r and _px_rm == [False, False], json.dumps(_px_rd)[:1500])
+
+# (5) live, in headless Chromium: the copy's own page, stand-in streams (the lanes' agent and funnel, a danger batch, dictation)
+_PX_STUB_LN = _LN_CDP[_LN_CDP.index("  function stub(cfg) {"):_LN_CDP.index("  const boot = `")]
+_PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000);") + _PX_STUB_LN + r'''  const W = +process.argv[9] || 1440, MODE = process.argv[10] || "full";
+  function extra() {
+    const prev = window.fetch.bind(window), N = String.fromCharCode(0), enc = new TextEncoder(), gates = {};
+    window.__suggest = 0; window.__pxApprovals = [];
+    const J = o => Promise.resolve(new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } }));
+    const F = (t, o) => N + t + ":" + JSON.stringify(o) + N, st = (i, l, s, d) => F("STEP", { id: i, l: l, s: s, d: d || "" });
+    const plan = [[0, N + "STATUS:Connecting to vps" + N], [150, st("conn", "Connected to vps", "done", "Linux vps x86_64")],
+      [250, st("cmd1", "Clean up old files", "run", "irreversible · 3 steps")], [350, st("cmd1_1", "ls /srv", "done", "exit 0")],
+      [450, st("cmd1_2", "rm -rf /srv/old", "wait", "Waiting for you")], [500, F("APPROVE", { jid: "d1", cmd: "rm -rf /srv/old", risk: "danger" })], ["gate", "d1"],
+      [200, st("cmd1_2", "rm -rf /srv/old", "done", "exit 0")], [300, st("cmd1_3", "df -h /srv", "done", "exit 0")],
+      [350, st("cmd1", "Clean up old files", "done", "3 of 3 ran")], [450, "Stand-in run complete."]];
+    const chat = () => { let c; const body = new ReadableStream({ start(x) { c = x; } });
+      (async () => { let b = performance.now(); for (const [at, s] of plan) { if (at === "gate") { await new Promise(r => { gates[s] = r; }); b = performance.now(); continue; }
+        const w = b + at - performance.now(); if (w > 0) await new Promise(r => setTimeout(r, w)); c.enqueue(enc.encode(s)); } setTimeout(() => c.close(), 100); })();
+      return new Response(body, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Models": "stand-in", "X-Web-Search": "0" } }); };
+    let dn = 0; const WORDS = "Remind me to call the plumber".split(" ");
+    window.fetch = (u, o) => { const p = String(u && u.url || u).split("?")[0];
+      if (/\/api\/suggest/.test(p)) { window.__suggest++; return J({ on: false, chips: [], refreshing: false }); }
+      if (p.endsWith("/api/chat") && window.__pxPlan === "danger") return Promise.resolve(chat());
+      if (p.endsWith("/api/remote/approve") && window.__pxPlan === "danger") { const d = JSON.parse(o.body); window.__pxApprovals.push(d); const g = gates[d.jid]; if (g) { delete gates[d.jid]; setTimeout(g, 10); } return J({ ok: !!g }); }
+      if (p.endsWith("/api/voice/status")) return J({ supported: true, ready: true, pct: 100 });
+      if (p.endsWith("/api/voice/prepare")) return J({ ok: true });
+      if (p.endsWith("/api/dictate/warm")) return J({ ok: true, engine: "stand-in" });
+      if (p.endsWith("/api/dictate/start")) { dn = 0; return J({ ok: true, sid: "s1", engine: "stand-in", partials: true }); }
+      if (p.endsWith("/api/dictate/audio")) { dn = Math.min(WORDS.length * 3, dn + 1); return J({ ok: true, partial: WORDS.slice(0, Math.ceil(dn / 3)).join(" "), secs: dn * .2 }); }
+      if (p.endsWith("/api/dictate/end")) return J({ ok: true, text: WORDS.join(" ") + ".", engine: "stand-in" });
+      if (p.endsWith("/api/dictate/cancel")) return J({ ok: true });
+      return prev(u, o); };
+    const gum = () => { const ac = new (window.AudioContext || window.webkitAudioContext)(), os = ac.createOscillator(), g = ac.createGain(), lfo = ac.createOscillator(), lg = ac.createGain();
+      os.frequency.value = 220; g.gain.value = .3; lfo.frequency.value = 2.3; lg.gain.value = .28; lfo.connect(lg); lg.connect(g.gain); os.connect(g);
+      const d = ac.createMediaStreamDestination(); g.connect(d); os.start(); lfo.start(); try { ac.resume(); } catch (e) {} return Promise.resolve(d.stream); };
+    try { Object.defineProperty(MediaDevices.prototype, "getUserMedia", { value: gum, configurable: true, writable: true }); } catch (e) {}
+  }
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");}catch(e){}
+    (${stub.toString()})({});(${extra.toString()})();`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: W <= 400 ? 844 : 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (x, ms) => { for (let i = 0; i < (ms || 15000) / 100; i++) { if (await ev(x)) return true; await sleep(100); } return false; };
+  const press = async (k, code, vk, mods) => { await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: k, code: code, windowsVirtualKeyCode: vk, modifiers: mods || 0 });
+    await send("Input.dispatchKeyEvent", { type: "keyUp", key: k, code: code, windowsVirtualKeyCode: vk, modifiers: mods || 0 }); };
+  const click = async sel => { const p = await ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e)return null;const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,h=document.elementFromPoint(x,y);return {x,y,hit:!!h&&(h===e||e.contains(h))};})()`);
+    if (!p) return { hit: false, none: true };
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", clickCount: 1 }); return p; };
+  const AE = `(()=>{const a=document.activeElement;return a?(a.id?"#"+a.id:a.tagName.toLowerCase()+"."+String(a.className).split(" ")[0])+"|"+(a.textContent||"").trim().slice(0,16):null;})()`;
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#input")&&typeof switchLane==="function"&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await sleep(1500);
+  out.suggest = await ev(`window.__suggest`);
+  // ---- Settings, by the gear (the header's in Horizon; the sidebar's on a phone)
+  await ev(`(()=>{switchLane("ai");if(typeof setAgent==="function")setAgent("");return 1;})()`); await sleep(400);
+  out.gearId = await ev(`["#hz-settings","#settings-btn","#sidebar .sideset"].find(s=>{const e=document.querySelector(s);if(!e)return false;const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&getComputedStyle(e).visibility!=="hidden";})||""`);
+  out.gear = out.gearId ? await click(out.gearId) : null;
+  if (!out.gear || !out.gear.hit) { await ev(`(()=>{const b=document.querySelector(${JSON.stringify("#hz-settings")});if(b)b.focus();openAbout();return 1;})()`); }
+  await sleep(60);
+  out.open = await ev(`(()=>{const v=document.querySelector("#about-veil"),c=v.querySelector("#about-card");return {veil:getComputedStyle(v).animationName,card:getComputedStyle(c).animationName};})()`);
+  await sleep(450);
+  out.set = await ev(`(()=>{const v=document.querySelector("#about-veil"),c=v.querySelector("#about-card"),cs=getComputedStyle(c),r=c.getBoundingClientRect(),rail=v.querySelector("#set-rail").getBoundingClientRect(),
+      row=v.querySelector(".snav.on"),rr=row.getBoundingClientRect(),lab=v.querySelector(".sx-slab"),ls=getComputedStyle(lab);
+    const leaves=[...c.querySelectorAll("*")].filter(e=>[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())&&e.getClientRects().length&&getComputedStyle(e).display!=="none");
+    return {w:Math.round(r.width),h:Math.round(r.height),bg:cs.backgroundColor,radius:cs.borderTopLeftRadius,veil:getComputedStyle(v).backgroundColor,rail:Math.round(rail.width),railDir:getComputedStyle(v.querySelector("#set-rail")).flexDirection,
+      rowH:Math.round(rr.height),rowBg:getComputedStyle(row).backgroundColor,lab:[lab.textContent,ls.fontSize,ls.fontWeight,ls.textTransform,getComputedStyle(lab).display],
+      mono:leaves.filter(e=>/mono/i.test(getComputedStyle(e).fontFamily.split(",")[0])).map(e=>e.textContent.trim().slice(0,16)),
+      caps:leaves.filter(e=>getComputedStyle(e).textTransform==="uppercase"&&getComputedStyle(e).display!=="none").map(e=>e.textContent.trim().slice(0,16)),
+      sw:[document.documentElement.scrollWidth,innerWidth],focus:${AE}};})()`);
+  await press("ArrowDown", "ArrowDown", 40); await sleep(150);
+  out.arrow = [await ev(AE), await ev(`document.querySelector("#about-veil .spane.on").id`)];
+  out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
+  await press("Escape", "Escape", 27); await sleep(40);
+  out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
+  await sleep(320);
+  out.closed = [await ev(`document.querySelector("#about-veil").hasAttribute("hidden")`), await ev(AE)];
+  if (MODE === "full") {
+    // ---- the palette: a Code chat says Code; the return arrow is a character
+    await ev(`(()=>{chats.unshift({id:"px-code-1",lane:"code",title:"Fix the nginx config",ts:Date.now(),messages:[]});palOpen();return 1;})()`); await sleep(200);
+    out.pal = await ev(`({first:[...document.querySelectorAll("#palette .pitem")].slice(0,1).map(e=>[e.querySelector(".pk").textContent,e.querySelector(".pt").textContent])[0],foot:document.querySelector("#palette .pfoot").textContent.replace(/\\s+/g," ").trim()})`);
+    await ev(`palClose()`); await ev(`(()=>{chats=chats.filter(c=>c.id!=="px-code-1");return 1;})()`);
+    // ---- dictation: the level runs while listening; the send key is not the ember
+    await ev(`document.querySelector("#input").focus()`); out.mic = await click("#mic"); await sleep(1600);
+    out.dict = await ev(`(()=>{const m=document.querySelector("#mic"),cv=m.querySelector("canvas.sx-lvl");let ink=0;if(cv){const d=cv.getContext("2d").getImageData(0,0,cv.width,cv.height).data;for(let i=3;i<d.length;i+=4)ink+=d[i]>0?1:0;}
+      return {rec:m.classList.contains("rec"),cv:!!cv,ink,w:Math.round(m.getBoundingClientRect().width),send:getComputedStyle(document.querySelector("#send")).backgroundColor,val:document.querySelector("#input").value};})()`);
+    await click("#mic"); await sleep(800); await ev(`(()=>{const i=document.querySelector("#input");i.value="";i.dispatchEvent(new Event("input",{bubbles:true}));return 1;})()`);
+    // ---- the Code lane: the host chip, its sheet, a danger command's own card
+    await ev(`(()=>{switchLane("code");setAgent("Remote");return 1;})()`); await sleep(500);
+    out.chip = await ev(`(()=>{const b=document.querySelector("#sx-host");return {shown:!b.hidden&&getComputedStyle(b).display!=="none",text:b.textContent,ph:document.querySelector("#input").placeholder,
+      line:(document.querySelector("#hero #sx-lanehome")||{}).textContent||"",side:!!document.querySelector("#sidebar #remote-bar")&&getComputedStyle(document.querySelector("#remote-bar")).display};})()`);
+    out.chipHit = await click("#sx-host"); await sleep(300);
+    out.sheet = await ev(`(()=>({open:!document.querySelector("#sx-host-veil").hidden,fields:["#rm-host","#rm-user","#rm-port","#rm-key","#rm-jump","#rm-save","#rm-test","#rm-forget"].filter(s=>document.querySelector("#sx-host-sheet "+s)).length,focus:document.activeElement.id}))()`);
+    await press("Escape", "Escape", 27); await sleep(200);
+    out.sheetShut = await ev(`({hidden:document.querySelector("#sx-host-veil").hidden,home:!!document.querySelector("#code-wrap #remote-bar"),focus:document.activeElement.id})`);
+    await ev(`(()=>{window.__pxPlan="danger";const i=document.querySelector("#input");i.focus();i.value="Clean up old files";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+    await until(`!!document.querySelector(".apcard.hz-ap:not(.decided)")`, 10000);
+    out.danger = await ev(`(()=>{const c=document.querySelector(".apcard.hz-ap:not(.decided)"),cs=getComputedStyle(c),k=c.querySelector(".apbtn.ok"),li=c.closest("li");
+      return {cls:c.className,border:cs.borderTopColor,under:li&&li.previousElementSibling?li.previousElementSibling.dataset.id:null,inSub:!!c.closest(".hz-subruns"),okBg:getComputedStyle(k).backgroundColor,cmd:(c.querySelector(".apcmd")||{}).textContent};})()`);
+    out.dHit = await click(".apcard.hz-ap:not(.decided) .apbtn.ok");
+    await until(`!generating`, 10000); await sleep(300);
+    out.dDone = await ev(`({approvals:window.__pxApprovals,runs:[...document.querySelectorAll(".msg.ai.hz-coderun li.hz-run")].map(l=>l.dataset.id+"|"+l.className.replace("hz-run ",""))})`);
+    await ev(`(()=>{window.__pxPlan="";const n=document.querySelector("#newchat");if(n)n.click();return 1;})()`); await sleep(400);
+    // ---- Funnels: the goal form is the lane's home; the stage hairline; the answer's cue
+    await ev(`(()=>{switchLane("funnel");return 1;})()`); await sleep(500);
+    out.fnHome = await ev(`(()=>{const f=document.querySelector("#funnel-wrap");return {parent:f.parentNode.id,shown:getComputedStyle(f).display!=="none",composer:getComputedStyle(document.querySelector("#composer")).display,
+      go:(()=>{const b=document.querySelector("#fn-go"),r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!h&&(h===b||b.contains(h));})(),
+      label:getComputedStyle(f.querySelector(".fq")).fontFamily.split(",")[0].replace(/["']/g,""),caps:getComputedStyle(f.querySelector(".fq")).textTransform};})()`);
+    await ev(`(()=>{document.querySelector("#fn-goal").value="What to cook for six";document.querySelector("#fn-go").click();return 1;})()`);
+    await until(`document.querySelectorAll(".hz-stage.cur .fopt:not(:disabled)").length>=3`, 8000);
+    out.fn1 = await ev(`(()=>{const f=document.querySelector("#funnel-wrap");return {parent:f.parentNode.id,shown:getComputedStyle(f).display!=="none",composer:getComputedStyle(document.querySelector("#composer")).display,ph:document.querySelector("#input").placeholder};})()`);
+    await click(".hz-stage.cur .fopt"); await until(`document.querySelectorAll(".hz-stage.done").length>=1&&document.querySelectorAll(".hz-stage.cur .fopt:not(:disabled)").length>=3`, 8000); await sleep(700);
+    out.fn2 = await ev(`(()=>{const t=document.querySelector(".hz-fn>.ftrail");return {bar:getComputedStyle(t,"::after").backgroundImage,who:getComputedStyle(document.querySelector(".hz-fn>.who")).display};})()`);
+  }
+  await ev(`(()=>{switchLane("ai");if(typeof setAgent==="function")setAgent("");return 1;})()`);
+  out.errs = out.errs.concat(await ev(`(window.__errs||[]).filter(e=>!/ResizeObserver loop/.test(e)).concat((window.__errs||[]).filter(e=>/ResizeObserver loop/.test(e)).length?["ResizeObserver loop"]:[])`) || []);
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _px_live(width, mode="full", mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="px625-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_PX_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, "balanced",
+            os.path.join(d_, "mut.json") if mutation else "", str(width), mode]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=130)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _px_set_ok(r, phone=False):
+    s_, o_, c_ = r.get("set") or {}, r.get("open") or {}, r.get("closing") or {}
+    return (not r.get("err") and not r.get("errs") and r.get("suggest") == 0
+            and o_.get("veil") == "sxFade" and o_.get("card") == "sxRise"
+            and s_.get("bg") == "rgb(20, 20, 22)" and s_.get("veil") == "rgba(0, 0, 0, 0.55)"
+            and (s_.get("w") == (s_.get("sw") or [0, 0])[1] and s_.get("radius") == "0px" and s_.get("railDir") == "row" if phone
+                 else s_.get("w") == 672 and s_.get("h") == 640 and s_.get("radius") == "14px" and s_.get("rail") == 184 and s_.get("railDir") == "column"
+                 and s_.get("lab") == ["Settings", "11px", "600", "uppercase", "block"] and s_.get("caps") == ["Settings"])
+            and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
+            and (s_.get("focus") or "").startswith("button.snav|About")
+            and r.get("arrow") == [r.get("arrow", [""])[0], "p-account"] and (r.get("arrow") or [""])[0].startswith("button.snav|Account")
+            and r.get("tabs") == [True] * 5
+            and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
+            and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
+            and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
+def _px_full_ok(r):
+    p_, d_, ch_, sh_, dg_, dd_ = r.get("pal") or {}, r.get("dict") or {}, r.get("chip") or {}, r.get("sheet") or {}, r.get("danger") or {}, r.get("dDone") or {}
+    f0, f1, f2 = r.get("fnHome") or {}, r.get("fn1") or {}, r.get("fn2") or {}
+    return (_px_set_ok(r)
+            and p_.get("first") == ["Code", "Fix the nginx config"] and "↩ open" in (p_.get("foot") or "") and "\\u21a9" not in (p_.get("foot") or "")
+            and d_.get("rec") is True and d_.get("cv") is True and (d_.get("ink") or 0) > 20 and (d_.get("w") or 0) >= 80 and d_.get("send") == "rgba(0, 0, 0, 0)"
+            and ch_.get("shown") is True and ch_.get("text") == "Connect a server" and ch_.get("ph") == "What should happen on the server?"
+            and ch_.get("line") == "Run tasks on your server over SSH. You choose what waits for your OK." and ch_.get("side") == "none"
+            and (r.get("chipHit") or {}).get("hit") is True and sh_.get("open") is True and sh_.get("fields") == 8 and sh_.get("focus") == "rm-host"
+            and r.get("sheetShut") == {"hidden": True, "home": True, "focus": "sx-host"}
+            and "danger" in (dg_.get("cls") or "") and dg_.get("border") == "rgba(232, 65, 90, 0.6)" and dg_.get("under") == "cmd1_2" and dg_.get("inSub") is True
+            and dg_.get("okBg") == "rgba(0, 0, 0, 0)" and dg_.get("cmd") == "rm -rf /srv/old" and (r.get("dHit") or {}).get("hit") is True
+            and dd_.get("approvals") == [{"jid": "d1", "ok": True}] and "cmd1|done batch" in (dd_.get("runs") or [])
+            and f0.get("parent") == "sx-fnhome" and f0.get("shown") is True and f0.get("composer") == "none" and f0.get("go") is True
+            and f0.get("label") == "Inter" and f0.get("caps") == "none"
+            and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
+            and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
+_px_w = _px_live(1440); _px_p = _px_live(390, "settings")
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+      _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
+_px_mw = [
+    ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
+    ("Settings not wired (no fade out, no focus on the rail)", [["function sxBoot(){\n  sxSetWire();", "function sxBoot(){\n  "]]),
+    ("a Code chat called Chat", [['return l==="code"?"code":l==="funnel"?"funnel":"chat";', 'return "chat";']]),
+    ("no level while dictating", [['  if(typeof dictMeter==="function")dictMeter(e.inputBuffer.getChannelData(0));   // the live level (6b625)\n', ""]]),
+    ("the goal form left in the sidebar", [['const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="funnel"&&!!$("#hero");', "const on=false;"]]),
+    ("no host chip", [["b.hidden=!on;if(!on)return;", "b.hidden=true;return;"]]),
+]
+_px_mr = []
+for d_, m_ in _px_mw:
+    r_ = _px_live(1440, "full", m_)
+    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "errs", "mutated")}))
+check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
+      all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
+# ==== 6b625 the polish: end ====
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:

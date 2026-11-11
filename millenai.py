@@ -54976,7 +54976,7 @@ html:not(.hz) #sx-build{display:none}
 .hz #code-wrap .agent .ico{display:inline-flex;align-items:center;justify-content:center;width:16px;font-size:0}
 .hz #code-wrap .agent.on .ico svg{color:var(--sx-ink)}
 .hz #code-wrap #remote-bar{display:none!important}   /* the connection lives in the host sheet (Horizon) */
-#sx-host{display:none}
+html:not(.hz) #sx-host{display:none}
 .hz #sx-host:not([hidden]){display:inline-flex;align-items:center;gap:6px;order:5;margin-left:auto;height:36px;max-width:200px;padding:0 10px;box-sizing:border-box;
   border-radius:8px;border:var(--sx-hl) solid var(--hz-hair-2);background:transparent;color:var(--hz-ink-2);font:450 13px/1 var(--hz-font-ui);cursor:pointer;
   transition:background .15s var(--sx-e),color .15s var(--sx-e)}
@@ -54991,40 +54991,40 @@ html:not(.hz) #sx-build{display:none}
 .hz.hz-sx-code #composer.hastext #send:not(:disabled):not(.stop):hover{background:#fff;color:#141416}
 .hz:not(.hz-kb) #sx-host:focus-visible{outline:0}
 .hz.hz-kb #sx-host:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
-#sx-host-veil{position:fixed;inset:0;z-index:62;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);animation:sxFade .18s cubic-bezier(.2,.7,.2,1) both}
-#sx-host-veil[hidden]{display:none}
-#sx-host-sheet{position:relative;width:min(480px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;padding:24px;border-radius:14px;
+.hz #sx-host-veil{position:fixed;inset:0;z-index:62;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);animation:sxFade .18s cubic-bezier(.2,.7,.2,1) both}
+.hz #sx-host-veil[hidden]{display:none}
+.hz #sx-host-sheet{position:relative;width:min(480px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;padding:24px;border-radius:14px;
   background:#141416;border:var(--chat-hw,1px) solid rgba(255,255,255,.1);color:rgba(255,255,255,.78);font:450 13px/1.4 var(--hz-font-ui);
   animation:sxRise .2s cubic-bezier(.2,.7,.2,1) both;-webkit-font-smoothing:antialiased}
-#sx-host-sheet h2{margin:0 0 4px;font:600 15px/24px var(--hz-font-ui);color:#f4f5fa}
-#sx-host-sheet .sx-sub{margin:0 0 16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55)}
-#sx-host-sheet .sx-x{position:absolute;top:12px;right:12px;width:28px;height:28px;border:0;border-radius:8px;background:none;color:rgba(255,255,255,.55);
+.hz #sx-host-sheet h2{margin:0 0 4px;font:600 15px/24px var(--hz-font-ui);color:#f4f5fa}
+.hz #sx-host-sheet .sx-sub{margin:0 0 16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55)}
+.hz #sx-host-sheet .sx-x{position:absolute;top:12px;right:12px;width:28px;height:28px;border:0;border-radius:8px;background:none;color:rgba(255,255,255,.55);
   display:flex;align-items:center;justify-content:center;cursor:pointer}
-#sx-host-sheet .sx-x:hover{background:#1f1f22;color:#f4f5fa}
-#sx-host-sheet #remote-bar{display:flex!important;flex-direction:column;gap:8px;padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none}
-#sx-host-sheet #remote-bar .set-h{margin:8px 0 0;font:500 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:rgba(255,255,255,.6)}
-#sx-host-sheet #remote-bar .set-h:first-child{margin-top:0}
-#sx-host-sheet #autonomy-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;border-radius:8px;background:#1a1a1d;border:var(--chat-hw,1px) solid rgba(255,255,255,.08)}
-#sx-host-sheet .autoseg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:0;padding:8px 10px;border:0;border-radius:6px;background:none;box-shadow:none;
+.hz #sx-host-sheet .sx-x:hover{background:#1f1f22;color:#f4f5fa}
+.hz #sx-host-sheet #remote-bar{display:flex!important;flex-direction:column;gap:8px;padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none}
+.hz #sx-host-sheet #remote-bar .set-h{margin:8px 0 0;font:500 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:rgba(255,255,255,.6)}
+.hz #sx-host-sheet #remote-bar .set-h:first-child{margin-top:0}
+.hz #sx-host-sheet #autonomy-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;border-radius:8px;background:#1a1a1d;border:var(--chat-hw,1px) solid rgba(255,255,255,.08)}
+.hz #sx-host-sheet .autoseg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:0;padding:8px 10px;border:0;border-radius:6px;background:none;box-shadow:none;
   color:rgba(255,255,255,.7);text-align:left;cursor:pointer;font:450 12px/16px var(--hz-font-ui)}
-#sx-host-sheet .autoseg .ai{display:inline-flex;font-size:0;margin:0 0 2px}
-#sx-host-sheet .autoseg .ai svg{width:14px;height:14px;stroke-width:1.5}
-#sx-host-sheet .autoseg b{font:500 13px/18px var(--hz-font-ui);color:#f4f5fa}
-#sx-host-sheet .autoseg .ad{font:450 11px/15px var(--hz-font-ui);color:rgba(255,255,255,.55)}
-#sx-host-sheet .autoseg.on{background:#2a2a2f;border:0;box-shadow:none}
-#sx-host-sheet .autoseg:hover{color:#f4f5fa}
-#sx-host-sheet #remote-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 64px;gap:8px}
-#sx-host-sheet #remote-bar input{height:32px;width:100%;box-sizing:border-box;padding:0 10px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.14);background:#0e0e10;
+.hz #sx-host-sheet .autoseg .ai{display:inline-flex;font-size:0;margin:0 0 2px}
+.hz #sx-host-sheet .autoseg .ai svg{width:14px;height:14px;stroke-width:1.5}
+.hz #sx-host-sheet .autoseg b{font:500 13px/18px var(--hz-font-ui);color:#f4f5fa}
+.hz #sx-host-sheet .autoseg .ad{font:450 11px/15px var(--hz-font-ui);color:rgba(255,255,255,.55)}
+.hz #sx-host-sheet .autoseg.on{background:#2a2a2f;border:0;box-shadow:none}
+.hz #sx-host-sheet .autoseg:hover{color:#f4f5fa}
+.hz #sx-host-sheet #remote-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 64px;gap:8px}
+.hz #sx-host-sheet #remote-bar input{height:32px;width:100%;box-sizing:border-box;padding:0 10px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.14);background:#0e0e10;
   color:#f4f5fa;font:450 13px/1 var(--hz-font-mono);box-shadow:none}
-#sx-host-sheet #remote-bar input::placeholder{color:rgba(255,255,255,.4);font-family:var(--hz-font-ui)}
-#sx-host-sheet #remote-bar input:focus{outline:1px solid var(--hz-ember);outline-offset:-1px;border-color:rgba(255,255,255,.14)}
-#sx-host-sheet #remote-foot{display:flex;gap:8px;margin-top:8px}
-#sx-host-sheet .about-btn{width:auto;height:28px;padding:0 12px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);background:#1a1a1d;box-shadow:none;
+.hz #sx-host-sheet #remote-bar input::placeholder{color:rgba(255,255,255,.4);font-family:var(--hz-font-ui)}
+.hz #sx-host-sheet #remote-bar input:focus{outline:1px solid var(--hz-ember);outline-offset:-1px;border-color:rgba(255,255,255,.14)}
+.hz #sx-host-sheet #remote-foot{display:flex;gap:8px;margin-top:8px}
+.hz #sx-host-sheet .about-btn{width:auto;height:28px;padding:0 12px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);background:#1a1a1d;box-shadow:none;
   color:#f4f5fa;font:500 12px/1 var(--hz-font-ui);cursor:pointer}
-#sx-host-sheet .about-btn:hover{background:#222226}
-#sx-host-sheet .about-btn[hidden]{display:none}
-#sx-host-sheet #rm-note{min-height:16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55);overflow-wrap:anywhere}
-@media (prefers-reduced-motion:reduce){#sx-host-veil,#sx-host-sheet{animation:none}}
+.hz #sx-host-sheet .about-btn:hover{background:#222226}
+.hz #sx-host-sheet .about-btn[hidden]{display:none}
+.hz #sx-host-sheet #rm-note{min-height:16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55);overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){.hz #sx-host-veil,.hz #sx-host-sheet{animation:none}}
 /* the keys: no light blue anywhere; danger is an ember outline, its own card per command */
 .hz .apbtn.ok{background:transparent;color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.34)}
 .hz .apcard .aprisk.read{color:var(--hz-ink-2);background:rgba(255,255,255,.06)}
@@ -55035,13 +55035,13 @@ html:not(.hz) #sx-build{display:none}
 .hz .msg .apcard.hz-ap.danger:not(.decided) .apbtn.ok:hover{background:rgba(232,65,90,.08);border-color:var(--hz-ember)}
 .hz .hz-subruns>.hz-apli{margin:4px 0 2px}
 /* the lane's home line: what the lane does, under the greeting */
-#sx-lanehome{display:none}
+html:not(.hz) #sx-lanehome{display:none}
 .hz #hero #sx-lanehome:not([hidden]){display:block;margin:12px auto 0;max-width:560px;text-align:center;font:450 15px/22px var(--hz-font-ui);color:var(--sx-meta);
   animation:sxFade .4s var(--sx-e) both}
 @media (prefers-reduced-motion:reduce){.hz #hero #sx-lanehome{animation:none}}
 /* ---- FUNNELS: the goal form is the lane's home, in the main column; the trail's stage hairline ---------------------- */
 .hz #sx-fnhome{display:none}
-.hz #sx-fnhome.on{display:block;width:min(640px,100%);margin:0 auto;box-sizing:border-box}
+.hz #sx-fnhome.on{display:block;flex:none;width:min(640px,calc(100% - 48px));margin:0 auto 44px;box-sizing:border-box}
 .hz.hz-sx-fn #composer,.hz.hz-sx-fn #hz-cglow{display:none!important}
 .hz #sx-fnhome #funnel-wrap{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 12px;padding:20px;border-radius:14px;
   background:#141416;border:var(--sx-hl) solid rgba(255,255,255,.1);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
@@ -55611,6 +55611,8 @@ __CODE_ROWS__
             title="Close (Esc)">&#10005;</button>
   </div>
 
+  <!-- the Funnels lane's home (6b625): the goal form moves here, in place of the composer, on the home only -->
+  <div id="sx-fnhome"></div>
   <div id="composer-wrap">
     <!-- back to the newest line: shown only while an answer streams and the
          reader has scrolled up out of it (6b425) -->
@@ -55625,8 +55627,6 @@ __CODE_ROWS__
     <div id="bm-busy" hidden></div>
     <!-- Horizon (6b526): the glow under the glass, placed by hzGlowFit -->
     <div id="hz-cglow" hidden></div>
-    <!-- the Funnels lane's home (6b625): the goal form moves here, where the composer sits -->
-    <div id="sx-fnhome"></div>
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
@@ -57736,7 +57736,7 @@ $$("#code-wrap .agent").forEach(el=>
 function showAgentPop(el,name){
   const m=(typeof AGENT_META!=="undefined"&&AGENT_META[name])||null;
   if(!m)return;
-  tierPop.innerHTML="<b>"+m.icon+" "+esc(name)+"</b>"
+  tierPop.innerHTML="<b>"+(isHz()?"":m.icon+" ")+esc(name)+"</b>"   // Horizon: no colour emoji (6b625)
     +'<div class="mline">'+esc(m.desc)+'</div>'
     +(m.picks&&m.picks.length
       ?'<span class="note">runs: '+esc(m.picks.join(", "))+'</span>':"");
@@ -70136,6 +70136,7 @@ function hzBalanceFor(H,compH){
 function hzBalance(){
   const w=$("#composer-wrap"),c=$("#composer");if(!w||!c)return;
   if(!$("#hero")||!document.documentElement.classList.contains("hz")){w.style.paddingBottom="";return;}
+  if(document.documentElement.classList.contains("hz-sx-fn")){if(w.style.paddingBottom!=="0px")w.style.paddingBottom="0px";return;}   // Funnels' home: the form holds the place (6b625)
   const pb=hzBalanceFor(innerHeight,c.getBoundingClientRect().height);
   if(w.style.paddingBottom!==pb+"px")w.style.paddingBottom=pb+"px";
 }
@@ -71405,7 +71406,7 @@ var SX_PR=(typeof Intl!=="undefined"&&Intl.PluralRules)?new Intl.PluralRules("en
 function sxPl(n,one,many){n=+n||0;const k=SX_PR?SX_PR.select(n):(n===1?"one":"other");return k==="one"?one:(many||one+"s");}
 // ---- SETTINGS: the demo's dialog ----------------------------------------------------------------------------------
 var sxSetPrev=null;
-function sxSetFocusables(){const c=$("#about-card");if(!c)return [];
+function sxSetFocusables(){const c=$("#about-veil #about-card");if(!c)return [];   // #about-card is also the update and new-model dialogs' id: scoped
   return [...c.querySelectorAll('button,a[href],input,select,textarea,[tabindex]')].filter(x=>x.tabIndex>=0&&!x.disabled&&x.offsetParent!==null&&!x.closest("[hidden]"));}
 function sxSetWire(){
   const v=$("#about-veil");if(!v||v._sx)return;v._sx=true;
@@ -71424,7 +71425,9 @@ function sxSetWire(){
   v.addEventListener("keydown",e=>{
     if(!sxHz()||want)return;
     if(e.key==="Tab"){const f=sxSetFocusables();if(!f.length)return;const i=f.indexOf(document.activeElement);
-      if(e.shiftKey&&i<=0){e.preventDefault();f[f.length-1].focus();}else if(!e.shiftKey&&(i===f.length-1||i<0)){e.preventDefault();f[0].focus();}return;}
+      if(e.shiftKey&&i<=0){e.preventDefault();f[f.length-1].focus();return;}
+      if(!e.shiftKey&&(i===f.length-1||i<0)){e.preventDefault();f[0].focus();return;}
+      const sh=e.shiftKey;setTimeout(()=>{const c=$("#about-veil #about-card");if(want||!c||c.contains(document.activeElement))return;const g=sxSetFocusables(),t=sh?g[g.length-1]:g[0];if(t)t.focus();},0);return;}
     const r=e.target&&e.target.closest&&e.target.closest("#set-nav .snav");
     if(r&&/^Arrow(Up|Down|Left|Right)$/.test(e.key)){e.preventDefault();
       const rs=[...v.querySelectorAll("#set-nav .snav")].filter(x=>x.offsetParent!==null),i=rs.indexOf(r),fw=/Down|Right/.test(e.key);
@@ -71493,7 +71496,7 @@ function sxPhWire(){
 }
 function sxPhPaint(){const i=$("#input");if(!i)return;const cur=i.getAttribute("placeholder")||"";if(SX_PHS.has(cur)||!cur)i.placeholder="Ask anything";}
 var SX_LANE={Coding:"Write, fix and explain code with a model on your machines.",Workspace:"Work inside a project folder on this computer.",
-  Remote:"Run tasks on your server over SSH. Every change waits for your OK."};
+  Remote:"Run tasks on your server over SSH. You choose what waits for your OK."};
 function sxLaneLine(){
   const h=$("#hero");if(!h)return;let p=h.querySelector("#sx-lanehome");
   const txt=sxHz()&&uiMode==="code"?SX_LANE[typeof agent!=="undefined"&&SX_LANE[agent]?agent:"Coding"]:"";
@@ -71539,7 +71542,9 @@ function sxFnHome(){
   const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="funnel"&&!!$("#hero");
   if(on&&f.parentNode!==home){f._sxHome=f._sxHome||{p:f.parentNode,n:f.nextSibling};home.appendChild(f);}
   else if(!on&&f.parentNode===home&&f._sxHome){f._sxHome.p.insertBefore(f,f._sxHome.n&&f._sxHome.n.parentNode===f._sxHome.p?f._sxHome.n:null);}
+  if(home.classList.contains("on")===on&&root.classList.contains("hz-sx-fn")===on)return;
   home.classList.toggle("on",on);root.classList.toggle("hz-sx-fn",on);
+  if(typeof hzBalance==="function")try{hzBalance();}catch(e){}   // the balance set now, not from inside a resize callback
 }
 // stage N of M as a thin silver hairline under the trail of choices
 function sxFnProg(box,p){
@@ -71551,6 +71556,7 @@ function sxLanePaint(){
   if(!document.body)return;
   sxIconsPaint();sxPhPaint();sxLaneLine();sxHostPaint();sxFnHome();
   document.documentElement.classList.toggle("hz-sx-code",sxHz()&&typeof uiMode!=="undefined"&&uiMode==="code");
+  if(sxHz()&&typeof hzGlowFit==="function")try{hzGlowFit();}catch(e){}   // the balance and the glow set now, so no resize callback has to change them
 }
 // deferred a tick, as modeShow's own repaint is: a hook can run during boot, before the chat's state is declared
 function sxLaneSoon(){setTimeout(()=>{try{sxLanePaint();}catch(e){}},0);}
