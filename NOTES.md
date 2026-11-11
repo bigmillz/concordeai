@@ -22403,6 +22403,10 @@ saved its fall back, and loadServers took an unreadable list as an empty one. Th
 (setTier quiet, no prefSet) and an unreadable list decides nothing (pinned; 6b337's node check re-pinned: with an agent
 the fall back paints and saves nothing).
 
+**beta-4-polish's Servers pane (9051f4b, merged before the full run).** One card per server (Awake, Asleep or Can't
+reach, said once), Wake only when asleep, "Use for answers", the rest under Advanced; its copy approved by Patrick as
+written. The rest of 6b625's Settings copy (the sections, "How much the sky moves.") is still waiting on him.
+
 **Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
