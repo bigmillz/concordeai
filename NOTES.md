@@ -21895,7 +21895,10 @@ cut, a refusal rescued with no error shown, nothing answering in one plain line,
 repaired, the update check offline); the page over the DevTools protocol on that copy (the key across two chats, the
 cut line live and reopened, Download again, the loading line, the silence line, the update line) with eight mutants
 served in place of the page; and four mutated copies of the app (the end mark not checked, the old order that never
-rescued, the raw exception, damaged weights never noticed). Re-pinned at the same strength: 6b519's "the send
+rescued, the raw exception, damaged weights never noticed). The stand-in exits when the copy that started it does,
+and the block stops any left. The trimmed run (prelude and this block on 9991-9993) passed 33/33 three times; the
+neighbouring blocks (6b590, 6b624, 6b522, 6b625, 6b620) gave the same results on this branch as on f969040 run the
+same way (6b590 and 6b624 each have one case that fails trimmed on both). Re-pinned at the same strength: 6b519's "the send
 button's first press stops it cleanly" (the key's handler is `robStopHere()?(rubinStop()||abortCtl.abort())`, and
 robStopHere's own rule is pinned beside it). Four in-process checks that lift `stream_ollama` / `stream_openai_compat`
 into their own namespaces (6b314's giant on Ollama, 6b325's usage ledger, 6b522's paths, 6b533's Muse) get

@@ -48628,6 +48628,21 @@ class H(BaseHTTPRequestHandler):
         self.wfile.flush()
 
 
+def _orphan_watch(parent=os.getppid()):
+    # the app that started it is gone (its copy stopped): so is the stand-in, never an orphan on a port
+    while True:
+        time.sleep(0.5)
+        if os.getppid() != parent:
+            os._exit(0)
+
+
+import threading
+threading.Thread(target=_orphan_watch, daemon=True).start()
+try:
+    with open(os.path.join(HERE, "stub.pids"), "a") as f:
+        f.write("%d\n" % os.getpid())
+except OSError:
+    pass
 ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
 '''
 def _r627_free():
@@ -48868,10 +48883,16 @@ ch.stderr.on("data", async d => {
     }
     if (G.has("load")) {   // a cold engine: the live line says it's loading and how long it takes here
       mode({ default: "die", words: 4 });
-      await fresh(); await ask("Hi?"); await idle(); await sleep(500);
+      await fresh(); await ask("Figs?"); await idle(); await sleep(1500);
       mode({ default: "ok", words: 10, first: 6 });
-      await fresh(); await ask("Hello?"); await started(); await sleep(3000);
-      S.load = { during: await ev(`(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),l=d&&d.querySelector(".liveline em");return l?l.textContent:null;})()`) };
+      await fresh(); await ask("Plums?"); await started();
+      S.load = { during: null, seen: [] };
+      for (let i = 0; i < 30; i++) {   // the line as it reads over the first 6 s (a step can land a beat after the send)
+        const t = await ev(`(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),l=d&&d.querySelector(".liveline em");return l?l.textContent:null;})()`);
+        if (t && S.load.seen[S.load.seen.length - 1] !== t) S.load.seen.push(t);
+        if (t && /^Loading /.test(t)) { S.load.during = t; break; }
+        await sleep(200);
+      }
       await idle(); await sleep(400);
     }
     if (G.has("quiet")) {   // words, then a long silence: counted under them, gone when words come again
@@ -48991,6 +49012,16 @@ for _i, (_d, _sc, _a, _bm) in enumerate(_R627_SM):
         _M.stop()
 check("6b627 live: %d mutated copies of the app, each caught by the scene it breaks" % len(_R627_SM),
       all(x_[1] is False for x_ in _c627sm), "%r" % _c627sm)
+# no stand-in engine outlives its copy (each exits when its parent does; any left is stopped here)
+time.sleep(1.2)
+try:
+    for _p in set(open(os.path.join(_r627_dir, "stub.pids")).read().split()):
+        try:
+            os.kill(int(_p), signal.SIGTERM)
+        except (OSError, ValueError):
+            pass
+except OSError:
+    pass
 # ==== 6b627 robust: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
