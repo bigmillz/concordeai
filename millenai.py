@@ -57785,6 +57785,20 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
 .hz-ghost{text-shadow:none;color:#e6e7eb}
 .hz #chat-list .chat-item .ct{transition:opacity .12s cubic-bezier(.2,.7,.2,1)}
 /* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): end ==== */
+/* ==== THE DEMO'S LOOK (6b631): begin ====
+   Per Patrick, the web demo beside the app: "the web version that we made looks so much better" (near-black sky, the
+   aurora centred above the greeting, a graphite composer) against the app's navy wash and "rain" of vertical streaks.
+   The GPU sky was already the demo's; what made the app blue and streaky were the layers over it, which the demo does
+   not have or keeps to Full: the ice rays (#hz-aurw) drew at every level (the demo's are Full's alone, and blurred, see
+   hzDrawAuroraLayer), the wash's four blue-violet blooms (now the demo's two silver ones, hzDrawWash), a second
+   moonlight in CSS (the shader draws the Moon's light), a wide blue glow under the composer (#hz-cglow; the demo: "no
+   wide glow anywhere") and a navy ground under the canvas (it shows wherever the canvas is not drawn: the fallback
+   without WebGL, the first frames). The composer's corners and Ultra's silver edge are untouched (pinned by 6b631). */
+.hz #hz-sky{background:radial-gradient(120% 90% at 72% 0%,#0c0c0f 0%,#0a0a0c 50%,#030305 100%)}
+.hz:not(.hz-full) #hz-aurw{display:none}
+.hz #hz-moonglow,.hz #hz-cglow{display:none}
+.hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,3,5,.5) 70%)}
+/* ==== THE DEMO'S LOOK (6b631): end ==== */
 </style>
 </head>
 <body>
@@ -71825,6 +71839,9 @@ function hzFxBal(){return hzFxLevel()==="balanced";}     // Balanced's living to
 const HZ_MOODS={night:[[6,6,8],[62,63,78],[232,234,240],[.64,1.45,0]],dawn:[[10,8,9],[201,140,128],[255,226,184],[.62,1.32,0]],
   day:[[9,10,12],[150,178,206],[255,247,236],[.66,1.28,0]],dusk:[[10,8,9],[214,150,84],[255,212,194],[.62,1.32,0]]};
 const HZ_MOOD_AT=[[5.5,"night","dawn"],[7.5,"dawn","day"],[17.5,"day","dusk"],[19.5,"dusk","night"]];
+// how far the footage's cool cast folds to grey by the hour (6b631): .9 through the night (19:30 to 5:30), .3 in
+// the day, eased across dawn and dusk (two hours each) so it never steps
+function hzBlueLim(h){const n=h<5.5||h>=19.5?1:h<7.5?1-(h-5.5)/2:h<17.5?0:(h-17.5)/2,e=n*n*(3-2*n);return .3+.6*e;}
 function hzMoodAt(h){
   const n=k=>HZ_MOODS[k].map((r,i)=>i<3?r.map(v=>v/255):r.slice());
   for(const [b,a,c] of HZ_MOOD_AT)if(Math.abs(h-b)<=1/6){const u=(h-b)*3+.5,t=u*u*(3-2*u),A=n(a),C=n(c);return A.map((r,i)=>r.map((v,k)=>v+(C[i][k]-v)*t));}
@@ -71906,7 +71923,7 @@ function hzSkyBoot(){
     +"vec3 lit=min(c*hi,p.rgb*decay+vec3(atk));"
     +"gl_FragColor=vec4(max(lit,p.rgb*decay-1.5/255.),max(e,p.a*edecay-2./255.));}";
   const SHOW=HEAD+"uniform sampler2D vid,trail,bl1,bl2,stk,aur,hold,stars;uniform vec2 px,res,mpos,ctw,cam,mup;uniform vec4 mrect,mw0,mw1,marr;"
-    +"uniform float mon,time,boost,expo,moon,mrad,dscale,foot,rise,calm,fw,tw,twist,arc,starB,glint,wa,ww,vg,hiT,hmix,lim,starsOn,dbl;uniform vec3 gS,gM,gH,gx,skyTop,skyMid,skyLow,wv;"
+    +"uniform float mon,time,boost,expo,moon,mrad,dscale,foot,rise,calm,fw,tw,twist,arc,starB,glint,wa,ww,vg,hiT,hmix,lim,starsOn,dbl,blim;uniform vec3 gS,gM,gH,gx,skyTop,skyMid,skyLow,wv;"
     // the edge tint at Ultra: ice to violet only
     +"vec3 spec(float t){t=fract(t)*4.;vec3 a=vec3(.86,.91,1.),b=vec3(.56,.72,1.),c=vec3(.65,.55,1.),d=vec3(.78,.8,1.);"
     +"if(t<1.)return mix(a,b,t);if(t<2.)return mix(b,c,t-1.);if(t<3.)return mix(c,d,t-2.);return mix(d,a,t-3.);}"
@@ -71955,6 +71972,10 @@ function hzSkyBoot(){
     +"vec3 earth=(base*wf*fw+(gradeL(tc.rgb*.42+g1*.9+g2*1.1+vec3(.55,.7,1.)*sk*.45)*boost*wl+gH*tc.a*.1*wl)*(1.-calm))*ef;"
     +"earth=mix(earth,.45+(earth-.45)/(1.+(earth-.45)*2.5),step(.45,earth));"
     +"earth.b-=max(earth.b-.5*(earth.r+earth.g),0.)*dbl;"   // less blue (6b621, per Patrick: "awfully blue"): the footage's blue excess cut, more at rest than at Ultra
+    // NEVER NAVY (6b631, per Patrick: "less blue ... night leans neutral ink/silver"): the footage's cool cast (blue or
+    // teal over red: the sea clips under a night sky read as a navy wash) folds toward its own grey by blim (hzBlueLim)
+    +"float le=dot(earth,vec3(.2126,.7152,.0722)),cw=clamp((max(earth.g,earth.b)-earth.r)/(le+.01),0.,1.);earth=mix(earth,vec3(le),blim*cw);"
+
     +"vec3 col=screen(screen(screen(sky*(1.-gx.z*wf*fw*ef),earth),moonL),texture2D(aur,uv).rgb);"
     +"if(wr>.001){vec3 wc=mix(vec3(.98,.99,1.),mix(vec3(.56,.72,1.),vec3(.65,.55,1.),uv.x),smoothstep(.2*ww,1.4*ww,abs(dw)));col=screen(col,wc*wr*.6);}"
     +"if(vg>.001){vec2 e=(uv-.5)*2.;float ed=smoothstep(.78,1.,max(abs(e.x),abs(e.y)));col=screen(col,spec(atan(e.y,e.x)*.159+time*.03)*ed*vg);}"
@@ -72366,7 +72387,7 @@ function hzSkyBoot(){
     gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);gl.uniform1f(pS.U.rise,hzS.clip?hzS.clip.rise:.56);gl.uniform1f(pS.U.hiT,hzS.clip?hzS.clip.hi:.36);
     gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);gl.uniform1f(pS.U.hmix,hmix);gl.uniform1f(pS.U.lim,feedOn&&!warm?1:0);
     matrixUniforms(nowT,dt);
-    const hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255);
+    const hr=hzHourNow(),G=hzKeyed(HZ_GRADE,hr),SK=hzKeyed(HZ_SKYCOL,hr).map(v=>v/255);gl.uniform1f(pS.U.blim,hzBlueLim(hr));
     gl.uniform3f(pS.U.skyTop,SK[1],SK[2],SK[3]);gl.uniform3f(pS.U.skyMid,SK[4],SK[5],SK[6]);gl.uniform3f(pS.U.skyLow,SK[7],SK[8],SK[9]);
     gl.uniform1f(pS.U.boost,S.boost);gl.uniform1f(pS.U.calm,calm);gl.uniform1f(pS.U.fw,fw);gl.uniform1f(pS.U.tw,tw);gl.uniform1f(pS.U.twist,twistNow);gl.uniform1f(pS.U.arc,arcNow);
     gl.uniform1f(pS.U.starB,starB);gl.uniform1f(pS.U.glint,ultraE*(1+1.6*flareNow));gl.uniform1f(pS.U.dbl,.65-.3*(lift()?ultraE:0));
@@ -72608,7 +72629,11 @@ function hzDrawAuroraLayer(cv,o){
   if(o.glow){const g=x.createLinearGradient(0,0,W,0);
     g.addColorStop(0,c(0));g.addColorStop(.28,c(.2*gain));g.addColorStop(.55,c(.26*gain));g.addColorStop(1,c(0));
     x.fillStyle=g;x.fillRect(0,0,W,H);}
+  // SOFT, NOT RAIN (6b631, per Patrick: the demo's look): the rays are blurred once as they are drawn (about 5 px on
+  // screen, the demo's filter:blur(5px), at no cost per frame), so they read as a curtain's folds, never as streaks
+  x.filter="blur(1.25px)";
   for(const t of tiles){x.fillStyle=x.createPattern(t,"repeat-x");x.fillRect(0,0,W,H);}
+  x.filter="none";
   x.globalCompositeOperation="destination-in";
   const ph=o.phase||0,env=x.createLinearGradient(0,0,W,0);
   for(let i=0;i<=24;i++){const u=i/24,a=0.45+0.55*(0.5+0.5*Math.sin(u*6.283*1.6+ph)*Math.cos(u*6.283*0.7+ph*0.6));
@@ -72620,11 +72645,11 @@ function hzDrawAuroraLayer(cv,o){
   x.globalCompositeOperation="source-over";
 }
 function hzDrawAuroras(){
-  const r=hzS.rnd,k=0.9+r()*0.25,gain=0.85+r()*0.3,fr=0.8+r()*0.4,ph=r()*6.283,ph2=r()*6.283;
+  const r=hzS.rnd,k=0.9+r()*0.25,gain=(0.85+r()*0.3)*.8,fr=(0.8+r()*0.4)*.8,ph=r()*6.283,ph2=r()*6.283;   // a fifth softer (6b631: the demo's measured strength)
   const w1=$("#hz-aur1 canvas"),w2=$("#hz-aur2 canvas"),f1=$("#hz-aur1f");
-  if(w1)hzDrawAuroraLayer(w1,{w:1800,h:640,rgb:"168,198,255",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
-  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"186,176,255",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});   // the fringe soft violet, not mint (6b552)
-  if(w2)hzDrawAuroraLayer(w2,{w:1800,h:600,rgb:"186,208,255",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
+  if(w1)hzDrawAuroraLayer(w1,{w:1800,h:640,rgb:"178,198,238",k:k,gain:gain,glow:true,phase:ph,mask:[[0,0],[.42,.3],[.84,1],[1,0]]});
+  if(f1)hzDrawAuroraLayer(f1,{w:1800,h:640,rgb:"190,184,236",k:k,gain:fr*0.7,phase:ph,mask:[[0,0],[.62,0],[.88,1],[1,0]]});   // the fringe soft violet, not mint (6b552)
+  if(w2)hzDrawAuroraLayer(w2,{w:1800,h:600,rgb:"198,210,238",k:k*0.45,gain:gain*0.55,phase:ph2,mask:[[0,0],[.1,0],[.6,.5],[.9,1],[1,0]]});
 }
 // the wash flowers on arriving home (the intro has its own moment)
 function hzWashBloom(){
@@ -72640,9 +72665,9 @@ function hzDrawWash(){
   const bloom=(cx,cy,rx,ry,col,a)=>{x.save();x.translate(cx*W,cy*H);x.scale(rx*W,ry*H);
     const g=x.createRadialGradient(0,0,0,0,0,1);g.addColorStop(0,"rgba("+col+","+a+")");g.addColorStop(.72,"rgba("+col+",0)");g.addColorStop(1,"rgba("+col+",0)");
     x.fillStyle=g;x.beginPath();x.arc(0,0,1,0,7);x.fill();x.restore();};
-  // blue-violet only (6b552): the rose, amber and teal blooms became violet, ice and blue at the same strength
-  bloom(.24,.40,.42,.36,"98,96,255",.6);bloom(.72,.30,.38,.32,"150,118,255",.4);
-  bloom(.50,.64,.40,.30,"150,186,255",.44);bloom(.88,.58,.34,.30,"86,140,255",.34);
+  // silver, over black (6b631, per Patrick: "the web version ... looks so much better"; the demo's #wash): two neutral
+  // blooms, upper right and under the greeting; the four blue-violet ones (6b552) tinted the whole sky navy
+  bloom(.72,.30,.38,.32,"210,216,232",.3);bloom(.50,.64,.40,.30,"222,224,232",.3);
 }
 // ---- TRACED IN LIGHT (the reference's tracer): the same letters are drawn
 // into a mask; sparks leave the top of each outline and run both ways round

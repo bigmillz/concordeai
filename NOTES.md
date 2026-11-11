@@ -22299,3 +22299,60 @@ click wins. "Test relay" is treated the same way (the coordinator's default, not
 
 **Verified.** GAUNTLET_LINE
 
+
+## 6b631 — beta-4-look: the home looks like the web demo, near-black, no rain, no navy wash (7.0 beta 4, per Patrick)
+
+**Why.** Patrick, comparing the web demo with the app's page in the C++ preview: "the web version that we made looks
+so much better, but still not perfect"; "get the look right for our next C++ build". The demo: a near-black sky, the
+aurora centred above the greeting and level with a soft lower edge, stars above the box, a flat graphite composer.
+The app: a navy wash (worst low on the screen), vertical streaks like rain across most of the width, a bluer box.
+And on the app at Ultra: "I love these corners. They're so sexy." (the composer's 14 px corners, the silver lit edge
+and the sparkle stars just outside it): kept exactly, and now pinned.
+
+**What it was.** The GPU sky (the SHOW and AUR shaders, the hour's sky colours and moods) was already the demo's,
+line for line (both read `neon` .1 at Balanced). The difference was the layers over it, found by hiding them one at a
+time and measuring: the ice-ray canvases (`#hz-aurw`) drew at every level (the demo's `#aurora` is Full's alone,
+`html:not(.full) #aurora{display:none}`), unblurred (the demo's layers carry `filter:blur(5px)`); the wash's four
+blue-violet blooms (the demo's `#wash` is two silver ones); a second moonlight in CSS (`#hz-moonglow`; the shader
+draws the Moon's light, the demo has no CSS one); a wide blue glow under the composer (`#hz-cglow`, `0 24px 70px
+rgba(80,130,255,.22)`; the demo: "no wide glow anywhere"); a navy ground under the canvas (`#0b1636`, showing wherever
+the canvas is not drawn: no WebGL, the first frames). And the footage: at night the app also plays its sea clips
+(dolphins, a whale, kelp; their rise covers the whole height), whose blue kept 64 % of its colour through the night
+grade, a navy wash over everything in WebKit (headless Chromium cannot decode the HEVC city and space clips, so it
+mostly showed the H.264 sea clips).
+
+**What changed.** One CSS block at the end of the style (`THE DEMO'S LOOK (6b631)`): the ground the demo's
+(`#0c0c0f` to `#030305`), the rays Full's alone, no CSS moonlight, no glow under the composer, the conversation's
+composer band neutral. `hzDrawAuroraLayer` blurs the rays once as it draws them (`x.filter="blur(1.25px)"` in the
+quarter-size canvas, 5 px on screen: the demo's softness at no cost per frame); `hzDrawAuroras` draws them a fifth
+softer and silver-ice (`178,198,238`, the fringe `190,184,236`, the second `198,210,238`). `hzDrawWash` draws the
+demo's two silver blooms. The SHOW shader folds the footage's cool cast toward its own grey by `blim`
+(`hzBlueLim`: .9 at night, .3 by day, eased over two hours at dawn and dusk), on the footage alone, before it meets
+the sky. Ultra keeps everything of 6b621 (the twist, the stars, the births, the shower, the matrix, the edge); its
+rays are the same softer ones. No copy changed.
+
+**Measured** (the band between the greeting and the composer, the middle 80 %: luminance 0-255, blue excess
+B-(R+G)/2, streak = the column means' ripple against a 41 px moving average; the demo `beta/orig.html` at the same
+hour, `?aur=.5` and the app's `?hz=aur=.5` pinning the curtain). Real WKWebView, 1440, 2 am, a night city clip:
+Balanced 19.3 / 8.0 / 2.07 before, 4.9 / 1.9 / 0.44 after (the demo 5.7 / 1.7 / 0.21); Full 32.0 / 12.8 / 3.65 before,
+22.3 / 5.8 / 3.30 after (the demo 19.4 / 5.9 / 2.26); Ultra at rest, Full, 43.9 / 17.2 before, 31.2 / 8.1 after (the
+demo 27.2 / 8.8; the demo's numbers from headless Chromium, where its H.264 footage plays). A sea clip (14, dolphins), Balanced: 27.9 / 17.0, saturation .48 before; 11.6 / 3.0, .23 after.
+The same at 760. Headless Chromium agrees. The working views (a landed answer, Code, Funnels) were already neutral
+(the reading surface 13 / 2.0 before and after, the margins 17 / 2.0). The composer: `#151517` at rest, its Ultra
+fill unchanged (the demo's own Ultra fill is bluer still).
+
+Frame times in WebKit (Full, 60 Hz): p95 19 ms at home, through the Ultra arrival, at rest and streaming.
+
+**Gauntlet** (`# ==== 6b631 the demo's look`): the served page's rules (five mutants); `hzBlueLim` in node and the
+shader's use of it (four mutants); live in headless Chromium on the copy's page (2 am, no footage, the curtain
+pinned): the band behind the greeting near-black, neutral and unstreaked, Full's ray canvas soft (its alpha ripple
+.1, unblurred .25), with the rays, the moonlight, the glow and the blur served back it fails (15.3 / 4.2 / 1.8);
+THE CORNERS AND THE EDGE: the radius 14 px at rest and at Ultra, the lit ring 1.5 px at 15 px, a luminous silver
+hairline along the top at Ultra (luminance about 220, chroma about 45) and the corner pixel dark against the arc
+(30 against 152); a 3 px corner (250 against 81) and an unlit edge (92) both fail; the rules pinned to the letter.
+6b552's colour check re-pinned for two wash blooms, its two colour mutants following the new strings. A trimmed copy (the prelude, this block, and 6b542's sky and gating, 6b552, 6b553's seam, 6b555's sky and the
+horizon checks) on 9975-9977: 38/38.
+
+**Left.** The C++ preview could not be run here (it talks to the real server); its WKWebView should match the
+harness's. Pat's screenshot of it looked bluer than any page this build draws, so it may have been an older page.
+The sea clips still play at night (now grey-blue, not navy); taking them out of the night rotation is Patrick's call.

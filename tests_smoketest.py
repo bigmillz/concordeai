@@ -45062,7 +45062,7 @@ def _sl549_aurora(js):
     fr = re.search(r'vec3 c=mix\(vec3\(([^)]*)\),vec3\(([^)]*)\),smoothstep\(0\.,\.3,d\)\);c=mix\(c,pal\(', js)   # (6b621) the demo's order: the edge-to-tip pair, then the palette's touch
     cur = re.findall(r'hzDrawAuroraLayer\(\w+,\{w:\d+,h:\d+,rgb:"(\d+),(\d+),(\d+)"', js)
     wash = re.findall(r'bloom\([.\d]+,[.\d]+,[.\d]+,[.\d]+,"(\d+),(\d+),(\d+)",', js)
-    if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 4:
+    if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 2:   # 6b631: the demo's two silver blooms (were four blue-violet)
         return False
     cols = [tuple(float(v) for v in g_.split(",")) for g_ in [x_ for p_ in pals for x_ in p_] + [fr.group(1), fr.group(2)]]
     cols += [tuple(int(v) / 255 for v in c_) for c_ in cur + wash]
@@ -45179,8 +45179,8 @@ check("6b552 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       and not _sl549(_hz_css, _hz_js.replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)"), page)
       and not _sl549(_hz_css, _hz_js.replace(_jsfn(_hz_js, "async function hzTraceIn(el,opts){"), _jsfn(_hz_js, "async function hzTraceIn(el,opts){").replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)")), page)   # the greeting's trace alone back to rose
       and not _sl549(_hz_css, _hz_js.replace("vec3 c=mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d));", "vec3 c=mix(vec3(.5,.94,.84),vec3(.7,.6,1.),smoothstep(0.,.3,d));"), page)   # a mint lower edge (6b555: the preview's blue edge)
-      and not _sl549(_hz_css, _hz_js.replace('rgb:"186,176,255",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
-      and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"150,118,255",.4);', 'bloom(.72,.30,.38,.32,"255,118,178",.4);'), page)
+      and not _sl549(_hz_css, _hz_js.replace('rgb:"190,184,236",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
+      and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"210,216,232",.3);', 'bloom(.72,.30,.38,.32,"255,118,178",.3);'), page)
       # THE KNOB STAYS THE KNOB (6b553, per Patrick: "one star that sits there spinning just looks tacky"): the star back in the
       # markup, the knob folded away at Ultra, a morphing knob (a star clip), a spinning knob, a script morphing it, a wide halo, a violet halo
       and not _sl549(_hz_css, _hz_js.replace('<i class="hz-sl-core"></i></span>', '<i class="hz-sl-core"></i><svg class="hz-sl-star" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0 -10L3 -3L10 0L3 3L0 10L-3 3L-10 0L-3 -3Z"/></svg></span>'), page)
@@ -50751,6 +50751,218 @@ _T620.stop()
 _t620_stub.shutdown()
 _t620_ss.shutdown()
 # ==== 6b620 trust (live): end ====
+
+# ==== 6b631 the demo's look: begin ====
+print("== the demo's look (6b631): near-black, no rain of rays, no navy wash; the composer's corners and Ultra's edge pinned ==")
+# THE DEMO'S LOOK (6b631, per Patrick, the web demo beside the app: "the web version that we made looks so much
+# better"; on the app at Ultra: "I love these corners. They're so sexy."). The GPU sky was the demo's already; the blue
+# and the streaks were the layers over it. Pinned four ways, each with mutants the same predicate catches:
+# (1) the served page: the ice rays are Full's alone, the CSS moonlight and the wide blue glow under the composer gone,
+# the ground under the canvas near-black, the wash the demo's two silver blooms, the rays blurred once as drawn;
+# (2) pure (node): the footage's cool cast folds to grey by the hour (hzBlueLim: .9 at night, .3 by day, eased), and
+# the shader applies it to the footage alone, every frame; (3) live, headless Chromium on the copy's own page (no
+# footage, the aurora pinned to the centre, 2 am): the sky behind and below the greeting at Balanced is near-black,
+# neutral and unstreaked (its pixels, from a screenshot, decoded in node), the ray canvas in Full is soft (its alpha
+# ripple across the width); (4) THE CORNERS AND THE EDGE: the composer's radius 14 px at rest and at Ultra, and at
+# Ultra a luminous silver hairline on its top edge with the corner's outside dark (the arc, not a square), its rules
+# kept to the letter. Mutants are served in place of the page.
+_L631_CSS = [".hz #hz-sky{background:radial-gradient(120% 90% at 72% 0%,#0c0c0f 0%,#0a0a0c 50%,#030305 100%)}",
+             ".hz:not(.hz-full) #hz-aurw{display:none}",
+             ".hz #hz-moonglow,.hz #hz-cglow{display:none}"]
+def _l631_static(pg):
+    wash = re.findall(r'bloom\([.\d]+,[.\d]+,[.\d]+,[.\d]+,"(\d+),(\d+),(\d+)",([.\d]+)\)', _jsfn(pg, "function hzDrawWash(){"))
+    lay = _jsfn(pg, "function hzDrawAuroraLayer(cv,o){")
+    return (all(r_ in pg for r_ in _L631_CSS)
+            and pg.index(_L631_CSS[0]) > pg.index(".hz #hz-sky{display:block;position:fixed;inset:0;")      # later, so it wins
+            and len(wash) == 2 and all(max(int(c) for c in w[:3]) - min(int(c) for c in w[:3]) <= 24 and float(w[3]) <= .3 for w in wash)   # silver, faint
+            and 'x.filter="blur(1.25px)";\n  for(const t of tiles){x.fillStyle=x.createPattern(t,"repeat-x");x.fillRect(0,0,W,H);}\n  x.filter="none";' in lay)
+check("6b631 the served page: the ice rays are Full's alone, no CSS moonlight, no wide glow under the composer, a near-black ground under the sky, the wash the demo's two silver blooms, the rays blurred once as drawn; five mutants caught",
+      _l631_static(page)
+      and not _l631_static(page.replace(".hz:not(.hz-full) #hz-aurw{display:none}", ""))
+      and not _l631_static(page.replace(".hz #hz-moonglow,.hz #hz-cglow{display:none}", ".hz #hz-moonglow{display:none}"))
+      and not _l631_static(page.replace("#0c0c0f 0%,#0a0a0c 50%,#030305 100%)}", "#0b1636 0%,#050913 55%,#03040a 100%)}"))
+      and not _l631_static(page.replace('bloom(.50,.64,.40,.30,"222,224,232",.3);', 'bloom(.50,.64,.40,.30,"150,186,255",.44);'))
+      and not _l631_static(page.replace('x.filter="blur(1.25px)";', "")), "")
+# (2) the footage's cool cast, by the hour (pure), and the shader's use of it
+def _l631_blue(pg):
+    try:
+        return _node_json(_jsfn(pg, "function hzBlueLim(h){") + r'''
+const hs=[];for(let h=0;h<24;h+=.25)hs.push(+hzBlueLim(h).toFixed(4));
+process.stdout.write(JSON.stringify({n2:hzBlueLim(2),n23:hzBlueLim(23),d12:hzBlueLim(12),dawn:hzBlueLim(6.5),dusk:hzBlueLim(18.5),hs}));''', "l631blue.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _l631_blue_ok(o, pg):
+    hs = o.get("hs") or []
+    steps = [abs(b - a) for a, b in zip(hs, hs[1:])]
+    return (abs(o.get("n2", 0) - .9) < 1e-9 and abs(o.get("n23", 0) - .9) < 1e-9 and abs(o.get("d12", 0) - .3) < 1e-9
+            and .3 < o.get("dawn", 0) < .9 and .3 < o.get("dusk", 0) < .9 and len(hs) == 96 and max(steps) <= .12   # eased, never a step
+            and '+"float le=dot(earth,vec3(.2126,.7152,.0722)),cw=clamp((max(earth.g,earth.b)-earth.r)/(le+.01),0.,1.);earth=mix(earth,vec3(le),blim*cw);"' in pg
+            and pg.index("earth=mix(earth,vec3(le),blim*cw);") < pg.index('"vec3 col=screen(screen(screen(sky*(1.-gx.z*wf*fw*ef),earth),moonL)')   # on the footage, before it meets the sky
+            and "gl.uniform1f(pS.U.blim,hzBlueLim(hr));" in pg and "hiT,hmix,lim,starsOn,blim;" in pg)
+_l631_bo = _l631_blue(page)
+_l631_bm = [(d_, _l631_blue_ok(_l631_blue(page.replace(a_, b_, 1)), page.replace(a_, b_, 1)) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("no fold by day either", "return .3+.6*e;}", "return .6*e;}"),
+    ("a step at dawn", "h<7.5?1-(h-5.5)/2:", "h<7.5?0:"),
+    ("the shader never told", "gl.uniform1f(pS.U.blim,hzBlueLim(hr));", ""),
+    ("the fold gone from the shader", "earth=mix(earth,vec3(le),blim*cw);", "")]]
+check("6b631 never navy: the footage's cool cast folds toward its own grey by the hour (.9 at night, .3 by day, eased across dawn and dusk), applied to the footage alone in the sky's shader every frame; four mutants caught",
+      _l631_blue_ok(_l631_bo, page) and all(r_ is False for _, r_ in _l631_bm), "%r" % ([_l631_bo.get("err"), {k: _l631_bo.get(k) for k in ("n2", "d12", "dawn", "dusk")}] + _l631_bm,))
+# (3) and (4) live: the copy's own page in headless Chromium over the DevTools protocol
+_L631_PAGE = r'''// 6b631: the home's sky and the composer's corners and edge, measured in headless Chromium (DevTools protocol, node's own WebSocket)
+// argv: <chromium> <base> <cookie name> <key> <token> [mutation.json: [[from, to], ...] applied to the page]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os"), zlib = require("zlib");
+const [exe, base, ckName, key, tok, mutf] = process.argv.slice(2);
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-631-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { S: {}, errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 170000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// a PNG (8-bit RGB or RGBA, not interlaced: what the screenshot gives) to its pixels
+function png(b64) {
+  const b = Buffer.from(b64, "base64"); let p = 8, W = 0, H = 0, ct = 0; const idat = [];
+  while (p < b.length) { const n = b.readUInt32BE(p), t = b.toString("ascii", p + 4, p + 8), d = b.subarray(p + 8, p + 8 + n);
+    if (t === "IHDR") { W = d.readUInt32BE(0); H = d.readUInt32BE(4); ct = d[9]; } else if (t === "IDAT") idat.push(d); p += 12 + n; }
+  const raw = zlib.inflateSync(Buffer.concat(idat)), bpp = ct === 6 ? 4 : 3, st = W * bpp, px = Buffer.alloc(H * st);
+  for (let y = 0; y < H; y++) { const f = raw[y * (st + 1)], src = raw.subarray(y * (st + 1) + 1, (y + 1) * (st + 1));
+    for (let x = 0; x < st; x++) { const a = x >= bpp ? px[y * st + x - bpp] : 0, u = y ? px[(y - 1) * st + x] : 0, c = x >= bpp && y ? px[(y - 1) * st + x - bpp] : 0;
+      let v = src[x]; if (f === 1) v += a; else if (f === 2) v += u; else if (f === 3) v += (a + u) >> 1;
+      else if (f === 4) { const q = a + u - c, pa = Math.abs(q - a), pb = Math.abs(q - u), pc = Math.abs(q - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? u : c; }
+      px[y * st + x] = v & 255; } }
+  return { W, H, at: (x, y) => [px[y * st + x * bpp], px[y * st + x * bpp + 1], px[y * st + x * bpp + 2]] };
+}
+const lum = c => .2126 * c[0] + .7152 * c[1] + .0722 * c[2];
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/*", resourceType: "Document", requestStage: "Response" }] });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); if (r && r.exceptionDetails) out.errs.push("eval: " + JSON.stringify(r.exceptionDetails).slice(0, 240)); return r && r.result ? r.result.value : undefined; };
+  await send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  const open = async fx => {
+    await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+      try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");}catch(e){}` });
+    let ready = false;
+    for (let tries = 0; tries < 2 && !ready; tries++) { await send("Page.navigate", { url: base + "/?hz=time=2026-11-11T02:00:00,aur=.5,media=0" });
+      for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#input")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro&&!!hzS.sky`); } }
+    if (!ready) out.errs.push("page not ready (" + fx + ")");
+    await sleep(4500); return ready;
+  };
+  const R = s => ev(`(()=>{const e=document.querySelector(${JSON.stringify(s)});if(!e)return null;const r=e.getBoundingClientRect();return r.width?[r.left,r.top,r.right,r.bottom]:null;})()`);
+  const shot = async (x, y, w, h) => { const r = await send("Page.captureScreenshot", { format: "png", clip: { x, y, width: w, height: h, scale: 1 } }); return png(r.data); };
+  try {
+    // ---- Balanced: the sky behind and below the greeting
+    if (await open("balanced")) {
+      const g = await R("#hero .greet"), c = await R("#composer"), S = out.S.bal = { g, c };
+      S.dom = await ev(`(()=>{const d=s=>{const e=document.querySelector(s);return e?getComputedStyle(e).display:"absent";};
+        return {aurw:d("#hz-aurw"),moon:d("#hz-moonglow"),cglow:d("#hz-cglow"),ground:getComputedStyle(document.querySelector("#hz-sky")).backgroundImage,radius:getComputedStyle(document.querySelector("#composer")).borderTopLeftRadius,sw:document.documentElement.scrollWidth<=innerWidth};})()`);
+      if (g && c) {
+        const x0 = 144, x1 = 1296, y0 = Math.round(g[3] + 30), y1 = Math.round(c[1] - 12), im = await shot(x0, y0, x1 - x0, y1 - y0);
+        const cols = []; let L = 0, B = 0, n = 0;
+        for (let x = 0; x < im.W; x++) { let s = 0; for (let y = 0; y < im.H; y++) { const p = im.at(x, y), l = lum(p); s += l; L += l; B += p[2] - (p[0] + p[1]) / 2; n++; } cols.push(s / im.H); }
+        const sm = cols.map((_, i) => { let s = 0, k = 0; for (let j = Math.max(0, i - 20); j <= Math.min(cols.length - 1, i + 20); j++) { s += cols[j]; k++; } return s / k; });
+        const dv = cols.map((v, i) => v - sm[i]), mu = dv.reduce((a, b) => a + b, 0) / dv.length;
+        S.band = { lum: L / n, blue: B / n, streak: Math.sqrt(dv.reduce((a, b) => a + (b - mu) * (b - mu), 0) / dv.length) };
+        // below the composer: the old wide blue glow sat here
+        const lo = await shot(Math.round(c[0] + 60), Math.round(c[3] + 6), Math.round(c[2] - c[0] - 120), 40); let LB = 0, ln = 0;
+        for (let y = 0; y < lo.H; y++) for (let x = 0; x < lo.W; x++) { const p = lo.at(x, y); LB += p[2] - (p[0] + p[1]) / 2; ln++; }
+        S.under = { blue: LB / ln };
+      }
+    }
+    // ---- Full: the rays are back, soft; then Ultra: the corners and the edge
+    if (await open("full")) {
+      const S = out.S.full = {};
+      S.dom = await ev(`(()=>{const c=document.querySelector("#hz-aur1 canvas"),x=c.getContext("2d"),d=x.getImageData(0,0,c.width,c.height).data,W=c.width,H=c.height;let s=0,a=0;
+        for(const fy of [.6,.75,.9]){const y=Math.floor(H*fy);for(let i=1;i<W;i++){s+=Math.abs(d[(y*W+i)*4+3]-d[(y*W+i-1)*4+3]);a+=d[(y*W+i)*4+3];}}
+        return {aurw:getComputedStyle(document.querySelector("#hz-aurw")).display,ripple:s/a,radius:getComputedStyle(document.querySelector("#composer")).borderTopLeftRadius};})()`);
+      await ev(`hzEffortSet(4)`); await sleep(3500);
+      const c = await R("#composer"); S.c = c;
+      S.ultra = await ev(`(()=>{const c=document.querySelector("#composer"),u=c.querySelector(":scope>.hz-ulit"),r=u&&u.querySelector(":scope>i.r");
+        return {cls:document.documentElement.classList.contains("hz-ultra"),radius:getComputedStyle(c).borderTopLeftRadius,ulit:u?getComputedStyle(u).opacity:null,
+          ring:r?[getComputedStyle(r).borderTopLeftRadius,getComputedStyle(r).paddingTop]:null};})()`);
+      if (c) {
+        const L0 = Math.round(c[0]), T0 = Math.round(c[1]), im = await shot(L0 - 4, T0 - 4, Math.round(c[2] - c[0]) + 8, 40);
+        // the top edge's hairline: the brightest row within 3 px of the box's top, along its straight run
+        let edge = 0, chroma = 0, k = 0;
+        for (let x = 40; x < im.W - 40; x += 2) { let best = null; for (let y = 2; y <= 7; y++) { const p = im.at(x, y); if (!best || lum(p) > lum(best)) best = p; }
+          edge += lum(best); chroma += Math.max(...best) - Math.min(...best); k++; }
+        // the corner: the box's own corner pixel (outside a 14 px arc) against the arc's midpoint (at 45 deg)
+        const cornerPx = im.at(4 + 1, 4 + 1), arc = im.at(4 + Math.round(14 - 14 * Math.SQRT1_2), 4 + Math.round(14 - 14 * Math.SQRT1_2));
+        S.edge = { lum: edge / k, chroma: chroma / k, corner: lum(cornerPx), arc: lum(arc) };
+      }
+    }
+  } catch (e) { out.errs.push("driver: " + String(e && e.stack || e).slice(0, 300)); }
+  done();
+});
+'''
+def _l631_page(mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="l631-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "d.js"), "w").write(_L631_PAGE)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "d.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation)); args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=200)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _l631_sky_ok(r):
+    b_ = (r.get("S") or {}).get("bal") or {}; d_ = b_.get("dom") or {}; n_ = b_.get("band") or {}; f_ = ((r.get("S") or {}).get("full") or {}).get("dom") or {}
+    return (not r.get("err") and not r.get("errs")
+            and d_.get("aurw") == "none" and d_.get("moon") == "none" and d_.get("cglow") == "none" and d_.get("sw") is True
+            and "rgb(12, 12, 15)" in (d_.get("ground") or "") and "rgb(11, 22, 54)" not in (d_.get("ground") or "")
+            and n_.get("lum", 99) < 10 and n_.get("blue", 99) < 3.5 and n_.get("streak", 99) < 1.0          # the demo's: about 5.7, 1.7 and 0.2 (6b631 measured; the old app 19, 8, 2.1)
+            and (b_.get("under") or {}).get("blue", 99) < 3.5                                             # no blue glow under the composer
+            and f_.get("aurw") == "block" and f_.get("ripple", 99) < .15)                                  # Full's rays soft: about .1 (unblurred .25)
+def _l631_corner_ok(r):
+    f_ = (r.get("S") or {}).get("full") or {}; u_ = f_.get("ultra") or {}; e_ = f_.get("edge") or {}
+    return (not r.get("err") and not r.get("errs")
+            and (f_.get("dom") or {}).get("radius") == "14px" and ((r.get("S") or {}).get("bal") or {}).get("dom", {}).get("radius") == "14px"
+            and u_.get("cls") is True and u_.get("radius") == "14px" and u_.get("ulit") == "1" and u_.get("ring") == ["15px", "1.5px"]
+            and e_.get("lum", 0) > 110 and e_.get("chroma", 999) < 90                                     # a luminous silver hairline (ice at most)
+            and e_.get("corner", 999) < .5 * e_.get("arc", 0))                                             # the corner rounds: dark outside the arc
+_L631_EDGE_RULES = [".hz #composer{background:var(--chat-surface);border:var(--chat-hw) solid var(--chat-line);border-radius:14px;",
+    "--hz-r-composer:14px;",
+    ".hz #composer>.hz-ulit>i,.hz #composer>.hz-ulit>b>i{position:absolute;inset:13px;border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;overflow:hidden;",
+    "background:conic-gradient(from var(--hz-a0),#8fb7ff,#c9d8ff 26%,#fff 46%,#b9b0ff 62%,#dce8ff 69%,#fff 71%,#dce8ff 73%,#8fb7ff 84%)}",
+    ".hz #composer>.hz-ulit>b{position:absolute;inset:0;filter:blur(3px);opacity:0;transition:opacity .9s var(--hz-ease-in-out)}",
+    ".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit>b{opacity:.75;transition:opacity .9s var(--hz-ease-out)}",
+    ".hz #composer>.hz-ulit>i.h{opacity:0;filter:drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px rgba(207,224,255,.85));"]
+_l631_live = _l631_page()
+_l631_mrays = _l631_page([[".hz:not(.hz-full) #hz-aurw{display:none}", ""], [".hz #hz-moonglow,.hz #hz-cglow{display:none}", ""], ['x.filter="blur(1.25px)";', ""]])
+_l631_mcorner = _l631_page([["--hz-r-composer:14px", "--hz-r-composer:3px"], ["border-radius:14px;\n  -webkit-backdrop-filter:none;backdrop-filter:none;", "border-radius:3px;\n  -webkit-backdrop-filter:none;backdrop-filter:none;"]])
+_l631_medge = _l631_page([[".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit{opacity:1;", ".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit{opacity:0;"]])
+check("6b631 the home's sky, live (headless Chromium, Balanced, 2 am, no footage): no rays outside Full, no CSS moonlight, no glow under the composer, the ground near-black; behind and below the greeting near-black (luminance under 10), neutral (blue excess under 3.5) and unstreaked (column ripple under 1); Full's rays soft; with the rays, the moonlight, the glow and the blur back (served in place) it fails",
+      _l631_sky_ok(_l631_live) and _l631_live.get("mutated") == 0
+      and _l631_mrays.get("mutated", 0) >= 1 and not _l631_sky_ok(_l631_mrays),
+      json.dumps({"live": _l631_live.get("S"), "errs": _l631_live.get("errs"), "mut": (_l631_mrays.get("S") or {}).get("bal"), "mut_full": ((_l631_mrays.get("S") or {}).get("full") or {}).get("dom"), "merr": _l631_mrays.get("errs")})[:1400])
+check("6b631 THE CORNERS AND THE EDGE (per Patrick: \"I love these corners. They're so sexy.\"): the composer's radius is 14 px at rest and at Ultra; at Ultra its lit edge is on (a 1.5 px ring at 15 px) and draws a luminous silver hairline along its top (luminance over 110, chroma under 90) while the box's corner pixel stays dark (an arc, not a square); its rules kept to the letter; a 3 px corner and an unlit edge (served in place) both fail",
+      _l631_corner_ok(_l631_live) and all(r_ in page for r_ in _L631_EDGE_RULES)
+      and _l631_mcorner.get("mutated", 0) >= 1 and not _l631_corner_ok(_l631_mcorner)
+      and _l631_medge.get("mutated", 0) >= 1 and not _l631_corner_ok(_l631_medge),
+      json.dumps({"live": ((_l631_live.get("S") or {}).get("full") or {}), "corner": ((_l631_mcorner.get("S") or {}).get("full") or {}).get("edge"), "edge": ((_l631_medge.get("S") or {}).get("full") or {}).get("edge"), "errs": [_l631_mcorner.get("errs"), _l631_medge.get("errs")]})[:1400])
+# ==== 6b631 the demo's look: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
