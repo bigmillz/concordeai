@@ -8063,12 +8063,14 @@ check("Windows web search goes through a loopback proxy that refuses strangers",
 import builtins as _bi17, io as _io17, wave as _wv17
 def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
     log = []
+    langs = _voice_langs
     class _WM:
         def __init__(self, repo, device, compute_type):
             self.dev = device
             log.append(("load", repo, device, compute_type))
-        def transcribe(self, audio, beam_size):
+        def transcribe(self, audio, beam_size, language=None):
             log.append(("beam", beam_size))
+            langs.append(language)              # 6b641: always told, never None
             def gen():
                 if self.dev == "cuda" and gpu_breaks:
                     raise RuntimeError("Library cublas64_12.dll is not found")
@@ -8087,12 +8089,14 @@ def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
         return fakes[name] if name in fakes else _bi17.__import__(name, *a, **k)
     ns = {"__builtins__": dict(vars(_bi17), __import__=_imp),
           "IS_MAC": mac, "IS_WIN": not mac, "IS_ARM": False,
-          "threading": __import__("threading")}
+          "threading": __import__("threading"), "re": re, "os": os}
     _exec_names(ns, {"WHISPER_REPO", "WHISPER_REPO_CPU", "_whisper_lock",
+                     "_LANG_RE", "dict_lang_ok", "_system_langs", "_whisper_lang",   # 6b641: whisper told the language
                      "_fw_model", "_fw_cuda", "_whisper_cuda", "_whisper_repo",
                      "_transcribe_wav", "_transcribe_audio", "_wav_to_f32",   # 6b542 split the WAV decode out
                      "_fw_transcribe"})
     return ns, log
+_voice_langs = []
 _wbuf = _io17.BytesIO()
 with _wv17.open(_wbuf, "wb") as _w:
     _w.setnchannels(1); _w.setsampwidth(2); _w.setframerate(16000)
@@ -8127,6 +8131,7 @@ check("voice on a PC: the small model greedy on the CPU, the big one only on a u
                                            ("load", _big, "cpu", "int8"),
                                            ("beam", 1), ("beam", 1)])
       and _mac_ns["_whisper_repo"]() == "mlx-community/whisper-large-v3-turbo"
+      and _voice_langs and all(isinstance(x_, str) and len(x_) == 2 for x_ in _voice_langs)   # 6b641
       and _voice_src.count("_whisper_repo()") == 2
       and "_hf_model_dir(WHISPER_REPO)" not in _MILLENAI_SRC,
       "%r" % _vr)
@@ -27570,9 +27575,10 @@ def _dk_pins(src):
     _p = {}
     _p["mac"] = ('const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);'
                  '\n  if(!mod||e.altKey||e.shiftKey)return;' in src)
-    _p["key"] = "  if(!dictIsD(e.key,e.code))return;\n  const modal=dictModal();" in src
-    _p["prevent"] = ('const a=dictKey({type:"down",repeat:e.repeat,modal,rec:recording},Date.now());\n'
-                     '  if(!modal||a==="stop")e.preventDefault();' in src)
+    # 6b641: the chord is ours everywhere, a dialog included (never the browser's bookmark)
+    _p["key"] = "  if(!dictIsD(e.key,e.code))return;\n  // the chord is ours everywhere" in src
+    _p["prevent"] = ('  e.preventDefault();\n  const modal=dictModal();\n'
+                     '  const a=dictKey({type:"down",repeat:e.repeat,modal,rec:recording},Date.now());\n  dictAct(a);' in src)
     _p["keyup"] = ('const modUp=e.key===(IS_PC?"Control":"Meta");\n'
                    '  if(!modUp&&!dictIsD(e.key,e.code))return;\n'
                    '  dictAct(dictKey({type:"up",mod:modUp},Date.now()));\n},true);' in src)
@@ -27587,7 +27593,7 @@ def _dk_pins(src):
                  '  +" to talk, or tap to keep listening";' in src
                  and 'const DICT_KEY=IS_PC?"Ctrl+D":"\\u2318D";' in src)
     _p["hold_ph"] = '"Listening. Release to finish."' in src
-    _p["toggle_ph"] = '"Listening. Press "+DICT_KEY+" or tap the mic to finish."' in src
+    _p["toggle_ph"] = '"Listening. Pause or press "+DICT_KEY+" to finish."' in src   # 6b641: a toggle ends itself
     _p["slip_ph"] = 'input.placeholder="Didn’t catch that. Try again.";return;}' in src     # the real apostrophe (6b543)
     _p["path"] = ("const cap=micAttach();" in src
                   and 'body:JSON.stringify({stop:true})}).catch(()=>{});   // barge-in' in src
@@ -27603,11 +27609,11 @@ check("dictation hotkey: the handler, the tooltip, the placeholders and the exis
       "are in the source and in the served page",
       all(_DKP.values()) and all(_DKP_PAGE.values()), "%r %r" % (_DKP, _DKP_PAGE))
 _dkp_bad = []
-for _k, _a in [("mac", "e.metaKey&&!e.ctrlKey"), ("key", "if(!dictIsD(e.key,e.code))return;\n  const modal"),
-               ("prevent", 'if(!modal||a==="stop")e.preventDefault();'),
+for _k, _a in [("mac", "e.metaKey&&!e.ctrlKey"), ("key", "if(!dictIsD(e.key,e.code))return;\n  // the chord"),
+               ("prevent", 'e.preventDefault();\n  const modal=dictModal();'),
                ("keyup", '{type:"up",mod:modUp}'), ("blur", "document.hidden"),
                ("modal", '[id$="-veil"]'), ("tip", "Hold \"+DICT_KEY"), ("hold_ph", "Release to finish"),
-               ("toggle_ph", "or tap the mic to finish"), ("slip_ph", "catch that"),
+               ("toggle_ph", "Pause or press"), ("slip_ph", "catch that"),
                ("path", "const cap=micAttach();"), ("btn", "  dictStart();\n});")]:
     if _MILLENAI_SRC.count(_a) < 1:
         _dkp_bad.append("anchor " + _a)
@@ -27964,7 +27970,7 @@ await sec(["listening","trace"],async()=>{
   reset();await dictStart();
   const pre=input.placeholder==="Listening…"&&recording===true;
   feed(0.1);
-  o.listening=pre&&input.placeholder.includes("tap the mic to finish");
+  o.listening=pre&&input.placeholder.includes("Pause or press");
   o.trace=typeof dictT.gum==="number"&&typeof dictT.voice==="number"&&typeof dictT.chunk==="number";
   await stopRec();await dictStart();feed(0.1);          // the warm one is marked as well
   o.trace=o.trace&&dictT.warm===true&&dictT.gum<50&&typeof dictT.chunk==="number";
@@ -28010,7 +28016,7 @@ await sec("prompt",async()=>{
   reset();dictKey({type:"down"},0);const relG=delayedGum();const p=dictStart();await tick();
   dictAway();const tg=dictSt.mode==="toggle";relG();await p;
   let pr=recording&&dictSt.mode==="toggle"&&tg;feed(1);
-  pr=pr&&input.placeholder.includes("tap the mic to finish");
+  pr=pr&&input.placeholder.includes("Pause or press");
   dictAway();await tick();
   o.prompt=pr&&!recording&&ended();
 });
@@ -28056,7 +28062,7 @@ await sec("earlytap",async()=>{
   dictAct(dictKey({type:"up",mod:true},150));
   const tg=dictSt.mode==="toggle"&&!dictPend;
   relV();await p;await tick();feed(1);
-  const on=recording===true&&dictSt.mode==="toggle"&&input.placeholder.includes("tap the mic");
+  const on=recording===true&&dictSt.mode==="toggle"&&input.placeholder.includes("Pause or press");
   dictAct(dictKey({type:"down"},3000));await tick();
   o.earlytap=tg&&on&&!recording&&ended();
 });
@@ -28262,7 +28268,7 @@ check("mic warm pref: an account's choice sits in its own local.json and never r
       _mw_acct())
 _MW_PROF = _prof_sect("profile")
 _mw_mut = [
-    ("class", "local", '"lend", "lend_pick", "studio_opts.*.neg", "mic_warm",\n    "cloud_balance", "comps"))', '"lend", "lend_pick", "studio_opts.*.neg",\n    "cloud_balance", "comps"))'),
+    ("class", "local", '"lend", "lend_pick", "studio_opts.*.neg", "mic_warm",\n    "cloud_balance", "comps", "dict_lang"))', '"lend", "lend_pick", "studio_opts.*.neg",\n    "cloud_balance", "comps", "dict_lang"))'),
     ("bool", "bool", "                k in LOCAL_BOOL and not isinstance(v, bool)) or (", "                False) or ("),
 ]
 _mw_bad = []
@@ -28551,8 +28557,9 @@ check("dictation instant: every mutation of the streaming path breaks the scenar
 # the page: the dimmed partial and the warm-up on focus are served
 check("dictation instant: the served page dims a partial and warms the recognizer when the composer "
       "takes focus",
-      "#input.dictating{opacity:.62}" in page and 'input.addEventListener("focus",dictWarm);' in page
-      and "micCtx.createScriptProcessor(2048,1,1);" in page and 'api("/api/dictate/warm",{method:"POST"})' in page,
+      "#input.dictating{caret-color:transparent}" in page and 'input.addEventListener("focus",dictWarm);' in page   # 6b641: as typed text
+      and "micCtx.createScriptProcessor(2048,1,1);" in page
+      and 'api("/api/dictate/warm?lang="+encodeURIComponent(dictLang()),{method:"POST"})' in page,
       "page pins")
 
 # ---- the session, live, on the fake engine (a partial per chunk; the final is the whole; nothing kept)
@@ -28659,6 +28666,499 @@ check("dictation instant: the helper is found beside millenai.py or in shell/dic
       and "./shell/dictate/build.sh" in open("build_shell_dmg.sh").read()
       and 'codesign "${SIGN[@]}" "$BUNDLE/Contents/Resources/concorde-dictate"' in open("build_shell_dmg.sh").read())   # 6b549: the signing mode's arguments
 # ==== 6b543 dictation instant: end ====
+
+
+# ==== 6b641 dictation polished: begin ====
+print("== dictation polished (6b641) ==")
+# 6b641, per Patrick: he pressed Cmd+D, said "What's up, man?", and the composer got "Hvittar";
+# "the voice responsiveness is sorely lacking... let's make it so much more polished. And like,
+# in C++." What it was: every road the system recognizer could fail on ended in whisper GUESSING
+# the language of a one-second clip (the helper took the region, en_UY, and died at launch; the
+# utterance numbers drifted after an utterance with no audio and every line was dropped; the
+# first segment's "final" ended the wait and lost the rest). Here: the page's new rules run in
+# node on 6b345's stubs (the language rides every call, a toggle ends itself on a pause, the
+# words go at the caret, the C++ shell's native path, Esc and the chord), each with a mutant;
+# the listening state is pinned silver and ice with no rose and no animation, with mutants; the
+# server's helper protocol runs on a stand-in helper (BEGIN frames, a quick death, the language
+# passed, whisper always told the language), with mutants; and, when the helper is built on
+# this Mac, the real recognizer writes a `say` clip's words, in English under a Spanish region.
+_DP_SCEN = r"""
+process.on("unhandledRejection",()=>{});
+const tick=()=>new Promise(r=>realST(r,5));
+let NOW=100000;Date.now=()=>NOW;
+const feedA=(s,amp)=>micProc.onaudioprocess({inputBuffer:{getChannelData:()=>new Float32Array(Math.round(s*16000)).fill(amp||0)}});
+const reset=()=>{
+  micCap=false;micGum=null;dictStarting=false;
+  try{micClose(true);}catch(e){}
+  micCtx=null;micProc=null;micSrc=null;micStream=null;micTimer=null;
+  dictKey({type:"end"},0);recording=false;dictPend=false;recBuf=[];recHeard=false;
+  calls.length=0;bodies.length=0;gumLog.length=0;streams.length=0;timers.length=0;
+  ctxMade=srcMade=resumes=suspends=0;gumImpl=null;resumeImpl=null;apiImpl=null;srcThrow=false;
+  P={};voiceReady=true;voiceChat=false;sent=0;inputs=0;input.placeholder="";input.value="";
+  delete input.selectionStart;delete input.selectionEnd;
+  input.classList.s.clear();micBtn.classList.s.clear();
+  dictSid=null;dictQ=[];dictInflight=null;dictPartial="";dictSecs=0;dictWarmT=0;dictNat=null;
+  delete window.pywebview;
+  for(const k of Object.keys(dictT))delete dictT[k];
+};
+const ended=()=>calls.some(u=>u.includes("dictate/end"));
+const o={};
+const sec=async(names,fn)=>{
+  names=[].concat(names);
+  try{await fn();}catch(e){for(const n of names)o[n]=false;}
+  for(const n of names)if(o[n]===undefined)o[n]=false;
+};
+// a stand-in for the C++ shell's bridge: voice() records, answers by act
+const natCalls=[];let natImpl=null;
+const natOn=()=>{natCalls.length=0;natImpl=null;window.pywebview={api:{voice:async(c)=>{natCalls.push(c);
+  if(natImpl){const r=natImpl(c);if(r!==undefined)return r;}
+  if(c.act==="start")return {ok:true,u:7,engine:"analyzer",locale:"en-US"};
+  return {ok:true};}}};};
+(async()=>{
+// 1. the language rides the start and the warm; a bad one is never sent
+await sec("lang",async()=>{
+  reset();P.dict_lang="es-MX";await dictStart();
+  const sb=bodies[calls.findIndex(u=>u.includes("dictate/start"))];
+  const a=JSON.parse(sb).lang==="es-MX";
+  await stopRec();
+  reset();P.dict_lang="es MX\"><x";await dictStart();
+  const sb2=bodies[calls.findIndex(u=>u.includes("dictate/start"))];
+  const b=JSON.parse(sb2).lang==="";
+  await stopRec();
+  reset();P.dict_lang="pt-BR";dictWarm();
+  const w=calls.find(u=>u.includes("dictate/warm"))||"";
+  o.lang=a&&b&&w.includes("lang=pt-BR");
+});
+// 2. a toggle ends itself: words, then a second of quiet (the level under the floor, no new words)
+await sec("autostop",async()=>{
+  reset();await dictStart();                     // the mic button's path: a toggle
+  feedA(0.1,0.002);NOW+=100;feedA(0.1,0.002);NOW+=100;   // the room
+  for(let i=0;i<10;i++){feedA(0.05,0.2);NOW+=50;}        // half a second of words
+  feedA(0.1,0.002);NOW+=500;feedA(0.1,0.002);
+  const notYet=recording===true&&!ended();
+  NOW+=600;feedA(0.1,0.002);await tick();await tick();
+  o.autostop=notYet&&recording===false&&ended();
+});
+// 3. a hold never ends itself: the release does
+await sec("autohold",async()=>{
+  reset();dictKey({type:"down"},0);await dictStart();
+  for(let i=0;i<10;i++){feedA(0.05,0.2);NOW+=50;}
+  feedA(0.1,0.002);NOW+=3000;feedA(0.1,0.002);await tick();
+  o.autohold=recording===true&&!ended()&&dictSt.mode==="hold";
+  await stopRec();
+});
+// 4. new words keep it listening though the level is low (a soft voice under the floor rule)
+await sec("autopartial",async()=>{
+  reset();await dictStart();
+  for(let i=0;i<10;i++){feedA(0.05,0.2);NOW+=50;}
+  feedA(0.1,0.002);NOW+=1100;dictShow("still talking",false);feedA(0.1,0.002);await tick();
+  const kept=recording===true&&!ended();
+  NOW+=700;feedA(0.1,0.002);await tick();await tick();
+  o.autopartial=kept&&recording===false&&ended();
+});
+// 5. nothing said at all: it ends after DICT_NOSPEECH_MS
+await sec("nospeech",async()=>{
+  reset();await dictStart();
+  feedA(0.1,0.002);NOW+=5000;feedA(0.1,0.002);
+  const kept=recording===true;
+  NOW+=3100;feedA(0.1,0.002);await tick();await tick();
+  o.nospeech=kept&&recording===false&&ended();
+});
+// 6. the words go at the caret, between what was typed; nothing heard puts it back
+await sec("caret",async()=>{
+  reset();input.value="hello world";input.selectionStart=6;input.selectionEnd=6;
+  apiImpl=(u)=>u.includes("dictate/audio")?okJ({ok:true,partial:"there"}):u.includes("dictate/end")?okJ({ok:true,text:"there,"}):undefined;
+  await dictStart();feedA(0.5,0.2);await tick();
+  const mid=input.value==="hello there world"&&input.classList.contains("dictating");
+  await stopRec();
+  const fin=input.value==="hello there, world"&&!input.classList.contains("dictating");
+  reset();input.value="keep me";input.selectionStart=7;input.selectionEnd=7;
+  apiImpl=(u)=>u.includes("dictate/end")?okJ({ok:true,text:""}):u.includes("dictate/audio")?okJ({ok:true,partial:""}):undefined;
+  await dictStart();feedA(0.5,0.002);await stopRec();
+  o.caret=mid&&fin&&input.value==="keep me"&&input.placeholder.includes("catch that");
+});
+// 7. the C++ shell's native path: no server call, partials in place, the final at the stop,
+// another utterance's lines ignored
+await sec("native",async()=>{
+  reset();natOn();P.dict_lang="en-US";
+  await dictStart();
+  const st=natCalls[0]&&natCalls[0].act==="start"&&natCalls[0].lang==="en-US"&&recording===true&&dictNat&&dictNat.u===7;
+  window.__concordeVoice({ev:"level",u:7,rms:.2});
+  window.__concordeVoice({ev:"partial",u:7,text:"What's"});
+  window.__concordeVoice({ev:"partial",u:6,text:"Hvittar"});
+  const mid=input.value==="What's"&&recHeard===true;
+  NOW+=1000;const p=stopRec();await tick();
+  const race=(q)=>Promise.race([q,new Promise(r=>realST(r,60))]);
+  const stopSent=natCalls.some(c=>c.act==="stop"&&c.u===7);
+  window.__concordeVoice({ev:"final",u:7,text:"What's up, man?"});
+  window.__concordeVoice({ev:"done",u:7});
+  await race(p);
+  o.native=st&&mid&&stopSent&&input.value==="What's up, man?"&&dictNat===null
+    &&!calls.some(u=>u.includes("/api/dictate/"))&&!micBtn.classList.contains("rec");
+});
+// 8. the shell without a recognizer here falls to the server's path; a refusal says why and resets
+await sec("natfall",async()=>{
+  reset();natOn();natImpl=(c)=>c.act==="start"?{ok:false,code:"no-engine"}:undefined;
+  await dictStart();
+  const fell=calls.some(u=>u.includes("dictate/start"))&&recording===true;
+  await stopRec();
+  reset();natOn();natImpl=(c)=>c.act==="start"?{ok:false,code:"mic-denied"}:undefined;
+  dictKey({type:"down"},0);await dictStart();
+  o.natfall=fell&&recording===false&&input.placeholder.includes("Microphone blocked")
+    &&dictSt.mode===""&&!micBtn.classList.contains("rec")&&!calls.some(u=>u.includes("dictate/start"));
+});
+// 9. the native path ends itself on a pause too, from the shell's levels
+await sec("natauto",async()=>{
+  reset();natOn();await dictStart();
+  for(let i=0;i<10;i++){window.__concordeVoice({ev:"level",u:7,rms:.2});NOW+=50;}
+  window.__concordeVoice({ev:"level",u:7,rms:.002});NOW+=1100;
+  window.__concordeVoice({ev:"level",u:7,rms:.002});await tick();
+  o.natauto=recording===false&&natCalls.some(c=>c.act==="stop");
+});
+process.stdout.write(JSON.stringify(o));
+})();"""
+_DP_NAMES = ["lang", "autostop", "autohold", "autopartial", "nospeech", "caret", "native", "natfall", "natauto"]
+
+
+def _dp_run(js):
+    try:
+        return _node_json(js + _DP_SCEN, "polished641.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+
+
+_DP_BASE = _dp_run(_FS_GLUE)
+_dp_ok = lambda *ns: all(_DP_BASE.get(n_) is True for n_ in ns)
+check("dictation polished: the dictation language rides the start and the warm, a malformed one is never sent (node)",
+      _dp_ok("lang"), "%r" % _DP_BASE)
+check("dictation polished: a toggle ends itself a second after the words stop; a hold never does; new words keep it "
+      "listening; with nothing said it ends after 8 s (node)",
+      _dp_ok("autostop", "autohold", "autopartial", "nospeech"), "%r" % _DP_BASE)
+check("dictation polished: the words land at the caret between what was typed, and nothing heard puts the composer back "
+      "and says so (node)", _dp_ok("caret"), "%r" % _DP_BASE)
+check("dictation polished: the C++ shell's native path: no server call, partials in place, the final at the stop, "
+      "another utterance's lines ignored; no recognizer there falls to the server, a refusal says why (node)",
+      _dp_ok("native", "natfall", "natauto"), "%r" % _DP_BASE)
+_DP_MUT = [
+    ("lang", 'body:JSON.stringify({lang:dictLang()})});', 'body:"{}"});'),
+    ("lang", 'return typeof v==="string"&&/^([A-Za-z]{2,3}', 'return typeof v==="string"||/^([A-Za-z]{2,3}'),
+    ("autostop", 'if(dictVad(dictRms(ch),Date.now())==="stop")dictAct("auto");', ''),
+    ("autostop", 'else if(a==="stop"||a==="auto"){', 'else if(a==="stop"){'),
+    ("autohold", 'if(!recording||dictSt.mode==="hold")return "";', 'if(!recording)return "";'),
+    ("autopartial", '&&now-v.partAt>=DICT_AUTOSTOP_MS*.6)return "stop";', ')return "stop";'),
+    ("autopartial", '  if(!final){dictV.partAt=Date.now();dictV.speech=true;}   // new words: speech, and not a pause yet\n', ''),
+    ("natauto", '  if(now-v.startAt<1500)floor=Math.min(floor,DICT_VAD_PRIOR);\n', ''),   # words from the first chunk
+    ("nospeech", 'if(!v.speech&&v.startAt&&now-v.startAt>=DICT_NOSPEECH_MS)return "stop";', ''),
+    ("caret", '  if(!srv){dictTrace("down");dictAnchor();}\n', '  if(!srv){dictTrace("down");}\n'),
+    ("caret", 'input.value=t?dictPre+t+dictSuf:', 'input.value=t?t:'),
+    ("caret", 'input.placeholder=text?"Ask anything":"Didn’t catch that. Try again.";', 'input.placeholder="Ask anything";'),
+    ("native", 'if(!srv&&dictNative())return dictStartNat();', ''),
+    ("native", '  if(!ev||!n||ev.u!==n.u)return;', '  if(!ev||!n)return;'),
+    ("native", '  if(dictNat)return dictNatStop();     // the shell\'s own recognizer (6b641)\n', ''),
+    ("native", 'if(ev.ev==="done"&&n.res)n.res();', ''),
+    ("natfall", 'if(!r||r.code==="no-engine")return null;', 'if(!r)return null;'),
+    ("natfall", 'if(nat!==true){dictPend=false;dictKey({type:"end"},0);return;}', 'if(nat!==true)return;'),
+    ("natauto", '    if(dictVad(r,Date.now())==="stop")dictAct("auto");\n', ''),
+]
+_dp_bad = []
+for _nm, _a, _b in _DP_MUT:
+    if _FS_GLUE.count(_a) != 1:
+        _dp_bad.append("anchor %r x%d" % (_a[:40], _FS_GLUE.count(_a)))
+        continue
+    if _dp_run(_FS_GLUE.replace(_a, _b)).get(_nm) is not False:
+        _dp_bad.append("%s survived %r" % (_nm, _a[:40]))
+check("dictation polished: every mutation of the new rules breaks the scenario aimed at it (%d mutants, node)" % len(_DP_MUT),
+      not _dp_bad and _DP_BASE.get("err") is None and _dp_ok(*_DP_NAMES), "%r %r" % (_dp_bad, _DP_BASE))
+
+# ---- Esc ends a dictation ahead of every other Esc; the chord is never the browser's bookmark
+_DP_KEY = _MILLENAI_SRC[_MILLENAI_SRC.index('document.addEventListener("keydown",e=>{\n  // Esc ends a dictation'):]
+_DP_KEY = _DP_KEY[:_DP_KEY.index("},true);") + 8]
+_DP_KSCEN = r"""
+let H=null;const document={addEventListener(t,f){if(t==="keydown")H=f;}};
+const IS_PC=false;let recording=false,dictStarting=false,modal=false,acts=[];
+function dictIsD(k){return String(k).toLowerCase()==="d";}
+function dictModal(){return modal;}
+function dictKey(ev){return ev.modal?"":"start";}
+function dictAct(a){acts.push(a);}
+""" + "%s" + r"""
+const ev=(o)=>{const e=Object.assign({key:"",code:"",metaKey:false,ctrlKey:false,altKey:false,shiftKey:false,repeat:false,
+  prevented:false,stopped:false},o);e.preventDefault=()=>{e.prevented=true;};e.stopImmediatePropagation=()=>{e.stopped=true;};return e;};
+const r={};
+recording=true;let e=ev({key:"Escape"});H(e);r.esc=e.prevented&&e.stopped&&acts.join()==="stop";
+recording=false;acts=[];e=ev({key:"Escape"});H(e);r.escIdle=!e.prevented&&!e.stopped&&acts.length===0;
+modal=true;acts=[];e=ev({key:"d",code:"KeyD",metaKey:true});H(e);r.bookmark=e.prevented;
+modal=false;acts=[];e=ev({key:"d",code:"KeyD",metaKey:true});H(e);r.chord=e.prevented&&acts.join()==="start";
+process.stdout.write(JSON.stringify(r));
+"""
+
+
+def _dp_key(src_key):
+    try:
+        return _node_json(_DP_KSCEN % src_key, "key641.js")
+    except Exception as _e:
+        return {"err": str(_e)}
+
+
+_DPK = _dp_key(_DP_KEY)
+_dpk_mut = [("esc", _DP_KEY.replace("e.preventDefault();e.stopImmediatePropagation();dictAct(\"stop\");return;}", "dictAct(\"stop\");return;}")),
+            ("escIdle", _DP_KEY.replace('if(e.key==="Escape"&&(recording||dictStarting)){', 'if(e.key==="Escape"){')),
+            ("bookmark", _DP_KEY.replace("  e.preventDefault();\n  const modal=dictModal();", "  const modal=dictModal();\n  if(!modal)e.preventDefault();"))]
+_dpk_bad = [n_ for n_, m_ in _dpk_mut if m_ == _DP_KEY or _dp_key(m_).get(n_) is not False]
+check("dictation polished: Esc ends a dictation (and only then, ahead of every other Esc); the chord is ours in a dialog "
+      "too, so a browser's Cmd+D bookmark never opens; 3 mutants caught (node)",
+      all(_DPK.get(k_) is True for k_ in ("esc", "escIdle", "bookmark", "chord")) and not _dpk_bad, "%r %r" % (_DPK, _dpk_bad))
+
+# ---- the listening state: silver and ice, no rose, nothing animated, the send key quiet under the words
+def _dp_listen_rules(css):
+    """Every rule of the listening state: (selector, body) for a selector naming #mic.rec,
+    .dict-on, .dictating or the level canvas."""
+    body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    out = []
+    for m_ in re.finditer(r"([^{}]+)\{([^{}]*)\}", body):
+        sel_ = m_.group(1).strip()
+        if re.search(r"#mic\.rec|\.dict-on|\.dictating|sx-lvl", sel_) and "@" not in sel_:
+            out.append((sel_, m_.group(2)))
+    return out
+
+
+def _dp_rose(decl):
+    """A red, rose or pink in a declaration: the page's red and ember tokens, or a colour whose
+    red leads green and blue by 40 or more."""
+    if re.search(r"var\(--(red|hz-ember|accent-hot)\)", decl):
+        return True
+    for h_ in re.findall(r"#([0-9a-fA-F]{6})\b", decl):
+        r_, g_, b_ = int(h_[0:2], 16), int(h_[2:4], 16), int(h_[4:6], 16)
+        if r_ - max(g_, b_) >= 40:
+            return True
+    for r_, g_, b_ in re.findall(r"rgba?\((\d+),\s*(\d+),\s*(\d+)", decl):
+        if int(r_) - max(int(g_), int(b_)) >= 40:
+            return True
+    return False
+
+
+def _dp_listen_ok(css, js):
+    rules = _dp_listen_rules(css)
+    bad = [s_ for s_, d_ in rules if _dp_rose(d_) or re.search(r"animation:(?!none)", d_)]
+    sels = " ".join(s_ for s_, _d in rules)
+    return (not bad and ".hz #composer.dict-on" in sels and ".hz #composer.dict-on #send" in sels
+            and ".hz #composer.dict-on.hastext #send:not(:disabled):not(.stop)" in sels
+            and re.search(r"\.hz #composer\.dict-on,\.hz #composer\.dict-on:focus-within\{border-color:rgba\(184,211,236,", css) is not None
+            and 'g.fillStyle="rgba(184,211,236,"' in js and 'cmp.classList.toggle("dict-on",on);' in js), bad
+
+
+_dp_css = "\n".join(re.findall(r"<style[^>]*>(.*?)</style>", page, re.S))
+_dp_lok, _dp_lbad = _dp_listen_ok(_dp_css, page)
+check("dictation polished: the listening state is silver and ice: the composer's ice hairline, the send key the quiet "
+      "outline under the words, the level in ice, no red, rose or ember and nothing animated in any listening rule "
+      "(served page)", _dp_lok, "%r" % _dp_lbad)
+_dp_lm = [("ember border", _dp_css + "\n.hz #composer.dict-on{border-color:var(--hz-ember)}", page),
+          ("rose send", _dp_css + "\n.hz #composer.dict-on.hastext #send:not(:disabled):not(.stop){background:#e8415a}", page),
+          ("blink", _dp_css + "\n#mic.rec{animation:blink 1s ease infinite}", page),
+          ("red mic", _dp_css + "\n#mic.rec{color:rgba(226,109,90,.9)}", page),
+          ("no state", _dp_css, page.replace('cmp.classList.toggle("dict-on",on);', "")),
+          ("rose level", _dp_css, page.replace('g.fillStyle="rgba(184,211,236,"', 'g.fillStyle="rgba(232,65,90,"'))]
+_dp_lmb = [n_ for n_, c_, j_ in _dp_lm if _dp_listen_ok(c_, j_)[0]]
+check("dictation polished: each listening-state rule fails when broken (%d mutants)" % len(_dp_lm), not _dp_lmb, "%r" % _dp_lmb)
+
+# ---- the server: the helper protocol on a stand-in helper
+_DP_REG = _MILLENAI_SRC[_MILLENAI_SRC.index("# @dictate-begin"):_MILLENAI_SRC.index("# @dictate-end")]
+_DP_WL = _MILLENAI_SRC[_MILLENAI_SRC.index("_LANG_RE = re.compile("):_MILLENAI_SRC.index("def _transcribe_audio(audio")]
+_DP_FAKE = r'''#!/usr/bin/env python3
+# a stand-in for concorde-dictate's protocol (6b641): BEGIN frames, partials and one final of the
+# whole utterance; MODE=die exits before ready; MODE=old counts utterances itself (no BEGIN)
+import sys, json, struct, os
+mode = os.environ.get("DP_MODE", "")
+if mode == "die":
+    sys.exit(1)
+loc = sys.argv[sys.argv.index("--locale") + 1] if "--locale" in sys.argv else "sys"
+def out(ev, text="", u=0):
+    sys.stdout.write(json.dumps({"ev": ev, "text": text, "u": u}) + "\n"); sys.stdout.flush()
+out("ready", loc)
+inp = sys.stdin.buffer
+u = 0; n = 0; heard = 0
+while True:
+    h = inp.read(4)
+    if len(h) < 4: break
+    k = struct.unpack("<I", h)[0]
+    if k == 0xFFFFFFFF:
+        u = struct.unpack("<I", inp.read(4))[0]; heard = 0; out("listening", "", u); continue
+    if k == 0:
+        if u: out("final", ("heard %d" % heard) if heard else "", u); out("done", "", u)
+        u = 0; continue
+    inp.read(k); heard += k
+    if not u:
+        n += 1; u = n
+    out("partial", "heard %d" % heard, u)
+'''
+_dp_fake_path = os.path.join(_si_dir, "dp-fake-dictate")
+open(_dp_fake_path, "w").write(_DP_FAKE)
+os.chmod(_dp_fake_path, 0o755)
+
+
+def _dp_ns(reg=None, wl=None, mode="", langs=("en-UY",)):
+    """The dictation region alone, its helper the stand-in, whisper a recorder."""
+    import struct as _st, subprocess as _sp, secrets as _sc, threading as _th, atexit as _ax, time as _tm
+    wcalls = []
+    ns = {"os": os, "json": json, "re": re, "time": _tm, "threading": _th, "struct": _st, "subprocess": _sp,
+          "secrets": _sc, "atexit": _ax, "platform": __import__("platform"), "IS_MAC": True, "IS_ARM": True,
+          "DEV_HOME": "x", "TEST_HOOKS": frozenset(), "resource": lambda *a: "/nonexistent",
+          "ctx_thread": lambda target=None, args=(), daemon=True, bind=True: _th.Thread(target=target, args=args, daemon=daemon),
+          "_whisper_libs": lambda: True, "_whisper_weights": lambda: True, "_whisper_cuda": lambda: False,
+          "_transcribe_audio": lambda audio, lang="": wcalls.append(lang) or "WHISPER"}
+    os.environ["MILLENAI_DICT_HELPER"] = _dp_fake_path
+    os.environ["DP_MODE"] = mode
+    exec((wl if wl is not None else _DP_WL), ns)
+    ns["_system_langs"] = lambda: list(langs)
+    exec((reg if reg is not None else _DP_REG).replace("def _pcm16_to_f32(b: bytes):", "def _pcm16_to_f32(b: bytes):\n    return b\n\ndef _unused(b: bytes):"), ns)
+    return ns, wcalls
+
+
+def _dp_srv(reg=None, wl=None):
+    r = {}
+    try:
+        ns, wc = _dp_ns(reg, wl)
+        s1 = ns["_dict_start"]("")
+        s1.cancel(); ns["_dict_drop"](s1)                      # an utterance with no audio at all
+        s2 = ns["_dict_start"]("")
+        s2.feed(b"\x00\x00" * 800)
+        t2 = s2.end(b"\x00\x00" * 800)
+        r["sync"] = s2.engine == "system" and t2 == "heard 3200" and wc == []
+        s3 = ns["_dict_start"]("")                             # nothing heard: "" and no whisper
+        t3 = s3.end(b"")
+        r["empty"] = t3 == "" and wc == []
+        s4 = ns["_dict_start"]("es-MX")                        # the language passed; a change restarts it
+        r["locale"] = ns["_dict_helper"].locale == "es-MX" and s4.lang == "es-MX"
+        s4.cancel()
+        r["badlang"] = ns["dict_lang_ok"]("es MX") is False and ns["dict_lang_ok"]("zh-Hans-CN") and ns["dict_lang_ok"]("")
+        ns["_dict_helper"].stop()
+        ns2, wc2 = _dp_ns(reg, wl, mode="die")
+        t0_ = time.time()
+        s5 = ns2["_dict_start"]("es-MX")
+        r["die"] = time.time() - t0_ < 2.0 and s5 is not None and s5.engine == "whisper" and ns2["_dict_engine_name"]() == "whisper"
+        r["whisperlang"] = s5.end(b"\x00\x00" * 8000) == "WHISPER" and "es-MX" in wc2
+        ns["_system_langs"] = lambda: []
+        r["wl"] = (ns["_whisper_lang"]("") == "en" and ns["_whisper_lang"]("es-MX") == "es"
+                   and ns["_whisper_lang"]("bad lang") == "en")
+        ns["_system_langs"] = lambda: ["pt-BR", "en-US"]
+        r["wl"] = r["wl"] and ns["_whisper_lang"]("") == "pt"
+        ns2["_dict_helper"].stop()
+    except Exception as _e:
+        r["err"] = repr(_e)[:300]
+    finally:
+        os.environ.pop("MILLENAI_DICT_HELPER", None)
+        os.environ.pop("DP_MODE", None)
+    return r
+
+
+_DPS = _dp_srv()
+_DPS_NAMES = ("sync", "empty", "locale", "badlang", "die", "whisperlang", "wl")
+check("dictation polished: the server's helper protocol on a stand-in: an utterance with no audio leaves the next one "
+      "heard (BEGIN frames), nothing heard is \"\" with no whisper guess, the language is passed, a helper that dies "
+      "before ready ends the wait at once and whisper is told the language (6b641)",
+      all(_DPS.get(k_) is True for k_ in _DPS_NAMES), "%r" % _DPS)
+_dps_mut = [
+    ("sync", _DP_REG.replace('self.p.stdin.write(struct.pack("<II", 0xFFFFFFFF, sess.u))', 'self.p.stdin.write(b"")'), None),
+    ("empty", _DP_REG.replace('                if self.final is not None:\n                    return (self.final or "").strip()',
+                              '                if self.final:\n                    return self.final.strip()'), None),
+    ("locale", _DP_REG.replace('p = subprocess.Popen([path] + (["--locale", lang] if lang else []),', 'p = subprocess.Popen([path],'), None),
+    ("die", _DP_REG.replace("while not self.ready.is_set() and not self.dead.is_set() and time.time() < end:",
+                            "while not self.ready.is_set() and time.time() < end:"), None),
+    ("wl", None, _DP_WL.replace('    return "en"\n', '    return None\n')),
+]
+_dps_bad = []
+for _k, _rm, _wm in _dps_mut:
+    if (_rm is not None and _rm == _DP_REG) or (_wm is not None and _wm == _DP_WL):
+        _dps_bad.append("anchor " + _k)
+        continue
+    if _dp_srv(_rm, _wm).get(_k) is True:
+        _dps_bad.append(_k + " survived")
+check("dictation polished: each server rule fails when broken (%d mutants)" % len(_dps_mut), not _dps_bad, "%r" % _dps_bad)
+check("dictation polished: whisper is always told the language (mlx and faster-whisper both), never left to detect it",
+      "mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_REPO, language=wl)" in _MILLENAI_SRC
+      and "beam_size=5 if gpu else 1, language=wl)" in _MILLENAI_SRC
+      and len(re.findall(r"mlx_whisper\.transcribe\(", _MILLENAI_SRC)) == 1
+      and len(re.findall(r"_fw_model\.transcribe\(", _MILLENAI_SRC)) == 1, "")
+
+# ---- the helper's source: the language, the segments, BEGIN, the empty utterance
+_DP_SW = _DI_SWIFT
+
+
+def _dp_sw_ok(sw):
+    return ("Locale.current" not in sw and "Locale.preferredLanguages" in sw and '"--locale"' in sw
+            and 'return Engine(dictation: true, locale: Locale(identifier: "en-US"))' in sw
+            and "DictationTranscriber(locale: locale, contentHints: [.shortForm], transcriptionOptions: [.punctuation]," in sw
+            and "let all = joined(done + (fin ? [] : [t]))" in sw and 'emit("final", text, u)' in sw
+            and 'emit("done", "", u)' in sw and "if n == 0xFFFF_FFFF {" in sw and "case .begin(let k): u = k" in sw
+            and "if !fedAny { feed(Data(count: 3200)) }" in sw)
+
+
+check("dictation polished: the helper picks the language from the one named or the preferred languages (never the "
+      "region), DictationTranscriber with punctuation, partials and the final are the whole utterance, BEGIN frames, "
+      "and an utterance with no audio still finishes", _dp_sw_ok(_DP_SW), "")
+_dp_swm = [("region", _DP_SW.replace("want += Locale.preferredLanguages", "want += [Locale.current.identifier]")),
+           ("segments", _DP_SW.replace("let all = joined(done + (fin ? [] : [t]))", "let all = t")),
+           ("empty", _DP_SW.replace("if !fedAny { feed(Data(count: 3200)) }", "")),
+           ("begin", _DP_SW.replace("case .begin(let k): u = k", "case .begin(let k): n += 1; u = n"))]
+_dp_swb = [n_ for n_, m_ in _dp_swm if m_ == _DP_SW or _dp_sw_ok(m_)]
+check("dictation polished: each helper rule fails when broken (%d mutants)" % len(_dp_swm), not _dp_swb, "%r" % _dp_swb)
+
+# ---- the real recognizer, when the helper is built on this Mac (macOS 26+): a `say` clip's words,
+# English under a Spanish region (the process alone is told es_UY), and an empty utterance first
+_dp_bin = os.path.join("shell", "dictate", "concorde-dictate")
+_dp_mac = 0
+try:
+    _dp_mac = int((__import__("platform").mac_ver()[0] or "0").split(".")[0])
+except ValueError:
+    pass
+if sys.platform == "darwin" and _dp_mac >= 26 and os.access(_dp_bin, os.X_OK) and shutil.which("say"):
+    import struct as _dst, wave as _dwv
+    _dpa = os.path.join(_si_dir, "dp-wsm.aiff")
+    _dpw = os.path.join(_si_dir, "dp-wsm.wav")
+    subprocess.run(["say", "-o", _dpa, "What's up, man?"], check=True, timeout=30)
+    subprocess.run(["afconvert", "-f", "WAVE", "-d", "LEI16@16000", "-c", "1", _dpa, _dpw], check=True, timeout=30)
+    with _dwv.open(_dpw) as _w:
+        _dpcm = _w.readframes(_w.getnframes())
+
+    def _dp_real(args):
+        p_ = subprocess.Popen([_dp_bin] + args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        fr = _dst.pack("<II", 0xFFFFFFFF, 1) + _dst.pack("<I", 0) + _dst.pack("<II", 0xFFFFFFFF, 2)
+        for i_ in range(0, len(_dpcm), 3200):
+            fr += _dst.pack("<I", len(_dpcm[i_:i_ + 3200])) + _dpcm[i_:i_ + 3200]
+        fr += _dst.pack("<I", 0)
+        try:
+            out_, _e = p_.communicate(fr, timeout=60)
+        except subprocess.TimeoutExpired:
+            p_.kill()
+            return None, []
+        ls_ = [json.loads(x_) for x_ in out_.decode().splitlines() if x_.strip().startswith("{")]
+        fin_ = [x_.get("text", "") for x_ in ls_ if x_.get("ev") == "final" and x_.get("u") == 2]
+        return (fin_[0] if fin_ else None), ls_
+
+    _dpr, _dpl = _dp_real(["--locale", "en-US", "-AppleLocale", "es_UY", "-AppleLanguages", "(es-UY)"])
+    _dpe = [x_ for x_ in _dpl if x_.get("u") == 1 and x_.get("ev") in ("final", "done")]
+    check("dictation polished: the real recognizer on this Mac writes \"What's up, man?\" in English under a Spanish "
+          "region, after an utterance with no audio (which finishes as \"\")",
+          _dpr is not None and re.sub(r"[^a-z ]", "", _dpr.lower()).split() == ["whats", "up", "man"]
+          and [x_.get("ev") for x_ in _dpe] == ["final", "done"] and _dpe[0].get("text") == "", "%r %r" % (_dpr, _dpl[:6]))
+else:
+    print("  (the real recognizer check needs shell/dictate/concorde-dictate built on macOS 26+: skipped)")
+
+# ---- the language as a setting, and the start route reading it
+check("dictation polished: the dictation language is a setting of this profile, validated (a malformed one is ignored), "
+      "and Settings shows it", '"cloud_balance", "comps", "dict_lang"))' in _MILLENAI_SRC
+      and 'k == "dict_lang" and not dict_lang_ok(v)):' in _MILLENAI_SRC
+      and '<select id="dict-lang"><option value="">Same as this computer</option>' in page
+      and 'prefSet({dict_lang:sel.value});' in page, "")
+_dp_s = json.loads(req("/api/dictate/start", "POST", {"lang": "es-MX"})[2])
+_dp_x = json.loads(req("/api/dictate/start", "POST", {"lang": "es MX<"})[2])
+check("dictation polished: the start route takes the language and names the one it uses; a malformed one is the "
+      "system's (live, the fake engine)",
+      _dp_s.get("ok") is True and _dp_s.get("locale") == "es" and _dp_x.get("ok") is True and len(_dp_x.get("locale") or "") == 2,
+      "%r %r" % (_dp_s, _dp_x))
+for _dpq in (_dp_s, _dp_x):
+    if _dpq.get("sid"):
+        req("/api/dictate/cancel?sid=" + _dpq["sid"], "POST", b"", headers={"Content-Type": "application/octet-stream"})
+# ==== 6b641 dictation polished: end ====
 
 
 # ==== 6b340 funnel pictures: begin ====
