@@ -22502,6 +22502,21 @@ configuration inside, so the port needs a hook before creation (a vendored wry p
 initWithFrame:configuration: in the shell before the window opens): not cheap or safe enough for a frozen beta 4.
 The effects level already follows prefs.json since 6b628 (fx_level); a fresh install has none, so it starts Balanced.
 
+**Three more from Patrick's screens (beta 4's P0 set).**
+- **Find in this chat** sat on the header at 1377 x 868 (the lanes and half the mode chip under it): in Horizon it now
+  docks 8 px under the header's real bottom, right-aligned over the transcript (its right edge the composer's), in the
+  graphite style, measured on open and on a resize (`findPlace`); closed until Cmd/Ctrl+F; Esc closes it. A live check
+  at 1440, 1377, 1100 and 760 (no header control under it, each control hit at its centre) with its mutant.
+- **A question with no answer** (an open chat showed the question and nothing): a reopened chat whose last turn is the
+  person's, with no answer on its way there, gets one line, "No answer came back for this question." with Try again
+  (6b590's kind error line). Funnels aside.
+- **Small talk never searches** ("What are we up to today?" came back as a news digest of CD rates, a phone update,
+  airline points and Broadway, then "you did mention a thought about breakfast"; Patrick: "and what?"): answer_kind
+  says "social" for the person's day, plans and how things are going (twelve phrasings in the check), so no search
+  and no carried evidence, and the writer gets SOCIAL_RULE (one or two warm sentences from what it knows, no news or
+  results, one useful question back with two or three things it could help with). The weather, the news, a race
+  result, TV tonight and stocks still search. Live on a dev copy: X-Web-Search 0 for the first, 1 for the weather.
+
 **Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
