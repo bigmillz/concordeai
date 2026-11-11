@@ -23234,3 +23234,66 @@ GROUND_NONE pin, 6b640's SOCIAL_RULE line. quality-2's namespace gains the names
 **Left.** The how-to rule still sends a capitalised name to the web; Code-lane asks still search (the Coding agent
 keeps auto_web). Fable 5.1 as the Pro/Max compositor when a Claude key exists is costed in the report (about $0.17*
 an answer against Opus 5.5's $0.07*), not switched: Patrick's call.
+
+## 6b677 — ultra-slam: the default stays below Ultra, and Ultra slams when you choose it (7.0 beta 5+, per Patrick)
+
+Patrick (relayed 2026-11-11, his screenshot the Chat home at Ultra on beta 3 with almost nothing showing): "Let's
+default, not going all the way to ultra, but make ultra slam super hard." Branch `ultra-slam` from beta-5 (e13019e).
+
+**Ultra is a deliberate choice.** `millen.effort` keeps Low to Extra as before; Ultra is never written
+(`hzEffortSet`), so a launch starts at the last level below Ultra that was picked, or Medium (`hzEffortKept`; a "4"
+kept by an older build reads as none). A new chat (`chatFresh`, so the New chat key, ⌘N and a lane's fresh chat) comes
+down from Ultra to that level (`hzEffortFresh`); inside a chat Ultra stays until it is changed. So the slam happens each
+time it is chosen instead of the app sitting at Ultra. No copy changed.
+
+**The slam (the arrival, at full strength in Balanced).** Before, Balanced played a lighter arrival: a half-bright edge,
+half the burst, no kick, no matrix wave, the greeting's rim at half and late, the aurora's surge and twist at half,
+225 landing stars. Now Balanced plays all of it, and Full a little more (`HZ_SLAM_K=[1,1.35]`, the sky's `slm_`):
+- the held beat: the scene dims by .16 (Full .2; was .08) in 150 ms and holds to the release at 200 ms (was 140), stays
+  down through the hang so the stars read against it, back over 2.0-3.2 s (never a step up);
+- the release: the light rush along the fill (unchanged, the one exempt fast rise), the edge bloom racing the rim from
+  the knob (Full's edge 560 ms), the kick in Balanced too (1.012; Full 1.018), the burst at full (Full x1.35), the field
+  launching from the box with 12 births (Full 16), the matrix's wave up to the greeting with the ice rim light on its
+  letters at full (1.16 s, held 520/640 ms), the aurora's surge and twist at full (Full x1.3), the landing's stars 450
+  (Full 600; the 30/60 that stay are unchanged);
+- THE DEPTH (new): the sky's GPU canvas (#hz-gl) draws back to .996 in the beat and swells to 1.016 (Full 1.02) at the
+  release, back to 1 by 2.8 s: one `scale` animation on the layer the canvas already has; never restarted mid-swell.
+  On #hz-sky (the first try) WebKit re-layered the footage and the canvases at the click: a 40-60 ms click frame in
+  Balanced; on #hz-gl an in-page A/B (16 arrivals, the swell on and off alternately) shows no cost;
+- the slam's window (`slamE`): the matrix at full through the hang, then the resting Ultra drops back to Balanced's half.
+  Resting Ultra is unchanged: calm-ish at Balanced.
+- It replays on every return to Ultra, at most once per 3 s (`hzUltraGate`, was 1.5 s); a return inside 3 s is quiet.
+Calm, reduced motion and effects off: none of it (hzUltraFx first, `:not(.hz-calm)`, the novideo and reduced-motion
+rules). Ice, violet and white; no circles; nothing on send, attach or mic.
+
+**Measured (a real offscreen WKWebView, 1440 x 900 at 2x, night, the same clip, `scratchpad/us1-work/wk/main.swift`;
+the beta-5 gauntlet was running on the machine, load 2-3, so the outliers are noisy).** rAF deltas through six
+arrivals from High per row (3.6 s each), the click frame apart:
+
+| copy | effects | arrival p50 / p95 / max (ms) | > 20 ms | click frame p50 / max | Ultra at rest p95 / max |
+|---|---|---|---|---|---|
+| beta-5 | Balanced | 17 / 18 / 24 | 3 of 1290 | 22 / 30 | 19 / 24 |
+| ultra-slam | Balanced | 17 / 19 / 25 | 5 of 1289 | 17 / 65 | 19 / 25 |
+| beta-5 | Full | 17 / 19 / 25 | 7 of 1284 | 51 / 67 | 19 / 21 |
+| ultra-slam | Full | 17 / 19 / 27 | 2 of 1288 | 30 / 53 | 19 / 20 |
+
+The arrival holds 60 Hz (p95 19 ms) with the heavier slam. The click frame (the frame that turns Ultra on) was already
+a 20-60 ms hitch on beta-5, more so in Full; it is the style and layer work of html.hz-ultra (a class-only toggle
+reproduces it; hiding the composer's lit edge, .hz-ulit, helps most in a bisect but not cleanly), not the slam.
+Contact sheets before/after, Balanced and Full: `scratchpad/us1-shots/`.
+
+**Checks.** A 6b677 block: Ultra not sticky (node run of the four effort functions + chatFresh's wiring, 5 mutants),
+the slam (the arrival's css and the sky's numbers, the depth's keyframes scale-only and on #hz-gl, Calm/reduced motion/effects off,
+10 mutants), the 3 s replay gate (2 mutants). Re-pinned at the same strength: 6b553 (the edge, the kick, the burst and
+the gate's sequence on the 3 s scale, with a new 1.5 s mutant; its "kick in Balanced", "Balanced's burst at full" and
+"Balanced's edge at full" mutants flipped to the old lighter arrival), 6b555 (the breath's string, the matrix wave, the
+greeting's rim, the node sequence at 200 ms / 3 s), the horizon neon string, 6b555's matrix level, 6b621's wave
+counts. The 6b621 live drive's bounds still hold by construction (the swell's lean stays at Full's old .45; births
+16 >= 9; 600 lit >= 300; 60 kept). Verified standalone against a page-only copy (9 of 9; the new three fail on
+beta-5); the gauntlet itself not run (the beta-5 run held the machine). GAUNTLET_TODO
+
+**Left.** The 60 fps cap in WKWebView: the only switch is WebKit's private "PreferPageRenderingUpdatesNear60FPS"
+feature flag, set on the configuration before the web view exists; no public WKPreferences key. A public-API route is
+a native sky: a CAMetalLayer view under a transparent WKWebView, driven by the view's display link at the screen's
+rate (the shader moves over as is), leaving the DOM at 60. Not done here. The click-frame hitch (above) is the next
+smoothness item.
