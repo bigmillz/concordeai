@@ -42839,7 +42839,8 @@ check("the Tauri shell hands the token over through one command that checks sche
       and ".initialization_script(BRIDGE_SHIM)" in _rs_main
       and "initialization_script_for_all_frames" not in _rs_main
       and _rs_cap.get("permissions") == ["allow-api-token", "allow-pick-folder", "core:window:allow-start-dragging",
-                                         "core:window:allow-internal-toggle-maximize"]
+                                         "core:window:allow-internal-toggle-maximize",
+                                         "opener:allow-open-url", "opener:allow-default-urls"]   # 6b643: links open in the browser
       and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
       and "token" not in _rs_shim.replace("api_token", "")
       and '.env("MILLENAI_SHELL", "tauri")' in _rs_main
@@ -42943,15 +42944,16 @@ check("the Mac shell's corner, mutants: a short reservation, lights off the row'
 # the lights' zone
 _rs_menu = _rs_main[_rs_main.index("fn build_menu("):_rs_main.index("fn menu_action(")]
 _rs_act = _rs_main[_rs_main.index("fn menu_action("):_rs_main.index("fn mark_fullscreen(")]
-check("the shell's menu bar is the curated one: ConcordeAI (About, Settings… ⌘,, Check for Updates…, Hide, Hide Others, Quit), Edit's six, View (Toggle Sidebar ⌘\\, Enter Full Screen), Window (Minimize, Zoom); no default menu, File, Help, Services or Show All; Reload only in debug; each page item wired; full screen marked",
+check("the shell's menu bar is the curated one: ConcordeAI (About, Settings… ⌘,, Check for Updates…, Hide, Hide Others, Quit), Edit's six, View (Toggle Sidebar ⌘\\, Enter Full Screen), Window (Minimize, Zoom, Close Window ⌘W since 6b643); no default menu, File, Help, Services or Show All; Reload only in debug; each page item wired; full screen marked",
       "Menu::default" not in _rs_main and "Menu::with_items(app, &[&app_menu, &edit, &view, &window])" in _rs_menu
       and set(re.findall(r'Submenu::with_items\(\s*app,\s*(&name|"\w+")', _rs_menu)) == {"&name", '"Edit"', '"View"', '"Window"'}
       and all(x in _rs_menu for x in ("PredefinedMenuItem::undo(", "PredefinedMenuItem::redo(", "PredefinedMenuItem::cut(",
                                       "PredefinedMenuItem::copy(", "PredefinedMenuItem::paste(", "PredefinedMenuItem::select_all(",
                                       "PredefinedMenuItem::hide(", "PredefinedMenuItem::hide_others(", "PredefinedMenuItem::quit(",
                                       "PredefinedMenuItem::fullscreen(", "PredefinedMenuItem::minimize(",
-                                      "PredefinedMenuItem::maximize(app, Some(\"Zoom\"))"))
-      and not any(x in _rs_menu for x in ("services(", "show_all(", "close_window(", '"File"', '"Help"'))
+                                      "PredefinedMenuItem::maximize(app, Some(\"Zoom\"))",
+                                      "PredefinedMenuItem::close_window(app, Some(\"Close Window\"))"))   # 6b643: Cmd+W
+      and not any(x in _rs_menu for x in ("services(", "show_all(", '"File"', '"Help"'))
       and '"settings", "Settings\\u{2026}", true, Some("CmdOrCtrl+,")' in _rs_menu
       and '"sidebar", "Toggle Sidebar", true, Some("CmdOrCtrl+Backslash")' in _rs_menu
       and "#[cfg(debug_assertions)]\n    let reload" in _rs_menu
@@ -51779,6 +51781,162 @@ check("6b631 THE CORNERS AND THE EDGE (per Patrick: \"I love these corners. They
       and _l631_medge.get("mutated", 0) >= 1 and not _l631_corner_ok(_l631_medge),
       json.dumps({"live": ((_l631_live.get("S") or {}).get("full") or {}), "corner": ((_l631_mcorner.get("S") or {}).get("full") or {}).get("edge"), "edge": ((_l631_medge.get("S") or {}).get("full") or {}).get("edge"), "errs": [_l631_mcorner.get("errs"), _l631_medge.get("errs")]})[:1400])
 # ==== 6b631 the demo's look: end ====
+
+# ==== 6b643 quirks-1: begin ====
+print("== quirks-1 (6b643): links open, drops land, Cmd+W closes, the name saves itself, the sidebar stays, the lane keeps the keyboard, dictation's failure in words ==")
+# THE QUIRKS PASS (6b643, per Patrick after a day of hitting quirks): the shipped Tauri shell (WKWebView) driven as a
+# Mac user would. Seven fixes, each with a predicate its mutants fail. (1) A link the page opens in a new tab (every
+# answer's links, sources, Settings' guides, Open in Maps) did nothing: the opener plugin's own click handler takes
+# every target=_blank click and calls plugin:opener|open_url, which the capability never granted ("not allowed by
+# ACL", measured in the shell). (2) A file dropped on the window never reached the page: Tauri's drag-and-drop handler
+# answers every native drop itself, so the page's HTML5 drop zones saw nothing. (3) Cmd+W did nothing (no Close
+# Window). (4) "What should we call you?" saved only with the Save under the other field. (5) The sidebar opened on
+# the home vanished in the chat picked from it when it had been shut in a chat before. (6) A click on a lane's tab
+# left the keyboard on the page. (7) Dictation's download failure showed the exception's text in the composer.
+_q643_rs = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+_q643_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
+def _q643_shell_ok(rs, cap):
+    perms = cap.get("permissions", [])
+    ow = rs[rs.index("fn open_window("):rs.index("let w = b.build()?;", rs.index("fn open_window("))] if "fn open_window(" in rs else ""
+    menu = rs[rs.index("fn build_menu("):rs.index("fn menu_action(")] if "fn build_menu(" in rs else ""
+    win = menu[menu.find('"Window",'):]
+    close = rs[rs.find("tauri::WindowEvent::CloseRequested { api, .. } => {"):][:500]
+    return {
+        # (1) the links: the plugin with its click handler, and the command and its scope granted to the page
+        "links": ".plugin(tauri_plugin_opener::init())" in rs and "opener:allow-open-url" in perms
+                 and "opener:allow-default-urls" in perms and "opener:default" not in perms
+                 and cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"],
+        # (2) the drops: Tauri's handler off on the one window, so WKWebView's own drop reaches the page
+        "drops": ".disable_drag_drop_handler()" in ow and ow.index("WebviewWindowBuilder::new(app, \"main\"") < ow.index(".disable_drag_drop_handler()"),
+        # (3) Cmd+W: Close Window in the Window menu, which the close handler turns into a hide
+        "closew": 'PredefinedMenuItem::close_window(app, Some("Close Window"))' in win
+                  and "api.prevent_close();" in close and "w2.hide()" in close,
+    }
+_q643_s = _q643_shell_ok(_q643_rs, _q643_cap)
+_q643_sm = [(d_, _q643_shell_ok(r_, c_)[k_]) for d_, k_, r_, c_ in [
+    ("the opener's command not granted (the shipped bug)", "links", _q643_rs, dict(_q643_cap, permissions=[p_ for p_ in _q643_cap["permissions"] if p_ != "opener:allow-open-url"])),
+    ("granted with no URL scope", "links", _q643_rs, dict(_q643_cap, permissions=[p_ for p_ in _q643_cap["permissions"] if p_ != "opener:allow-default-urls"])),
+    ("the opener plugin gone", "links", _q643_rs.replace(".plugin(tauri_plugin_opener::init())", "", 1), _q643_cap),
+    ("Tauri's drop handler back on", "drops", _q643_rs.replace(".disable_drag_drop_handler()", "", 1), _q643_cap),
+    ("no Close Window", "closew", _q643_rs.replace('PredefinedMenuItem::close_window(app, Some("Close Window"))?,', "", 1), _q643_cap),
+    ("Close Window that quits", "closew", _q643_rs.replace("            api.prevent_close();\n            save_window_state", "            save_window_state", 1), _q643_cap)]]
+check("6b643 the Mac shell: a target=_blank link opens in the browser (the opener plugin's click handler and its open_url with the http(s)/mailto/tel scope granted to the app's own origin, nothing more); a dropped file reaches the page (Tauri's drag-and-drop handler off); Cmd+W is Close Window, which hides the window as the red button does; %d mutants caught" % len(_q643_sm),
+      all(_q643_s.values()) and all(r_ is False for _, r_ in _q643_sm), "%r" % [_q643_s, _q643_sm])
+# the page still has the drop zones the shell now lets through (the composer's attachments and Bring your chats)
+check("6b643 the page's own drop zones are HTML5 listeners the shell now feeds (the composer's drop and the importer's)",
+      'addEventListener("drop",e=>{' in page and 'impV.addEventListener("drop",e=>{if(!hasFiles(e))return;' in page
+      and 'addEventListener("dragover",e=>{' in page, "")
+
+# (4) the name and the note save themselves, in node on the page's own lines
+_Q643_PS = r'''
+const posts=[];let T=[];
+function setTimeout(f,ms){T.push([f,ms]);return T.length;} function clearTimeout(i){if(i&&T[i-1])T[i-1][0]=null;}
+function flush(){const t=T;T=[];t.forEach(([f])=>{if(f)f();});}
+function mk(id){const L={};return {id,value:"",addEventListener(t,f){(L[t]=L[t]||[]).push(f);},fire(t){(L[t]||[]).forEach(f=>f({}));}};}
+const els={"#user-name":mk("user-name"),"#persona":mk("persona")};
+function $(q){return els[q]||null;}
+function api(u,o){posts.push([u,o&&o.method,o&&JSON.parse(o.body)]);return Promise.resolve({json:()=>({})});}
+'''
+def _q643_persona(pg):
+    try:
+        a_ = pg.index("// THE NAME AND THE NOTE SAVE THEMSELVES"); b_ = pg.index('/* "Personalise suggestions"', a_)
+        js = _Q643_PS + pg[a_:b_] + r'''
+const o={};
+els["#user-name"].value="Quinn ";els["#user-name"].fire("input");o.typed=posts.length;   // nothing while typing
+flush();o.afterPause=posts.slice();posts.length=0;                                   // saved after the pause
+els["#persona"].value="short answers";els["#persona"].fire("change");o.change=posts.slice();posts.length=0;   // at once on a change
+els["#user-name"].value="Q";els["#user-name"].fire("input");els["#user-name"].fire("change");o.pending=T.filter(x=>x[0]).length;flush();o.once=posts.length;
+process.stdout.write(JSON.stringify(o));'''
+        return _node_json(js, "q643ps.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _q643_persona_ok(o):
+    ap = o.get("afterPause") or [[None, None, {}]]
+    ch = o.get("change") or [[None, None, {}]]
+    return (o.get("typed") == 0 and len(ap) == 1 and ap[0][0] == "/api/prefs" and ap[0][1] == "POST"
+            and ap[0][2] == {"persona": "", "user_name": "Quinn"} and len(ch) == 1 and ch[0][2] == {"persona": "short answers", "user_name": "Quinn"}
+            and o.get("pending") == 0 and o.get("once") == 1)
+_q643_po = _q643_persona(page)
+_q643_pm = [(d_, _q643_persona_ok(_q643_persona(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("typing never saves (the shipped bug)", 'el.addEventListener("input",()=>{clearTimeout(personaSaveT);personaSaveT=setTimeout(personaSaveQuiet,700);});', ""),
+    ("the name left out of the save", "user_name:$(\"#user-name\").value.trim()})}).catch(()=>{});}", "})}).catch(()=>{});}"),
+    ("a change saves twice (the pending save not cleared)", "function personaSaveQuiet(){clearTimeout(personaSaveT);personaSaveT=0;", "function personaSaveQuiet(){")]]
+check("6b643 \"What should we call you?\" and \"Anything to keep in mind?\" save themselves: 0.7 s after typing stops and at once on a change, one POST of both to /api/prefs, Save kept; %d mutants caught" % len(_q643_pm),
+      _q643_persona_ok(_q643_po) and all(r_ is False for _, r_ in _q643_pm)
+      and '$("#persona-save").addEventListener("click",async ev=>{' in page, "%r" % [_q643_po, _q643_pm])
+
+# (5) the sidebar opened on the home stays open in the chat picked from it, in node on hzSidebarToggle
+_Q643_SB = r'''
+const cls=new Set(),ls={};let hero=true,innerWidth=1320;
+const document={documentElement:{classList:{contains:c=>cls.has(c),toggle:(c,on)=>{on=on===undefined?!cls.has(c):!!on;on?cls.add(c):cls.delete(c);return on;},remove:c=>cls.delete(c),add:c=>cls.add(c)}},
+  body:{classList:{toggle(){}}}};
+const localStorage={setItem:(k,v)=>{ls[k]=String(v);},getItem:k=>ls[k]};
+function $(q){return q==="#hero"&&hero?{}:null;} function hzTraceKill(){} function hzSidebarLabel(){}
+'''
+def _q643_sb(pg):
+    try:
+        js = _Q643_SB + _jsfn(pg, "function hzSidebarToggle(){") + r'''
+const o={};
+hero=false;hzSidebarToggle();o.shutInChat=[cls.has("sbhide"),ls["millen.sbhide"]];          // shut in a chat
+hero=true;hzSidebarToggle();o.openHome=[cls.has("hz-sbopen"),cls.has("sbhide"),ls["millen.sbhide"]];   // opened on the home
+hero=false;o.inChat=!cls.has("sbhide");                                                      // a chat picked: still open
+hero=true;hzSidebarToggle();o.closeHome=[cls.has("hz-sbopen"),cls.has("sbhide")];            // closed on the home
+hero=false;hzSidebarToggle();o.shutAgain=[cls.has("sbhide"),ls["millen.sbhide"]];
+process.stdout.write(JSON.stringify(o));'''
+        return _node_json(js, "q643sb.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _q643_sb_ok(o):
+    return (o.get("shutInChat") == [True, "1"] and o.get("openHome") == [True, False, "0"] and o.get("inChat") is True
+            and o.get("closeHome") == [False, False] and o.get("shutAgain") == [True, "1"])
+_q643_so = _q643_sb(page)
+_q643_sbm = [(d_, _q643_sb_ok(_q643_sb(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("the home's open forgets the chat's shut (the shipped bug)", 'if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}}', ""),
+    ("cleared but not remembered", 'root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}', 'root.classList.remove("sbhide");')]]
+check("6b643 the sidebar opened on the home stays open in the chat picked from it (a shut from a chat earlier is cleared and remembered); shutting it in a chat still sticks; %d mutants caught" % len(_q643_sbm),
+      _q643_sb_ok(_q643_so) and all(r_ is False for _, r_ in _q643_sbm), "%r" % [_q643_so, _q643_sbm])
+
+# (6) a lane's tab keeps the keyboard in the lane's own field, in node on switchLane and laneFocus
+_Q643_LN = r'''
+let uiMode="ai",agent="",prefsReady=true,P={},codeGuess=false,curChat=null;var LANE_LEFT={};const T=[];
+function setTimeout(f){T.push(f);} function modeShow(m){uiMode=m;} function setAgent(a){agent=a;} function laneOpen(){}
+function el(id,w){return {id,offsetWidth:w,disabled:false,focus(){document.activeElement=this;}};}
+const body={id:"body"},input=el("input",600),goal=el("fn-goal",600),dlg=el("dialog-btn",80);
+const document={body,documentElement:{},activeElement:body};
+function $(q){return q==="#fn-goal"?goal:null;}
+'''
+def _q643_lane(pg):
+    try:
+        js = _Q643_LN + _jsfn(pg, "function switchLane(m,how){") + _jsfn(pg, "function laneFocus(){") + r'''
+const o={},run=()=>{while(T.length)T.shift()();};
+switchLane("code");run();o.code=document.activeElement.id;
+document.activeElement=body;goal.offsetWidth=600;switchLane("funnel");run();o.funnel=document.activeElement.id;
+document.activeElement=body;switchLane("ai");run();o.chat=document.activeElement.id;
+document.activeElement=dlg;switchLane("code");run();o.dialog=document.activeElement.id;          // a dialog keeps it
+document.activeElement=body;input.offsetWidth=0;goal.offsetWidth=0;switchLane("funnel");run();o.hidden=document.activeElement.id;   // nothing on screen: nothing focused
+document.activeElement=body;input.offsetWidth=600;switchLane("funnel");run();o.same=document.activeElement.id;   // no switch, nothing moves
+process.stdout.write(JSON.stringify(o));'''
+        return _node_json(js, "q643ln.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _q643_lane_ok(o):
+    return (o.get("code") == "input" and o.get("funnel") == "fn-goal" and o.get("chat") == "input"
+            and o.get("dialog") == "dialog-btn" and o.get("hidden") == "body" and o.get("same") == "body")
+_q643_lo = _q643_lane(page)
+_q643_lm = [(d_, _q643_lane_ok(_q643_lane(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("a switch leaves the keyboard on the page (the shipped bug)", '  if(m!==from)setTimeout(()=>{if(typeof laneFocus==="function")laneFocus();},0);\n', ""),
+    ("taken from a dialog", "  if(ae&&ae!==document.body&&ae!==document.documentElement)return;\n", ""),
+    ("Funnels' question never given it", 'const g=$("#fn-goal"),t=uiMode==="funnel"&&g&&g.offsetWidth?g:input;', "const t=input;")]]
+check("6b643 a click on a lane's tab keeps the keyboard: the composer (Chat, Code) or Funnels' question takes it, never from a dialog that has it, never one that isn't on screen; %d mutants caught" % len(_q643_lm),
+      _q643_lane_ok(_q643_lo) and all(r_ is False for _, r_ in _q643_lm), "%r" % [_q643_lo, _q643_lm])
+
+# (7) dictation's download lines in plain words (the exception's text was the composer's placeholder)
+_q643_vc = _jsfn(page, "async function ensureVoice(){")
+check("6b643 dictation's download says what happened in plain words: \"Couldn't download dictation. Check your connection, then tap the mic to try again.\" (no exception text), \"Downloading dictation (N%)…\" while it runs (was \"getting the voice engine\")",
+      'input.placeholder="Couldn\\u2019t download dictation. Check your connection, then tap the mic to try again.";' in _q643_vc
+      and "s2.note.slice" not in _q643_vc and "getting the voice engine" not in page
+      and _q643_vc.count('"Downloading dictation ("') == 2, "")
+# ==== 6b643 quirks-1: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

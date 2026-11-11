@@ -1024,7 +1024,9 @@ fn stop_sidecar(app: &AppHandle) {
 
 /// THE MENU BAR, CURATED (per Patrick: "basically looked like one perfect
 /// window"): the app menu, Edit, View and Window, nothing else. No File or
-/// Help, no Services, no developer items in a release. Every item works:
+/// Help, no Services, no developer items in a release. Window has Close
+/// Window (Cmd+W, quirks-1: the key did nothing), which hides it as the red
+/// button does. Every item works:
 /// Edit's are the native responders (without them copy and paste stop in
 /// the webview); Settings, Import Chats (per Patrick: bring your chats
 /// integrated, not a main feature), Check for Updates and Toggle Sidebar
@@ -1086,6 +1088,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &PredefinedMenuItem::minimize(app, None)?,
             &PredefinedMenuItem::maximize(app, Some("Zoom"))?,
+            &PredefinedMenuItem::separator(app)?,
+            // Cmd+W closes the window as the red button does (quirks-1: it did
+            // nothing): CloseRequested hides it, the app stays in the Dock
+            &PredefinedMenuItem::close_window(app, Some("Close Window"))?,
         ],
     )?;
     Menu::with_items(app, &[&app_menu, &edit, &view, &window])
@@ -1226,6 +1232,12 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
         .theme(Some(tauri::Theme::Dark))
         .initialization_script(BRIDGE_SHIM)
         .initialization_script(FADE_IN)
+        // A FILE DROPPED ON THE WINDOW REACHES THE PAGE (quirks-1): Tauri's own
+        // drag-and-drop handler answers every native drop itself (wry's
+        // performDragOperation never calls WKWebView's), so the page's drop
+        // zones (the composer's attachments, Bring your chats) never saw a file.
+        // The page reads drops as HTML5 events; the shell listens to none.
+        .disable_drag_drop_handler()
         // only the app's own origin and the shell's own page load in this
         // window; anything else (a link in an answer) goes to the browser
         .on_page_load(|w, payload| {

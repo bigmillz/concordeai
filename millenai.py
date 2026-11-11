@@ -60407,6 +60407,15 @@ function switchLane(m,how){
   }
   else if(m!=="code"&&codey)setAgent("");
   if(m!==from&&how!=="keep")laneOpen(m,how);   // 6b628
+  // the lane's own field keeps the keyboard across a switch (quirks-1: a click on a lane's tab left it on the page, so
+  // the next keys went nowhere): the composer, or on Funnels' form its question; never taken from a field or a
+  // dialog that has it, never given to one that isn't on screen
+  if(m!==from)setTimeout(()=>{if(typeof laneFocus==="function")laneFocus();},0);
+}
+function laneFocus(){try{const ae=document.activeElement;
+  if(ae&&ae!==document.body&&ae!==document.documentElement)return;
+  const g=$("#fn-goal"),t=uiMode==="funnel"&&g&&g.offsetWidth?g:input;
+  if(t&&t.offsetWidth&&!t.disabled)t.focus({preventScroll:true});}catch(e){}
 }
 // ==== THE LANE'S OWN CHAT (6b628): begin ====
 // THE LANE'S OWN CHAT (6b628, per Patrick: "it has to be usable"; the walkthrough: Code kept the Chat conversation on
@@ -67134,9 +67143,9 @@ async function ensureVoice(){
     else if(s2.note&&!s2.downloading){
       // a failed fetch says so; tapping the mic again retries (6b317)
       clearInterval(voicePoll);voicePoll=null;
-      input.placeholder="Download failed ("+s2.note.slice(0,80)
-        +"). Tap the mic to retry.";}
-    else input.placeholder="getting the voice engine ("+(s2.pct||0)+"%)\u2026";
+      // plain words, never the exception's text (quirks-1: "Download failed (Got: ConnectError: [Errno 8] …")
+      input.placeholder="Couldn\u2019t download dictation. Check your connection, then tap the mic to try again.";}
+    else input.placeholder="Downloading dictation ("+(s2.pct||0)+"%)\u2026";
   },2000);
   return false;
 }
@@ -71120,6 +71129,16 @@ $("#persona-save").addEventListener("click",async ev=>{
   }catch(e){b.textContent="Couldn\u2019t save";}
   setTimeout(()=>{b.textContent="Save";},1800);
 });
+// THE NAME AND THE NOTE SAVE THEMSELVES (quirks-1): every other setting saves the moment it changes; these two waited
+// for the Save under the note, so a name typed and Settings closed was lost. Typing saves both, quietly, 0.7 s after
+// the last key, and a change (Enter, leaving the field) at once; Save stays and says Saved as before.
+let personaSaveT=0;
+function personaSaveQuiet(){clearTimeout(personaSaveT);personaSaveT=0;
+  api("/api/prefs",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({persona:$("#persona").value.trim(),user_name:$("#user-name").value.trim()})}).catch(()=>{});}
+["#user-name","#persona"].forEach(q=>{const el=$(q);if(!el)return;
+  el.addEventListener("input",()=>{clearTimeout(personaSaveT);personaSaveT=setTimeout(personaSaveQuiet,700);});
+  el.addEventListener("change",personaSaveQuiet);});
 /* "Personalise suggestions" (6b390): the switch is a setting of the person's
    (suggest_own, on unless saved off); the line under it says where the chips
    stand and Refresh asks for a pass now */
@@ -74107,7 +74126,10 @@ function hzSidebarToggle(){
   const root=document.documentElement;
   hzTraceKill();      // the greeting moves: no trace layer may stay where it was (6b542)
   if(innerWidth<=760){document.body.classList.toggle("sbopen");return;}
-  if($("#hero")){root.classList.toggle("hz-sbopen");}
+  if($("#hero")){const open=!root.classList.contains("hz-sbopen");root.classList.toggle("hz-sbopen",open);
+    // opened on purpose, it stays open in the chat picked from it (quirks-1: a sidebar shut in a chat earlier
+    // vanished the moment a chat was opened from the home's)
+    if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}}}
   else{const hide=!root.classList.contains("sbhide");root.classList.toggle("sbhide",hide);
     try{localStorage.setItem("millen.sbhide",hide?"1":"0");}catch(e){}}
   hzSidebarLabel();

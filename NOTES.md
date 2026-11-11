@@ -22652,3 +22652,81 @@ Security > Speech Recognition." (C++ shell before macOS 26); "Couldn’t start d
 takes 300 ms of the fake device's own time, and the pre-roll keeps what is said meanwhile. The send key turns ember
 once the words land (as for typed text, 6b542's rule); during listening and finishing it stays silver. The Python-app
 bundle (`build_macos_app.sh`) still carries no helper (6b543).
+
+## 6b643 — quirks-1: links open, dropped files land, ⌘W closes, the name saves itself (7.0 beta 4, per Patrick: a quirks pass after a day of hitting quirks)
+
+Branch `quirks-1` from beta-4 (4439647). The id is the next free one I could see; the release owner may renumber.
+
+**How it was driven.** The shipping Tauri shell built from this branch (`cargo tauri build --bundles app`, native arch)
+as a test bundle, `com.millen.millenai.quirkstest` / "ConcordeAI Quirks", in the scratchpad, never /Applications. Its
+Info.plist's `LSEnvironment` made it a dev copy (MILLENAI_DEV + its own MILLENAI_HOME, its own port), with
+`CONCORDE_PYTHON` the app's venv (no first-run bootstrap), `CONCORDE_SERVER` this branch's millenai.py, HF_HOME a stub
+cache, and the 6b627 hooks (engine-port / engine-cmd) on a stand-in engine that streams markdown (code, a table,
+links). No servers.json, no cloud key, no real server. The sidecar had no network: a `sitecustomize` on PYTHONPATH
+refused every non-loopback connect and DNS lookup and made ddgs/primp unimportable (no search engine was ever asked).
+The page was read and driven through the probe hook (compiled into this test build only, never committed) and real
+key presses posted to the process (CGEventPostToPid). The window sat on another Space behind a full-screen app for
+most of the run, so WKWebView was not painting (document hidden): what needs pixels or the window in front (traffic
+lights, dragging the header, full screen, split view, context menus, the light/dark native bits, a real drag of a
+file) is listed under Open, not claimed.
+
+**Fixed.**
+1. **Links did nothing (P0).** Every `target="_blank"` link (an answer's links, its source chips, Settings' guides,
+   Open in Maps) is taken by the opener plugin's own click script (tauri-plugin-opener 2.7.2, `open_js_links_on_click`
+   on by default), which `preventDefault`s and invokes `plugin:opener|open_url`; the capability never granted it, so
+   the call failed with "Command plugin:opener|open_url not allowed by ACL" (measured in the shell) and nothing opened.
+   `capabilities/main.json` grants `opener:allow-open-url` and `opener:allow-default-urls` (http, https, mailto, tel;
+   not `opener:default`, which adds reveal-in-folder). Measured after: open_url is allowed and a `file:` URL is still
+   refused by the scope ("Not allowed to open url").
+2. **A dropped file never reached the page (P0).** Tauri's drag-and-drop handler is on by default and answers every
+   native drop itself (tauri-runtime-wry's handler returns true; wry then never calls WKWebView's own
+   `performDragOperation`), so the composer's drop and Bring your chats' drop zone saw no file in the shell (6b547's
+   drop was tested in node only). The window is built with `.disable_drag_drop_handler()`; the page's HTML5 listeners
+   are the only ones. By source; a real drag was not possible with the window off screen.
+3. **⌘W did nothing (P1).** The Window menu has **Close Window ⌘W** (Pat's curated menu otherwise unchanged; no Show
+   All). It goes through CloseRequested, which hides the window as the red button does. Measured: ⌘W hid the window;
+   opening the app again brought it back.
+4. **"What should we call you?" was lost (P1).** It and "Anything to keep in mind?" saved only with the Save under the
+   second field, while every other setting saves at once: a name typed and Settings closed was gone at the next open.
+   Both now save 0.7 s after typing stops and at once on a change (one POST of both); Save stays. Measured: typed
+   "Quinn", Esc, relaunch: prefs.json and the field have it.
+5. **The sidebar vanished (P1).** Shut in a chat (sbhide), then opened from the home (hz-sbopen), it disappeared the
+   moment a chat was picked from it. Opening it on the home now clears the earlier shut and remembers that.
+6. **A lane's tab took the keyboard away (P1).** After a click on Chat, Code or Funnels the focus was on the page,
+   so typing did nothing. The lane's field takes it (the composer, or Funnels' question), never from a dialog.
+7. **Dictation's download failure (P1/P2).** The composer's placeholder showed the exception: "Download failed (Got:
+   ConnectError: [Errno 8] … An error happened w). Tap the mic to retry." Now plain words (copy below).
+
+**Checked and fine on beta-4.** The find bar sits under the header (380 px wide at y 80 at 1320, no header control
+under it). A reopened chat with no answer says "No answer came back for this question." with Try again. The effects
+level follows prefs.json into a new origin (a new port: localStorage empty, Full kept). The send key is the silver
+outline. "dripOff" is declared outside the try. The updater's swap, run on two throwaway bundles: "swapped", the new
+one launched, Launch Services has the path at the new version and no stale `.app.old` record. A second launch hands
+off to the first (one shell). ⌘, opens Settings, Esc closes it and the composer has the keyboard again; ⌘K, ⌘N,
+⌘F/Esc, ⌘\ and Shift+Return work. Quit mid-answer: 0.5 s, the partial answer saved as Stopped with Try again. A
+dropped stream: "The connection dropped." with Continue and Try again. The cold start: the port in 0.44 s, the page
+complete in about 2 s. The window's place comes back at the same size every launch (no creep). The answer's Copy and
+the code card's Copy reach the clipboard. Long tables scroll inside their own box.
+
+**Gauntlet.** New `# ==== 6b643 quirks-1` (7 checks): the shell by its source and capability (links, drops, Close
+Window; 6 mutants), the page's drop zones, the name and note autosave in node (3 mutants), the sidebar in node on
+hzSidebarToggle (2 mutants), the lane focus in node on switchLane and laneFocus (3 mutants), the dictation lines.
+Re-pinned at the same strength: the shell's permission list (two opener grants) and the curated menu (Close Window
+required, Show All still refused). Run standalone on a dev copy of this branch (those two checks and the block),
+8/8; the full gauntlet is the beta-4 integrator's.
+
+**Copy (for Patrick).**
+- Window menu: (none) → **"Close Window ⌘W"** (new item; macOS adds "Close All" as its Option alternate).
+- Composer, dictation download failed: "Download failed (<error text>). Tap the mic to retry." → **"Couldn’t download
+  dictation. Check your connection, then tap the mic to try again."**
+- Composer, dictation downloading (later polls): "getting the voice engine (N%)…" → **"Downloading dictation (N%)…"**
+  (the first poll already said this).
+
+**Open (not fixed here; in the report to Patrick).** The window's 940 × 620 minimum is wider than half of every
+screen this Mac family has at default scaling (half of 1728 is 864), so Split View and the half-screen tiles can't
+take ConcordeAI; lowering it needs the `html.tl` header checked under 940. No zoom (⌘+ / ⌘−) in the shell.
+`accept_first_mouse` is off, so the first click on an inactive window only activates it (the header can't be
+dragged from the background in one go): Pat's call. The sidebar's shut state and width are per origin
+(localStorage), so a port change forgets them. The draft in the composer follows you across lanes. Tab order puts
+Attach after the mode and the effort slider, and the header last. About shows the chip as "M4 PRO". Search never
+ran here by rule (the search engines are rate-limiting this Mac's address).
