@@ -20988,3 +20988,66 @@ anchors are untouched.
 - 120 Hz is not measurable on this machine's displays (both engines cap at 60 Hz on screen); the uncapped Chromium
   frame time is the proxy.
 - Inter falls back to the system's sans until beta-4-panel's font file lands.
+## 6b600 — quiet-hours: a sleeping server is left asleep at night unless it was picked alone (7.0 beta 4, per Patrick)
+
+Patrick approved: during his home server's quiet hours (23:00 to 08:00 in the server's own time zone, Florida) the
+app must not wake a sleeping paired server unless the person picked that server alone ("<name> Only"). Otherwise
+the question goes to this computer or the cloud, as the fallback already does, with one short status line saying
+why. Branch `quiet-hours` from beta-3 (c5d44c5); the server kit's half is branch `kit-quiet`, built alongside and
+not installed yet, so nothing here was tried against a real kit.
+
+**The contract.** The kit's signed `GET /v1/sleep-config` and `GET /v1/whoami` answers gain
+`"quiet": {"enabled": true, "start": "23:00", "end": "08:00", "tz": "America/New_York", "now": false,
+"sleep_minutes": 12}` (start and end on the server's clock, tz an IANA name). Older kits send none.
+
+**Now.**
+- **Kept, cleaned** (`_srv_clean_quiet`, `quiet` in the server's row of `servers.json`): a bool, two "HH:MM", a zone
+  `zoneinfo` knows (it refuses paths, dot segments and unknown names) and whole minutes 0 to 1,440. One part wrong
+  and none of it is believed; `now`, and anything else the server adds, is never kept. Saved from a sleep-config
+  answer (`_srv_sleep_call`) and from a check's signed whoami (`_srv_keep_quiet`, written only when it changed). An
+  answer without `quiet` keeps what was kept; a malformed one drops it (no guess). A hand-edited file is cleaned on
+  read like the rest of the row. No `quiet` ever seen: no quiet hours, exactly as before.
+- **Read by the app itself** (`srv_quiet_at`, `server_quiet`): this computer's clock in the server's zone (summer and
+  winter time follow the zone), start <= time < end, across midnight when end comes first (23:00 to 08:00: 08:00 is
+  morning), start == end never quiet, `enabled: false` never. The server's `now` isn't used: it is asleep when this
+  matters.
+- **No wake call in them** for anything but "<name> Only": `server_sleepers` (the modes, the Code lane and, through
+  `server_gen_sleepers`, a picture or a video) leaves it out, `server_wake_ask` skips it with no step and no
+  countdown, and `server_wake` itself refuses (the refresh's old wake for pictures, the agents with their own flow
+  and the funnels all go through it). "<name> Only" (and a mode on that server alone) wakes it as before:
+  `server_only_resolve` passes `only=True`, and the wake after the headers is `rewait`'s, which only "<name> Only"
+  uses. A server that is awake and answering is used as always: quiet hours only stop waking. Settings' **Wake up
+  server** and **Test relay** buttons are left alone (a person pressing them asks for exactly that).
+- **The one line** (a STATUS frame after the headers, before any wake step; once per server per request, cleared by
+  `server_quiet_reset` with the request's other notes; `server_make` says it for a picture): who answers is read from
+  the roster and from whether the cloud may answer (`gate_ladder(fast_cloud_ladder(), ...)`).
+
+**Copy, new (for Patrick's approval):**
+- "Ollama1 is in quiet hours until 08:00, so this computer is answering."
+- "Ollama1 is in quiet hours until 08:00, so the cloud is answering." (one seat with cloud power on, since Fast asks
+  the cloud first; or no local seat)
+- "Ollama1 is in quiet hours until 08:00, so this computer and the cloud are answering." (Thinking, Pro, Max with
+  cloud power on)
+- "Ollama1 is in quiet hours until 08:00, so it wasn't woken." (a picture or a video, or nobody to name)
+- another of the person's servers seated instead: "... so <that server> is answering."
+
+The brief's example was past tense ("so this computer answered"); the line shows while the answer is being written,
+so it reads in the present. The hour is the server's own clock, as the kit sends it.
+
+**Tests:** `== quiet hours ... (6b600) ==`, in process on the servers section alone, with the stand-in transport
+(`_w46_router`), a stand-in clock (`_srv_quiet_clock`) and recorded packets (none sent): the cleaning (good, 31
+malformed shapes, absent, a hand-edited file, whoami and sleep-config); the window (midnight crossing, the 08:00
+edge, a daytime window, start == end over the whole day, off, the zone in July, in January and in Tokyo); the wake
+(a mode's refresh, the list after the headers, a picture's list, the ten-second ask and `server_wake` send nothing
+at 03:00; "<name> Only" before and after the headers wakes it; an awake server is used; no card, nothing to say;
+08:00, 14:00, no `quiet`, turned off and start == end all wake as before); the line (each wording, markup in a name,
+never "Mac", once a request, the handler's wiring and the picture's); no secret in anything new. 34 mutations, each
+caught.
+
+**Left / worth knowing.**
+- Not tried against a real kit (`kit-quiet` isn't installed); the contract above is all this side knows.
+- A kit downgraded to one without quiet hours leaves the last `quiet` kept (an answer without it keeps it). Turning
+  quiet hours off in the kit (`enabled: false`) clears them at its next answer.
+- "until 08:00" is the server's clock. Away from Florida that is not this computer's 08:00; converting it would need
+  saying which clock, so it is left as the kit sends it.
+- This computer's clock decides while the server is asleep; a wrong clock here moves the hours.
