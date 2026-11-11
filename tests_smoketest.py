@@ -8029,12 +8029,14 @@ check("Windows web search goes through a loopback proxy that refuses strangers",
 import builtins as _bi17, io as _io17, wave as _wv17
 def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
     log = []
+    langs = _voice_langs
     class _WM:
         def __init__(self, repo, device, compute_type):
             self.dev = device
             log.append(("load", repo, device, compute_type))
-        def transcribe(self, audio, beam_size):
+        def transcribe(self, audio, beam_size, language=None):
             log.append(("beam", beam_size))
+            langs.append(language)              # 6b641: always told, never None
             def gen():
                 if self.dev == "cuda" and gpu_breaks:
                     raise RuntimeError("Library cublas64_12.dll is not found")
@@ -8053,12 +8055,14 @@ def _voice_ns(mac, devices, dlls, gpu_breaks, f16=True):
         return fakes[name] if name in fakes else _bi17.__import__(name, *a, **k)
     ns = {"__builtins__": dict(vars(_bi17), __import__=_imp),
           "IS_MAC": mac, "IS_WIN": not mac, "IS_ARM": False,
-          "threading": __import__("threading")}
+          "threading": __import__("threading"), "re": re, "os": os}
     _exec_names(ns, {"WHISPER_REPO", "WHISPER_REPO_CPU", "_whisper_lock",
+                     "_LANG_RE", "dict_lang_ok", "_system_langs", "_whisper_lang",   # 6b641: whisper told the language
                      "_fw_model", "_fw_cuda", "_whisper_cuda", "_whisper_repo",
                      "_transcribe_wav", "_transcribe_audio", "_wav_to_f32",   # 6b542 split the WAV decode out
                      "_fw_transcribe"})
     return ns, log
+_voice_langs = []
 _wbuf = _io17.BytesIO()
 with _wv17.open(_wbuf, "wb") as _w:
     _w.setnchannels(1); _w.setsampwidth(2); _w.setframerate(16000)
@@ -8093,6 +8097,7 @@ check("voice on a PC: the small model greedy on the CPU, the big one only on a u
                                            ("load", _big, "cpu", "int8"),
                                            ("beam", 1), ("beam", 1)])
       and _mac_ns["_whisper_repo"]() == "mlx-community/whisper-large-v3-turbo"
+      and _voice_langs and all(isinstance(x_, str) and len(x_) == 2 for x_ in _voice_langs)   # 6b641
       and _voice_src.count("_whisper_repo()") == 2
       and "_hf_model_dir(WHISPER_REPO)" not in _MILLENAI_SRC,
       "%r" % _vr)

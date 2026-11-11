@@ -73078,7 +73078,7 @@ function sxSetSimplify(){
   if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(x=>x.classList.add("sx-gone"));
   // About: the version, What's new, Check now and Effects; the rest under Advanced
   const ab=g("#p-about");const fn=g("#fx-level-note");if(fn)fn.classList.add("sx-gone");
-  if(ab)sxAdv(ab,[g("#beta-row"),g("#autochk-toggle"),g("#look-row"),g("#micwarm-toggle"),g("#micwarm-note")]);
+  if(ab)sxAdv(ab,[g("#beta-row"),g("#autochk-toggle"),g("#look-row"),g("#dictlang-row"),g("#micwarm-toggle"),g("#micwarm-note")]);   // 6b641: the dictation language with the microphone's
   // Your stuff: the privacy line stays, the long paragraph goes; the cloud switch and re-reading under Advanced
   const pk=g("#p-know");
   if(pk){const td=pk.querySelector(":scope>.tdesc"),pv=g("#know-privacy");if(td&&pv){td.before(pv);pv.classList.add("sx-priv");td.classList.add("sx-gone");}
