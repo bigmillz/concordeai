@@ -2379,10 +2379,11 @@ check("advanced council picker present",
       '"__adv__"' in page and 'class="engdiv"' in page
       and 'id="adv-veil"' in page and 'id="adv-comp"' in page
       and '<div class="adv-h">Compositor</div>' in page and "ADV_USE" in page)
-# 6b247: the four-step first-run wizard — markup, all four steps, the
-# once-only gate, and the plan/provider machinery it drives
+# 6b247: the first-run wizard — markup, every step (five since 6b630: the
+# pair-your-server step), the once-only gate, and the plan/provider machinery
 check("first-run wizard present, gated on wizard_done",
-      'id="wiz-veil"' in page and page.count('class="wstep"') == 4
+      'id="wiz-veil"' in page and page.count('class="wstep"') == 5
+      and 'id="wiz-code"' in page and 'id="wiz-srv-adv"' in page
       and "wizard_done" in page and "openWizard" in page
       and "platform.moonshot.ai" in page and "aistudio.google.com" in page)
 # (6b534) the Horizon look closes the sidebar on its home by its own scoped rules, each with
@@ -2523,8 +2524,9 @@ check("prune: retired registry + ladders scrubbed",
       and '"Mistral Small 24B":' in _MILLENAI_SRC
       and "def _gb_of" in _MILLENAI_SRC
       and "elif label in RETIRED_MODELS:" in _MILLENAI_SRC)
-check("wizard has the auto-clean box, no button",
-      'id="wiz-ac"' in page and "wiz-clean-now" not in page)
+# 6b630, per Patrick: the power-user boxes left the wizard for Settings › Models
+check("auto-clean is Settings' switch, not the wizard's box, and no button",
+      'id="wiz-ac"' not in page and 'id="autoclean-toggle"' in page and "wiz-clean-now" not in page)
 # the name and town come from /api/prefs behind the token (6b321), not
 # from the page's HTML
 check("hero greets by name and town",
@@ -2738,7 +2740,7 @@ check("post-update sweep, endpoints, and the default wired",
       and "_app_models_add(label)" in _MILLENAI_SRC.split(
           "def _download_model")[1][:1500]
       and "pr2.auto_cleanup!==false" in page
-      and 'id="wiz-ac" checked' in page)
+      and 'id="autoclean-toggle"' in page and 'id="wiz-ac"' not in page)   # (6b630) Settings only
 s, h, b = req("/api/model/update", cookie=K)
 check("update status answers", s == 200 and b'"state"' in b, b[:80])
 # 6b307, per Patrick ("are all our cloud ones using the most capable
@@ -5007,8 +5009,8 @@ check("cloud wiring: ranked everywhere, no 6-id cap, no 4096 wall, one render tr
       # the month-old unstamped entry that kept Groq off every council
       and "AN ENTRY WITHOUT A STAMP GETS ANOTHER CHANCE" in _MILLENAI_SRC)
 check("giants boxes: greyed until no-limits, with the 512 GB tooltip",
-      'id="giants" disabled' in page and 'id="wiz-gi" disabled' in page
-      and page.count("Needs 512 GB of memory") >= 2      # (6b538) both tooltips
+      'id="giants" disabled' in page and 'id="wiz-gi"' not in page   # (6b630) Settings' only
+      and page.count("Needs 512 GB of memory") >= 1      # (6b538) its tooltip
       and "function paintGiants" in page and "include_giants:false" in page
       and "Titan · 512 GB" in _MILLENAI_SRC)
 # 6b283, per Patrick (twice): the Clean-up button and note were clipped
@@ -6419,16 +6421,16 @@ def _s5_wiring(src):
     i = src.index('        if self.path == "/api/setup/install":')
     route = src[i:src.index("            return\n", src.index("model_set_choose(_key)", i)) + 20]
     ss = src[src.index("def setup_status()"):src.index("def _other_millenai_running")]
-    return (route.index("_key = model_set_key(") < route.index(
-                "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or "
+    return (route.index("_key = \"starter\" if _plan == \"starter\" else model_set_key(_plan)") < route.index(
+                "            if not _key:\n                self._send_json({\"err\": \"Pick Starter, Light, Recommended or "
                 "Everything.\"},\n                                code=400)\n                return\n")
-            < route.index("_want = model_sets()[_key]")
-            < route.index("start_model_downloads(_want)") < route.index("model_set_choose(_key)")
+            < route.index("_want = [STARTER_MODEL] if _key == \"starter\" else model_sets()[_key]")
+            < route.index("start_starter_first(_want)") < route.index("model_set_choose(_key)")
             and "_remove_models" not in route
             and '"sets": model_sets_status(pulled, sets),' in ss and "sets = model_sets()\n" in ss
             and 'first = sets[model_set_chosen() or FIRST_RUN_SET]' in ss
             and '\nFIRST_RUN_SET = "light"\n' in src
-            and 'let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null;' in src
+            and 'let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null,wizSt=null;' in src
             and 'let setupPlan="light",setupPlanPicked=false,setupSt=null;' in src
             and "    stars_now = set(first)\n" in ss
             and "    for label in (list(labels) if labels is not None else first_set_labels()) + [\n" in src
@@ -6443,10 +6445,10 @@ def _s5_page(src):
     gone as set names, and the false sentence gone."""
     pg = page
     return ("planCardsPut(setCardsHtml(lastSetup.sets,{scr:\"grid\"}));" in src
-            and 'box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});' in src
+            and '+setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz",eta:true})' in src and "box.innerHTML=wizPlansHtml();" in src
             and "+setCardsHtml(sets,{pick:setupPlan,scr:\"setup\"})+" in src
             and "+setCardsHtml(d.sets,{where:s.name})+" in src
-            and src.count("setCardsHtml(") == 6
+            and src.count("setCardsHtml(") == 5      # (6b630) the wizard draws its rows in one place, wizPlansHtml
             and '<div id="plan-row"><div id="plan-limits">' in pg
             and pg.index('id="plan-limits"') < pg.index('id="nolimits"') < pg.index('id="giants"')
             and 'id="nolimits"' not in pg[pg.index('<div id="setup-veil"'):pg.index('<script>', pg.index('<div id="setup-veil"'))]
@@ -6507,11 +6509,11 @@ _S5_MUT = [
     ("the card offers Everything", "    k = st[\"chosen\"] or st[\"mine\"]\n    out = list(st[k][\"labels\"]) if k else []",
      "    out = list(st[\"everything\"][\"labels\"])", [2]),
     ("the card offers a set nobody picked", "    k = st[\"chosen\"] or st[\"mine\"]\n", "    k = st[\"chosen\"] or \"recommended\"\n", [2]),
-    ("the pick not kept", "            model_set_choose(_key)\n", "", [3]),
-    ("an unknown name installs something", "            if not _key:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},",
-     "            if not _key:\n                _key = \"everything\"\n            if False:\n                self._send_json({\"err\": \"Pick Light, Recommended or Everything.\"},", [3]),
+    ("the pick not kept", "                model_set_choose(_key)\n", "", [3]),
+    ("an unknown name installs something", "            if not _key:\n                self._send_json({\"err\": \"Pick Starter, Light, Recommended or Everything.\"},",
+     "            if not _key:\n                _key = \"everything\"\n            if False:\n                self._send_json({\"err\": \"Pick Starter, Light, Recommended or Everything.\"},", [3]),
     ("first run defaults to Recommended", 'FIRST_RUN_SET = "light"\n', 'FIRST_RUN_SET = "recommended"\n', [0, 3]),
-    ("the wizard with its own cards", 'box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});', 'box.innerHTML="";', [4]),
+    ("the wizard with its own cards", '+setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz",eta:true})', '+""', [4]),
 ]
 _s5m = []
 for _d5, _o5, _n5, _w5 in _S5_MUT:
@@ -6523,13 +6525,14 @@ for _d5, _o5, _n5, _w5 in _S5_MUT:
 check("the three sets: %d mutations of their rules, each caught by the check that guards it" % len(_S5_MUT),
       all(isinstance(v, list) for _d, v in _s5m), "%r" % [x for x in _s5m if not isinstance(x[1], list)])
 # the wizard's studio options: two one-line rows in the autoclean row's own look, no description (Patrick)
-_wz = page[page.index('<label id="wiz-image">'):page.index('<label id="wiz-nolimits">')]
-check("wizard: image and video options are two short rows styled like the autoclean row",
+_wz = page[page.index('<label id="wiz-image">'):page.index('<div class="wstep" data-w="3"')]
+check("wizard: image and video options are two short rows (the autoclean row's old look; 6b630: the power-user boxes are Settings')",
       '<span>Image generation <i class="wsz">(9.6 GB)</i></span>' in _wz
       and '<span>Video generation <i class="wsz">(19.6 GB)</i></span>' in _wz
       and "make pictures" not in _wz and "short video" not in _wz and "Also add" not in _wz
-      and "#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;" in page
-      and "#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}" in page
+      and 'id="wiz-nolimits"' not in page and 'id="wiz-autoclean"' not in page and 'id="wiz-giants"' not in page
+      and "#wiz-image,#wiz-video{display:flex;" in page
+      and "#wiz-image input,#wiz-video input{margin-top:2px}" in page
       and 'z.textContent="("+t.gb+" GB)"' in page
       and "Pictures from a description, on this computer" in page)     # the studio card's own line stays
 # ==== 6b405 model sets: end ====
@@ -8582,7 +8585,7 @@ def _upd(tag, frozen=False, mac=False, name="6.2", arm=False, arm_msi=False):
                          {"name": "ConcordeAI-6.2-Windows.zip", "browser_download_url": "https://github.com/x/w.zip", "size": 4e5}]
               + ([{"name": "ConcordeAI-6.2-arm64.msi", "browser_download_url": "https://github.com/x/arm.msi", "size": 7e7}]
                  if arm_msi else [])}}
-    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line"})
+    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line", "user_notes", "WHATS_NEW_OPEN", "WHATS_NEW_CLOSE"})
     return ns["_check_update_live"]()
 _u_new, _u_msi, _u_old, _u_mac = _upd("v320"), _upd("v320", frozen=True), _upd("v290"), _upd("v320", mac=True)
 # a higher tag with a LOWER version (6.0.4's v274 against 6.1's build 273)
@@ -37133,7 +37136,11 @@ def _c94_rows(src):
         "the page describes both": all('  "%s":"' % l in src for l in _C94),
         # 6b533: Muse Glimmer 30B asks for the pin, the version its module was checked in
         "Gemma 4 12B needs mlx-lm 0.32.0 for MLX": ns["MLX_REQUIRES"] == {"Gemma 4 12B": (0, 32, 0),
-                                                                        "Muse Glimmer 30B": (0, 32, 2)}}
+                                                                        "Muse Glimmer 30B": (0, 32, 2),
+                                                                        # 6b630: every gemma4, qwen3_5 and glm_moe_dsa row
+                                                                        "Gemma 4 E2B": (0, 31, 2), "Gemma 4 26B": (0, 31, 2),
+                                                                        "Qwen 3.5 9B": (0, 30, 7), "Qwen 3.8 27B": (0, 30, 7),
+                                                                        "Qwen 3.6 35B MoE": (0, 30, 7), "GLM 5.3": (0, 30, 7)}}
     return all(out.values()), {k: v for k, v in out.items() if not v}
 
 
@@ -43561,13 +43568,13 @@ def _c36_bundle(f):
                                                    and b.index('"Set :CFBundleVersion $BUILD"') < b.index('codesign "${SIGN[@]}"'),
         "read back": '[[ "$GOT_BUILD" == "$BUILD" ]] ||' in b and '[[ "$GOT_VER" == "$VER" ]] ||' in b
                      and '[[ "$GOT_ID" == "com.millen.millenai" ]]' in b and '[[ "$GOT_EXE" == "ConcordeAI" ]]' in b
-                     and "for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do" in b   # the two helpers (6b543, 6b546)
+                     and "for f in millenai.py launch.sh crypto-requirements.txt engine-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do" in b   # the two helpers (6b543, 6b546), the engine's pins (6b630)
                      and 'cmp -s millenai.py "$BUNDLE/Contents/Resources/millenai.py"' in b,
         "universal": 'TARGET="universal-apple-darwin"' in b and "expected a universal binary" in b,
         "the image is build_dmg.sh's": "DMG_APP_READY=1 ./build_dmg.sh" in b
                                       and 'if [[ -n "$DMG_APP_READY" ]]; then' in d and "  ./build_macos_app.sh\n" in d,
         "the bundle's identity and resources": conf.get("identifier") == "com.millen.millenai"
-                                              and {"millenai.py", "launch.sh", "crypto-requirements.txt", "fonts", "vfx"} <= set(res.values())
+                                              and {"millenai.py", "launch.sh", "crypto-requirements.txt", "engine-requirements.txt", "fonts", "vfx"} <= set(res.values())
                                               and conf["bundle"]["macOS"].get("minimumSystemVersion") == "11.0",
     }
     return all(out.values()), {k: v for k, v in out.items() if not v}
@@ -43605,10 +43612,12 @@ def _c36_updater(f):
         and "watch_sidecar(app.clone(), log_path.clone());" in rs
         and rs.index("*sc.child.lock().unwrap() = Some(child);") < rs.index("watch_sidecar(app.clone(), log_path.clone());")
         and rs.count("#[tauri::command]") == 1)
+    # (6b630: the setup's own screen and "Try again"; a venv too old for the engine is made again)
     out["shell: venv bootstrap on a fresh Mac"] = (
-        "fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool" in rs
+        "fn bootstrap_venv(app: &AppHandle, py: &Path) -> Option<bool>" in rs
         and 'if !cfg!(target_os = "macos") || std::env::var_os("CONCORDE_PYTHON").is_some()' in rs
-        and '.arg("--bootstrap")' in rs and "if !py.exists() && !bootstrap_venv(&app, &py) {" in rs)
+        and '.arg("--bootstrap")' in rs and "if !ensure_python(&app, &py) {" in rs
+        and "if venv_ready(py) {\n            return true;" in rs)
     return all(out.values()), {k: v for k, v in out.items() if not v}
 
 
@@ -43678,7 +43687,7 @@ _C36_MUT = [
      '        while num.count(".") >= 1 and num.endswith(".0"):\n            num = num[:-2]', [2]),
     ("rs", "the shell stays open on the sidecar's clean exit", "if status.code() == Some(0) {\n            app.exit(0);",
      "if status.code() == Some(0) {\n            return;", [2]),
-    ("rs", "no venv bootstrap", "if !py.exists() && !bootstrap_venv(&app, &py) {", "if !py.exists() {", [2]),
+    ("rs", "no venv bootstrap", "if !ensure_python(&app, &py) {", "if !py.exists() {", [2]),
     ("sb", "the shell MSI attached to the release", "      - uses: actions/upload-artifact@v4",
      "      - run: gh release upload v1 x.msi\n      - uses: actions/upload-artifact@v4", [3]),
     ("nw", "the nightly DMG is the Python app's", "./build_shell_dmg.sh", "./build_dmg.sh", [3]),
@@ -44686,7 +44695,7 @@ def _sl_upd(rel, nightly="7.0 · 38f247b"):
           "APP_VERSION": "7.0.0", "re": re, "urllib": __import__("urllib"), "_update": {}, "_gh_time": lambda s: 0,
           "short_version": lambda: "7.0", "_app_bundle_path": lambda: None, "_build_from_tag": lambda t: int(re.sub(r"\D", "", t) or 0),
           "_channel_release": lambda: rel}
-    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line"})
+    _exec_names(ns, {"_check_update_live", "_release_notes", "_nightly_line", "user_notes", "WHATS_NEW_OPEN", "WHATS_NEW_CLOSE"})
     return ns["_check_update_live"]()
 
 
@@ -44699,7 +44708,7 @@ def _sl_wn(rels):
         request=__import__("types").SimpleNamespace(Request=lambda u, headers=None: u, urlopen=lambda u, timeout=8: _R(json.dumps(rels).encode())))
     ns = {"APP_NIGHTLY": "7.0 · 38f247b", "APP_BUILD": 278, "APP_VERSION": "7.0.0", "UPDATE_API": "https://api.github.com", "UPDATE_REPO": "x/y",
           "urllib": _ur, "json": json, "re": re, "short_version": lambda: "7.0 · 38f247b", "_whatsnew_cache": {}}
-    _exec_names(ns, {"whats_new", "_nightly_line"})
+    _exec_names(ns, {"whats_new", "_nightly_line", "user_notes", "WHATS_NEW_OPEN", "WHATS_NEW_CLOSE"})
     return ns["whats_new"]("7.0 · 1111111")
 
 
@@ -47998,6 +48007,385 @@ for d_, m_, ok_ in _u621_lm:
 check("6b621 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _u621_lmr),
       all(o_ for _, o_, _ in _u621_lmr), json.dumps(_u621_lmr)[:1500])
 # ==== 6b621 ultra at full strength: end ====
+# ==== first run (6b630): begin ====
+# Patrick, after a fresh-eyes audit of a new Mac's first run: the bootstrap ran the system's python3 (the Command
+# Line Tools' 3.9.6), pip could then give only mlx-lm 0.29.1, and the Light set's everyday model died with "Model type
+# gemma4 not supported"; a Mac without the tools got a dialog with a Terminal command in it; the app said "ready" with
+# no model and the first question ended in "Backend error". Now: the app's own Python (a pinned, hash-checked
+# python-build-standalone 3.12, downloaded on first run, never the system's), every newer model type gated on the
+# mlx-lm that loads it, a branded setup screen with live steps and "Try again", and a home that says when nothing can
+# answer, with the Starter (0.8 GB) as its one primary button and the cloud as a choice of its own.
+import hashlib
+print("== first run: our own Python, the gate, the setup screen, the empty state, the Starter (6b630) ==")
+_FR = {k: open(v, encoding="utf-8").read() for k, v in {
+    "bm": "build_macos_app.sh", "bsd": "build_shell_dmg.sh", "rel": "release.sh",
+    "stamp": os.path.join("packaging", "shell_stamp.py"),
+    "rs": os.path.join("shell", "src-tauri", "src", "main.rs"),
+    "conf": os.path.join("shell", "src-tauri", "tauri.conf.json")}.items()}
+_FR["src"] = _MILLENAI_SRC
+_FR["page"] = page
+
+
+def _fr_launch(f):
+    m = re.search(r"<<'LAUNCH'\n(.*?)\nLAUNCH\n", f["bm"], re.S)
+    return m.group(1) if m else ""
+
+
+def _fr_py_static(f):
+    """launch.sh never runs the system's Python: a pinned python-build-standalone per architecture, its SHA-256
+    checked before anything is unpacked, the venv made from it; the engine at the app's pins; no Terminal words."""
+    L, rs = _fr_launch(f), f["rs"]
+    shas = dict(re.findall(r"(aarch64|x86_64) PBS_BYTES=\d+\n\s+PBS_SHA=([0-9a-f]{64}) ;;", L))
+    i_sum, i_tar = L.find("/usr/bin/shasum -a 256"), L.find("/usr/bin/tar -xzf")
+    conf = json.loads(f["conf"])
+    out = {
+        "no system python": "command -v python3" not in L and "/usr/bin/python3" not in L and "python3 -m venv" not in L,
+        "the pins": "PBS_TAG=20261026" in L and "PBS_VER=3.12.16" in L and len(shas) == 2
+                    and shas.get("aarch64") == "353d5f1b4fd2715e7053f12f068435d5bbad16b91e057006b5d01e0925709a7e"
+                    and shas.get("x86_64") == "37c38fda76fec1fbf310adcbafb7f0d96af13b5511bf8ea954c3aa8eec185734"
+                    and "/cpython-$PBS_VER%2B$PBS_TAG-$PBS_ARCH-apple-darwin-install_only_stripped.tar.gz" in L
+                    and 'PBS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/$PBS_TAG' in L,
+        "checked before it is unpacked": 0 < i_sum < i_tar and 'if [[ "$sum" != "$PBS_SHA" ]]; then' in L
+                                         and L.index('if [[ "$sum" != "$PBS_SHA" ]]; then') < i_tar,
+        "the venv from it": '"$BASE" -m venv "$VENV"' in L and 'BASE="$BASE_DIR/bin/python3"' in L,
+        "a venv too old is made again": "too_old()" in L and "(( v < 11 ))" in L and 'OLD="$SUPPORT/venv-old-$$"' in L,
+        "a setup stopped half way is finished next time": ': > "$UNFINISHED"' in L and 'rm -f "$UNFINISHED"' in L
+                                                          and '[[ -x "$PY" && ! -e "$UNFINISHED" ]] && ! too_old || return 1' in L,
+        "no Terminal words for people": not re.search(r"xcode-select|CONCORDE_PYTHON|CONCORDE_SERVER|Terminal", L)
+                                        and "xcode-select" not in rs,
+        "the screen's lines": 'say "@@steps $(( 3 + ARM ))"' in L and "--progress-bar raw" in L and 'say "@@pct ' in L
+                              and '[[ "$2" == "--shell" ]] && SHELLRUN=1' in L,
+        "the engine at the app's pins": 'ENG="$DIR/../Resources/engine-requirements.txt"' in L
+                                        and "engine-requirements.txt" in json.dumps(conf["bundle"]["resources"])
+                                        and "crypto-requirements.txt engine-requirements.txt" in f["bsd"],
+        "the bootstrap still hands back": '[[ "$1" == "--bootstrap" ]] && exit 0\nexec "$PY" "$DIR/../Resources/millenai.py"' in L,
+    }
+    ns = {}
+    exec(f["stamp"][f["stamp"].index("def engine_reqs"):f["stamp"].index("def main")], dict(ns, re=re, sys=sys), ns)
+    out["engine-requirements.txt from MLX_LM_PIN and MLX_PIN"] = (
+        "engine_reqs" in ns and ns["engine_reqs"](f["src"]) == "mlx-lm==0.32.2\nmlx==0.32.4\n")
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _fr_py_run(f):
+    """The script's own functions, run in zsh in a folder of their own: a venv's age from its pyvenv.cfg; pip's lines
+    into screen lines; a download whose SHA-256 differs is never unpacked, one that matches is."""
+    L = _fr_launch(f)
+    pre = L[:L.index("if ! ready; then")] if "if ! ready; then" in L else ""
+    # the quarantine sweep reaches two folders up from the script: not in a test
+    pre = pre.replace('xattr -dr com.apple.quarantine "$DIR/../.." 2>/dev/null || true', ":")
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    home, app = os.path.join(d, "home"), os.path.join(d, "app", "Contents", "Resources")
+    os.makedirs(home)
+    os.makedirs(app)
+    open(os.path.join(d, "pre.sh"), "w").write(pre)
+    # a stand-in Python: bin/python3 that answers -c with 0
+    stage = os.path.join(d, "stage", "python", "bin")
+    os.makedirs(stage)
+    open(os.path.join(stage, "python3"), "w").write("#!/bin/sh\nexit 0\n")
+    os.chmod(os.path.join(stage, "python3"), 0o755)
+    tgz = os.path.join(d, "py.tar.gz")
+    subprocess.run(["/usr/bin/tar", "-czf", tgz, "-C", os.path.join(d, "stage"), "python"], check=True)
+    good = hashlib.sha256(open(tgz, "rb").read()).hexdigest()
+    drv = r'''
+source "$1/pre.sh"
+venv_cfg() { mkdir -p "$VENV"; print -r -- "home = /x
+version = $1" > "$VENV/pyvenv.cfg"; }
+venv_cfg 3.9.6; too_old && print -r -- "old39" || print -r -- "ok39"
+venv_cfg 3.12.16; too_old && print -r -- "old312" || print -r -- "ok312"
+venv_cfg 3.14.5; too_old && print -r -- "old314" || print -r -- "ok314"
+rm -rf "$VENV"; too_old && print -r -- "oldnone" || print -r -- "oknone"
+printf '%s\n' "Collecting transformers>=5.7.0" "  Downloading x.whl.metadata (1.6 kB)" \
+  "Downloading torch-2.15.0-cp312-cp312-macosx_14_0_arm64.whl (138.6 MB)" "Progress 41156608 of 138558517" | to_log
+PBS_URL="file://$2" PBS_BYTES=1000
+PBS_SHA=0000000000000000000000000000000000000000000000000000000000000000
+get_python >/dev/null && print -r -- "badsum:took" || print -r -- "badsum:refused"
+[[ -e "$BASE_DIR" ]] && print -r -- "badsum:unpacked" || print -r -- "badsum:nothing"
+PBS_SHA=$3
+get_python >/dev/null && print -r -- "goodsum:took" || print -r -- "goodsum:refused"
+[[ -x "$BASE" ]] && print -r -- "goodsum:unpacked" || print -r -- "goodsum:nothing"
+'''
+    open(os.path.join(d, "drv.sh"), "w").write(drv)
+    r = subprocess.run(["/bin/zsh", os.path.join(d, "drv.sh"), d, tgz, good], capture_output=True, text=True, timeout=60,
+                       cwd=app, env={"HOME": home, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"})
+    lines = [x for x in r.stdout.splitlines() if x.strip()]
+    want = ["old39", "ok312", "ok314", "oknone", "@@item transformers", "@@item torch · 138.6 MB", "@@pct 29",
+            "badsum:refused", "badsum:nothing", "goodsum:took", "goodsum:unpacked"]
+    shutil.rmtree(d, ignore_errors=True)
+    return lines == want, {"got": lines, "err": r.stderr[-400:]}
+
+
+def _fr_shell(f):
+    """The shell's first run: its own screen (Inter, one hairline bar, the step and its percent from launch.sh's
+    lines), no Terminal words or settings for people, "Try again" and "Copy details" answered by on_navigation and
+    never loaded, a venv too old for the engine made again, and Quit stopping a setup under way."""
+    rs = f["rs"]
+    page_ = rs[rs.find('const SETUP_PAGE: &str = r##"'):rs.find('"##;', rs.find('const SETUP_PAGE: &str'))]
+    out = {
+        "no words for developers on screen": all(w not in rs for w in (
+            "set CONCORDE_PYTHON", "Open the Python app once", "Set CONCORDE_SERVER", "opens on its own",
+            "xcode-select", "can't find its Python engine")),
+        "the screen": "Setting up ConcordeAI" in page_ and "font:14px/1.5 Inter,-apple-system" in page_
+                      and '<div class="bar"><i id="fill"></i></div>' in page_ and "window.__boot=function(i,n,name,pct,item){" in page_
+                      and "far=Math.max(far," in page_ and "border-radius:50%" not in page_ and "999px" not in page_
+                      and "box-shadow" not in page_,
+        "try again and copy details": '<button id="retry" type="button">Try again</button>' in page_
+                                      and '<a id="copy" href="concorde-shell://copy">Copy details</a>' in page_
+                                      and 'location.href="concorde-shell://retry"' in page_,
+        "answered, never loaded": 'if url.scheme() == "concorde-shell" {' in rs
+                                  and 'Some("retry") => RETRY.store(true, Ordering::SeqCst),' in rs
+                                  and "std::thread::spawn(move || copy_details(&a));" in rs
+                                  and rs.index('if url.scheme() == "concorde-shell" {') < rs.index("let own = (url.scheme() == \"http\"")
+                                  and "                return false;\n            }\n            let own" in rs,
+        "the lines drive it": '.arg("--shell")' in rs and '"@@steps" => n = a.parse().unwrap_or(n),' in rs
+                              and '"@@pct" => pct = a.parse().unwrap_or(pct),' in rs
+                              and "sent.elapsed() > Duration::from_millis(120)" in rs,
+        "a failure waits for Try again": "if !wait_retry() {\n            return false;" in rs
+                                         and 'Some(false) => ("Setup didn’t finish", "Check your internet connection, then try again."),' in rs,
+        "too old is made again": "fn venv_too_old(py: &Path) -> bool" in rs and "Some(major == 3 && minor < 11)" in rs
+                                 and "if venv_ready(py) {" in rs and 'join(".setup-unfinished").exists()' in rs
+                                 and "    py.exists() && !venv_too_old(py) && !unfinished\n" in rs,
+        "Quit stops a setup under way": "cmd.process_group(0);" in rs and "BOOT_PGID.store(child.id(), Ordering::SeqCst);" in rs
+                                        and "libc::kill(-(pg as libc::pid_t), libc::SIGTERM);" in rs
+                                        and "let pg = BOOT_PGID.swap(0, Ordering::SeqCst);" in rs[rs.index("fn stop_sidecar("):rs.index("let child = sc.child")],
+        "the details go to the clipboard, not the screen": 'Command::new("/usr/bin/pbcopy")' in rs and "tail_of(log, 60)" in rs
+                                                           and "__copied" in rs and "pre:empty{{display:none}}" in rs,
+    }
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _fr_gate(f):
+    """Every MLX row of a model type newer than some mlx-lm a venv may hold asks for the first mlx-lm that loads it
+    (read off the wheels on PyPI): on 0.29.1 (a Python 3.9 venv's) the Gemma 4 and Qwen 3.5 rows run on Ollama, an
+    MLX-only one isn't offered, Llama 3.2 1B stays on MLX; on the pin everything is MLX."""
+    src = f["src"]
+    ns = {}
+    for x in _ast0.parse(src).body:
+        if isinstance(x, _ast0.Assign) and any(getattr(t, "id", "") in (
+                "CATALOG", "MODEL_INFO", "MLX_REQUIRES", "MLX_TYPE_SINCE", "MLX_MODEL_TYPES") for t in x.targets):
+            exec(_ast0.get_source_segment(src, x), ns)
+    since, req_, types = ns.get("MLX_TYPE_SINCE", {}), ns.get("MLX_REQUIRES", {}), ns.get("MLX_MODEL_TYPES", {})
+    rows = [l for l, i in ns.get("MODEL_INFO", {}).items() if i["mlx"]]
+    out = {"the types and their first mlx-lm": since == {"qwen3_5": (0, 30, 7), "qwen3_5_moe": (0, 30, 7), "glm_moe_dsa": (0, 30, 7),
+                                                        "gemma4": (0, 31, 2), "gemma4_unified": (0, 32, 0)},
+           "every such row gated": all(tuple(req_.get(l, ())) >= since[types[l]] for l in rows if types.get(l) in since),
+           "the gemma4 and qwen3_5 rows all there": {l for l in rows if types.get(l) in ("gemma4", "qwen3_5")}
+           == {"Gemma 4 E2B", "Gemma 4 26B", "Qwen 3.5 9B", "Qwen 3.8 27B"}}
+    old, new = _s5_mac(src, 48, mlxv=(0, 29, 1)), _s5_mac(src, 48, mlxv=(0, 32, 2))
+    out["0.29.1: Ollama where it can, MLX for the rest"] = (
+        old["MODEL_ROUTES"]["Gemma 4 E2B"] == ("ollama", "gemma4:e2b") and old["MODEL_ROUTES"]["Qwen 3.5 9B"] == ("ollama", "qwen3.5:9b")
+        and old["MODEL_ROUTES"]["Gemma 4 26B"][0] == "ollama" and old["SUPPORTED"].get("GLM 5.3") is False
+        and old["MODEL_ROUTES"]["Llama 3.2 1B"] == ("mlx", 8884))
+    out["the pin: MLX"] = all(new["MODEL_ROUTES"][l][0] == "mlx" for l in ("Gemma 4 E2B", "Gemma 4 26B", "Qwen 3.5 9B", "Llama 3.2 1B"))
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _fr_node(js, tail):
+    d = tempfile.mkdtemp(dir=_SMOKE_TMP)
+    p_ = os.path.join(d, "t.js")
+    open(p_, "w").write(js + "\n" + tail)
+    r = subprocess.run(["node", p_], capture_output=True, text=True, timeout=30)
+    shutil.rmtree(d, ignore_errors=True)
+    try:
+        return json.loads(r.stdout)
+    except ValueError:
+        return {"err": (r.stdout + r.stderr)[-600:]}
+
+
+def _fr_home(f):
+    """The home says when nothing can answer (no model here, no working cloud key, no paired server answering) and
+    only then; its one primary button is the Starter with its size and time; a question then stays in the box; a
+    relaunch opens no window over the app; the wizard's last key names what downloads first."""
+    pg, src = f["page"], f["src"]
+    fns = "".join(_jsfn(pg, h) for h in ("function hzNoModel(", "function muGB(", "function dlAbout(", "function dlSizeTime(",
+                                         "function wizStarterGb(", "function wizStarterHere(", "function wizCloudOk(",
+                                         "function wizGoLabel("))
+    js = ("const DL_ASSUME_BPS=6.25e6;const SET_NAMES={light:'Light',recommended:'Recommended',everything:'Everything'};"
+          "let tierInfo={},wizPlan='light',wizSt={},wizSets={};\n" + fns)
+    tail = r'''
+const A=[];const nm=(st,t)=>hzNoModel(st,t);
+A.push(nm(null,{}), nm({},{}), nm({models_ready:1},{}), nm({models_ready:0},{}),
+  nm({models_ready:0},{"Cloud Only":{available:true}}), nm({models_ready:0},{"Cloud Only":{available:false}}),
+  nm({models_ready:0},{"srv:ab12cd34":{available:true}}), nm({models_ready:0},{"srv:ab12cd34":{available:false},"srv:ab12cd34:fast":{available:true}}));
+A.push(dlAbout(0.8), dlSizeTime(0.8), dlAbout(11), dlAbout(164), dlAbout(0.2));
+wizSt={starter:{gb:0.8,state:"missing"}};wizSets={light:{dl_gb:11}};A.push(wizGoLabel());
+wizSt={starter:{gb:0.8,state:"ready"}};A.push(wizGoLabel());
+wizPlan="starter";A.push(wizGoLabel());
+wizPlan="cloud";A.push(wizGoLabel());tierInfo={"Cloud Only":{available:true}};A.push(wizGoLabel());
+console.log(JSON.stringify(A));'''
+    got = _fr_node(js, tail)
+    want = [False, False, False, True, False, True, False, True,
+            "about 2 min", "0.8 GB · about 2 min", "about 29 min", "about 7 h", "about a minute",
+            "Download Starter · 0.8 GB · about 2 min", "Download Light · 11 GB · about 29 min",
+            "Start chatting", "Add a cloud key", "Start chatting"]
+    send = _jsfn(pg, "async function send(){")
+    boot = pg[pg.index("// FIRST RUN opens the guided wizard (6b247)"):pg.index("/* ------------------------------------------------------ mobile drawer */")]
+    ss = src[src.index("def setup_status()"):src.index("def _other_millenai_running")]
+    route = src[src.index('        if self.path == "/api/setup/install":'):src.index('        if self.path == "/api/models/offer":')]
+    out = {"who can answer": got == want,
+           "the markup": '<div id="hz-nomodel" role="status" aria-live="polite" hidden>' in pg
+                         and '<button type="button" class="nm-go">Get a starter model</button>' in pg
+                         and '<button type="button" class="nm-cloud">Use the cloud instead</button>' in pg
+                         and 'go.textContent=s.state==="error"?"Try again · "+dlSizeTime(g):"Get a starter model · "+dlSizeTime(g);' in pg
+                         and 'body:JSON.stringify({plan:"starter"})' in pg,
+           "a question waits": "if(typeof hzNmBlock===\"function\"&&hzNmBlock())return;" in send
+                               and send.index("hzNmBlock()") < send.index("A BENCHMARK OWNS THE ENGINES"),
+           "no window on a relaunch": "if(!done)openWizard();\n    }\n    hzNmSt=st;hzNmCheck();" in boot and "openSetup()" not in boot,
+           "needs_setup is no model, not two": '"needs_setup": models_ready < 1,' in ss and "ready_n < 2" not in ss
+                                               and 'and x["label"] not in _STUDIO_ROWS and x["label"] != ENGINE_ROW)' in ss
+                                               and '"starter": ({"label": STARTER_MODEL, "gb": _sr["est_gb"],' in ss,
+           "the starter's route": "_want = [STARTER_MODEL] if _key == \"starter\" else model_sets()[_key]" in route
+                                  and "_started = start_starter_first(_want)" in route,
+           "the wizard": pg.count('class="wstep"') == 5 and '<button class="about-btn primary" id="wiz-next">Get started</button>' in pg
+                         and all(i_ not in pg for i_ in ('id="wiz-nl"', 'id="wiz-gi"', 'id="wiz-ac"', "About a minute. Pick what to install",
+                                                         "Several draft an answer"))
+                         and '<p id="wiz-promise">Private AI, running on your own machines.</p>' in pg
+                         and "#wiz-dots i{width:14px;height:2px;border-radius:1px;" in pg,
+           "the empty state keeps the golden point": "nmH=nm&&!nm.hidden?nm.getBoundingClientRect().height+14:0;" in pg}
+    return all(out.values()), {k: (v if k != "who can answer" else got) for k, v in out.items() if not v}
+
+
+def _fr_starter(f):
+    """The Starter first: start_starter_first starts it alone, holds the rest of the set as queued (so the bar counts
+    them), and starts them once it has landed; when it is here already, or isn't an MLX download, the set starts as
+    before."""
+    import threading as _th
+    calls = []
+    jobs = {}
+
+    def smd(labels):
+        calls.append(list(labels))
+        for l_ in labels:
+            jobs[l_] = {"status": "downloading"}
+        return list(labels)
+
+    def mk(cached=(), route="mlx"):
+        ns = {"STARTER_MODEL": "Llama 3.2 1B", "SUPPORTED": {"Llama 3.2 1B": True, "Gemma 4 E2B": True, "Gemma 4 12B": True},
+              "MODEL_ROUTES": {"Llama 3.2 1B": (route, 8884), "Gemma 4 E2B": ("mlx", 8946), "Gemma 4 12B": ("mlx", 8908)},
+              "giant_fits_here": lambda l: True, "model_cached": lambda l, p=None: l in cached,
+              "ollama_pulled_tags": lambda: set(), "_setup_lock": _th.RLock(), "_setup_jobs": jobs,
+              "start_model_downloads": smd, "ctx_thread": _th.Thread, "time": time}
+        exec(f["src"][f["src"].index("def start_starter_first("):f["src"].index("_dl_sample = {")], ns)
+        return ns
+    ns = mk()
+    got1 = ns["start_starter_first"](["Gemma 4 E2B", "Llama 3.2 1B", "Gemma 4 12B"])
+    held = sorted(l for l, j in jobs.items() if j.get("after") == "Llama 3.2 1B" and j["status"] == "queued")
+    first = [list(c) for c in calls]
+    jobs["Llama 3.2 1B"] = {"status": "done"}
+    t0 = time.time()
+    while len(calls) < 2 and time.time() - t0 < 5:
+        time.sleep(0.05)
+    then = [list(c) for c in calls]
+    calls.clear(); jobs.clear()
+    mk(cached=("Llama 3.2 1B",))["start_starter_first"](["Gemma 4 E2B", "Llama 3.2 1B"])
+    here = [list(c) for c in calls]
+    calls.clear(); jobs.clear()
+    mk(route="ollama")["start_starter_first"](["Gemma 4 E2B", "Llama 3.2 1B"])
+    oll = [list(c) for c in calls]
+    out = {"alone first": first == [["Llama 3.2 1B"]] and held == ["Gemma 4 12B", "Gemma 4 E2B"]
+                          and sorted(got1) == ["Gemma 4 12B", "Gemma 4 E2B", "Llama 3.2 1B"],
+           "the rest once it lands": then == [["Llama 3.2 1B"], ["Gemma 4 E2B", "Gemma 4 12B"]],
+           "here already: as before": here == [["Gemma 4 E2B", "Llama 3.2 1B"]],
+           "an Ollama download: as before": oll == [["Gemma 4 E2B", "Llama 3.2 1B"]]}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+def _fr_notes(f):
+    """What's new is its own field: release.sh writes RELEASE_NOTES.md between the markers and the install notes
+    after them; the app shows only what is between them, and an older body without them loses its install notes."""
+    ns = {"re": re}
+    for x in _ast0.parse(f["src"]).body:
+        nm_ = getattr(x, "name", None) or next((getattr(t, "id", None) for t in getattr(x, "targets", [])), None)
+        if nm_ in ("WHATS_NEW_OPEN", "WHATS_NEW_CLOSE", "user_notes"):
+            exec(_ast0.get_source_segment(f["src"], x), ns)
+    un = ns.get("user_notes", lambda b: None)
+    new_body = "<!-- whats-new -->\n- A starter model\n- Faster first run\n<!-- /whats-new -->\n\n**macOS** — download the .dmg.\n\n**Windows** — the .msi installer"
+    old_body = "- A new look\n- A native window\n\n**macOS** — download the .dmg. Existing installs update themselves.\n\n**Windows** — the .msi installer (attached by CI)"
+    r = f["rel"]
+    out = {"between the markers": un(new_body) == "- A starter model\n- Faster first run",
+           "an older body without its install notes": un(old_body) == "- A new look\n- A native window",
+           "release.sh writes the field": '--notes "<!-- whats-new -->\n${WHATS_NEW}\n<!-- /whats-new -->\n\n**macOS**' in r,
+           "used everywhere the notes are read": f["src"].count("user_notes(") >= 6
+                                                  and '        return user_notes((rel or {}).get("body"))' in f["src"]
+                                                  and 'notes = user_notes(rel.get("body"))' in f["src"]
+                                                  and 'notes = (rel.get("body") or "")[:4000]' not in f["src"]}
+    return all(out.values()), {k: v for k, v in out.items() if not v}
+
+
+_FR_CHECKS = [
+    ("6b630 launch.sh never runs the system's Python: a pinned python-build-standalone 3.12 per architecture, its "
+     "SHA-256 checked before it is unpacked, the venv from it, the engine at the app's pins, no Terminal words", _fr_py_static),
+    ("6b630 launch.sh's own functions, run: a venv's age from its pyvenv.cfg, pip's lines into screen lines, a "
+     "download with the wrong SHA-256 never unpacked and one with the right one unpacked", _fr_py_run),
+    ("6b630 the shell's first-run screen: branded, live, no words for developers, Try again and Copy details answered "
+     "and never loaded, a venv too old made again, Quit stopping a setup", _fr_shell),
+    ("6b630 the minimum-engine gate: every gemma4, qwen3_5 and newer MLX row asks for the mlx-lm that loads it; on "
+     "0.29.1 they run on Ollama or aren't offered, on the pin all MLX", _fr_gate),
+    ("6b630 the home says when nothing can answer, with the Starter (size and time) as its one primary key and the "
+     "cloud as a choice; a question waits; no window on a relaunch; the wizard's five steps and its last key", _fr_home),
+    ("6b630 the Starter downloads first and the rest of the set follows it", _fr_starter),
+    ("6b630 What's new is its own field, never the release page's install notes", _fr_notes),
+]
+
+
+def _fr_run(f, which=None):
+    res = []
+    for i, (n, fn) in enumerate(_FR_CHECKS):
+        if which is not None and i not in which:
+            continue
+        try:
+            ok, det = fn(f)
+        except Exception as e_:
+            ok, det = False, "raised %r" % (e_,)
+        res.append((i, n, bool(ok), det))
+    return res
+
+
+for _ifr, _nfr, _ofr, _dfr in _fr_run(_FR):
+    check(_nfr, _ofr, "%r" % (_dfr,))
+_FR_MUT = [
+    ("bm", "the system's python3 again", 'BASE="$BASE_DIR/bin/python3"', 'BASE="$(command -v python3)"', [0]),
+    ("bm", "unpacked before it is checked", '  /usr/bin/tar -xzf "$tmp/py.tar.gz" -C "$tmp" 2>> "$LOG" || { rm -rf "$tmp"; return 1; }\n',
+     "", [0, 1]),
+    ("bm", "the checksum not compared", 'if [[ "$sum" != "$PBS_SHA" ]]; then', 'if false; then', [0, 1]),
+    ("bm", "a 3.10 venv kept", "(( v < 11 ))", "(( v < 10 ))", [0, 1]),
+    ("bm", "half a venv taken as done", '[[ -x "$PY" && ! -e "$UNFINISHED" ]] && ! too_old', '[[ -x "$PY" ]] && ! too_old', [0]),
+    ("rs", "half a venv started on", '    py.exists() && !venv_too_old(py) && !unfinished\n', '    py.exists() && !venv_too_old(py)\n', [2]),
+    ("bm", "the Terminal dialog back", "ConcordeAI couldn’t finish setting up. Check your internet connection and open it again.",
+     "Install the Apple Command Line Tools (run: xcode-select --install), then open ConcordeAI again.", [0]),
+    ("rs", "an env var on the screen", '("ConcordeAI isn’t set up yet", "Something it needs is missing. Download ConcordeAI again and replace this copy.")',
+     '("ConcordeAI can\'t find its Python engine", "Open the Python app once, or set CONCORDE_PYTHON.")', [2]),
+    ("rs", "Try again never heard", 'Some("retry") => RETRY.store(true, Ordering::SeqCst),', "Some(\"retry\") => {}", [2]),
+    ("rs", "the old static screen", 'show_page(app, SETUP_PAGE);\n    mark("bootstrap started");',
+     'show_error(app, "Setting up ConcordeAI", "First run: the window opens on its own when it is ready.", "");\n    mark("bootstrap started");', [2]),
+    ("rs", "Quit leaves pip running", "                libc::kill(-(pg as libc::pid_t), libc::SIGTERM);\n", "", [2]),
+    ("src", "Gemma 4 E2B ungated", '    "Gemma 4 E2B": (0, 31, 2), "Gemma 4 26B": (0, 31, 2),\n', '    "Gemma 4 26B": (0, 31, 2),\n', [3]),
+    ("src", "a type left out of the table", '    "qwen3_5": (0, 30, 7), "qwen3_5_moe": (0, 30, 7), "glm_moe_dsa": (0, 30, 7),\n',
+     '    "qwen3_5": (0, 30, 7), "glm_moe_dsa": (0, 30, 7),\n', [3]),
+    ("page", "the cloud doesn't count", '  if(tiers["Cloud Only"]&&tiers["Cloud Only"].available)return false;\n', "", [4]),
+    ("page", "no model claimed before asking", '  if(!st||typeof st.models_ready!=="number")return false;\n', "  if(!st)return true;\n", [4]),
+    ("page", "the question sent anyway", 'if(typeof hzNmBlock==="function"&&hzNmBlock())return;', "", [4]),
+    ("page", "the relaunch window back", "if(!done)openWizard();\n    }\n    hzNmSt=st;hzNmCheck();",
+     "if(!done)openWizard();\n      else{openSetup();setupManual=false;}\n    }\n    hzNmSt=st;hzNmCheck();", [4]),
+    ("page", "the last key without its size", 'if(!wizStarterHere(st))return "Download Starter \u00b7 "+dlSizeTime(wizStarterGb(st));',
+     'if(!wizStarterHere(st))return "Let’s go";', [4]),
+    ("src", "two models before the wizard lets go", '        "needs_setup": models_ready < 1,', '        "needs_setup": ready_n < 2,', [4]),
+    ("src", "the starter not first", "    first = start_model_downloads([STARTER_MODEL])\n", "    first = start_model_downloads(labels)\n", [5]),
+    ("src", "the rest never follows", "    start_model_downloads(held)\n\n\n_dl_sample", "\n\n_dl_sample", [5]),
+    ("src", "the whole body again", '        return user_notes((rel or {}).get("body"))', '        return ((rel or {}).get("body") or "")[:4000]', [6]),
+    ("rel", "the notes without their markers", '--notes "<!-- whats-new -->\n${WHATS_NEW}\n<!-- /whats-new -->\n\n**macOS**', '--notes "${WHATS_NEW}\n\n**macOS**', [6]),
+]
+_fr_missed = []
+for _mf, _mn, _ma, _mb, _mw in _FR_MUT:
+    _mut = dict(_FR)
+    _mut[_mf] = _FR[_mf].replace(_ma, _mb, 1)
+    if _mut[_mf] == _FR[_mf]:
+        _fr_missed.append((_mn, "anchor missing"))
+        continue
+    if all(_o for _i, _n, _o, _d in _fr_run(_mut, _mw)):
+        _fr_missed.append((_mn, "not caught"))
+check("6b630's rules each break a check when broken (%d mutants)" % len(_FR_MUT), not _fr_missed, "%r" % _fr_missed)
+# ==== first run (6b630): end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

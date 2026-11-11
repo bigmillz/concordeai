@@ -17,7 +17,8 @@
 #     the version there; the bundle is patched after the build and signed
 #     again, and both keys are read back;
 #   * Resources/ carries millenai.py, fonts/, vfx/, the first-run launch.sh,
-#     crypto-requirements.txt (the sidecar's venv bootstrap, 6b537) and
+#     crypto-requirements.txt (the sidecar's venv bootstrap, 6b537),
+#     engine-requirements.txt (the MLX engine at the app's pin, 6b630) and
 #     concorde-dictate, the on-device speech helper (6b543, built here by
 #     shell/dictate/build.sh and signed on its own) and concorde-pdftext,
 #     the on-device PDF reader (6b546, shell/pdftext/build.sh, the same way);
@@ -206,7 +207,7 @@ GOT_EXE="$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$PLIST")"
 for k in NSMicrophoneUsageDescription NSSpeechRecognitionUsageDescription; do
   /usr/libexec/PlistBuddy -c "Print :$k" "$PLIST" >/dev/null 2>&1 || { echo "Info.plist has no $k"; exit 1; }
 done
-for f in millenai.py launch.sh crypto-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do
+for f in millenai.py launch.sh crypto-requirements.txt engine-requirements.txt fonts vfx concorde-dictate concorde-pdftext; do
   [[ -e "$BUNDLE/Contents/Resources/$f" ]] || { echo "Resources/$f is missing from the bundle"; exit 1; }
 done
 # the bundled server is this source, build and all

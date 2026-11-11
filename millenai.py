@@ -1548,6 +1548,23 @@ MLX_REQUIRES = {
     # 6b533: models/muse_glimmer.py, checked in 0.32.2 (the pin); not known
     # for 0.32.0-0.32.1, so the row asks for the pin
     "Muse Glimmer 30B": (0, 32, 2),
+    # 6b630 (the first-run audit: a fresh Mac's venv, made from the Command
+    # Line Tools' Python 3.9, got mlx-lm 0.29.1 and the Light set's
+    # everyday model died with "Model type gemma4 not supported"). Every
+    # row whose model_type is newer than some mlx-lm a venv may hold, at
+    # the first version that has it (MLX_TYPE_SINCE, below)
+    "Gemma 4 E2B": (0, 31, 2), "Gemma 4 26B": (0, 31, 2),
+    "Qwen 3.5 9B": (0, 30, 7), "Qwen 3.8 27B": (0, 30, 7),
+    "Qwen 3.6 35B MoE": (0, 30, 7), "GLM 5.3": (0, 30, 7),
+}
+# THE FIRST MLX-LM THAT LOADS EACH NEWER MODEL TYPE (6b630): read off the
+# wheels on PyPI (mlx_lm/models/<type>.py, or the type mapping in its
+# utils.py), 0.28.4 to 0.32.2, on 2026-11-10. A type missing here is in
+# every mlx-lm since 0.28.4. The gauntlet holds MLX_REQUIRES to it: every
+# MLX row of one of these types asks for at least that version.
+MLX_TYPE_SINCE = {
+    "qwen3_5": (0, 30, 7), "qwen3_5_moe": (0, 30, 7), "glm_moe_dsa": (0, 30, 7),
+    "gemma4": (0, 31, 2), "gemma4_unified": (0, 32, 0),
 }
 # each MLX build's config.json "model_type", from the hub on 2026-10-21
 # (6b497): the gauntlet checks every one loads on the engine the app
@@ -5002,6 +5019,13 @@ MODEL_SET_ALIASES = {"basic": "light", "min": "light",
 QUICK_PAIR = ("Gemma 4 E2B", "Llama 3.2 1B")
 # what a first run installs until the person picks another (per Patrick)
 FIRST_RUN_SET = "light"
+# THE STARTER (6b630, per Patrick: a fresh install sat "ready" with nothing
+# to answer, and the Light set's first answer waited on 12 GB). One small
+# model, downloaded FIRST whatever set is picked, so the first answer comes
+# in minutes and the rest of the set follows in the background. It is also
+# a choice of its own ("starter" to /api/setup/install), and what the home's
+# empty state offers. Not a fourth set: the three sets stay the three sets.
+STARTER_MODEL = "Llama 3.2 1B"
 EVERYDAY_MAX_GB = 8.5          # the catalog's size (cat_gb), as on a Mac
 # who writes the merge, best first: merge_pref_label reads it too
 MERGE_PREFS = ("Gemma 4 26B", "Gemma 4 12B")
@@ -6316,6 +6340,9 @@ def ollama_url(path: str) -> str:
     """The URL of THIS user's Ollama. Raises rather than hand a prompt,
     a pull or a delete to an Ollama another account runs, or to one
     whose owner couldn't be checked."""
+    if "no-ollama" in TEST_HOOKS:
+        # a dev copy acting out a fresh Mac (6b630): no Ollama at all
+        raise RuntimeError("no Ollama here (test hook)")
     port = OLLAMA_PORT[0]
     if _port_in_use(port):
         mine = _listener_is_mine(port)
@@ -6420,6 +6447,8 @@ def _engine_exe(folder: str):
 
 
 def _ollama_bin():
+    if "no-ollama" in TEST_HOOKS:          # a fresh Mac's dev copy (6b630)
+        return None
     exe = "ollama.exe" if IS_WIN else "ollama"
     cands = [shutil.which("ollama"), _engine_exe(_MANAGED_BIN_DIR)]
     if IS_WIN:
@@ -10222,9 +10251,9 @@ def _channel_release():
             # newest release of any kind is the honest fallback. Its body
             # is a list of commit subjects, so it carries the newest
             # numbered release's notes for people to read (6b551)
-            human = next((x.get("body") or "" for x in rels
+            human = next((user_notes(x.get("body")) for x in rels
                           if x.get("tag_name") != "nightly"
-                          and (x.get("body") or "").strip()), "")
+                          and user_notes(x.get("body"))), "")
             rels = ([dict(x, _human_notes=human) for x in rels
                      if x.get("tag_name") == "nightly"] or rels)
         else:
@@ -10253,11 +10282,38 @@ def _nightly_line() -> str:
     return "Latest changes from the %s line." % (m.group(1) if m else "current")
 
 
+# WHAT'S NEW IS ITS OWN FIELD (6b630, per Patrick: the Updates pane showed the
+# release page's install notes, the .msi and the .zip). release.sh writes the
+# person-facing notes (RELEASE_NOTES.md) between these two markers, which
+# GitHub doesn't show; everything after them is the download page's. A
+# release from before 6b630 has no markers: its body is cut at the install
+# boilerplate (a "**macOS**" or "**Windows**" line) and lines about the
+# installer files are dropped.
+WHATS_NEW_OPEN = "<!-- whats-new -->"
+WHATS_NEW_CLOSE = "<!-- /whats-new -->"
+
+
+def user_notes(body) -> str:
+    body = str(body or "")
+    i = body.find(WHATS_NEW_OPEN)
+    if i >= 0:
+        j = body.find(WHATS_NEW_CLOSE, i)
+        return body[i + len(WHATS_NEW_OPEN):j if j >= 0 else None].strip()[:4000]
+    keep = []
+    for ln in body.splitlines():
+        if re.match(r"\s*\*\*(macOS|Windows)\*\*", ln):
+            break
+        if re.search(r"\.(msi|zip|dmg|exe)\b|\binstaller\b", ln, re.I):
+            continue
+        keep.append(ln)
+    return "\n".join(keep).strip()[:4000]
+
+
 def _release_notes(rel) -> str:
     if (rel or {}).get("tag_name") != "nightly":
-        return ((rel or {}).get("body") or "")[:4000]
-    human = ((rel or {}).get("_human_notes") or "").strip()
-    return human[:4000] if human else _nightly_line()
+        return user_notes((rel or {}).get("body"))
+    human = user_notes((rel or {}).get("_human_notes"))
+    return human if human else _nightly_line()
 
 
 def check_update(force=False):
@@ -10417,16 +10473,16 @@ def whats_new(prev: str) -> dict:
             # line; never its commit subjects (6b551)
             try:
                 rels = _get("releases?per_page=20")
-                notes = next(((x.get("body") or "")[:4000] for x in rels
+                notes = next((user_notes(x.get("body")) for x in rels
                               if not x.get("draft")
                               and x.get("tag_name") != "nightly"
-                              and (x.get("body") or "").strip()), "")
+                              and user_notes(x.get("body"))), "")
             except Exception:
                 notes = ""
             notes = notes or _nightly_line()
         else:
             rel = _get("releases/tags/v%d" % APP_BUILD)
-            notes = (rel.get("body") or "")[:4000]
+            notes = user_notes(rel.get("body"))
     except Exception:
         notes = ""
     out = {"title": short_version(), "prev": prev or "", "notes": notes}
@@ -19864,6 +19920,51 @@ def start_model_downloads(labels=None, refresh=()) -> list:
     return started
 
 
+def start_starter_first(labels) -> list:
+    """start_model_downloads, the starter first (6b630): when the starter is
+    in `labels`, missing and an MLX download, it starts alone and the rest
+    wait as "queued" (so the bar counts them from the start) until it has
+    landed, then start as before. Anything else is start_model_downloads
+    as it was (an Ollama batch already goes smallest first)."""
+    labels = list(labels)
+    pulled = ollama_pulled_tags() or set()
+    if (STARTER_MODEL not in labels or not SUPPORTED.get(STARTER_MODEL)
+            or MODEL_ROUTES.get(STARTER_MODEL, ("",))[0] != "mlx"
+            or model_cached(STARTER_MODEL, pulled)):
+        return start_model_downloads(labels)
+    first = start_model_downloads([STARTER_MODEL])
+    rest = [l for l in labels if l != STARTER_MODEL and SUPPORTED.get(l)
+            and l in MODEL_ROUTES and giant_fits_here(l)
+            and not model_cached(l, pulled)]
+    held = []
+    with _setup_lock:
+        for l in rest:
+            if _setup_jobs.get(l, {}).get("status") in ("downloading", "queued"):
+                continue
+            _setup_jobs[l] = {"status": "queued", "note": "", "pct": 0,
+                              "after": STARTER_MODEL}
+            held.append(l)
+    if held:
+        ctx_thread(target=_after_starter, args=(held,), daemon=True).start()
+    return first + held
+
+
+def _after_starter(held: list):
+    """The rest of a set, once the starter is down (or failed: the set
+    shouldn't wait on it)."""
+    while True:
+        with _setup_lock:
+            st = (_setup_jobs.get(STARTER_MODEL) or {}).get("status")
+        if st not in ("downloading", "queued"):
+            break
+        time.sleep(1)
+    with _setup_lock:
+        for l in held:
+            if (_setup_jobs.get(l) or {}).get("after") == STARTER_MODEL:
+                _setup_jobs.pop(l, None)
+    start_model_downloads(held)
+
+
 _dl_sample = {"bytes": 0, "ts": 0.0, "bps": 0.0}
 
 
@@ -21171,6 +21272,11 @@ def setup_status() -> dict:
                            "note": _j.get("note", "")})
     ready_n = sum(1 for x in models
                   if x["status"] == "ready" and x["label"] not in _STUDIO_ROWS)
+    # MODELS, not the Ollama engine's pseudo-row (6b630): an Intel Mac with
+    # Ollama and nothing pulled has no model, though its engine is "ready"
+    models_ready = sum(1 for x in models if x["status"] == "ready"
+                       and x["label"] not in _STUDIO_ROWS and x["label"] != ENGINE_ROW)
+    _sr = next((x for x in models if x["label"] == STARTER_MODEL), None)
     have, want = _downloaded_bytes(pulled)
     bps = _dl_speed(have)
     busy = any(m["status"] in ("downloading", "queued") for m in models)
@@ -21200,9 +21306,18 @@ def setup_status() -> dict:
                         max(1, round((want - have) / bps / 60)))
                     if busy and bps > 2e5 and want > have else None),
         "busy": busy,
-        # nag on first run only: once a couple of models work, the sets
-        # are in Settings › Models
-        "needs_setup": ready_n < 2,
+        # the first run's wizard, until a model is here (6b630: "a couple"
+        # held a person who took the starter alone in it forever, and the
+        # setup window opened on every launch of a cloud-only one)
+        "needs_setup": models_ready < 1,
+        "models_ready": models_ready,
+        # the starter (6b630): what the home offers while nothing can
+        # answer, and what the wizard downloads first. gb is its download
+        # here (Ollama's file off Apple silicon)
+        "starter": ({"label": STARTER_MODEL, "gb": _sr["est_gb"],
+                     "state": _sr["status"], "pct": _sr.get("pct", 0),
+                     "loading": bool(_sr.get("loading"))}
+                    if _sr else None),
         # the ONE bare psutil call in the file killed /api/setup (and the
         # header download strip with it) on any python without psutil
         "mem_gb": (round(psutil.virtual_memory().total / 1e9)
@@ -44131,14 +44246,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # everything). It ADDS what is missing and deletes nothing: an
             # outdated version stays auto-clean's job. The pick is kept, so
             # the status and the More-models card follow the person's set
-            _key = model_set_key((_d if isinstance(_d, dict) else {}).get("plan"))
+            _plan = str((_d if isinstance(_d, dict) else {}).get("plan") or "").strip().lower()
+            # the starter alone (6b630): one small model, no set picked
+            _key = "starter" if _plan == "starter" else model_set_key(_plan)
             if not _key:
-                self._send_json({"err": "Pick Light, Recommended or Everything."},
+                self._send_json({"err": "Pick Starter, Light, Recommended or Everything."},
                                 code=400)
                 return
-            _want = model_sets()[_key]
-            _started = start_model_downloads(_want)
-            model_set_choose(_key)
+            _want = [STARTER_MODEL] if _key == "starter" else model_sets()[_key]
+            # the starter first, whatever the set (6b630)
+            if _key != "starter" and STARTER_MODEL in MODEL_ROUTES and STARTER_MODEL not in _want:
+                _want = [STARTER_MODEL] + list(_want)
+            _started = start_starter_first(_want)
+            if _key != "starter":
+                model_set_choose(_key)
             self._send_json({"set": _key, "started": _started, "n": len(_want),
                              "already": len(_want) - len(_started),
                              "gb": round(sum(MODEL_INFO[l]["gb"]
@@ -52458,10 +52579,10 @@ body.gen #chip-model{color:var(--accent)}
 .set-card.on{border-color:var(--accent-hot);background:var(--accent-dim)}
 .set-card:focus-visible{outline:2px solid var(--accent-hot);outline-offset:2px}
 .set-card.none{opacity:.5;cursor:default}
-#wiz-autoclean,#wiz-nolimits,#wiz-image,#wiz-video{display:flex;gap:8px;align-items:flex-start;
+#wiz-image,#wiz-video{display:flex;gap:8px;align-items:flex-start;
   font-size:11px;color:var(--faint);line-height:1.5;cursor:pointer}
-#wiz-autoclean input,#wiz-nolimits input,#wiz-image input,#wiz-video input{margin-top:2px}
-#wiz-autoclean,#wiz-image,#wiz-video{margin-bottom:6px}
+#wiz-image input,#wiz-video input{margin-top:2px}
+#wiz-image,#wiz-video{margin-bottom:6px}
 #wiz-image[hidden],#wiz-video[hidden]{display:none}
 #wiz-image .wsz,#wiz-video .wsz{font-style:normal;opacity:.6}
 .wprov{border:1px solid var(--line);border-radius:11px;
@@ -52486,9 +52607,77 @@ body.gen #chip-model{color:var(--accent)}
    trap as every other veil, restated here so Back can actually hide */
 #wiz-foot .about-btn[hidden]{display:none}
 #wiz-dots{display:flex;gap:6px;margin:0 auto}
-#wiz-dots i{width:6px;height:6px;border-radius:50%;
+#wiz-dots i{width:14px;height:2px;border-radius:1px;
   background:rgba(255,255,255,.18)}
 #wiz-dots i.on{background:#ececec}
+/* FIRST RUN, SHARP (6b630, per Patrick: Claude-sharp chrome, Inter with the
+   system face until the font file is approved, no rainbow, no circles, no
+   flashes). The wizard is a flat near-black card with 1 px hairlines; its
+   models are one list, each row its size and its time; the main action is
+   the one filled key. The home's empty state is a line and a key under the
+   composer, the same width as the box. */
+#wiz-card{--fr-ui:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-family:var(--fr-ui);
+  background:#0c0d10;border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:28px 28px 20px;
+  box-shadow:0 24px 64px rgba(0,0,0,.5);-webkit-font-smoothing:antialiased}
+#wiz-card .set-h{font-family:var(--fr-ui);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}
+#wiz-card p{font-size:14px;line-height:1.55;color:#c9ccd5}
+#wiz-skip{font-family:var(--fr-ui);font-size:12px;letter-spacing:0;text-transform:none;color:#7d8291;top:16px;right:18px}
+#wiz-skip:hover{color:#eceef3}
+#wiz-brand b{font-family:var(--disp)}
+#wiz-promise{text-align:center;font-size:15px!important;color:#eceef3!important;margin:4px 0 8px!important}
+#wiz-plans{display:flex;flex-direction:column;gap:0;margin:8px 0 14px;border:1px solid rgba(255,255,255,.09);border-radius:8px;overflow:hidden}
+#wiz-plans .set-card{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;row-gap:2px;align-items:baseline;
+  margin:0;padding:11px 14px;border:0;border-top:1px solid rgba(255,255,255,.07);border-radius:0;background:transparent;
+  cursor:pointer;text-align:left;min-height:0}
+#wiz-plans .set-card:first-child{border-top:0}
+#wiz-plans .set-card b{grid-column:1;font:500 14px/1.35 var(--fr-ui);color:#eceef3}
+#wiz-plans .set-card .sd{grid-column:1;font:400 12.5px/1.4 var(--fr-ui);color:#8d93a3}
+#wiz-plans .set-card .gb{grid-column:2;grid-row:1/span 2;align-self:center;font:400 12.5px/1.3 var(--fr-ui);color:#b6bac6;
+  font-variant-numeric:tabular-nums;white-space:nowrap;margin:0}
+#wiz-plans .set-card .cur{display:none}
+#wiz-plans .set-card:hover{background:rgba(255,255,255,.03)}
+#wiz-plans .set-card.on{background:rgba(255,255,255,.06);box-shadow:inset 2px 0 0 #eceef3}
+#wiz-plans .set-card:focus-visible{outline:1px solid #e0344b;outline-offset:-1px}
+#wiz-pair-row{display:flex;gap:8px;margin:6px 0 10px}
+#wiz-pair-row input,#wiz-srv-adv input{flex:1;min-width:0;box-sizing:border-box;height:36px;background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.12);border-radius:8px;color:#eceef3;padding:0 12px;font:400 14px var(--fr-ui)}
+#wiz-code{font-variant-numeric:tabular-nums;letter-spacing:.06em;text-transform:uppercase}
+#wiz-code::placeholder{letter-spacing:0;text-transform:none}
+#wiz-pair-row input:focus,#wiz-srv-adv input:focus{outline:none;border-color:rgba(255,255,255,.32)}
+#wiz-pair-row .about-btn{width:auto;margin:0;height:36px;padding:0 16px}
+#wiz-srv-adv{margin:0 0 8px}
+#wiz-srv-adv summary{cursor:pointer;font-size:12.5px;color:#8d93a3;list-style:none;width:max-content}
+#wiz-srv-adv summary::-webkit-details-marker{display:none}
+#wiz-srv-adv summary::before{content:"\203a";display:inline-block;margin-right:6px;transition:transform .15s}
+#wiz-srv-adv[open] summary::before{transform:rotate(90deg)}
+#wiz-srv-adv summary:hover{color:#eceef3}
+#wiz-srv-adv input{display:block;width:100%;margin-top:8px}
+#wiz-srv-note.ok{color:#b9d8b0}
+#wiz-done-line{min-height:44px}
+#wiz-foot{border-top:1px solid rgba(255,255,255,.07)}
+#wiz-foot .about-btn{font:500 13px/1 var(--fr-ui);height:36px;padding:0 18px;border-radius:8px}
+#wiz-back{background:transparent;border:1px solid rgba(255,255,255,.12);color:#c9ccd5}
+#wiz-next{background:#eceef3;color:#0b0c10;border:0;white-space:nowrap}
+#wiz-dots{flex:1 1 auto;justify-content:center;min-width:0}
+#wiz-next:hover{background:#fff;color:#000}
+#wiz-next:focus-visible,#wiz-back:focus-visible{outline:1px solid #e0344b;outline-offset:2px}
+#hz-nomodel{--fr-ui:Inter,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;pointer-events:auto;max-width:780px;
+  margin:14px auto 0;font-family:var(--fr-ui);text-align:center;-webkit-font-smoothing:antialiased}
+#hz-nomodel[hidden]{display:none}
+#hz-nomodel .nm-line{margin:0 0 12px;font-size:14px;line-height:1.5;color:#c9ccd5}
+#hz-nomodel .nm-acts{display:flex;gap:16px;align-items:center;justify-content:center;flex-wrap:wrap}
+#hz-nomodel .nm-acts[hidden]{display:none}
+#hz-nomodel .nm-go{height:36px;padding:0 18px;border:0;border-radius:8px;background:#eceef3;color:#0b0c10;
+  font:500 13px/1 var(--fr-ui);font-variant-numeric:tabular-nums;cursor:pointer}
+#hz-nomodel .nm-go:hover{background:#fff;color:#000}
+#hz-nomodel .nm-go:active{transform:translateY(1px)}
+#hz-nomodel .nm-cloud{height:36px;padding:0 4px;border:0;background:none;color:#9aa1b2;font:400 13px/1 var(--fr-ui);cursor:pointer}
+#hz-nomodel .nm-cloud:hover{color:#eceef3}
+#hz-nomodel button:focus-visible{outline:1px solid #e0344b;outline-offset:2px}
+#hz-nomodel .nm-bar{height:2px;max-width:320px;margin:0 auto;background:rgba(255,255,255,.1);border-radius:1px;overflow:hidden}
+#hz-nomodel .nm-bar[hidden]{display:none}
+#hz-nomodel .nm-bar i{display:block;height:100%;width:0;background:#e9ebf1;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+@media (prefers-reduced-motion:reduce){#hz-nomodel .nm-bar i{transition:none}}
 #setup-card{
   width:440px;max-width:calc(100vw - 40px);background:var(--panel2);
   border:1px solid var(--line);border-radius:14px;padding:22px 22px 18px;
@@ -55981,6 +56170,20 @@ __CODE_ROWS__
       </div>
       </div>
     </div>
+    <!-- NOTHING CAN ANSWER YET (6b630, per Patrick: a fresh install sat "ready"
+         with no model, and the first question ended in "Backend error").
+         Under the composer while no model is on this computer, no cloud key
+         works and no paired server answers: one line, one primary button for
+         the Starter, and the cloud as a choice of its own. The download's
+         progress takes the button's place; it goes when a model is here. -->
+    <div id="hz-nomodel" role="status" aria-live="polite" hidden>
+      <p class="nm-line">No model on your machines yet.</p>
+      <div class="nm-bar" hidden><i></i></div>
+      <div class="nm-acts">
+        <button type="button" class="nm-go">Get a starter model</button>
+        <button type="button" class="nm-cloud">Use the cloud instead</button>
+      </div>
+    </div>
     <!-- (6b555, per Patrick: "we need to fix these suggestions too. I think we just get rid of them. They look tacky.")
          the home is the greeting, the composer and the sky; recent chats live in the sidebar -->
   </div>
@@ -56480,12 +56683,15 @@ __CODE_ROWS__
   </div>
 </div>
 
-<!-- FIRST-RUN WIZARD (6b247, per Patrick): four guided steps over the
-     app — welcome, local brains, cloud power, go. Shows once
-     (prefs.wizard_done); the old setup veil stays for updates and the
-     download progress it already draws well. -->
+<!-- FIRST-RUN WIZARD (6b247, per Patrick): guided steps over the app.
+     Shows once (prefs.wizard_done). 6b630 (per Patrick, the first-run
+     audit): one plain promise, the models with a size and a time each (the
+     Starter first, cloud only a choice of its own), a step to pair your
+     server, and a last step that says what will download and how long.
+     The power-user boxes (No limits, the giants, auto-clean) live in
+     Settings › Models only. -->
 <div id="wiz-veil" hidden>
-  <div id="wiz-card">
+  <div id="wiz-card" role="dialog" aria-modal="true" aria-label="Set up ConcordeAI">
     <button id="wiz-skip" title="Everything here is in Settings too">Skip</button>
 
     <div class="wstep" data-w="1">
@@ -56494,44 +56700,54 @@ __CODE_ROWS__
         <b>Concorde<b>AI</b></b>
         <span id="wiz-ver">__APP_VER__</span>
       </div>
-      <p>ConcordeAI runs AI models on your machines. Several draft an answer; the strongest writes the final. Cloud is optional.</p>
-      <p>About a minute. Pick what to install, add any cloud keys, done. Everything is in Settings later.</p>
+      <p id="wiz-promise">Private AI, running on your own machines.</p>
     </div>
 
     <div class="wstep" data-w="2" hidden>
-      <div class="set-h">Local models</div>
-      <p>Models run on this computer, no internet needed. Pick how much to install.</p>
-      <div id="wiz-plans"></div>
-      <label id="wiz-autoclean"><input type="checkbox" id="wiz-ac" checked>
-        Remove outdated models after updates</label>
+      <div class="set-h">Models</div>
+      <p>Start small. Add more any time.</p>
+      <div id="wiz-plans" role="radiogroup" aria-label="Models"></div>
       <label id="wiz-image"><input type="checkbox" id="wiz-img">
         <span>Image generation <i class="wsz">(9.6 GB)</i></span></label>
       <label id="wiz-video"><input type="checkbox" id="wiz-vid">
         <span>Video generation <i class="wsz">(19.6 GB)</i></span></label>
-      <label id="wiz-nolimits"><input type="checkbox" id="wiz-nl">
-        No limits. Everything includes models bigger than memory; they can crash this computer.</label>
-      <!-- 6b307, per Patrick: the giants sit behind a second box that
-           only wakes up once the first is ticked -->
-      <label id="wiz-giants" class="giants-row off"><input type="checkbox"
-        id="wiz-gi" disabled><span>__GIANT_LABEL__</span><i
-        class="hint" title="__GIANT_TIP__">i</i></label>
     </div>
 
     <div class="wstep" data-w="3" hidden>
       <div class="set-h">Cloud</div>
-      <p>Optional. Some are free, some need a paid key. While on, your prompts leave your machines.</p>
+      <p id="wiz-cloud-line">Optional. Some are free, some need a paid key. While on, your prompts leave your machines.</p>
       <div id="wiz-provs"></div>
     </div>
 
     <div class="wstep" data-w="4" hidden>
-      <div class="set-h">Done</div>
-      <p id="wiz-done-line">Models download in the background. Chat opens when the first one is ready.</p>
+      <div class="set-h">Your server</div>
+      <p>Optional. Pair a ConcordeAI server you run with the code on its screen.</p>
+      <div id="wiz-pair-row">
+        <input id="wiz-code" type="text" autocomplete="off" spellcheck="false"
+               autocapitalize="characters" maxlength="16" placeholder="Pairing code"
+               aria-label="Pairing code">
+        <button class="about-btn slim" id="wiz-pair" type="button">Pair</button>
+      </div>
+      <details id="wiz-srv-adv"><summary>Advanced</summary>
+        <input id="wiz-srv-url" type="text" autocomplete="off" spellcheck="false"
+               placeholder="https://server.example.com" aria-label="Address">
+        <input id="wiz-srv-aid" type="password" autocomplete="off"
+               placeholder="Access Client ID (optional)" aria-label="Access Client ID">
+        <input id="wiz-srv-asec" type="password" autocomplete="off"
+               placeholder="Access Client Secret (optional)" aria-label="Access Client Secret">
+      </details>
+      <div class="wnote" id="wiz-srv-note" aria-live="polite"></div>
+    </div>
+
+    <div class="wstep" data-w="5" hidden>
+      <div class="set-h">Ready</div>
+      <p id="wiz-done-line"></p>
     </div>
 
     <div id="wiz-foot">
       <button class="about-btn" id="wiz-back" hidden>Back</button>
-      <div id="wiz-dots"><i class="on"></i><i></i><i></i><i></i></div>
-      <button class="about-btn primary" id="wiz-next">Continue</button>
+      <div id="wiz-dots" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+      <button class="about-btn primary" id="wiz-next">Get started</button>
     </div>
   </div>
 </div>
@@ -61188,6 +61404,8 @@ async function send(){
   if(generating&&input.value.trim()&&!pendingImages.length&&!pendingDocs.length&&uiMode!=="funnel"){
     sendQueued=true;const qc=$("#composer");if(qc)qc.classList.add("queued");return;}
   if((!input.value.trim()&&!pendingImages.length&&!pendingDocs.length)||generating)return;
+  // NOTHING CAN ANSWER YET (6b630): the text stays; the home's line says what to do
+  if(typeof hzNmBlock==="function"&&hzNmBlock())return;
   // A BENCHMARK OWNS THE ENGINES (6b331): asked before anything is
   // cleared (a chat, a funnel's answer or goal), so the text, pictures
   // and files stay in the composer
@@ -65139,8 +65357,10 @@ function setDesc(k,x,where){
     :"Every model "+where+" can run.";
 }
 // the count line: what is here already, or what would download
-function setLine(x){
+function setLine(x,eta){
   const n=x.n+" model"+(x.n===1?"":"s");
+  // the wizard's rows add the time (6b630): "3 models · 11 GB · about 30 min"
+  if(eta)return x.state==="download"?n+" \u00b7 "+dlSizeTime(x.dl_gb):n+" installed";
   return x.state==="download"?n+", "+muGB(x.dl_gb):n+" installed";
 }
 // THE RISKY CARD ASKS TWICE, in place, naming the risk (6b258): Everything
@@ -65168,12 +65388,12 @@ function setCardsHtml(sets,o){
     const danger=risky&&!!sets.danger;   // a giant is in: red, not yellow
     return '<div class="plan-card set-card'+(risky?" risky":"")+(danger?" danger":"")
       +(x.state==="yours"?" current":"")+(o.pick===k?" on":"")+(x.n?"":" none")
-      +'" data-set="'+k+'" role="button" tabindex="0">'
+      +'" data-set="'+k+'" role="'+(o.eta?"radio":"button")+'"'+(o.eta?' aria-checked="'+(o.pick===k)+'"':"")+' tabindex="0">'
       +(x.state==="yours"?'<i class="cur">\u2713 yours</i>':"")
       +'<b>'+(risky?'<span class="warn">\u26a0</span> ':"")+SET_NAMES[k]+'</b>'
       +'<span class="sd">'+esc(armed===k?SET_ASK:x.n?setDesc(k,Object.assign({},x,{risky:risky}),where)
         :"Nothing fits "+where+".")+'</span>'
-      +(x.n?'<span class="gb">'+esc(setLine(x))+'</span>':"")+'</div>';
+      +(x.n?'<span class="gb">'+esc(setLine(x,o.eta))+'</span>':"")+'</div>';
   }).join("");
 }
 // a card is a button: Enter and Space press it
@@ -65213,8 +65433,8 @@ function renderSetup(st){
   // FIRST RUN, without the wizard: the same three cards as the wizard and
   // Settings (6b405), the button downloading the one picked
   if(!setupManual){
-    setTitle("Welcome",
-      "Setting up. Chat opens when the first model is ready.");
+    setTitle("Models",
+      "Pick a set. Chat works as soon as the first model is here.");
     const sets=st.sets||{};
     if(!setupPlanPicked){if(sets.chosen)setupPlan=sets.chosen;setupPlanPicked=true;}
     setupList.innerHTML=html+'<div class="set-row">'
@@ -66693,7 +66913,7 @@ function paintGiants(nl,gi){
 }
 /* one pair of settings, two screens: whichever was ticked, both show it */
 function syncLimits(nlOn,giOn){
-  [["#nolimits","#giants"],["#wiz-nl","#wiz-gi"]].forEach(([a,b])=>{
+  [["#nolimits","#giants"]].forEach(([a,b])=>{
     const nl=$(a),gi=$(b);if(!nl||!gi)return;
     nl.checked=!!nlOn;gi.checked=!!(nlOn&&giOn);paintGiants(nl,gi);
   });
@@ -66732,27 +66952,62 @@ $("#models-flag").addEventListener("click",()=>{openModelUpdates();});
 // start downloads, /api/cloud + /api/cloud/set for keys, and the old
 // setup veil for the progress bar once the wizard hands off.
 const wizVeil=$("#wiz-veil");
-// the set the wizard installs (6b405): Light until one is picked
-let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null;
+// the set the wizard installs (6b405): Light until one is picked; "starter"
+// (the Starter alone) and "cloud" (nothing to download) are choices too (6b630)
+let wizStep=1,wizPlan="light",wizPicked=false,wizSets=null,wizSt=null;
+const WIZ_STEPS=5;
 const WIZ_PROVS=[
   ["gemini","Gemini","free","https://aistudio.google.com/app/apikey"],
   ["groq","Groq","free","https://console.groq.com/keys"],
   ["claude","Claude","paid","https://console.anthropic.com/settings/keys"],
   ["kimi","Kimi K3","paid","https://platform.moonshot.ai/console/api-keys"]];
+/* HOW LONG A DOWNLOAD TAKES, BEFORE IT STARTS (6b630). Nothing has been
+   measured yet on a first run, so the time is an estimate at 50 Mbit/s, a
+   common home connection: 0.8 GB is about 2 min. Once bytes move, every
+   bar says its measured time left (dlLeft). */
+const DL_ASSUME_BPS=6.25e6;
+function dlAbout(gb){
+  const s=(+gb||0)*1e9/DL_ASSUME_BPS;
+  if(s<90)return "about a minute";
+  const m=Math.round(s/60);
+  if(m<60)return "about "+m+" min";
+  const h=Math.round(m/60);
+  return "about "+h+" h";
+}
+// one row's size and time: "0.8 GB · about 2 min"
+function dlSizeTime(gb){return muGB(gb)+" · "+dlAbout(gb);}
+// the starter as /api/setup tells it, or the catalog's size before it answers
+function wizStarterGb(st){return +(((st||{}).starter||{}).gb)||0.8;}
+function wizStarterHere(st){return (((st||{}).starter||{}).state)==="ready";}
 function wizShow(n){
   wizStep=n;
   $$("#wiz-card .wstep").forEach(s=>s.hidden=+s.dataset.w!==n);
   [...$("#wiz-dots").children].forEach((d,i)=>
     d.classList.toggle("on",i===n-1));
   $("#wiz-back").hidden=n===1;
-  $("#wiz-next").textContent=n===4?"Let’s go":"Next";
+  $("#wiz-next").textContent=n===1?"Get started":n===WIZ_STEPS?wizGoLabel():"Next";
   if(n===2)wizPaintPlans();
   if(n===3)wizPaintProvs();
+  if(n===WIZ_STEPS)wizPaintDone();
+}
+// THE MODEL ROWS (6b630): the Starter, the three sets (setCardsHtml, the one
+// renderer, with their time), cloud only. Each says its size and its time
+function wizRow(k,name,desc,line){
+  return '<div class="plan-card set-card'+(wizPlan===k?" on":"")+'" data-set="'+k+'" role="radio" aria-checked="'
+    +(wizPlan===k)+'" tabindex="0"><b>'+name+'</b><span class="sd">'+esc(desc)+'</span><span class="gb">'+esc(line)+'</span></div>';
+}
+function wizPlansHtml(){
+  const st=wizSt||{},g=wizStarterGb(st);
+  return wizRow("starter","Starter","One small model. Your first answers in minutes.",
+      wizStarterHere(st)?"Installed":dlSizeTime(g))
+    +setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz",eta:true})
+    +wizRow("cloud","Cloud only","Nothing to download. Answers come from your cloud keys.","No download");
 }
 async function wizPaintPlans(){
   const box=$("#wiz-plans");
   let st={};
   try{st=await(await api("/api/setup")).json();}catch(e){return;}
+  wizSt=st;
   const ss=st.studios||{};
   const wi=$("#wiz-image");
   if(wi)wi.hidden=!(ss.image&&ss.image.supported&&!ss.image.ready);
@@ -66763,46 +67018,27 @@ async function wizPaintPlans(){
     const s=ss[k]||{},t=(s.tiers||[]).find(x=>x.id===s.tier)||(s.tiers||[])[0];
     const z=el&&el.querySelector(".wsz");if(z&&t&&t.gb)z.textContent="("+t.gb+" GB)";
   });
-  // the same three cards as Settings (6b405)
+  // the same three cards as Settings (6b405), between the Starter and the cloud
   wizSets=st.sets||{};
   if(!wizPicked&&wizSets.chosen)wizPlan=wizSets.chosen;
-  box.innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
+  box.innerHTML=wizPlansHtml();
 }
 $("#wiz-plans").addEventListener("click",e=>{
   const c=e.target.closest&&e.target.closest(".set-card");
   if(!c)return;
   if(!setConfirm("wiz",c))return;
   wizPlan=c.dataset.set;wizPicked=true;
-  $("#wiz-plans").innerHTML=setCardsHtml(wizSets,{pick:wizPlan,scr:"wiz"});
-});
-$("#wiz-ac").addEventListener("change",async()=>{
-  await api("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({auto_cleanup:$("#wiz-ac").checked})});
-  const s=$("#autoclean-toggle");
-  if(s)s.classList.toggle("on",$("#wiz-ac").checked);
-});
-$("#wiz-nl").addEventListener("change",async()=>{
-  const on=$("#wiz-nl").checked;
-  syncLimits(on,$("#wiz-gi").checked);
-  await api("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify(on?{no_limits:true}
-      :{no_limits:false,include_giants:false})});
-  wizPaintPlans();          // the GB re-price under the new rules
-});
-$("#wiz-gi").addEventListener("change",async()=>{
-  syncLimits($("#wiz-nl").checked,$("#wiz-gi").checked);
-  await api("/api/prefs",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({include_giants:$("#wiz-gi").checked})});
-  wizPaintPlans();
+  $("#wiz-plans").innerHTML=wizPlansHtml();
+  const on=$('#wiz-plans .set-card[data-set="'+wizPlan+'"]');if(on)on.focus();
 });
 async function wizPaintProvs(){
   const box=$("#wiz-provs");
   let cs={};
   try{cs=await(await api("/api/cloud")).json();}catch(e){}
   const pv=(cs||{}).providers||{};
+  const cl=$("#wiz-cloud-line");
+  if(cl)cl.textContent=wizPlan==="cloud"?"Add at least one key. Gemini and Groq have free tiers. Your prompts go to the provider."
+    :"Optional. Some are free, some need a paid key. While on, your prompts leave your machines.";
   box.innerHTML=WIZ_PROVS.map(([id,label,tag,url])=>{
     const ok=(pv[id]||{}).status==="ok";
     return '<div class="wprov" data-p="'+id+'">'
@@ -66845,24 +67081,95 @@ $("#wiz-provs").addEventListener("click",async e=>{
     }else note.textContent=d.err||"that didn’t work";
   }catch(e2){note.textContent="Couldn’t reach the app. Try again.";}
 });
+/* PAIR YOUR SERVER (6b630, per Patrick: code first). The code from the
+   server's screen leads; its address and Cloudflare Access sit under
+   Advanced. The app pairs only over https (_srv_url), and nothing yet
+   tells it a server's address, so a code alone opens Advanced and asks
+   for the address there. Added, then paired, by Settings' own routes; a
+   pairing that fails takes the new entry back off, so trying again
+   starts clean. */
+let wizPaired="";
+async function wizPair(){
+  const note=$("#wiz-srv-note"),btn=$("#wiz-pair");
+  const code=$("#wiz-code").value.trim(),url=$("#wiz-srv-url").value.trim();
+  note.classList.remove("ok");
+  if(!code){note.textContent="Type the code from your server’s screen.";$("#wiz-code").focus();return;}
+  if(!url){$("#wiz-srv-adv").open=true;note.textContent="Add your server’s address too. It starts with https://.";
+    $("#wiz-srv-url").focus();return;}
+  btn.disabled=true;note.textContent="Pairing…";
+  let id="";
+  try{
+    const a=await srvPost("add",{url:url,name:"",
+      access_id:$("#wiz-srv-aid").value.trim(),access_secret:$("#wiz-srv-asec").value.trim()});
+    if(!a.ok){note.textContent=a.err||"Couldn’t add that server.";return;}
+    id=a.id;
+    const r=await srvPost("pair",{id:id,code:code});
+    if(!r.ok){note.textContent=r.err||"Couldn’t pair.";await srvPost("remove",{id:id});id="";return;}
+    wizPaired=((r.server||a.server||{}).name)||"your server";
+    note.textContent="Paired with "+wizPaired+".";note.classList.add("ok");
+    $("#wiz-code").value="";
+    if(typeof loadServers==="function")loadServers();
+    paintTierAvail();
+  }catch(e){note.textContent="Couldn’t reach the app. Try again.";if(id)srvPost("remove",{id:id});}
+  finally{btn.disabled=false;}
+}
+$("#wiz-pair").addEventListener("click",wizPair);
+$("#wiz-code").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();wizPair();}});
+/* THE LAST STEP SAYS WHAT HAPPENS (6b630): the main action names what
+   downloads first, its size and its time ("Download Starter · 0.8 GB ·
+   about 2 min"); a bigger set follows in the background, said on the line
+   above. Cloud only starts chatting, or asks for a key first. */
+function wizCloudOk(){return !!(tierInfo&&tierInfo["Cloud Only"]&&tierInfo["Cloud Only"].available);}
+function wizGoLabel(){
+  const st=wizSt||{},sets=(wizSets||{}),x=sets[wizPlan]||{};
+  if(wizPlan==="cloud")return wizCloudOk()?"Start chatting":"Add a cloud key";
+  if(!wizStarterHere(st))return "Download Starter · "+dlSizeTime(wizStarterGb(st));
+  if(wizPlan!=="starter"&&(x.dl_gb||0)>0)return "Download "+SET_NAMES[wizPlan]+" · "+dlSizeTime(x.dl_gb);
+  return "Start chatting";
+}
+function wizPaintDone(){
+  const st=wizSt||{},x=((wizSets||{})[wizPlan])||{},line=$("#wiz-done-line");
+  const here=wizStarterHere(st),rest=Math.max(0,(x.dl_gb||0)-(here?0:wizStarterGb(st)));
+  let t;
+  if(wizPlan==="cloud")t=wizCloudOk()?"Answers come from the cloud. Add models any time in Settings."
+    :"Cloud only needs a key. Gemini and Groq have free tiers.";
+  else if(wizPlan==="starter")t=here?"The Starter is here. Add bigger models any time in Settings."
+    :"Your first answer is a couple of minutes away. Add bigger models any time in Settings.";
+  else if(!here&&rest>0)t="Then "+SET_NAMES[wizPlan]+" follows in the background: "+muGB(rest)+", "+dlAbout(rest)+". Chat while it downloads.";
+  else if(rest>0)t=SET_NAMES[wizPlan]+" downloads in the background. Chat while it does.";
+  else t=SET_NAMES[wizPlan]+" is here. You’re set.";
+  if(wizPaired)t+=" "+wizPaired+" answers too.";
+  line.textContent=t;
+  $("#wiz-next").textContent=wizGoLabel();
+}
 function openWizard(){wizVeil.hidden=false;wizShow(1);}
 async function wizFinish(){
+  if(wizPlan==="cloud"&&!wizCloudOk()){wizShow(3);return;}
   api("/api/prefs",{method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({wizard_done:true})});
-  await api("/api/setup/install",{method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({plan:wizPlan})});
+  if(wizPlan==="cloud"){
+    // cloud only, a first-class choice: answers come from the keys
+    if(!isCloudMode(tier)&&tier!=="Cloud Only")setTier("Cloud Only");
+  }else{
+    hzNmStarting();
+    await api("/api/setup/install",{method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({plan:wizPlan})});
+  }
   for(const [el,k] of [["#wiz-img","image"],["#wiz-vid","video"]])
     if($(el)&&$(el).checked)
       api("/api/studio/install",{method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({key:k})});
   wizVeil.hidden=true;
-  openSetup();setupManual=false;   // the familiar progress bar takes over
+  // the home's own line shows the Starter coming (hzNoModel); the rest of
+  // the set rides the header's download strip. No window over the app
+  hzNmCheck();
+  input.focus();
 }
 $("#wiz-next").addEventListener("click",()=>{
-  if(wizStep<4)wizShow(wizStep+1);
+  if(wizStep<WIZ_STEPS)wizShow(wizStep+1);
   else wizFinish();
 });
 $("#wiz-back").addEventListener("click",()=>{
@@ -66873,7 +67180,88 @@ $("#wiz-skip").addEventListener("click",()=>{
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({wizard_done:true})});
   wizVeil.hidden=true;
+  hzNmCheck();
 });
+/* NOTHING CAN ANSWER YET (6b630, per Patrick). hzNoModel decides from
+   /api/setup and /api/tiers: true only while no model is on this computer
+   (models_ready), no cloud key works (Cloud Only) and no paired server
+   answers ("srv:<id>", its own row). Not known yet is false: the home
+   never claims "no model" before it has asked. */
+function hzNoModel(st,tiers){
+  if(!st||typeof st.models_ready!=="number")return false;
+  if(st.models_ready>0)return false;
+  tiers=tiers||{};
+  if(tiers["Cloud Only"]&&tiers["Cloud Only"].available)return false;
+  return !Object.keys(tiers).some(k=>/^srv:[^:]+$/.test(k)&&tiers[k]&&tiers[k].available);
+}
+let hzNmSt=null,hzNmOn=false,hzNmTimer=0,hzNmBusy=false,hzNmAsked=false,hzNmCloud=false;
+function hzNmPaint(st){
+  const box=$("#hz-nomodel");if(!box)return;
+  const on=hzNoModel(st,tierInfo);
+  hzNmOn=on;
+  if(box.hidden!==!on){box.hidden=!on;if(typeof hzBalance==="function")hzBalance();}
+  if(!on){
+    hzNmAsked=false;
+    // a cloud key and no model here: the mode that can answer, once (6b630)
+    if(!hzNmCloud&&st&&st.models_ready===0&&tierInfo&&tierInfo["Cloud Only"]&&tierInfo["Cloud Only"].available
+       &&!isCloudMode(tier)&&!isSrvMode(tier)&&tier!=="Cloud Only"){hzNmCloud=true;setTier("Cloud Only");}
+    return;
+  }
+  const s=st.starter||{},g=+s.gb||0.8,line=box.querySelector(".nm-line"),bar=box.querySelector(".nm-bar"),
+        acts=box.querySelector(".nm-acts"),go=box.querySelector(".nm-go");
+  const moving=s.state==="downloading"||s.state==="queued";
+  if(moving){
+    const pct=Math.max(0,Math.min(100,+s.pct||0)),want=g*1e9,left=dlLeft("starter",want*pct/100,want);
+    line.textContent="Getting your starter model · "+(s.state==="queued"?"starting":pct+"%")+dlTail(left);
+    bar.hidden=false;bar.firstElementChild.style.width=pct+"%";acts.hidden=true;
+  }else{
+    bar.hidden=true;acts.hidden=false;
+    line.textContent=s.state==="error"?"The download stopped. Check your connection and try again."
+      :s.state==="ready"?"Starting your starter model…"
+      :hzNmAsked?"Nothing can answer yet. Get the starter model, or use the cloud.":"No model on your machines yet.";
+    go.textContent=s.state==="error"?"Try again · "+dlSizeTime(g):"Get a starter model · "+dlSizeTime(g);
+    go.hidden=s.state==="ready";
+  }
+}
+// the press shows at once: "starting" until the next status says more
+function hzNmStarting(){
+  if(hzNmSt&&hzNmSt.starter&&hzNmSt.starter.state!=="ready"){hzNmSt.starter.state="queued";hzNmPaint(hzNmSt);}
+}
+async function hzNmCheck(){
+  if(hzNmBusy)return;hzNmBusy=true;
+  try{
+    const st=await(await api("/api/setup")).json();
+    hzNmSt=st;
+    // the tiers first when a key or a server may have changed what can answer
+    if(!tierInfo||!Object.keys(tierInfo).length)await paintTierAvail();
+    hzNmPaint(st);
+  }catch(e){}
+  finally{hzNmBusy=false;}
+  clearTimeout(hzNmTimer);
+  // while it shows, every 2 s (the download's progress); else nothing
+  if(hzNmOn&&!document.hidden)hzNmTimer=setTimeout(hzNmCheck,2000);
+}
+$("#hz-nomodel .nm-go").addEventListener("click",async()=>{
+  const go=$("#hz-nomodel .nm-go");go.disabled=true;
+  hzNmStarting();
+  try{await api("/api/setup/install",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({plan:"starter"})});}catch(e){}
+  finally{go.disabled=false;}
+  hzNmCheck();
+});
+$("#hz-nomodel .nm-cloud").addEventListener("click",async()=>{
+  await openAbout();settingsPane("p-cloud");
+});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)hzNmCheck();});
+// a question while nothing can answer stays in the box; the line says why
+function hzNmBlock(){
+  if(!hzNmOn)return false;
+  hzNmAsked=true;
+  if(hzNmSt)hzNmPaint(hzNmSt);
+  hzNmCheck();
+  return true;
+}
 function paintModelsFlag(st){
   // ONE progress surface (6b291, per Patrick: "here we go again" — this
   // pill said 52% while the strip under it said 53%, from two pollers,
@@ -66949,15 +67337,16 @@ setTimeout(kickWipe,450);
     // auto-open only when the app can't hold a conversation yet
     paintModelsFlag(st);
     if(st.needs_setup){
-      // FIRST RUN opens the guided wizard (6b247) — once. A machine
-      // that skipped or finished it falls back to the plain download
-      // panel.
+      // FIRST RUN opens the guided wizard (6b247) — once. A machine that
+      // skipped or finished it gets no window at all (6b630, per Patrick:
+      // a relaunch opened "Welcome. Setting up…" over the app with nothing
+      // setting up): the home's own line offers the Starter instead
       let done=false;
       try{done=!!(await(await api("/api/prefs")).json()).wizard_done;}
       catch(e){}
       if(!done)openWizard();
-      else{openSetup();setupManual=false;}
     }
+    hzNmSt=st;hzNmCheck();
   }catch(e){}
 })();
 
@@ -70861,7 +71250,9 @@ function hzBalance(){
   const w=$("#composer-wrap"),c=$("#composer");if(!w||!c)return;
   if(!$("#hero")||!document.documentElement.classList.contains("hz")){w.style.paddingBottom="";return;}
   if(document.documentElement.classList.contains("hz-sx-fn")){if(w.style.paddingBottom!=="0px")w.style.paddingBottom="0px";return;}   // Funnels' home: the form holds the place (6b625)
-  const pb=hzBalanceFor(innerHeight,c.getBoundingClientRect().height);
+  // the empty state's line under the composer (6b630) doesn't move the box off its point
+  const nm=$("#hz-nomodel"),nmH=nm&&!nm.hidden?nm.getBoundingClientRect().height+14:0;
+  const pb=Math.max(16,hzBalanceFor(innerHeight,c.getBoundingClientRect().height)-nmH);
   if(w.style.paddingBottom!==pb+"px")w.style.paddingBottom=pb+"px";
 }
 // ---- the send: two ice rings from the button; the night brightens while it

@@ -28,7 +28,8 @@
       "../../fonts": "fonts",
       "../../vfx": "vfx",
       "sidecar/launch.sh": "launch.sh",
-      "sidecar/crypto-requirements.txt": "crypto-requirements.txt"
+      "sidecar/crypto-requirements.txt": "crypto-requirements.txt",
+      "sidecar/engine-requirements.txt": "engine-requirements.txt"
     },
     "macOS": {
       "minimumSystemVersion": "11.0",

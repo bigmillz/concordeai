@@ -21056,6 +21056,134 @@ this branch touches, not re-run on beta-3 to confirm it predates this.
   saying which clock, so it is left as the kit sends it.
 - This computer's clock decides while the server is asleep; a wrong clock here moves the hours.
 
+## 6b621 — beta-4-ultra: the sky, the aurora and Ultra at full strength, matched to the demo (7.0 beta 4, per Patrick)
+
+Per Patrick, on the app at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important
+that the chat page and also obviously the code page and all that looks really dialed in." Beta 3 (6b555) had ported the
+web demo's sky and Ultra once; the demo has moved since (b509fe9, the aurora fluid and centred; d84e057, the governing
+rule's working views) and the port had left pieces out. Every difference found, frame by frame against the demo
+(`SP/preview-site/beta`, its DESIGN.md) at 1440 and 760, in headless Chromium and in a real WKWebView, and closed,
+except the few listed at the end with their reasons. Horizon only; the app's architecture kept (the GPU sky, the burst
+canvas, the time-based easing, the footage seam).
+
+**The aurora, fluid and centred** (DESIGN "The aurora, fluid"). The app still ran beta 3's seeded random walk, with the
+crest cap and the soft knee behind the greeting: measured over 10 minutes at real speed its centre of mass sat at 0.459
+(Full; the owner's "always left biased") and the mean profile had two humps with a dip at the centre ("a bit of drop in
+the centre"). Now the demo's: the centre is three slow sines round the middle (140, 210 and 85 s, random phases each
+visit) plus a 25 s sway of 1.5 %; on a continuous clock a fold wave travels sideways, a pulse of brightness travels
+across the rays and the rays' pattern slides and back; the crest cap and the knee are gone for a soft full-width band at
+the greeting's height (30 % dimmer, Ultra's 20 % lift withheld in it); the split's lobes ±10 % (was ±17 %). Balanced half
+the swing on the 1.6× clock, the motion at 60 %; Calm still and centred. Dev copies take `?hz=aurspeed=N` (the
+aurora's clocks N× faster) and the sky has `S.aurProfile()` (the preview's `aur()`: centre of mass and a 32-bin profile).
+Measured (`aurspeed=10`, 10 minutes of aurora time, 85 samples): Full 0.508 (range 0.315–0.677; the demo, the same run,
+0.503, 0.312–0.684), one hump peaking at the middle bin; Balanced 0.499 (0.409–0.611; demo 0.495, 0.384–0.631). Before,
+at real speed over 10 minutes: Full 0.459 with its peak at bin 10 of 32 and a centre dip; Balanced 0.497 with a dip.
+
+**The working views** (THE GOVERNING RULE). 6b580 laid a full-width gradient (.74–.90) over the sky; the demo instead
+recedes the sky to 30 % of its home strength (60 % at Ultra) over 1.2 s on the working ground `#0e0e10`, takes the
+footage to 12 %, and lays a near-solid flat band behind the column and the flow (`#0e0e10` at .93, feathered over 160 px,
+a gradient). Now the same: `#hz-scrim` is the ground at .7 (.4 at Ultra), `#hz-band` the band, fitted to `#chat-inner`'s
+content box + 24 px (a ResizeObserver; `hzBandFit`), the footage's ease target ×.12 off the home. What was showing when a
+conversation opens (a star sign, the arrival's constellation, a shooting star, a shower, the rain) now fades over .9 s;
+it used to be cut in one frame. The field above the composer in a conversation is the demo's short, light version: half
+the stars, centred over the top edge (.18–.82 of the band), each living 2–4 s and respawning (6b580's whole field shown
+for 3.6 s then gone is retired); the motes the same, half and centred.
+
+**Ultra, arriving** (DESIGN "The arrival's hang", "The Ultra moment"). Added: the knob settles to .97 in the held
+breath (140 ms, `html.hz-ant`), lifts back to 1 at the release (300 ms) and flashes once within 6 px (white 4 px, ice
+6 px, 900 ms); eight fine rays flare at the knob (38 px, 400 ms, lines); the burst, the glint and a stream of 12 stars
+leave the knob itself on the home and fly up through the glass (they started at the composer's top edge); the line of
+light runs round the border from the beam's angle at +400 ms in 600 ms (a white head with a short ice trail) and leaves
+the lit edge. The matrix's wave up to the greeting is Full's (it ran in Balanced too). Removed: the CSS curtains'
++.45 brightness breath on ignite (the demo has none; the GPU surge carries the arrival): it whitened the rays and was the
+largest rise round the composer, 21.7/255 in 200 ms; now 15.1, the demo 13.6.
+
+**The landing, pushed** (per Patrick, relayed while this was in flight: "add a little bit more twist when we hit
+ultra"; then "More twist, not just necessarily rotation. More stars, more pretty, more fantastic, more you're clicking on
+something that really matters. Like, let's push that one hard."; and "I love the stars ... I'm going to politely
+disagree with my friend"). Additive only: nothing of the stars, constellations, shooting stars or showers is thinned.
+- **The twist** is the curtain folding through itself, never a turn of the field: a shear that grows with height and
+  changes sign along the curtain (`x += tws (y − .62) sin(2.6 x − .7 phase)`: some sections lean left, some right, a
+  ribbon twist drifting with the folds), the folds deeper (`tam × (1 + .6 env)`) and their phase pushed `± .25 env`
+  rad (each arrival picks a side), all on the surge's own envelope (x² e^(2(1−x)), now peaking at 1.2 s). Numbers:
+  `ATW_AMP .6, ATW_PH .25, ATW_SH .35, ATW_REST .28`: the lean about 24° at the swell's peak and about 6° at resting
+  Ultra (`tws` .44 and .10 read back); the folds' amplitude .45 → .72 at the peak; the fastest phase push .4 rad/s against
+  the folds' own .16–.31 (a lean, never a spin). Balanced half; Calm and reduced motion none (gated on the sky being lifted).
+  Measured (the curtain's normalised 32-bin profile against the moment of the click, four arrivals each): the share of
+  its light that has moved by 0.5 / 1.0 / 1.5 s is .045 / .080 / .086 (before .024 / .040 / .056): twice the motion in
+  the hang, then the same by 3 s.
+- **More stars above the box:** 60 in Full (30 Balanced; was 40 and 20), six glints (three; was four and two), and a
+  deeper layer behind them on the home, 30 (15): .9–1.5 px, .18–.35, drifting at half the pace. A conversation still
+  takes half (30).
+- **Star births:** eight new stars (four in Balanced) bloom into the field during the hang (from 0.9–2.0 s, each over
+  1.4 s on the smootherstep with a soft four-point glint that rises and falls once) and stay.
+- **More drawing in:** a star sign draws in during the settle (1.8–2.6 s; was 9–15 s), then every 14–20 s (was 20–30);
+  a meteor shower crosses at 1.3 s (on the home; then every 60–90 s as before).
+- **The weight:** the held breath now holds to 2.0 s and settles by 3.2 s (was 1.6 and 2.6); the field's stars float
+  the last tenth over 1.7–2.1 s (was 1.3–1.6).
+- Mirrored into the web demo's `beta/index.html` (the scratchpad copy; not pushed): the same constants and lines.
+- Cost: Chromium rAF p95 16.7–16.8 ms through three arrivals and at rest (max 16.8); WKWebView on screen p95 18 ms in
+  the arrival and at rest (one run showed a single 103 ms frame at rest, not seen in the next); no flash (the largest
+  region rise within 200 ms 14.8/255, the bar's row).
+
+**Ultra at rest.** Added: the lit glass edge (a 1.5 px rim in ice, white and a hint of violet turning once every 6 s,
+its 2 px copy blurred 3 px at .75; it drains back the way it came in 900 ms; Calm, effects off and a page without
+@property keep 6b552's still rim), the light caught in the glass (a faint ice→violet wash from the top edge), the
+horizon line 4 px under the box, the knob's still 5 px ice glow, the label's shade (a feathered dark band behind
+"Ultra", z-index −1 in the composer's own stacking context, so it never covers the letters or widens the page), the
+motes round the composer (one every 170 ms, at most 40; working views half and centred), the chandelier also on a quiet
+return or a page opening at Ultra, its stars turning with their sway as the demo's. The fill flows in the demo's five
+stops every 7 s (was 8 s, three stops) with its bloom at .42; the lit label's close light 12 px .95 (was 6 px .9). The
+Balanced matrix sweeps every 6–8 s (the demo's code; was 5.2–6.8).
+
+**Traps found on the way.** (1) The lit edge's layers were made at the first Ultra, in the frame the class turned on,
+so they started at their end state: the rim was simply there at once, no line of light. They are made at boot now. (2)
+The demo's "charged" hairlines (the page's hairline tokens easing to blue-violet) were tried on the root: an inherited
+registered property transitioning on `html` restyled every element each frame, 133–183 ms stalls in the arrival. The
+composer alone would show nothing (its border is 6b580's `--chat-line` and sits under the rim), so it is not ported. (3)
+The rim's turning discs (112 % of the ring, square) are clipped by their mask for paint but not for layout: the page
+was 88–140 px wider than the window at 760 (and 404 at 390 from the label's shade on the slider). The rings clip
+(`overflow:hidden`) and the shade moved under the label.
+
+**Measured.** Chromium (headless shell, Metal, DPR 1, 1440): rAF p95 16.8 ms through the arrival and at rest at
+Ultra, max 16.8 (before: 16.7/16.8, one 133 ms first-arrival hitch). WKWebView (an offscreen window, the harness in
+`SP/b4-ultra/wk`), on screen: p95 18 ms in the arrival and at rest, Full and Balanced (before 6b621: the
+arrival 56 ms p95 on its first run, a 37-frame second); 760 offscreen p95 25/21 ms. AA with the aurora's reach held low at Ultra's brightest (the swell, 1.1 s) and at rest,
+the text cleared and the 95th-percentile luminance behind it: the greeting 5.3:1 and 5.9:1, "Ultra" 12.2:1 (the demo
+6.0/6.6 and 8.6/7.8). Flashes (8 × 5 regions, the arrival's screencast at 60 fps): the largest rise within 200 ms is
+15.1/255 on the slider's row (the bar's rush), the demo 13.6. No sideways scroll at 1440 and 760 (390's home is 19 px
+wide at every level before this change too: not Ultra's, left for the integrator). No page errors.
+
+**Gauntlet.** New block "6b621 ultra at full strength" (nine checks, the landing's push among them): the aurora's wander run in node on the page's own
+code over 10 minutes of aurora time, twelve visits a level (five mutants: a left bias, the edges, moving in Calm,
+Balanced at Full's motion, a jump); the shader (four mutants: the crest cap back, the knee back, the split's gap, the
+rays parked); the conversation's field plan (two); the working views' css and loop (four: a see-through band, the
+footage at full, a cut, a snap); Ultra's css (six: the rim at once, the lit edge in Calm, a spinning rim, the knob
+bouncing, a rose tint, a flood of motes); live in headless Chromium over the DevTools protocol (the curtain read back
+over 8 minutes of aurora time, the arrival's timeline, the motes, a conversation at Ultra, no sideways scroll at 760 and
+1440) and the pushed landing (the twist's fold, lean and phase in the swell, six or more births, a shower, the resting twist,
+the deeper layer), with five mutants served in place of the page (no twist, the aurora biased, the rim at once, the
+rim's discs unclipped, the sky not receding); the shader check also catches the twist in Calm and a spin for a lean. Re-pinned at the same strength: 6b553's knob pin (the arrival may now settle, lift and flash the knob
+once, `hzKnobSettle`/`hzKnobLift`/`hzKnobLit` only, scale .97–1, glow ≤ 7 px, never looping or turning; at rest one still
+5 px ice glow; the click-overshoot mutant still caught), 6b544 (the fill 7 s, the lit label 12 px, the CSS breath gone),
+6b552's two fill-colour mutants (the new stops), 6b553's burst anchor (from the knob), 6b542's and 6b553's footage ease
+(×.12 off the home), 6b555's sky (the sines, no crest cap, Balanced 6–8 s; the "edges" mutant on the sines) and its
+arrival (the wave Full's). Trimmed run (prelude + 6b542, 6b544, 6b555 chrome, 6b552, 6b553 ×2, 6b555 sky, 6b580, 6b621,
+on 9975–9977): 70/72. The two failures are the base's own at f9148e1 (the same trimmed run on f9148e1: 60/63, those two
+and 6b555's streamed answer in Balanced, which passed here: flaky): 6b542 Sting (the page has 18 `var(--hz-ember)`, the
+pin says 10) and 6b580's layout. Also re-pinned for the push: 6b552's field plan (90 and 45 with the deeper layer, six and
+three glints, the grid share 16–56), 6b553's launch float (1.7–2.1 s), 6b555's breath (2.0/3.2 s) and star signs
+(14–20 s, one on landing, a shower at 1.3 s).
+
+**Left.** The demo's Ultra mirror over the typed words (its shimmering letters and "Ask anything") is not ported: it
+needs a copy of the textarea's text laid exactly over it, and any metric difference in WKWebView would show the caret
+off the letters. The demo's knob trail along the track never shows there either (the knob finishes its 140 ms snap before
+the 140 ms release reads it) and is not ported. The demo's edge bloom has a 14 px glow; the app keeps its 10 px (the
+"no glow past 12 px" rule) and its 2 px scaleX line. The demo's head of the line of light has a warm white trail; the
+app's is ice white (Ultra is one cool pair). The sky's clock still runs at half speed behind a conversation (6b580's;
+invisible at 30 %). The demo's rain falls in a conversation; the app's stays the home's (6b580, per Patrick: "we don't
+have to litter the place with stars"). The conversation's burst stays centred over the composer (6b580) where the demo's
+leaves the knob. Not measured: 120 Hz (both engines cap at 60 here), WKWebView in the built shell's own window.
 ## 6b622 — beta-4-lanes: Code and Funnels in the flat chrome (7.0 beta 4, per Patrick)
 
 Per Patrick: "it's very important that the chat page and also obviously the code page and all that looks really
@@ -21554,131 +21682,105 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
 - The command output is still not on the wire (6b622), so a danger card shows the command, not a preview of what it
   will delete.
 - Checked in an offscreen WKWebView and headless Chromium, not in the shipped window.
-## 6b621 — beta-4-ultra: the sky, the aurora and Ultra at full strength, matched to the demo (7.0 beta 4, per Patrick)
+## 6b630 — first-run-1: the app's own Python, the minimum-engine gate, a setup screen that says what it's doing, a home that says when nothing can answer, the Starter first (7.0 beta, per Patrick: the first-run audit's P0s)
 
-Per Patrick, on the app at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important
-that the chat page and also obviously the code page and all that looks really dialed in." Beta 3 (6b555) had ported the
-web demo's sky and Ultra once; the demo has moved since (b509fe9, the aurora fluid and centred; d84e057, the governing
-rule's working views) and the port had left pieces out. Every difference found, frame by frame against the demo
-(`SP/preview-site/beta`, its DESIGN.md) at 1440 and 760, in headless Chromium and in a real WKWebView, and closed,
-except the few listed at the end with their reasons. Horizon only; the app's architecture kept (the GPU sky, the burst
-canvas, the time-based easing, the footage seam).
+On `first-run-1`, from `beta-3` (c5d44c5). The fresh-eyes audit of a new Mac's first run (scratchpad
+`audit/first-run/`) found: the bootstrap ran `command -v python3`, the Command Line Tools' 3.9.6, so pip could only
+give mlx-lm 0.29.1 and the Light set's everyday model died with "Model type gemma4 not supported"; a Mac without the
+tools got a dialog with `xcode-select --install` in it, and the shell's own page said "set CONCORDE_PYTHON"; the
+setup screen was static text and an empty log box that said the window would open on its own while it was open; and
+the app said "ready" with no model at all: the first question ended in "⚠️ Backend error — Gemma 4 E2B's engine
+didn't start" (reproduced on beta-3 in a fake HOME, stills in the scratchpad's `fr1/stills/before`).
 
-**The aurora, fluid and centred** (DESIGN "The aurora, fluid"). The app still ran beta 3's seeded random walk, with the
-crest cap and the soft knee behind the greeting: measured over 10 minutes at real speed its centre of mass sat at 0.459
-(Full; the owner's "always left biased") and the mean profile had two humps with a dip at the centre ("a bit of drop in
-the centre"). Now the demo's: the centre is three slow sines round the middle (140, 210 and 85 s, random phases each
-visit) plus a 25 s sway of 1.5 %; on a continuous clock a fold wave travels sideways, a pulse of brightness travels
-across the rays and the rays' pattern slides and back; the crest cap and the knee are gone for a soft full-width band at
-the greeting's height (30 % dimmer, Ultra's 20 % lift withheld in it); the split's lobes ±10 % (was ±17 %). Balanced half
-the swing on the 1.6× clock, the motion at 60 %; Calm still and centred. Dev copies take `?hz=aurspeed=N` (the
-aurora's clocks N× faster) and the sky has `S.aurProfile()` (the preview's `aur()`: centre of mass and a 32-bin profile).
-Measured (`aurspeed=10`, 10 minutes of aurora time, 85 samples): Full 0.508 (range 0.315–0.677; the demo, the same run,
-0.503, 0.312–0.684), one hump peaking at the middle bin; Balanced 0.499 (0.409–0.611; demo 0.495, 0.384–0.631). Before,
-at real speed over 10 minutes: Full 0.459 with its peak at bin 10 of 32 and a centre dip; Balanced 0.497 with a dip.
+**The app's own Python (P0 1).** `launch.sh` (build_macos_app.sh's LAUNCH heredoc, extracted into the shell by
+shell_stamp.py as before) never runs the system's Python. It downloads python-build-standalone 3.12.16 (release
+20261026, the install_only_stripped build, 25 MB) for the machine's architecture, checks its SHA-256 against the pin
+in the script (both arches' sums checked against the release's SHA256SUMS and GitHub's asset digests on 2026-11-10)
+**before** anything is unpacked, unpacks it into `~/Library/Application Support/MillenAI/python/cpython-3.12.16+20261026`
+and makes the venv from it. curl, shasum and tar are macOS's own; its TLS uses /etc/ssl/cert.pem (checked). Chosen
+over bundling it in the .app: the venv's ~350 MB of wheels needs the internet on a first run anyway, a bundled Python
+would add ~50 MB to the DMG (both arches; python-build-standalone has no universal build) and ~70 nested Mach-O files
+to sign and notarize under the hardened runtime (plus library validation against every pip wheel), and the download
+keeps the DMG at its size. The engine installs at the app's pins (`engine-requirements.txt`, written by
+shell_stamp.py from MLX_LM_PIN and MLX_PIN, a new bundle resource) instead of whatever pip picks. A venv older than
+3.11 (read from its pyvenv.cfg, never by running it: the Command Line Tools' 3.9 of an earlier first run) is moved
+aside and made again from our Python, and put back if that fails; the shell runs the setup for it too
+(`venv_too_old`). A setup stopped half way (Quit, a lost connection) leaves `.setup-unfinished` in the venv, so the
+next launch finishes it instead of starting the server on half a venv (`venv_ready`). In shell mode
+(`--bootstrap --shell`) there's no pywebview, no osascript, and the setup speaks to the shell in "@@" lines.
 
-**The working views** (THE GOVERNING RULE). 6b580 laid a full-width gradient (.74–.90) over the sky; the demo instead
-recedes the sky to 30 % of its home strength (60 % at Ultra) over 1.2 s on the working ground `#0e0e10`, takes the
-footage to 12 %, and lays a near-solid flat band behind the column and the flow (`#0e0e10` at .93, feathered over 160 px,
-a gradient). Now the same: `#hz-scrim` is the ground at .7 (.4 at Ultra), `#hz-band` the band, fitted to `#chat-inner`'s
-content box + 24 px (a ResizeObserver; `hzBandFit`), the footage's ease target ×.12 off the home. What was showing when a
-conversation opens (a star sign, the arrival's constellation, a shooting star, a shower, the rain) now fades over .9 s;
-it used to be cut in one frame. The field above the composer in a conversation is the demo's short, light version: half
-the stars, centred over the top edge (.18–.82 of the band), each living 2–4 s and respawning (6b580's whole field shown
-for 3.6 s then gone is retired); the motes the same, half and centred.
+**The gate.** MLX_TYPE_SINCE: the first mlx-lm that loads each newer model type, read off every mlx-lm wheel on PyPI
+from 0.28.4 to 0.32.2 (models/<type>.py or the type mapping): qwen3_5, qwen3_5_moe and glm_moe_dsa from 0.30.7, gemma4
+from 0.31.2, gemma4_unified from 0.32.0. MLX_REQUIRES now holds every MLX row of those types (Gemma 4 E2B and 26B,
+Qwen 3.5 9B, Qwen 3.8 27B, Qwen 3.6 35B MoE, GLM 5.3). On 0.29.1 they run on Ollama (GLM 5.3, MLX-only, isn't
+offered); Llama 3.2 1B stays on MLX; on the pin all are MLX.
 
-**Ultra, arriving** (DESIGN "The arrival's hang", "The Ultra moment"). Added: the knob settles to .97 in the held
-breath (140 ms, `html.hz-ant`), lifts back to 1 at the release (300 ms) and flashes once within 6 px (white 4 px, ice
-6 px, 900 ms); eight fine rays flare at the knob (38 px, 400 ms, lines); the burst, the glint and a stream of 12 stars
-leave the knob itself on the home and fly up through the glass (they started at the composer's top edge); the line of
-light runs round the border from the beam's angle at +400 ms in 600 ms (a white head with a short ice trail) and leaves
-the lit edge. The matrix's wave up to the greeting is Full's (it ran in Balanced too). Removed: the CSS curtains'
-+.45 brightness breath on ignite (the demo has none; the GPU surge carries the arrival): it whitened the rays and was the
-largest rise round the composer, 21.7/255 in 200 ms; now 15.1, the demo 13.6.
+**The setup screen (P0 2, P1).** The shell's own page (SETUP_PAGE, a data: document): the wordmark, Inter with the
+system face until the font file is approved, one hairline bar for the whole setup (each step its share, the file
+downloading now filling most of it, never going back), "Step 2 of 4", the step's name, and the file with its size and
+percent (pip's `--progress-bar raw`), at most every 120 ms. A failure: "Setup didn't finish / Check your internet
+connection, then try again." with "Try again" and "Copy details" (the log's tail and the machine onto the clipboard
+with pbcopy, never on the screen). Both are navigations to `concorde-shell://`, answered by on_navigation and never
+loaded. Quit during the setup stops its whole process group (pip included). Nothing on any shell page names a
+command or an environment variable now; a dev's CONCORDE_PYTHON hint goes to stderr. An empty log box is hidden.
 
-**The landing, pushed** (per Patrick, relayed while this was in flight: "add a little bit more twist when we hit
-ultra"; then "More twist, not just necessarily rotation. More stars, more pretty, more fantastic, more you're clicking on
-something that really matters. Like, let's push that one hard."; and "I love the stars ... I'm going to politely
-disagree with my friend"). Additive only: nothing of the stars, constellations, shooting stars or showers is thinned.
-- **The twist** is the curtain folding through itself, never a turn of the field: a shear that grows with height and
-  changes sign along the curtain (`x += tws (y − .62) sin(2.6 x − .7 phase)`: some sections lean left, some right, a
-  ribbon twist drifting with the folds), the folds deeper (`tam × (1 + .6 env)`) and their phase pushed `± .25 env`
-  rad (each arrival picks a side), all on the surge's own envelope (x² e^(2(1−x)), now peaking at 1.2 s). Numbers:
-  `ATW_AMP .6, ATW_PH .25, ATW_SH .35, ATW_REST .28`: the lean about 24° at the swell's peak and about 6° at resting
-  Ultra (`tws` .44 and .10 read back); the folds' amplitude .45 → .72 at the peak; the fastest phase push .4 rad/s against
-  the folds' own .16–.31 (a lean, never a spin). Balanced half; Calm and reduced motion none (gated on the sky being lifted).
-  Measured (the curtain's normalised 32-bin profile against the moment of the click, four arrivals each): the share of
-  its light that has moved by 0.5 / 1.0 / 1.5 s is .045 / .080 / .086 (before .024 / .040 / .056): twice the motion in
-  the hang, then the same by 3 s.
-- **More stars above the box:** 60 in Full (30 Balanced; was 40 and 20), six glints (three; was four and two), and a
-  deeper layer behind them on the home, 30 (15): .9–1.5 px, .18–.35, drifting at half the pace. A conversation still
-  takes half (30).
-- **Star births:** eight new stars (four in Balanced) bloom into the field during the hang (from 0.9–2.0 s, each over
-  1.4 s on the smootherstep with a soft four-point glint that rises and falls once) and stay.
-- **More drawing in:** a star sign draws in during the settle (1.8–2.6 s; was 9–15 s), then every 14–20 s (was 20–30);
-  a meteor shower crosses at 1.3 s (on the home; then every 60–90 s as before).
-- **The weight:** the held breath now holds to 2.0 s and settles by 3.2 s (was 1.6 and 2.6); the field's stars float
-  the last tenth over 1.7–2.1 s (was 1.3–1.6).
-- Mirrored into the web demo's `beta/index.html` (the scratchpad copy; not pushed): the same constants and lines.
-- Cost: Chromium rAF p95 16.7–16.8 ms through three arrivals and at rest (max 16.8); WKWebView on screen p95 18 ms in
-  the arrival and at rest (one run showed a single 103 ms frame at rest, not seen in the next); no flash (the largest
-  region rise within 200 ms 14.8/255, the bar's row).
+**Nothing can answer yet (P0 3).** `/api/setup` says `models_ready` (models, not the Ollama engine's pseudo-row) and
+the `starter`'s state; `needs_setup` is "no model here" (it was "fewer than two", which held a Starter-only or
+cloud-only install in the first-run window forever). The home, while no model is here, no cloud key works and no
+paired server answers (`hzNoModel`; never claimed before it has asked), shows one line under the composer and one
+primary key, "Get a starter model · 0.8 GB · about 2 min", with "Use the cloud instead" (Settings › Cloud) beside it;
+the download's progress takes the key's place; it goes when a model is here (and a working cloud key with no model
+here sets Cloud Only, once). A question then stays in the box and the line says why. A relaunch opens no window over
+the app (the "Welcome. Setting up…" panel); the setup window opens only from the download strip now. The composer
+keeps the golden point with the line under it.
 
-**Ultra at rest.** Added: the lit glass edge (a 1.5 px rim in ice, white and a hint of violet turning once every 6 s,
-its 2 px copy blurred 3 px at .75; it drains back the way it came in 900 ms; Calm, effects off and a page without
-@property keep 6b552's still rim), the light caught in the glass (a faint ice→violet wash from the top edge), the
-horizon line 4 px under the box, the knob's still 5 px ice glow, the label's shade (a feathered dark band behind
-"Ultra", z-index −1 in the composer's own stacking context, so it never covers the letters or widens the page), the
-motes round the composer (one every 170 ms, at most 40; working views half and centred), the chandelier also on a quiet
-return or a page opening at Ultra, its stars turning with their sway as the demo's. The fill flows in the demo's five
-stops every 7 s (was 8 s, three stops) with its bloom at .42; the lit label's close light 12 px .95 (was 6 px .9). The
-Balanced matrix sweeps every 6–8 s (the demo's code; was 5.2–6.8).
+**The Starter.** STARTER_MODEL = Llama 3.2 1B. `start_starter_first`: whatever set is picked, the starter downloads
+alone first and the rest of the set waits as "queued" (so the bar counts it) until it lands, then starts as before
+(an Ollama batch already went smallest first). `/api/setup/install` takes `starter` (the starter alone; no set is
+recorded, so the More-models card offers Light later).
 
-**Traps found on the way.** (1) The lit edge's layers were made at the first Ultra, in the frame the class turned on,
-so they started at their end state: the rim was simply there at once, no line of light. They are made at boot now. (2)
-The demo's "charged" hairlines (the page's hairline tokens easing to blue-violet) were tried on the root: an inherited
-registered property transitioning on `html` restyled every element each frame, 133–183 ms stalls in the arrival. The
-composer alone would show nothing (its border is 6b580's `--chat-line` and sits under the rim), so it is not ported. (3)
-The rim's turning discs (112 % of the ring, square) are clipped by their mask for paint but not for layout: the page
-was 88–140 px wider than the window at 760 (and 404 at 390 from the label's shade on the slider). The rings clip
-(`overflow:hidden`) and the shade moved under the label.
+**The wizard (P1).** Five steps, Inter, a flat near-black card with hairlines, the step marks 2 px bars (no circles):
+a plain promise ("Private AI, running on your own machines."; no "About a minute", no "Several draft…"); Models, one
+list with a size and a time on every row (Starter, Light, Recommended, Everything, Cloud only); Cloud (its line asks
+for a key when Cloud only is picked); Your server (the pairing code first; the address and Cloudflare Access under
+Advanced; a failed pair takes the new entry back off); Ready, whose one filled key names what downloads first
+("Download Starter · 0.8 GB · about 2 min"), the rest of the set said on the line above ("Then Light follows in the
+background: 10 GB, about 28 min."). No limits, the giants box and auto-clean left the wizard; they are Settings ›
+Models' (Manage). Times before a download are estimates at 50 Mbit/s (DL_ASSUME_BPS); once bytes move every bar
+says its measured time.
 
-**Measured.** Chromium (headless shell, Metal, DPR 1, 1440): rAF p95 16.8 ms through the arrival and at rest at
-Ultra, max 16.8 (before: 16.7/16.8, one 133 ms first-arrival hitch). WKWebView (an offscreen window, the harness in
-`SP/b4-ultra/wk`), on screen: p95 18 ms in the arrival and at rest, Full and Balanced (before 6b621: the
-arrival 56 ms p95 on its first run, a 37-frame second); 760 offscreen p95 25/21 ms. AA with the aurora's reach held low at Ultra's brightest (the swell, 1.1 s) and at rest,
-the text cleared and the 95th-percentile luminance behind it: the greeting 5.3:1 and 5.9:1, "Ultra" 12.2:1 (the demo
-6.0/6.6 and 8.6/7.8). Flashes (8 × 5 regions, the arrival's screencast at 60 fps): the largest rise within 200 ms is
-15.1/255 on the slider's row (the bar's rush), the demo 13.6. No sideways scroll at 1440 and 760 (390's home is 19 px
-wide at every level before this change too: not Ultra's, left for the integrator). No page errors.
+**What's new (P1).** release.sh writes RELEASE_NOTES.md between `<!-- whats-new -->` markers (GitHub doesn't show
+them) and the install notes after; `user_notes` shows only what is between them everywhere the app reads notes, and
+cuts an older body at its "**macOS**"/"**Windows**" boilerplate. Channel names: the app already says Beta everywhere
+(6b551); unchanged.
 
-**Gauntlet.** New block "6b621 ultra at full strength" (nine checks, the landing's push among them): the aurora's wander run in node on the page's own
-code over 10 minutes of aurora time, twelve visits a level (five mutants: a left bias, the edges, moving in Calm,
-Balanced at Full's motion, a jump); the shader (four mutants: the crest cap back, the knee back, the split's gap, the
-rays parked); the conversation's field plan (two); the working views' css and loop (four: a see-through band, the
-footage at full, a cut, a snap); Ultra's css (six: the rim at once, the lit edge in Calm, a spinning rim, the knob
-bouncing, a rose tint, a flood of motes); live in headless Chromium over the DevTools protocol (the curtain read back
-over 8 minutes of aurora time, the arrival's timeline, the motes, a conversation at Ultra, no sideways scroll at 760 and
-1440) and the pushed landing (the twist's fold, lean and phase in the swell, six or more births, a shower, the resting twist,
-the deeper layer), with five mutants served in place of the page (no twist, the aurora biased, the rim at once, the
-rim's discs unclipped, the sky not receding); the shader check also catches the twist in Calm and a spin for a lean. Re-pinned at the same strength: 6b553's knob pin (the arrival may now settle, lift and flash the knob
-once, `hzKnobSettle`/`hzKnobLift`/`hzKnobLit` only, scale .97–1, glow ≤ 7 px, never looping or turning; at rest one still
-5 px ice glow; the click-overshoot mutant still caught), 6b544 (the fill 7 s, the lit label 12 px, the CSS breath gone),
-6b552's two fill-colour mutants (the new stops), 6b553's burst anchor (from the knob), 6b542's and 6b553's footage ease
-(×.12 off the home), 6b555's sky (the sines, no crest cap, Balanced 6–8 s; the "edges" mutant on the sines) and its
-arrival (the wave Full's). Trimmed run (prelude + 6b542, 6b544, 6b555 chrome, 6b552, 6b553 ×2, 6b555 sky, 6b580, 6b621,
-on 9975–9977): 70/72. The two failures are the base's own at f9148e1 (the same trimmed run on f9148e1: 60/63, those two
-and 6b555's streamed answer in Balanced, which passed here: flaky): 6b542 Sting (the page has 18 `var(--hz-ember)`, the
-pin says 10) and 6b580's layout. Also re-pinned for the push: 6b552's field plan (90 and 45 with the deeper layer, six and
-three glints, the grid share 16–56), 6b553's launch float (1.7–2.1 s), 6b555's breath (2.0/3.2 s) and star signs
-(14–20 s, one on landing, a shower at 1.3 s).
+**Measured** (this Mac, Apple silicon, a fast line; fake HOME, PATH /usr/bin:/bin:/usr/sbin:/sbin, the release bundle
+as a dev copy, Ollama hidden by the dev-only `no-ollama` hook): launch → setup done 50.2 s (Python 2.8 s, venv
+2.8 s, basics 3.3 s, engine 41 s), page loaded 50.7 s; the setup downloads 25 MB + 354 MB of wheels (torch, 139 MB,
+is mlx-whisper's) and the venv is 1.5 GB. The Starter's download ran on its real path with its blobs already on disk
+(Llama 3.2 1B is in this Mac's HF cache, so it wasn't fetched again): 11-15 s of the hub's metadata and linking; first
+words 0.4-2.2 s after the question. On a 50 Mbit/s line* the downloads alone are about 1 min for the setup and 2 min
+for the Starter: about 4 min from the first open to the first answer, plus the person's clicks. (*estimate) The
+failure screen, Copy details and Try again were proven in the real WKWebView through the debug shell's probe hook (a
+dead proxy for the download); Quit at 9 s left no process of that HOME; a venv marked unfinished was finished by the
+next launch (2.7 s).
+DMG (universal, both Developer ID signed, not notarized): beta-3's 5,881,829 bytes → 5,902,733 (+20.9 KB); the
+.app 12.88 → 12.94 MB. The Developer ID (hardened runtime) bundle's first run was repeated on a fresh HOME: setup done
+in 67 s, page loaded at 68 s, nothing in the hardened runtime in the way (the downloaded Python carries no quarantine).
+The full gauntlet is owed: 9901 and 9902 were held for the whole session by another helper's `concorde-front`; the
+sections this touches ran standalone (all green but three that need the full run's fixtures, none of them changed).
 
-**Left.** The demo's Ultra mirror over the typed words (its shimmering letters and "Ask anything") is not ported: it
-needs a copy of the textarea's text laid exactly over it, and any metric difference in WKWebView would show the caret
-off the letters. The demo's knob trail along the track never shows there either (the knob finishes its 140 ms snap before
-the 140 ms release reads it) and is not ported. The demo's edge bloom has a 14 px glow; the app keeps its 10 px (the
-"no glow past 12 px" rule) and its 2 px scaleX line. The demo's head of the line of light has a warm white trail; the
-app's is ice white (Ultra is one cool pair). The sky's clock still runs at half speed behind a conversation (6b580's;
-invisible at 30 %). The demo's rain falls in a conversation; the app's stays the home's (6b580, per Patrick: "we don't
-have to litter the place with stars"). The conversation's burst stays centred over the composer (6b580) where the demo's
-leaves the knob. Not measured: 120 Hz (both engines cap at 60 here), WKWebView in the built shell's own window.
+**Checks.** A 6b630 block of seven checks and 23 mutants: launch.sh's pins and order (static) and its own functions
+run in zsh (a venv's age, pip's lines, a wrong SHA-256 never unpacked, the right one unpacked); the shell's screen,
+links, Quit and venv rules; the gate on 0.29.1 and on the pin; the home's who-can-answer table, the starter key, the
+send, the relaunch and the wizard's last key, run in node; start_starter_first run with stand-ins; user_notes and
+release.sh's markers. Re-pinned: the wizard's five steps, auto-clean and the giants box as Settings' only, 6b405's
+route and renderer counts, 6b494's MLX_REQUIRES, 6b537's bootstrap and resources, 6b551's notes helpers.
+
+**For Patrick.** The website's channel explainer and FAQ still say "Prerelease" (the app says Beta) and the FAQ says
+"Basic is one 0.8 GB model … Pro … Max" (the app: Starter, Light, Recommended, Everything); not edited. A code alone
+can't pair yet: the app pairs only over https and nothing tells it a server's address, so the address is asked for
+under Advanced; true code-only pairing needs the server to advertise itself or carry its address in the code (an
+ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
+setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
+Chromium and read back from the real WKWebView.
