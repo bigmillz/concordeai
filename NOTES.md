@@ -21893,7 +21893,8 @@ console errors in either.
 Re-pinned at the same strength: 6b514's place_search pin (now the lookup's start in the handler and
 `place_search(query, near)` in the source), 6b518's needs_search names (answer_kind's), 6b523's and the council
 check's post-pass names (answer_drop_noise's), the review-fixes title pin (`{texts:…}:{text:…}`). The trimmed run
-(prelude, 6b514, quality-2, fresh-1, quality-3, quality-4, 6b626) on 9975-9977: see the report.
+(prelude, 6b514, quality-2, fresh-1, quality-3, quality-4, 6b626) on 9975-9977: 165/165, exit 0. The council check
+that lifts the post-pass (review fixes, line ~12171) sits in unmarked code and was not in the trimmed run.
 
 **Left.** OpenStreetMap's public Overpass was timing out or refusing all session and overpass.kumi.systems no longer
 answers: the venue rows (real opening hours) need a working mirror, or a paid provider, to come back. The polish
