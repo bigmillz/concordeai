@@ -1004,6 +1004,10 @@ def _stub_web_answer(url: str, data=None):
         if not m:
             return 200, b'{"elements": []}'
         lat, lon = float(m.group(1)), float(m.group(2))
+        # venues only around the few places the stand-in knows; anywhere else (the default Brooklyn point the
+        # gauntlet's made-up "qzxvbn cafe" lands on) has none mapped, so no venue list stands in for a real one
+        if not any(abs(lat - p_[0]) < .05 and abs(lon - p_[1]) < .05 for p_ in _STUB_PLACES.values()):
+            return 200, b'{"elements": []}'
         els = [{"type": "node", "id": 9000 + i, "lat": lat + i / 2000.0, "lon": lon - i / 2000.0,
                 "tags": {"name": "Stand-in %s %d" % (kind.replace("_", " ").title(), i), "amenity": kind,
                          "opening_hours": "Mo-Su 07:00-23:00" if i != 3 else "Mo-Fr 09:00-17:00"}} for i in (1, 2, 3)]

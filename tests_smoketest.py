@@ -49501,7 +49501,8 @@ def get(url, data=None, opener=None):
 out["nom"] = get("https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=1&q=" + urllib.parse.quote("katz's delicatessen, new york"))
 out["nom0"] = get("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + urllib.parse.quote("qzxvbn cafe bushwick"))
 out["om"] = get("https://api.open-meteo.com/v1/forecast?latitude=40.7&longitude=-73.9&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m,relative_humidity_2m,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&temperature_unit=fahrenheit&timezone=auto&forecast_days=3")
-out["ov"] = get(urllib.request.Request("https://overpass-api.de/api/interpreter", data=urllib.parse.urlencode({"data": '[out:json];(nwr["amenity"~"^(pharmacy)$"]["name"](around:1400,40.69,-73.92););out center body 60;'}).encode()))
+out["ov"] = get(urllib.request.Request("https://overpass-api.de/api/interpreter", data=urllib.parse.urlencode({"data": '[out:json];(nwr["amenity"~"^(pharmacy)$"]["name"](around:1400,38.7223,-9.1393););out center body 60;'}).encode()))
+out["ov0"] = get(urllib.request.Request("https://overpass-api.de/api/interpreter", data=urllib.parse.urlencode({"data": '[out:json];(nwr["amenity"~"^(cafe)$"]["name"](around:1400,40.69,-73.92););out center body 60;'}).encode()))
 out["wttr"] = get("https://wttr.in/brooklyn?format=j1")
 out["rates"] = get("https://api.frankfurter.app/latest?from=USD&to=EUR")
 out["other"] = get("https://example.com/")
@@ -49545,6 +49546,7 @@ def _sw640_ok(r):
             and om.get("timezone") == "America/New_York" and len((om.get("daily") or {}).get("time") or []) == 3
             and isinstance((om.get("current") or {}).get("temperature_2m"), float)
             and len(ov.get("elements") or []) == 3 and all((e.get("tags") or {}).get("name") for e in ov["elements"])
+            and r.get("ov0") == {"elements": []}
             and r.get("wttr") == {"refused": "URLError"} and r.get("rates") == {"refused": "URLError"}
             and r.get("other") == {"refused": "URLError"} and r.get("custom") == {"refused": "URLError"}
             and "stand-in web" in str(r.get("gai")) and r.get("lan") == [True] * 7 and r.get("pub") == [False] * 4
