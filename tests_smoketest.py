@@ -49330,6 +49330,30 @@ check("6b640 no test searches the real web: every copy starts with the stand-in 
       _w640_ok(_MILLENAI_SRC, _w640_me)
       and not _w640_ok(_MILLENAI_SRC.replace('SEARCH_STUB = bool(DEV_HOME) and os.environ', 'SEARCH_STUB = True and os.environ', 1), _w640_me)
       and not _w640_ok(_MILLENAI_SRC.replace("def _net_probe():\n    if SEARCH_STUB:\n        return", "def _net_probe():\n    if False:\n        return", 1), _w640_me), "")
+# A CUT-OFF KEY SAYS SO, AND HAIKU COSTS HAIKU (6b640, from the App Store spike and answers-1): /api/cloud/set threw
+# TypeError (the connection dropped) for a short key that starts with its provider's prefix: its message had one value
+# too many; claude-haiku-5-5 was missing from CLAUDE_PRICES and costed at Fable's price. The message is formatted here
+# with its own arguments as the handler passes them, both ways (exact and at least); mutants: the fourth value back,
+# the price gone.
+def _k640_ok(src):
+    try:
+        i_ = src.index('"err": "The key looks cut off:'); seg_ = src[i_:src.index("})", i_)]
+        fmt_ = re.search(r'"(The key looks cut off:[^"]*)"', seg_).group(1)
+        args_ = seg_[seg_.index("% (") + 3:]
+        ns_ = {"key": "sk-ant-short", "which": "claude", "_want": 108}
+        a1 = eval("(" + args_.replace("\n", " "), dict(ns_, _exact=True))
+        a2 = eval("(" + args_.replace("\n", " "), dict(ns_, _exact=False))
+        m1, m2 = fmt_ % a1, fmt_ % a2
+        p_ = re.search(r'"claude-haiku-5-5": \(([^)]*)\)', src)
+        return (m1 == "The key looks cut off: 12 characters, not 108. Copy it again."
+                and m2 == "The key looks cut off: 12 characters, not at least 108. Copy it again."
+                and bool(p_) and [float(x) for x in p_.group(1).split(",")] == [0.10, 0.50, 0.01, 0.125])
+    except Exception:
+        return False
+check("6b640 a cut-off key says so (no TypeError: three places, three values) and Haiku 5.5 is costed at its own price; the mutants are caught",
+      _k640_ok(_MILLENAI_SRC)
+      and not _k640_ok(_MILLENAI_SRC.replace("% (len(key),\n", "% (len(key), which.title(),\n", 1))
+      and not _k640_ok(_MILLENAI_SRC.replace('    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),', "", 1)), "")
 # ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====

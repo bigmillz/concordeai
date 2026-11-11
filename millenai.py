@@ -27805,6 +27805,7 @@ CLAUDE_PRICES = {
     "claude-sonnet-4-6": (3.0, 15.0, 0.30, 3.75),
     "claude-sonnet-4-5": (3.0, 15.0, 0.30, 3.75),
     "claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25),
+    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),   # (beta 4) was costed at Fable's price, 100 times too high
 }
 PRICES_BY_PROVIDER = {"claude": CLAUDE_PRICES}
 # only providers that charge by the token and have no balance of their own
@@ -46222,7 +46223,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             if _pre and _want and key.startswith(_pre) and len(key) < _want:
                 self._send_json({
                     "ok": False,
-                    "err": "The key looks cut off: %d characters, not %s%d. Copy it again." % (len(key), which.title(),
+                    # (beta 4) three places, three values: the provider's name was a fourth and threw TypeError
+                    "err": "The key looks cut off: %d characters, not %s%d. Copy it again." % (len(key),
                                        "" if _exact else "at least ",
                                        _want)})
                 return
