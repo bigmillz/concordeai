@@ -1,0 +1,1494 @@
+{
+ "version": 1,
+ "as_of": "2026-11-11",
+ "about": "Everyday answers (answers-1): real-life prompts, each scored against expected qualities, not exact text. A case is one or more turns asked in order in one conversation; only turns with a rubric are scored. Rubric: search true (must search) / false (must not) / null (either); words [min, max] for the visible answer; must / never: case-insensitive regexes; tone: what the judge reads for. GLOBAL_NEVER in everyday.py applies to every scored turn.",
+ "profile": {
+  "user_name": "Pat",
+  "home_area": "Brooklyn, NY",
+  "length": 3,
+  "persona": ""
+ },
+ "cases": [
+  {
+   "id": "f01",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "I'm tired",
+     "rubric": {
+      "search": false,
+      "words": [
+       6,
+       90
+      ],
+      "never": [
+       "\\bnews\\b",
+       "cortisol",
+       "circadian"
+      ],
+      "tone": "A warm, human line acknowledging it, then one or two light, doable ideas or one gentle question. Short. No lecture, no list of ten tips."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f02",
+   "cat": "feelings",
+   "pat": true,
+   "turns": [
+    {
+     "q": "what's for breakfast? I'm tired",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       170
+      ],
+      "must": [
+       "egg|toast|oat|yogh?urt|banana|avocado|peanut butter|smoothie|cereal|granola|bagel"
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]",
+       "glycemic|cortisol|insulin spike"
+      ],
+      "tone": "Playful-practical, like a friend: a nod to being tired, then two to four easy breakfasts that need little effort, in plain words. Good: 'The I-need-a-hug option: avocado toast...'. No nutrition lecture, no search results."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p00",
+   "cat": "practical",
+   "pat": true,
+   "turns": [
+    {
+     "q": "What's for breakfast?",
+     "rubric": {
+      "search": false,
+      "words": [
+       25,
+       130
+      ],
+      "must": [
+       "egg|toast|oat|yogh?urt|banana|avocado|pancake|smoothie|granola|bagel|waffle"
+      ],
+      "never": [
+       "can'?t see your",
+       "I'?ll assume|assuming you",
+       "high[- ]utility",
+       "protein requirement",
+       "balance of (?:fats|macros)",
+       "macros",
+       "\\[\\d\\]",
+       "^#"
+      ],
+      "tone": "Like a friend who cooks: 2-3 tempting, concrete options in a short scannable form (a bolded name + one appetising line each), sized to the question; at most one light follow-up ('Want something sweet, or what's in the fridge?'). No assumption preamble ('Since I can't see your kitchen, I'll assume...'), no nutrition-label or fitness jargon ('high-utility', 'protein requirements')."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f03",
+   "cat": "feelings",
+   "pat": true,
+   "turns": [
+    {
+     "q": "what's for breakfast? I'm tired"
+    },
+    {
+     "q": "What if I'm run down?",
+     "rubric": {
+      "search": false,
+      "words": [
+       40,
+       200
+      ],
+      "must": [
+       "water|hydrat|drink",
+       "rest|nap|lie down|sleep|walk|easy|break"
+      ],
+      "never": [
+       "cortisol",
+       "autonomic",
+       "nervous system",
+       "NSDR",
+       "Yoga Nidra",
+       "optic flow",
+       "Zone 1",
+       "physiolog",
+       "burnout",
+       "prune your obligations",
+       "^#",
+       "\\n#"
+      ],
+      "tone": "Opens with a warm human line ('Sorry you're dragging today.'), then 3-4 simple, doable suggestions in plain words (water, something easy to eat, a short walk or rest, go easy on the to-do list). No jargon or pseudo-science, no headers. At most one gentle line about a doctor if it's been going on a while. Optional single follow-up question."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f04",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "ugh, Monday",
+     "rubric": {
+      "search": false,
+      "words": [
+       5,
+       70
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]"
+      ],
+      "tone": "Light, warm, a little humour; commiserate in a line and offer something small (or ask what's on the plate). Not a productivity essay."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f05",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "I'm so stressed about work right now",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       170
+      ],
+      "never": [
+       "cortisol",
+       "amygdala",
+       "\\[\\d\\]",
+       "^#"
+      ],
+      "tone": "Acknowledge in a few words, then two to four concrete, doable things for right now, plain words; one question about what's going on is fine. No therapy-speak lecture."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f06",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "can't sleep",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       170
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "^#",
+       "\\n#"
+      ],
+      "tone": "A kind line, then a few practical things to try right now (get up for a bit, dim light, no phone, breathing, a boring task). Plain words, short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f07",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "feeling kind of down today",
+     "rubric": {
+      "search": false,
+      "words": [
+       15,
+       130
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "^#",
+       "serotonin"
+      ],
+      "tone": "Gentle and warm, not clinical. Acknowledge, maybe one or two small things that help, and one caring question. No lecture, no hotline unless there is a risk signal (there isn't)."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f08",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "I have a headache, any ideas?",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       160
+      ],
+      "must": [
+       "water|hydrat"
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "^#",
+       "vasodilat|trigeminal"
+      ],
+      "tone": "Sympathetic line, then simple things: water, a snack, rest/dark room, an over-the-counter pain reliever as directed, caffeine maybe; one line on getting help for a sudden or severe one. Plain words."
+     }
+    }
+   ]
+  },
+  {
+   "id": "f09",
+   "cat": "feelings",
+   "turns": [
+    {
+     "q": "I'm bored",
+     "rubric": {
+      "search": false,
+      "words": [
+       10,
+       110
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]"
+      ],
+      "tone": "Upbeat; two to four concrete, fun ideas or one question to narrow it. Not a listicle of 15."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s01",
+   "cat": "smalltalk",
+   "turns": [
+    {
+     "q": "hi",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       35
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]"
+      ],
+      "tone": "A short friendly hello, maybe a light question. One or two sentences."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s02",
+   "cat": "smalltalk",
+   "pat": true,
+   "turns": [
+    {
+     "q": "What are we up to today?",
+     "rubric": {
+      "search": false,
+      "words": [
+       8,
+       70
+      ],
+      "never": [
+       "\\bnews\\b",
+       "CD rate",
+       "Netflix",
+       "Broadway",
+       "airline",
+       "\\[\\d\\]",
+       "you (?:did )?mention"
+      ],
+      "tone": "Warm and short: says it has nothing planned for you (it doesn't know your plans), offers two or three concrete things it could help with, one question back. No news digest, no invented plans."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s03",
+   "cat": "smalltalk",
+   "turns": [
+    {
+     "q": "good morning!",
+     "rubric": {
+      "search": false,
+      "words": [
+       2,
+       45
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]",
+       "weather"
+      ],
+      "tone": "A cheerful good morning back, short, maybe one light question."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s04",
+   "cat": "smalltalk",
+   "turns": [
+    {
+     "q": "how's it going?",
+     "rubric": {
+      "search": false,
+      "words": [
+       3,
+       50
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "as an AI"
+      ],
+      "tone": "Natural, short, turns it back to the person. No 'As an AI I don't have feelings' speech."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s05",
+   "cat": "smalltalk",
+   "turns": [
+    {
+     "q": "how many ounces in a cup?"
+    },
+    {
+     "q": "thanks, that helped",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       30
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "ounce"
+      ],
+      "tone": "A short, warm 'glad it helped'. Nothing repeated, no essay."
+     }
+    }
+   ]
+  },
+  {
+   "id": "s06",
+   "cat": "smalltalk",
+   "turns": [
+    {
+     "q": "what's up",
+     "rubric": {
+      "search": false,
+      "words": [
+       2,
+       45
+      ],
+      "never": [
+       "\\bnews\\b",
+       "\\[\\d\\]"
+      ],
+      "tone": "Casual, short, a question back. No news."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p01",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "what should I eat for dinner?",
+     "rubric": {
+      "search": false,
+      "words": [
+       25,
+       170
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "^#",
+       "\\n#"
+      ],
+      "tone": "Two to four concrete, appealing options (or a clear pick) with a few words each; maybe one quick question. Not a nutrition lecture."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p02",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "quick dinner idea with chicken and rice?",
+     "rubric": {
+      "search": false,
+      "words": [
+       40,
+       230
+      ],
+      "must": [
+       "\\d+\\s*(?:min|minutes)"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "One concrete dish with short steps and times. Practical, no preamble."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p03",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "how do I make French toast",
+     "rubric": {
+      "search": false,
+      "words": [
+       50,
+       260
+      ],
+      "must": [
+       "egg",
+       "milk|cream"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "Ingredients and steps, simple, specific amounts and heat. No history of French toast."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p04",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "I have eggs, spinach and cheese. what can I make?",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       200
+      ],
+      "must": [
+       "omelet|omelette|frittata|scramble|quiche|egg muffin"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "A clear pick or two to three options with quick how-to. Friendly, practical."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p05",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "give me a 20-minute workout I can do at home",
+     "rubric": {
+      "search": false,
+      "words": [
+       50,
+       270
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "A concrete routine with times/reps that adds up to about 20 minutes. A list is fine."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p06",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "plan my Saturday, I want to relax",
+     "rubric": {
+      "search": false,
+      "words": [
+       40,
+       230
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "\\bnews\\b"
+      ],
+      "tone": "A loose, relaxed plan (morning/afternoon/evening) with concrete easy ideas; light touch. Could mention Brooklyn but doesn't need to."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p07",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "how do I get a red wine stain out of a shirt?",
+     "rubric": {
+      "search": false,
+      "words": [
+       40,
+       200
+      ],
+      "must": [
+       "cold water|salt|dish soap|hydrogen peroxide|blot|baking soda"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "Quick steps: blot, cold water, a common household fix, wash; don't use the dryer until it's gone."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p08",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "write a quick text to my friend saying I'm running 15 minutes late",
+     "rubric": {
+      "search": false,
+      "words": [
+       6,
+       70
+      ],
+      "must": [
+       "15"
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "^#"
+      ],
+      "tone": "Just the text (maybe one alternative). Casual and natural."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p09",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "what should I pack for a weekend beach trip?",
+     "rubric": {
+      "search": null,
+      "words": [
+       40,
+       230
+      ],
+      "must": [
+       "sunscreen|SPF"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "A tight, scannable list of the essentials; no padding."
+     }
+    }
+   ]
+  },
+  {
+   "id": "p10",
+   "cat": "practical",
+   "turns": [
+    {
+     "q": "how long do I boil an egg for a runny yolk?",
+     "rubric": {
+      "search": false,
+      "words": [
+       8,
+       90
+      ],
+      "must": [
+       "\\b(?:5|6|7|six|seven)(?:[.½]\\d?)?\\s*(?:-|to|–)?\\s*(?:\\d\\s*)?min"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "The number up front (about 6-7 minutes in boiling water), one line on the ice bath. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k01",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "What is the capital of Australia?",
+     "rubric": {
+      "search": null,
+      "words": [
+       2,
+       60
+      ],
+      "must": [
+       "Canberra"
+      ],
+      "tone": "Canberra, up front, maybe one line of context (not Sydney). Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k02",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "how many ounces in a cup?",
+     "rubric": {
+      "search": false,
+      "words": [
+       3,
+       60
+      ],
+      "must": [
+       "\\b8\\b|eight"
+      ],
+      "tone": "8 fluid ounces (US), maybe note dry vs fluid in a line. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k03",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "who wrote Pride and Prejudice?",
+     "rubric": {
+      "search": null,
+      "words": [
+       2,
+       50
+      ],
+      "must": [
+       "Austen"
+      ],
+      "tone": "Jane Austen, one line of context at most."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k04",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "why is the sky blue?",
+     "rubric": {
+      "search": null,
+      "words": [
+       25,
+       170
+      ],
+      "must": [
+       "scatter"
+      ],
+      "tone": "Rayleigh scattering in plain words, short. No headings."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k05",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "what's the difference between baking soda and baking powder?",
+     "rubric": {
+      "search": null,
+      "words": [
+       30,
+       180
+      ],
+      "must": [
+       "acid"
+      ],
+      "tone": "Soda needs an acid; powder carries its own. A practical tip on swapping. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k06",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "what's 30 Celsius in Fahrenheit?",
+     "rubric": {
+      "search": false,
+      "words": [
+       2,
+       50
+      ],
+      "must": [
+       "\\b86\\b"
+      ],
+      "tone": "86°F up front."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k07",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "what does ubiquitous mean?",
+     "rubric": {
+      "search": null,
+      "words": [
+       4,
+       60
+      ],
+      "must": [
+       "everywhere"
+      ],
+      "tone": "A one-line definition and a short example."
+     }
+    }
+   ]
+  },
+  {
+   "id": "k08",
+   "cat": "known",
+   "turns": [
+    {
+     "q": "how far away is the moon?",
+     "rubric": {
+      "search": null,
+      "words": [
+       5,
+       80
+      ],
+      "must": [
+       "384|238"
+      ],
+      "tone": "About 384,000 km (238,900 miles) on average; one line more at most."
+     }
+    }
+   ]
+  },
+  {
+   "id": "w01",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "what's the weather in Brooklyn today?",
+     "rubric": {
+      "search": true,
+      "words": [
+       8,
+       130
+      ],
+      "never": [
+       "training data|my training"
+      ],
+      "tone": "Weather comes from wttr.in (not a search engine). Today's conditions and temperature up front with a practical note; if no live numbers came through, one plain line saying so and no invented reading."
+     }
+    }
+   ]
+  },
+  {
+   "id": "w02",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "who won the Knicks game last night?",
+     "rubric": {
+      "search": true,
+      "words": [
+       8,
+       130
+      ],
+      "never": [
+       "training data|my training"
+      ],
+      "tone": "FIXTURE (the stand-in web): the Knicks beat the Bulls 118-109 on Tuesday night (Brunson 34). The result and score up front, short.",
+      "must": [
+       "118"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "w03",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "what's in the news today?",
+     "rubric": {
+      "search": true,
+      "words": [
+       40,
+       260
+      ],
+      "never": [
+       "training data|my training"
+      ],
+      "tone": "FIXTURE (the stand-in web): the Senate stopgap funding bill (through Jan. 30), Veterans Day ceremonies, COP31 opening in Antalya, stocks up ahead of Thursday's CPI. A few of these, one line each."
+     }
+    }
+   ]
+  },
+  {
+   "id": "w04",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "what's the price of bitcoin right now?",
+     "rubric": {
+      "search": true,
+      "words": [
+       5,
+       100
+      ],
+      "must": [
+       "\\$"
+      ],
+      "never": [
+       "training data|my training",
+       "don't have access"
+      ],
+      "tone": "NO RESULTS on purpose (the stand-in web has nothing for bitcoin): one plain line that live results didn't come through, then what it knows with a date caveat, never a remembered price as today's; no 'check CoinMarketCap' instead of an answer."
+     }
+    }
+   ]
+  },
+  {
+   "id": "w05",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "any good movies in theaters this weekend?",
+     "rubric": {
+      "search": true,
+      "words": [
+       30,
+       230
+      ],
+      "never": [
+       "training data|my training",
+       "Gladiator|Wicked|Red One"
+      ],
+      "tone": "FIXTURE (the stand-in web): opening Fri Nov 14: 'The Long Walk Home' (Florence Pugh family drama), 'Night Shift 2' (horror sequel), 'Pip and the Paper Moon' (animated); 'Overland' (Austin Butler Western) still strong. Names a few with a line each; no films from memory presented as this weekend's."
+     }
+    }
+   ]
+  },
+  {
+   "id": "w06",
+   "cat": "fresh",
+   "turns": [
+    {
+     "q": "is the L train running normally today?",
+     "rubric": {
+      "search": true,
+      "words": [
+       8,
+       140
+      ],
+      "never": [
+       "training data|my training",
+       "I can't pull"
+      ],
+      "tone": "FIXTURE (the stand-in web): good service today (Wed Nov 11); this weekend no L between Broadway Junction and Canarsie, shuttle buses. Says so plainly, the weekend work as a heads-up."
+     }
+    }
+   ]
+  },
+  {
+   "id": "a01",
+   "cat": "arith",
+   "turns": [
+    {
+     "q": "What is 17 × 23?",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       30
+      ],
+      "must": [
+       "391"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "391. Nothing else needed."
+     }
+    }
+   ]
+  },
+  {
+   "id": "a02",
+   "cat": "arith",
+   "turns": [
+    {
+     "q": "what's 15% of 80",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       30
+      ],
+      "must": [
+       "\\b12\\b"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "12."
+     }
+    }
+   ]
+  },
+  {
+   "id": "a03",
+   "cat": "arith",
+   "turns": [
+    {
+     "q": "split $86 between 3 people",
+     "rubric": {
+      "search": false,
+      "words": [
+       3,
+       50
+      ],
+      "must": [
+       "28\\.6[67]"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "$28.67 each (one pays a cent less, or $28.66/$28.67/$28.67). Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "a04",
+   "cat": "arith",
+   "turns": [
+    {
+     "q": "how many minutes in 3.5 hours?",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       30
+      ],
+      "must": [
+       "210"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "210 minutes."
+     }
+    }
+   ]
+  },
+  {
+   "id": "a05",
+   "cat": "arith",
+   "turns": [
+    {
+     "q": "what's 2 to the 10th",
+     "rubric": {
+      "search": false,
+      "words": [
+       1,
+       30
+      ],
+      "must": [
+       "1,?024"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "1,024."
+     }
+    }
+   ]
+  },
+  {
+   "id": "u01",
+   "cat": "followup",
+   "turns": [
+    {
+     "q": "What is the capital of Australia?"
+    },
+    {
+     "q": "How do I hard-boil an egg?",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       200
+      ],
+      "must": [
+       "boil",
+       "minute|min\\b"
+      ],
+      "never": [
+       "Australia",
+       "Canberra",
+       "\\[\\d\\]"
+      ],
+      "tone": "A plain egg method with times; nothing about Australia."
+     }
+    }
+   ]
+  },
+  {
+   "id": "u02",
+   "cat": "followup",
+   "turns": [
+    {
+     "q": "How do I hard-boil an egg?"
+    },
+    {
+     "q": "how long should I cool them after that?",
+     "rubric": {
+      "search": null,
+      "words": [
+       8,
+       110
+      ],
+      "must": [
+       "ice|cold"
+      ],
+      "tone": "A few minutes in an ice bath (about 5-15), the number up front. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "u03",
+   "cat": "followup",
+   "turns": [
+    {
+     "q": "what should I eat for dinner?"
+    },
+    {
+     "q": "something without meat",
+     "rubric": {
+      "search": false,
+      "words": [
+       20,
+       180
+      ],
+      "never": [
+       "chicken|beef|pork|steak|bacon|sausage",
+       "\\[\\d\\]"
+      ],
+      "tone": "Two to four vegetarian dinners, concrete, short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "u05",
+   "cat": "followup",
+   "turns": [
+    {
+     "q": "What is the capital of Australia?"
+    },
+    {
+     "q": "what's the population there?",
+     "rubric": {
+      "search": null,
+      "words": [
+       5,
+       90
+      ],
+      "must": [
+       "Canberra|4[0-9]{2}[,.]?\\d{0,3}|half a million"
+      ],
+      "tone": "Canberra's population (around 470,000), the figure up front, dated if searched. Understands 'there' = Canberra."
+     }
+    }
+   ]
+  },
+  {
+   "id": "u06",
+   "cat": "followup",
+   "turns": [
+    {
+     "q": "give me a quick pasta recipe"
+    },
+    {
+     "q": "make it for 4 people",
+     "rubric": {
+      "search": false,
+      "words": [
+       30,
+       260
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "The same recipe scaled to 4 (about 400-450 g / 1 lb pasta), concrete quantities; no new unrelated recipe."
+     }
+    }
+   ]
+  },
+  {
+   "id": "c01",
+   "cat": "chat",
+   "turns": [
+    {
+     "q": "What is the capital of Australia?"
+    },
+    {
+     "q": "How do I hard-boil an egg?"
+    },
+    {
+     "q": "What was the first thing I said to you in this chat?",
+     "rubric": {
+      "search": false,
+      "words": [
+       3,
+       45
+      ],
+      "must": [
+       "capital|Australia"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "Quotes or names it: you asked what the capital of Australia is. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "c02",
+   "cat": "chat",
+   "turns": [
+    {
+     "q": "how do I make French toast"
+    },
+    {
+     "q": "can you say that shorter?",
+     "rubric": {
+      "search": false,
+      "words": [
+       15,
+       90
+      ],
+      "must": [
+       "egg"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "The same French toast method, much shorter."
+     }
+    }
+   ]
+  },
+  {
+   "id": "c03",
+   "cat": "chat",
+   "turns": [
+    {
+     "q": "What is 17 × 23?"
+    },
+    {
+     "q": "summarize our chat so far",
+     "rubric": {
+      "search": false,
+      "words": [
+       4,
+       60
+      ],
+      "must": [
+       "391|17"
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "One or two lines: you asked 17 x 23, it's 391."
+     }
+    }
+   ]
+  },
+  {
+   "id": "c04",
+   "cat": "chat",
+   "turns": [
+    {
+     "q": "what's a good name for a golden retriever puppy?"
+    },
+    {
+     "q": "which one did you suggest first?",
+     "rubric": {
+      "search": false,
+      "words": [
+       2,
+       60
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "Names the first name from its own previous answer. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "l01",
+   "cat": "length",
+   "prefs": {
+    "length": 1
+   },
+   "turns": [
+    {
+     "q": "explain how a mortgage works",
+     "rubric": {
+      "search": null,
+      "words": [
+       20,
+       110
+      ],
+      "never": [
+       "length limit|word limit|word cap|technical limit|single response",
+       "^#"
+      ],
+      "tone": "Short setting: a tight two-to-four sentence explanation (loan, house as collateral, monthly principal+interest over 15-30 years). Never mentions the setting or a limit."
+     }
+    }
+   ]
+  },
+  {
+   "id": "l02",
+   "cat": "length",
+   "prefs": {
+    "length": 1
+   },
+   "turns": [
+    {
+     "q": "write me a 300-word short story about a cat",
+     "rubric": {
+      "search": false,
+      "words": [
+       210,
+       420
+      ],
+      "never": [
+       "length limit|word limit|word cap|technical limit|single response|keep (?:it|this) (?:short|brief)"
+      ],
+      "tone": "A complete ~300-word story despite the Short setting: the person's own words win. No meta-commentary."
+     }
+    }
+   ]
+  },
+  {
+   "id": "l03",
+   "cat": "length",
+   "prefs": {
+    "length": 1
+   },
+   "turns": [
+    {
+     "q": "what should I eat for breakfast? I'm tired",
+     "rubric": {
+      "search": false,
+      "words": [
+       8,
+       80
+      ],
+      "never": [
+       "length limit|word limit|technical limit",
+       "\\[\\d\\]"
+      ],
+      "tone": "Short setting: a warm line and one or two easy picks."
+     }
+    }
+   ]
+  },
+  {
+   "id": "d01",
+   "cat": "code",
+   "agent": "Coding",
+   "turns": [
+    {
+     "q": "how do I reverse a list in python?",
+     "rubric": {
+      "search": false,
+      "words": [
+       8,
+       150
+      ],
+      "must": [
+       "\\[::-1\\]|\\.reverse\\(\\)|reversed\\("
+      ],
+      "tone": "The idiom(s) in a code block, one line on in-place vs copy. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "d02",
+   "cat": "code",
+   "agent": "Coding",
+   "turns": [
+    {
+     "q": "git command to undo my last commit but keep the changes?",
+     "rubric": {
+      "search": null,
+      "words": [
+       5,
+       120
+      ],
+      "must": [
+       "reset --soft HEAD~1|reset --soft HEAD\\^|reset HEAD~1|reset --mixed HEAD~1"
+      ],
+      "tone": "git reset --soft HEAD~1 in a code block, one line on what it does (and --mixed if relevant). Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "d03",
+   "cat": "code",
+   "agent": "Coding",
+   "turns": [
+    {
+     "q": "fix this: for i in range(10) print(i)",
+     "rubric": {
+      "search": false,
+      "words": [
+       4,
+       110
+      ],
+      "must": [
+       "range\\(10\\):"
+      ],
+      "tone": "The fixed code (colon, newline, indent) in a block and one line on the missing colon."
+     }
+    }
+   ]
+  },
+  {
+   "id": "d04",
+   "cat": "code",
+   "agent": "Coding",
+   "turns": [
+    {
+     "q": "let vs const in JS? quick",
+     "rubric": {
+      "search": null,
+      "words": [
+       15,
+       130
+      ],
+      "must": [
+       "reassign"
+      ],
+      "tone": "const can't be reassigned (but objects can still be mutated), let can; both block-scoped; a tiny example. Quick."
+     }
+    }
+   ]
+  },
+  {
+   "id": "j01",
+   "cat": "decision",
+   "turns": [
+    {
+     "q": "Kindle or just read on my iPad?",
+     "rubric": {
+      "search": null,
+      "words": [
+       30,
+       200
+      ],
+      "must": [
+       "e-?ink|eye|glare|battery|sun"
+      ],
+      "tone": "A clear pick with the reason (e-ink easier on the eyes, battery, sunlight) and when the iPad is fine. Not a spec table."
+     }
+    }
+   ]
+  },
+  {
+   "id": "j02",
+   "cat": "decision",
+   "turns": [
+    {
+     "q": "pizza or tacos tonight?",
+     "rubric": {
+      "search": false,
+      "words": [
+       5,
+       80
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "Picks one, playfully, with a quick reason. Short."
+     }
+    }
+   ]
+  },
+  {
+   "id": "j03",
+   "cat": "decision",
+   "turns": [
+    {
+     "q": "should I go to the gym or rest today? I slept badly",
+     "rubric": {
+      "search": false,
+      "words": [
+       20,
+       140
+      ],
+      "never": [
+       "\\[\\d\\]",
+       "cortisol",
+       "^#"
+      ],
+      "tone": "A clear, kind recommendation (light movement or rest; skip the heavy session) in plain words."
+     }
+    }
+   ]
+  },
+  {
+   "id": "j04",
+   "cat": "decision",
+   "turns": [
+    {
+     "q": "dog or cat for a small apartment?",
+     "rubric": {
+      "search": null,
+      "words": [
+       30,
+       180
+      ],
+      "never": [
+       "\\[\\d\\]"
+      ],
+      "tone": "A clear pick (usually a cat) with two or three reasons and when a dog works. Short."
+     }
+    }
+   ]
+  }
+ ]
+}

@@ -450,6 +450,7 @@ def print_entry(e):
 
 # ---------------------------------------------------------------- commands
 def cmd_run(args):
+    rb.use_search_args(args)        # (6b651) never the real engines unless --real-web
     if args.port in rb.FORBIDDEN_PORTS or args.judge_port in rb.FORBIDDEN_PORTS or any(
             8884 <= p <= 8999 and p % 2 == 0 for p in (args.port, args.judge_port)):
         sys.exit("a forbidden port (the owner's app, the gauntlet's or an engine's)")
@@ -578,6 +579,7 @@ def main():
     r.add_argument("--idle", type=int, default=300)
     r.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", rb.DEFAULT_LOCK_DIR))
     r.add_argument("--no-lock", action="store_true")
+    rb.add_search_args(r)       # (6b651) a stand-in web unless --real-web
     r.add_argument("--head", help="the commit the checkout is (for an exported tree without .git)")
     j = sub.add_parser("judge")
     j.add_argument("label")

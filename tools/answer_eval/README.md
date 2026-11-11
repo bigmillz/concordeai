@@ -31,6 +31,13 @@ Files:
   timings since then read the app's own first-word clock, `app_first_s`.
 - `scorecard.py` — (6b560) the per-build scorecard: 20 fixed questions, a fixed local judge, a JSON history and
   a gate (`SCORECARD.md`).
+- `everyday.py` + `everyday.json` — (6b651) the everyday set: 65 real-life prompts (feelings, small talk, quick
+  practical help, known facts, fresh facts, follow-ups, sums, the chat itself, the Short setting, Code-lane asks,
+  small decisions), each with a rubric (search or not, a length band, must / never patterns, the tone), rule checks
+  plus the scorecard's local judge graded against Claude Fable 5.1's own answers (`everyday_refs.json`). It never
+  asks a real search engine: the copy runs with the `search-fixture` hook on `everyday_search.json` (invented,
+  dated results for the fresh questions; anything else finds nothing). `everyday.py run --label L --config fast`,
+  `judge L`, `show A B`, `sides A B [ids]`. Runs in `everyday/runs/<label>/`.
 - `runs/<run>/` — one JSON record per turn, `summary.json`, `answers.md`,
   `devcopy.log`, `scores.md`.
 

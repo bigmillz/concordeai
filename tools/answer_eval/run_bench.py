@@ -53,6 +53,13 @@ DEFAULT_PY = os.path.join(REAL_APP_DIR, "venv", "bin", "python3")
 DEFAULT_LOCK_DIR = ("/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/"
                     "b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad")
 FORBIDDEN_PORTS = {8889, 9901, 9902, 9903}
+# NO REAL SEARCH ENGINE BY DEFAULT (6b651, per Patrick via the lead: the bench and gauntlet traffic got this Mac's
+# connection bot-flagged; DuckDuckGo answered 202 "anomaly" and Brave 429). Every copy started here searches a
+# stand-in web (the app's dev-only `search-fixture` hook): no_web.json (nothing found) unless --search-fixture names
+# a file of recorded results; the real engines only with --real-web, said at the start of the run.
+NO_WEB = os.path.join(HERE, "no_web.json")
+SEARCH = {"real_web": False, "fixture": NO_WEB}
+_FIXTURE_MARK = "# ==== 6b651 search fixture: begin ===="
 
 CONFIGS = {
     "local-fast": {"where": "local", "tier": "Fast", "lock": "engines.lock"},
@@ -192,6 +199,13 @@ class DevCopy:
         env.update(MILLENAI_DEV="1", MILLENAI_HOME=self.home, MILLENAI_NOWINDOW="1",
                    MILLENAI_PORT=str(self.port))
         env.update(self.extra_env)      # --env: a dev copy's measuring knobs (6b520)
+        if not SEARCH["real_web"]:
+            with open(os.path.join(self.repo, "millenai.py"), encoding="utf-8") as fh:
+                if _FIXTURE_MARK not in fh.read():
+                    sys.exit("refusing: %s/millenai.py has no search-fixture hook, so its copy would search the real "
+                             "engines; pass --real-web to allow that (6b651)" % self.repo)
+            hooks = [h for h in env.get("MILLENAI_TEST_HOOKS", "").split(",") if h and not h.startswith("search-fixture=")]
+            env["MILLENAI_TEST_HOOKS"] = ",".join(hooks + ["search-fixture=" + os.path.abspath(SEARCH["fixture"])])
         os.makedirs(self.home, mode=0o700, exist_ok=True)
         os.chmod(self.home, 0o700)
         self._log = open(self.logfile, "a")
@@ -398,6 +412,20 @@ def chat(copy, body, max_wait, idle):
     return rec
 
 
+def add_search_args(ap):
+    ap.add_argument("--search-fixture", default=NO_WEB,
+                    help="the stand-in web the copy searches (default: no_web.json, nothing found) (6b651)")
+    ap.add_argument("--real-web", action="store_true",
+                    help="search the real engines (DuckDuckGo, Brave): rate-limit risk for this connection")
+
+
+def use_search_args(args):
+    SEARCH["real_web"] = bool(getattr(args, "real_web", False))
+    SEARCH["fixture"] = getattr(args, "search_fixture", None) or NO_WEB
+    log("search: %s" % ("THE REAL ENGINES (--real-web)" if SEARCH["real_web"]
+                        else "stand-in web %s" % os.path.basename(SEARCH["fixture"])))
+
+
 def load_questions(path, only, limit):
     with open(path, encoding="utf-8") as fh:
         qs = json.load(fh)["questions"]
@@ -463,12 +491,14 @@ def main():
     ap.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", DEFAULT_LOCK_DIR))
     ap.add_argument("--no-lock", action="store_true")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between turns")
+    add_search_args(ap)
     ap.add_argument("--env", action="append", default=[], metavar="MILLENAI_X=V",
                     help="a dev-only knob for the copy, e.g. MILLENAI_FRESH_OFF=news (6b520); repeatable")
     ap.add_argument("--warmup", action="store_true",
                     help="ask one throwaway question on the tier first (not recorded): the copy learns "
                          "what the server's card refuses (6b516) and the first seats load before q01")
     args = ap.parse_args()
+    use_search_args(args)
 
     if args.port in FORBIDDEN_PORTS or 8884 <= args.port <= 8999 and args.port % 2 == 0:
         sys.exit("port %d is the owner's app, the gauntlet's or an engine's" % args.port)
