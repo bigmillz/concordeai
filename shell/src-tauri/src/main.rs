@@ -363,7 +363,6 @@ fn show_error(app: &AppHandle, title: &str, why: &str, log: &str) {
     // is a whole document of its own, loaded as a data: URL (no race
     // with the blank page's load), in the Horizon night. The sidecar now
     // starts before the window is built, so wait a moment for it.
-    let Some(w) = main_window(app) else { return };
     let esc = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     let html = format!(
         "<!doctype html><html><head><meta charset=utf-8><style>\
@@ -374,11 +373,19 @@ fn show_error(app: &AppHandle, title: &str, why: &str, log: &str) {
          pre{{font:12px/1.5 ui-monospace,Menlo,monospace;color:#9aa6c6;\
          background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);\
          border-radius:12px;padding:14px;overflow:auto;max-height:40vh}}\
+         pre:empty{{display:none}}\
          </style></head><body><main><h1>{}</h1><p>{}</p><pre>{}</pre></main></body></html>",
         esc(title),
         esc(why),
         esc(log)
     );
+    show_page(app, &html);
+}
+
+/// A document of the shell's own, loaded as a data: URL (no race with the
+/// blank page's load, no origin that could reach the IPC).
+fn show_page(app: &AppHandle, html: &str) {
+    let Some(w) = main_window(app) else { return };
     let mut enc = String::with_capacity(html.len() * 3);
     for b in html.bytes() {
         match b {
@@ -391,38 +398,307 @@ fn show_error(app: &AppHandle, title: &str, why: &str, log: &str) {
     }
 }
 
+/// THE FIRST-RUN SCREEN (6b630, per Patrick: a fresh Mac sat on static
+/// text and an empty log box, told the window would appear by itself while it
+/// was open, and a failure asked for Terminal commands). The app's own
+/// look: the wordmark on the night, Inter (the system face until the font
+/// file is approved), one hairline bar for the whole setup, the step and
+/// its percent under it, live from launch.sh's "@@" lines. If it fails:
+/// a calm sentence, "Try again" and "Copy details" (the log's tail goes to
+/// the clipboard, never onto the screen). Both are plain navigations to
+/// concorde-shell://, which on_navigation answers and cancels; the page
+/// holds no secret and can reach nothing else.
+const SETUP_PAGE: &str = r##"<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--ink:#eceef3;--soft:#9aa1b2;--faint:#5d6476;--line:rgba(255,255,255,.09)}
+html,body{margin:0;height:100%;background:#03040a;color:var(--ink);
+  font:14px/1.5 Inter,-apple-system,system-ui,sans-serif;-webkit-font-smoothing:antialiased;cursor:default;
+  -webkit-user-select:none;user-select:none}
+main{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);width:360px;max-width:calc(100% - 48px)}
+.mark{display:flex;align-items:center;gap:10px;margin:0 0 40px}
+.mark svg{width:22px;height:19px}
+.mark b{font-weight:500;font-size:15px;letter-spacing:.02em}
+h1{font-size:17px;font-weight:600;margin:0 0 6px;letter-spacing:-.005em}
+p{margin:0;color:var(--soft)}
+.bar{height:2px;background:var(--line);border-radius:1px;margin:28px 0 12px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:#e9ebf1;border-radius:1px;transition:width .4s cubic-bezier(.2,.7,.2,1)}
+.row{display:flex;justify-content:space-between;gap:16px;font-size:13px;color:var(--soft);font-variant-numeric:tabular-nums}
+.row span:last-child{color:var(--faint)}
+.item{font-size:12px;color:var(--faint);margin-top:4px;min-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{display:flex;align-items:center;gap:20px;margin-top:28px}
+button{font:inherit;font-size:13px;font-weight:500;height:32px;padding:0 16px;border-radius:8px;border:0;
+  background:#eceef3;color:#0b0c10;cursor:pointer}
+button:focus-visible,a:focus-visible{outline:1px solid #e0344b;outline-offset:2px}
+a{color:var(--soft);font-size:13px;text-decoration:none;cursor:pointer}
+a:hover{color:var(--ink)}
+#fail{display:none}
+body.failed #run{display:none}
+body.failed #fail{display:block}
+</style></head><body data-tauri-drag-region>
+<main>
+<div class="mark"><svg viewBox="2 2.3 19.6 16.4" aria-hidden="true"><g stroke="#d9dce4" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>ConcordeAI</b></div>
+<section id="run" role="status" aria-live="polite">
+<h1>Setting up ConcordeAI</h1>
+<p>This takes a few minutes the first time.</p>
+<div class="bar"><i id="fill"></i></div>
+<div class="row"><span id="what">Starting</span><span id="step"></span></div>
+<div class="item" id="item"></div>
+</section>
+<section id="fail" role="alert">
+<h1 id="ftitle">Setup didn’t finish</h1>
+<p id="fwhy">Check your internet connection, then try again.</p>
+<div class="acts"><button id="retry" type="button">Try again</button><a id="copy" href="concorde-shell://copy">Copy details</a></div>
+</section>
+</main>
+<script>
+var NAMES={python:"Downloading",venv:"Preparing",base:"Installing",engine:"Installing the AI engine"};
+// the bar is the whole setup: each step its share, the file downloading now
+// filling most of that share; it never goes back (a new file starts at 0)
+var far=0;
+window.__boot=function(i,n,name,pct,item){
+  document.body.classList.remove("failed");
+  var p=Math.max(0,Math.min(100,pct|0));
+  if(!n){far=0;}else far=Math.max(far,((i-1)+0.9*p/100)/n);
+  document.getElementById("fill").style.width=(Math.min(1,far)*100).toFixed(1)+"%";
+  document.getElementById("what").textContent=NAMES[name]||"Starting";
+  document.getElementById("step").textContent=n?"Step "+i+" of "+n:"";
+  document.getElementById("item").textContent=(item||"")+(item&&p>0&&p<100?" · "+p+"%":"");
+};
+window.__failed=function(t,w){
+  if(t)document.getElementById("ftitle").textContent=t;
+  if(w)document.getElementById("fwhy").textContent=w;
+  document.body.classList.add("failed");
+  document.getElementById("copy").textContent="Copy details";
+};
+window.__copied=function(){document.getElementById("copy").textContent="Copied";};
+document.getElementById("retry").addEventListener("click",function(){
+  window.__boot(0,0,"",0,"");location.href="concorde-shell://retry";});
+</script></body></html>"##;
+
+/// What the first-run screen's two links ask of the shell (6b630): set by
+/// on_navigation, read by the thread that waits on the failure screen.
+static RETRY: AtomicBool = AtomicBool::new(false);
+/// The words "Copy details" puts on the clipboard: the log's tail and the
+/// machine, never shown on the screen.
+static DETAILS: Mutex<String> = Mutex::new(String::new());
+/// The bootstrap's process group while it runs, so Quit stops pip too.
+static BOOT_PGID: AtomicU32 = AtomicU32::new(0);
+
+fn set_details(app: &AppHandle, what: &str, log: &Path) {
+    let os = Command::new("/usr/bin/sw_vers")
+        .arg("-productVersion")
+        .output()
+        .ok()
+        .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default();
+    let text = format!(
+        "ConcordeAI {} setup\n{}\nmacOS {} on {}\n\n{}\n",
+        app.package_info().version,
+        what,
+        os,
+        std::env::consts::ARCH,
+        tail_of(log, 60)
+    );
+    if let Ok(mut d) = DETAILS.lock() {
+        *d = text;
+    }
+}
+
+/// The details onto the clipboard (pbcopy is part of macOS).
+fn copy_details(app: &AppHandle) {
+    let text = DETAILS.lock().map(|d| d.clone()).unwrap_or_default();
+    #[cfg(target_os = "macos")]
+    {
+        use std::io::Write;
+        if let Ok(mut c) = Command::new("/usr/bin/pbcopy").stdin(Stdio::piped()).spawn() {
+            if let Some(mut i) = c.stdin.take() {
+                let _ = i.write_all(text.as_bytes());
+            }
+            let _ = c.wait();
+        }
+    }
+    let _ = text;
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.eval("window.__copied&&__copied()");
+    }
+}
+
+/// THE VENV'S PYTHON, FROM ITS pyvenv.cfg (6b630; never by running it):
+/// older than 3.11 is the system's, from a first run before the app had a
+/// Python of its own. pip stops at mlx-lm 0.29.1 there (no Gemma 4, no
+/// Qwen 3.5), so launch.sh makes it again from the app's own Python.
+fn venv_too_old(py: &Path) -> bool {
+    let Some(venv) = py.parent().and_then(|b| b.parent()) else { return false };
+    let Ok(cfg) = std::fs::read_to_string(venv.join("pyvenv.cfg")) else { return false };
+    cfg.lines()
+        .filter_map(|l| l.split_once('='))
+        .find(|(k, _)| k.trim() == "version" || k.trim() == "version_info")
+        .and_then(|(_, v)| {
+            let mut it = v.trim().split('.');
+            let major: u32 = it.next()?.parse().ok()?;
+            let minor: u32 = it.next()?.parse().ok()?;
+            Some(major == 3 && minor < 11)
+        })
+        .unwrap_or(false)
+}
+
+/// The venv is there, new enough and finished: launch.sh leaves
+/// .setup-unfinished in it until a setup completes, so one stopped half way
+/// (Quit, a lost connection) is finished at the next launch (6b630).
+fn venv_ready(py: &Path) -> bool {
+    let unfinished = py
+        .parent()
+        .and_then(|b| b.parent())
+        .map(|v| v.join(".setup-unfinished").exists())
+        .unwrap_or(false);
+    py.exists() && !venv_too_old(py) && !unfinished
+}
+
 /// FIRST RUN ON A FRESH MAC (6b537): the Python app's launcher built the
 /// venv on first run (launch.sh, written by build_macos_app.sh). The shell
 /// carries that same script in its Resources (build_shell_dmg.sh extracts
-/// it) and runs it with --bootstrap: it makes the venv, installs the
+/// it) and runs it with --bootstrap --shell: it downloads the app's own
+/// Python (pinned and hash-checked, 6b630), makes the venv, installs the
 /// engine and exits 0, then the server starts as usual. A Mac that has the
 /// Python app's venv already (an install updating into the shell) never
-/// gets here. macOS only: the script is zsh and the venv path is a Mac's.
-fn bootstrap_venv(app: &AppHandle, py: &Path) -> bool {
+/// gets here unless that venv is too old (venv_too_old). macOS only: the
+/// script is zsh and the venv path is a Mac's. None: nothing to run here
+/// (another platform, a dev's CONCORDE_PYTHON, no launch.sh).
+fn bootstrap_venv(app: &AppHandle, py: &Path) -> Option<bool> {
     if !cfg!(target_os = "macos") || std::env::var_os("CONCORDE_PYTHON").is_some() {
-        return false;
+        return None;
     }
-    let Ok(res) = app.path().resource_dir() else { return false };
+    let res = app.path().resource_dir().ok()?;
     let script = res.join("launch.sh");
     if !script.exists() {
-        return false;
+        return None;
     }
-    show_error(
-        app,
-        "Setting up ConcordeAI",
-        "First run: building the AI engine. This needs the internet and takes a few minutes; the window opens on its own when it is ready.",
-        "",
-    );
-    let ok = Command::new("/bin/zsh")
-        .arg(&script)
+    let log = expand_tilde("~/Library/Logs/MillenAI/bootstrap.log");
+    show_page(app, SETUP_PAGE);
+    mark("bootstrap started");
+    let mut cmd = Command::new("/bin/zsh");
+    cmd.arg(&script)
         .arg("--bootstrap")
+        .arg("--shell")
         .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false);
-    ok && py.exists()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        cmd.process_group(0);
+    }
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => {
+            set_details(app, &format!("launch.sh didn't start: {}", e), Path::new(&log));
+            return Some(false);
+        }
+    };
+    BOOT_PGID.store(child.id(), Ordering::SeqCst);
+    // the "@@" lines drive the screen, at most every 120 ms (pip's raw
+    // progress is a line per chunk) and at once when the step changes
+    let (mut i, mut n, mut name, mut pct, mut item) = (0u32, 0u32, String::new(), 0u32, String::new());
+    let mut sent = Instant::now() - Duration::from_secs(1);
+    if let Some(out) = child.stdout.take() {
+        use std::io::BufRead;
+        for line in std::io::BufReader::new(out).lines().map_while(Result::ok) {
+            if QUITTING.load(Ordering::SeqCst) {
+                break;
+            }
+            let mut w = line.splitn(3, ' ');
+            let (tag, a, b) = (w.next().unwrap_or(""), w.next().unwrap_or(""), w.next().unwrap_or(""));
+            let mut now = false;
+            match tag {
+                "@@steps" => n = a.parse().unwrap_or(n),
+                "@@step" => {
+                    i = a.parse().unwrap_or(i);
+                    name = b.to_string();
+                    pct = 0;
+                    item.clear();
+                    now = true;
+                    mark(&format!("bootstrap step {} {}", i, name));
+                }
+                "@@pct" => pct = a.parse().unwrap_or(pct),
+                "@@item" => item = a.to_string(),
+                _ => continue,
+            }
+            if now || sent.elapsed() > Duration::from_millis(120) {
+                sent = Instant::now();
+                if let Some(w) = app.get_webview_window("main") {
+                    let js = format!(
+                        "window.__boot&&__boot({},{},{},{},{})",
+                        i,
+                        n,
+                        serde_json::to_string(&name).unwrap_or_default(),
+                        pct,
+                        serde_json::to_string(&item).unwrap_or_default()
+                    );
+                    let _ = w.eval(&js);
+                }
+            }
+        }
+    }
+    let ok = child.wait().map(|s| s.success()).unwrap_or(false);
+    BOOT_PGID.store(0, Ordering::SeqCst);
+    mark(&format!("bootstrap ended ({})", if ok { "ok" } else { "failed" }));
+    if ok && py.exists() {
+        return Some(true);
+    }
+    set_details(app, "The first-run setup stopped.", Path::new(&log));
+    Some(false)
+}
+
+/// The failure screen's wait: true when "Try again" is pressed, false on
+/// Quit.
+fn wait_retry() -> bool {
+    RETRY.store(false, Ordering::SeqCst);
+    loop {
+        if QUITTING.load(Ordering::SeqCst) {
+            return false;
+        }
+        if RETRY.swap(false, Ordering::SeqCst) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+/// The server's Python, there and new enough, or the first-run setup until
+/// it is (6b630): a failure waits on its screen for "Try again". false
+/// only on Quit.
+fn ensure_python(app: &AppHandle, py: &Path) -> bool {
+    loop {
+        if venv_ready(py) {
+            return true;
+        }
+        let (title, why) = match bootstrap_venv(app, py) {
+            Some(true) => return true,
+            // an old venv and nothing to rebuild it with: it still runs
+            None if py.exists() => return true,
+            None => {
+                // a dev build's way round it is in the log, never on the screen
+                eprintln!("[shell] no Python at {}; a dev build names one with CONCORDE_PYTHON", py.display());
+                set_details(app, &format!("No Python at {}.", py.display()), Path::new(""));
+                show_page(app, SETUP_PAGE);
+                ("ConcordeAI isn’t set up yet", "Something it needs is missing. Download ConcordeAI again and replace this copy.")
+            }
+            Some(false) => ("Setup didn’t finish", "Check your internet connection, then try again."),
+        };
+        if let Some(w) = main_window(app) {
+            // the page may still be loading: say it once it can hear
+            for _ in 0..20 {
+                std::thread::sleep(Duration::from_millis(50));
+                let _ = w.eval(&format!(
+                    "window.__failed&&__failed({},{})",
+                    serde_json::to_string(title).unwrap_or_default(),
+                    serde_json::to_string(why).unwrap_or_default()
+                ));
+            }
+        }
+        if !wait_retry() {
+            return false;
+        }
+    }
 }
 
 /// The window, waiting up to 3 s for it: the sidecar starts before the
@@ -540,23 +816,19 @@ fn start_sidecar(app: AppHandle) {
         let home = data_home();
         let py = python_path();
         let script = server_script(&app);
-        if !py.exists() && !bootstrap_venv(&app, &py) {
-            show_error(
-                &app,
-                "ConcordeAI can't find its Python engine",
-                &format!(
-                    "Expected {}. Open the Python app once (it builds its venv), or set CONCORDE_PYTHON.",
-                    py.display()
-                ),
-                "",
-            );
+        // the first run's setup, or a venv too old for the engine
+        // (6b630): its own screen, live, and "Try again" if it fails;
+        // nothing on it is a command or a setting to type
+        if !ensure_python(&app, &py) {
             return;
         }
         if !script.exists() {
+            // a dev's CONCORDE_SERVER is in the log, not on the screen
+            eprintln!("[shell] no server at {}", script.display());
             show_error(
                 &app,
-                "ConcordeAI can't find its server",
-                &format!("Expected {}. Set CONCORDE_SERVER to a millenai.py.", script.display()),
+                "ConcordeAI is missing a file",
+                "Download ConcordeAI again and replace this copy.",
                 "",
             );
             return;
@@ -673,6 +945,17 @@ fn start_sidecar(app: AppHandle) {
 fn stop_sidecar(app: &AppHandle) {
     QUITTING.store(true, Ordering::SeqCst);
     let Some(sc) = app.try_state::<Sidecar>() else { return };
+    // a first-run setup under way stops with the app, pip and all (6b630):
+    // its process group, so no download is left running unseen
+    #[cfg(unix)]
+    {
+        let pg = BOOT_PGID.swap(0, Ordering::SeqCst);
+        if pg > 0 {
+            unsafe {
+                libc::kill(-(pg as libc::pid_t), libc::SIGTERM);
+            }
+        }
+    }
     let child = sc.child.lock().ok().and_then(|mut g| g.take());
     let Some(mut child) = child else { return };
     #[cfg(unix)]
@@ -917,6 +1200,19 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
             if cfg!(debug_assertions) {
                 eprintln!("[shell] navigate {}", url);
             }
+            // the first-run screen's two links (6b630): answered here,
+            // never loaded
+            if url.scheme() == "concorde-shell" {
+                match url.host_str() {
+                    Some("retry") => RETRY.store(true, Ordering::SeqCst),
+                    Some("copy") => {
+                        let a = nav_app.clone();
+                        std::thread::spawn(move || copy_details(&a));
+                    }
+                    _ => {}
+                }
+                return false;
+            }
             let own = (url.scheme() == "http" && url.host_str() == Some("127.0.0.1"))
                 || url.scheme() == "tauri"
                 || url.host_str() == Some("tauri.localhost")
@@ -998,7 +1294,6 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
         }
         _ => {}
     });
-    let _ = nav_app;
     Ok(())
 }
 

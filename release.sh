@@ -207,23 +207,27 @@ fi
 echo "→ publishing v$BUILD"
 git add -A && git commit -m "Release $SHOW (build $BUILD)" || true
 git push origin HEAD
-# WHAT'S NEW, IN HUMAN (6b257): the Updates pane renders the release
-# BODY now — /api/update/check carries it — so every cut deserves a
-# short bulleted summary a person would actually read. Write it into
-# RELEASE_NOTES.md before releasing; it is consumed here and then
-# cleared, so a stale list can never ship with the next build.
+# WHAT'S NEW, IN HUMAN (6b257): every cut deserves a short bulleted
+# summary a person would actually read. Write it into RELEASE_NOTES.md
+# before releasing; it is consumed here and then cleared, so a stale list
+# can never ship with the next build. ITS OWN FIELD (6b630, per Patrick):
+# it goes between the whats-new markers, which GitHub's page doesn't show,
+# and the app shows only that (user_notes in millenai.py), never the
+# install notes under it (the .msi, the .zip).
 WHATS_NEW=""
 if [[ -s RELEASE_NOTES.md ]]; then
-  WHATS_NEW="$(cat RELEASE_NOTES.md)
-
-"
+  WHATS_NEW="$(cat RELEASE_NOTES.md)"
 else
-  echo "  (no RELEASE_NOTES.md — the Updates pane will show the boilerplate only)"
+  echo "  (no RELEASE_NOTES.md — the app's What's new will be empty for this cut)"
 fi
 gh release create "v$BUILD" "$DMG" "$ZIP" \
   "${PRE[@]}" \
   --title "$SHOW" \
-  --notes "${WHATS_NEW}**macOS** — download the .dmg. Existing installs update themselves.
+  --notes "<!-- whats-new -->
+${WHATS_NEW}
+<!-- /whats-new -->
+
+**macOS** — download the .dmg. Existing installs update themselves.
 
 **Windows** — the .msi installer (attached by CI a few minutes after
 release) needs nothing else: no Python, no admin. On an NVIDIA machine CUDA

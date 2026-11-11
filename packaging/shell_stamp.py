@@ -11,8 +11,13 @@ shell-build workflow on Windows and Linux. It
     set after the bundle is built; Tauri writes the version there);
   * writes the sidecar's first-run files into shell/src-tauri/sidecar/
     (ignored by git): launch.sh, extracted from build_macos_app.sh's LAUNCH
-    heredoc so there is one copy of the venv bootstrap, and the hash-pinned
-    crypto-requirements.txt that script installs (packaging/crypto_reqs.py).
+    heredoc so there is one copy of the venv bootstrap, the hash-pinned
+    crypto-requirements.txt that script installs (packaging/crypto_reqs.py)
+    and engine-requirements.txt (6b630): the MLX engine at the app's own
+    pin, MLX_LM_PIN and MLX_PIN, so a first run starts on the engine the
+    app expects instead of whatever pip picks.
+
+`--engine-reqs PATH` writes only that last file (build_macos_app.sh).
 
 Prints "<APP_VERSION> <APP_BUILD>" on one line for the caller.
 """
@@ -29,8 +34,21 @@ CONF = ROOT / "shell" / "src-tauri" / "tauri.conf.json"
 SIDECAR = ROOT / "shell" / "src-tauri" / "sidecar"
 
 
+def engine_reqs(src: str) -> str:
+    """mlx-lm and mlx at the app's pins, as a pip requirements file."""
+    def pin(name):
+        m = re.search(r"^%s = \((\d+), (\d+), (\d+)\)" % name, src, re.M)
+        if not m:
+            sys.exit("millenai.py: %s was not found" % name)
+        return ".".join(m.groups())
+    return "mlx-lm==%s\nmlx==%s\n" % (pin("MLX_LM_PIN"), pin("MLX_PIN"))
+
+
 def main() -> int:
     src = SRC.read_text(encoding="utf-8")
+    if sys.argv[1:2] == ["--engine-reqs"]:
+        pathlib.Path(sys.argv[2]).write_text(engine_reqs(src), encoding="ascii")
+        return 0
     version = re.search(r'^APP_VERSION = "([^"]+)"', src, re.M).group(1)
     build = int(re.search(r"^APP_BUILD = (\d+)", src, re.M).group(1))
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
@@ -52,6 +70,7 @@ def main() -> int:
     os.chmod(launch, 0o755)
     subprocess.run([sys.executable, str(ROOT / "packaging" / "crypto_reqs.py"),
                     str(SRC), str(SIDECAR / "crypto-requirements.txt")], check=True)
+    (SIDECAR / "engine-requirements.txt").write_text(engine_reqs(src), encoding="ascii")
     print(version, build)
     return 0
 

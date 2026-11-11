@@ -20492,3 +20492,101 @@ the spine harness (+signMode), three 6b346 mutation anchors that followed the wa
 - The ink's per-word dissolve applies to the final writer's words as before; the provisional draft uses the existing
   swap (hold, dim, shimmer in), not the preview's word-level LCS dissolve (not ported in 6b555 either).
 - Verified in Blink (headless Chromium), not in the app's WKWebView.
+
+## 6b630 — first-run-1: the app's own Python, the minimum-engine gate, a setup screen that says what it's doing, a home that says when nothing can answer, the Starter first (7.0 beta, per Patrick: the first-run audit's P0s)
+
+On `first-run-1`, from `beta-3` (c5d44c5). The fresh-eyes audit of a new Mac's first run (scratchpad
+`audit/first-run/`) found: the bootstrap ran `command -v python3`, the Command Line Tools' 3.9.6, so pip could only
+give mlx-lm 0.29.1 and the Light set's everyday model died with "Model type gemma4 not supported"; a Mac without the
+tools got a dialog with `xcode-select --install` in it, and the shell's own page said "set CONCORDE_PYTHON"; the
+setup screen was static text and an empty log box that said the window would open on its own while it was open; and
+the app said "ready" with no model at all: the first question ended in "⚠️ Backend error — Gemma 4 E2B's engine
+didn't start" (reproduced on beta-3 in a fake HOME, stills in the scratchpad's `fr1/stills/before`).
+
+**The app's own Python (P0 1).** `launch.sh` (build_macos_app.sh's LAUNCH heredoc, extracted into the shell by
+shell_stamp.py as before) never runs the system's Python. It downloads python-build-standalone 3.12.16 (release
+20261026, the install_only_stripped build, 25 MB) for the machine's architecture, checks its SHA-256 against the pin
+in the script (both arches' sums checked against the release's SHA256SUMS and GitHub's asset digests on 2026-11-10)
+**before** anything is unpacked, unpacks it into `~/Library/Application Support/MillenAI/python/cpython-3.12.16+20261026`
+and makes the venv from it. curl, shasum and tar are macOS's own; its TLS uses /etc/ssl/cert.pem (checked). Chosen
+over bundling it in the .app: the venv's ~350 MB of wheels needs the internet on a first run anyway, a bundled Python
+would add ~50 MB to the DMG (both arches; python-build-standalone has no universal build) and ~70 nested Mach-O files
+to sign and notarize under the hardened runtime (plus library validation against every pip wheel), and the download
+keeps the DMG at its size. The engine installs at the app's pins (`engine-requirements.txt`, written by
+shell_stamp.py from MLX_LM_PIN and MLX_PIN, a new bundle resource) instead of whatever pip picks. A venv older than
+3.11 (read from its pyvenv.cfg, never by running it: the Command Line Tools' 3.9 of an earlier first run) is moved
+aside and made again from our Python, and put back if that fails; the shell runs the setup for it too
+(`venv_too_old`). A setup stopped half way (Quit, a lost connection) leaves `.setup-unfinished` in the venv, so the
+next launch finishes it instead of starting the server on half a venv (`venv_ready`). In shell mode
+(`--bootstrap --shell`) there's no pywebview, no osascript, and the setup speaks to the shell in "@@" lines.
+
+**The gate.** MLX_TYPE_SINCE: the first mlx-lm that loads each newer model type, read off every mlx-lm wheel on PyPI
+from 0.28.4 to 0.32.2 (models/<type>.py or the type mapping): qwen3_5, qwen3_5_moe and glm_moe_dsa from 0.30.7, gemma4
+from 0.31.2, gemma4_unified from 0.32.0. MLX_REQUIRES now holds every MLX row of those types (Gemma 4 E2B and 26B,
+Qwen 3.5 9B, Qwen 3.8 27B, Qwen 3.6 35B MoE, GLM 5.3). On 0.29.1 they run on Ollama (GLM 5.3, MLX-only, isn't
+offered); Llama 3.2 1B stays on MLX; on the pin all are MLX.
+
+**The setup screen (P0 2, P1).** The shell's own page (SETUP_PAGE, a data: document): the wordmark, Inter with the
+system face until the font file is approved, one hairline bar for the whole setup (each step its share, the file
+downloading now filling most of it, never going back), "Step 2 of 4", the step's name, and the file with its size and
+percent (pip's `--progress-bar raw`), at most every 120 ms. A failure: "Setup didn't finish / Check your internet
+connection, then try again." with "Try again" and "Copy details" (the log's tail and the machine onto the clipboard
+with pbcopy, never on the screen). Both are navigations to `concorde-shell://`, answered by on_navigation and never
+loaded. Quit during the setup stops its whole process group (pip included). Nothing on any shell page names a
+command or an environment variable now; a dev's CONCORDE_PYTHON hint goes to stderr. An empty log box is hidden.
+
+**Nothing can answer yet (P0 3).** `/api/setup` says `models_ready` (models, not the Ollama engine's pseudo-row) and
+the `starter`'s state; `needs_setup` is "no model here" (it was "fewer than two", which held a Starter-only or
+cloud-only install in the first-run window forever). The home, while no model is here, no cloud key works and no
+paired server answers (`hzNoModel`; never claimed before it has asked), shows one line under the composer and one
+primary key, "Get a starter model · 0.8 GB · about 2 min", with "Use the cloud instead" (Settings › Cloud) beside it;
+the download's progress takes the key's place; it goes when a model is here (and a working cloud key with no model
+here sets Cloud Only, once). A question then stays in the box and the line says why. A relaunch opens no window over
+the app (the "Welcome. Setting up…" panel); the setup window opens only from the download strip now. The composer
+keeps the golden point with the line under it.
+
+**The Starter.** STARTER_MODEL = Llama 3.2 1B. `start_starter_first`: whatever set is picked, the starter downloads
+alone first and the rest of the set waits as "queued" (so the bar counts it) until it lands, then starts as before
+(an Ollama batch already went smallest first). `/api/setup/install` takes `starter` (the starter alone; no set is
+recorded, so the More-models card offers Light later).
+
+**The wizard (P1).** Five steps, Inter, a flat near-black card with hairlines, the step marks 2 px bars (no circles):
+a plain promise ("Private AI, running on your own machines."; no "About a minute", no "Several draft…"); Models, one
+list with a size and a time on every row (Starter, Light, Recommended, Everything, Cloud only); Cloud (its line asks
+for a key when Cloud only is picked); Your server (the pairing code first; the address and Cloudflare Access under
+Advanced; a failed pair takes the new entry back off); Ready, whose one filled key names what downloads first
+("Download Starter · 0.8 GB · about 2 min"), the rest of the set said on the line above ("Then Light follows in the
+background: 10 GB, about 28 min."). No limits, the giants box and auto-clean left the wizard; they are Settings ›
+Models' (Manage). Times before a download are estimates at 50 Mbit/s (DL_ASSUME_BPS); once bytes move every bar
+says its measured time.
+
+**What's new (P1).** release.sh writes RELEASE_NOTES.md between `<!-- whats-new -->` markers (GitHub doesn't show
+them) and the install notes after; `user_notes` shows only what is between them everywhere the app reads notes, and
+cuts an older body at its "**macOS**"/"**Windows**" boilerplate. Channel names: the app already says Beta everywhere
+(6b551); unchanged.
+
+**Measured** (this Mac, Apple silicon, a fast line; fake HOME, PATH /usr/bin:/bin:/usr/sbin:/sbin, the release bundle
+as a dev copy, Ollama hidden by the dev-only `no-ollama` hook): launch → setup done 50.2 s (Python 2.8 s, venv
+2.8 s, basics 3.3 s, engine 41 s), page loaded 50.7 s; the setup downloads 25 MB + 354 MB of wheels (torch, 139 MB,
+is mlx-whisper's) and the venv is 1.5 GB. The Starter's download ran on its real path with its blobs already on disk
+(Llama 3.2 1B is in this Mac's HF cache, so it wasn't fetched again): 11-15 s of the hub's metadata and linking; first
+words 0.4-2.2 s after the question. On a 50 Mbit/s line* the downloads alone are about 1 min for the setup and 2 min
+for the Starter: about 4 min from the first open to the first answer, plus the person's clicks. (*estimate) The
+failure screen, Copy details and Try again were proven in the real WKWebView through the debug shell's probe hook (a
+dead proxy for the download); Quit at 9 s left no process of that HOME; a venv marked unfinished was finished by the
+next launch (2.7 s).
+
+**Checks.** A 6b630 block of seven checks and 23 mutants: launch.sh's pins and order (static) and its own functions
+run in zsh (a venv's age, pip's lines, a wrong SHA-256 never unpacked, the right one unpacked); the shell's screen,
+links, Quit and venv rules; the gate on 0.29.1 and on the pin; the home's who-can-answer table, the starter key, the
+send, the relaunch and the wizard's last key, run in node; start_starter_first run with stand-ins; user_notes and
+release.sh's markers. Re-pinned: the wizard's five steps, auto-clean and the giants box as Settings' only, 6b405's
+route and renderer counts, 6b494's MLX_REQUIRES, 6b537's bootstrap and resources, 6b551's notes helpers.
+
+**For Patrick.** The website's channel explainer and FAQ still say "Prerelease" (the app says Beta) and the FAQ says
+"Basic is one 0.8 GB model … Pro … Max" (the app: Starter, Light, Recommended, Everything); not edited. A code alone
+can't pair yet: the app pairs only over https and nothing tells it a server's address, so the address is asked for
+under Advanced; true code-only pairing needs the server to advertise itself or carry its address in the code (an
+ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
+setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
+Chromium and read back from the real WKWebView.
