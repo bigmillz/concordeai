@@ -21411,6 +21411,32 @@ version ... it's just looking kind of lacking").
   Chromium; home, the landing at 0.5 / 1.4 / 2.6 s, Ultra at rest): this branch is at least as rich as the demo in both
   engines; the C++ Preview's beta-2 page is the blue, full-height-rain one.
 - Mirrored into the demo's `beta/index.html` (not pushed).
+
+**The stars' landing** (per Patrick, ~09:15: "make it much more sexy and push the star effect when somebody hits ultra a
+lot harder while still not being tacky"; ~09:30: "send the stars effect through the roof a little bit ... something that
+Gemini is going for"). Additive; the rim, its corners and the controls untouched.
+- At the release a wave of star births sweeps out from the composer's top edge into the open sky, each star's moment
+  set by its distance (150 ms at the composer to 1.5 s at the far corners, eased): 450 in Full (225 Balanced), of four
+  kinds: pin-points (.5-.8 px, sharp twinkle), stars, four-point glints (a soft cross that rises and falls once as they
+  bloom) and a few slow bright stars (blooming over 2.5 s); 30 (15) arrive as trails streaking out of the composer
+  (500-750 ms, a fading ice-white tail); four in ten on a deeper, smaller, dimmer layer. Each blooms in over 900 ms or
+  more: no flash (the largest region rise within 200 ms in the arrival 13.6/255, as before). The sky is about 2.5× as
+  dense through the hang (642 stars lit at 1.5 s against 252 at rest); from 3.3-5 s they dissolve over 1.2 s, all but 60
+  (30) that stay: a richer rest, twinkling (a third sharp) and drifting a few px.
+- The landing's star sign now draws itself above the greeting from 1.5 s; the meteor shower (5-8) crosses the aurora's
+  band at 1.3 s.
+- At Ultra the stars answer the hand: within ~90 px of a moving pointer they brighten softly (×1.6 at most, easing out
+  over 1.2 s); typing sets a light shimmer through the field above the box. Home only; Calm and reduced motion none.
+- The particles' pool grew to 1,600 quads (was 700: the wave would have been cut off silently).
+- WKWebView at 120 Hz (the C++ shell's config, on screen, timing only), measured while the machine carried a load average
+  of 8-11 from other work: before the stars' landing the 5 s arrival rAF p95 13 ms (max 43), after it 12-17 ms (max
+  47-79); at rest p95 11 both. The 8-9 ms target was not met by either under that load; not yet measured on a quiet machine
+  or on Patrick's M4 Pro.
+- An on-screen screen recording for these stills captured another app's window on the shared screen when the harness's
+  window was not in front; it was deleted at once, and the stills here come from an offscreen
+  WKWebView instead (their snapshots land 0.4-0.6 s late; the labels give the real times).
+- Mirrored into the demo's `beta/index.html` (not pushed).
+
 ## 6b622 — beta-4-lanes: Code and Funnels in the flat chrome (7.0 beta 4, per Patrick)
 
 Per Patrick: "it's very important that the chat page and also obviously the code page and all that looks really

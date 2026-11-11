@@ -73896,8 +73896,8 @@ function hzPfxProgram(gl){
   const sh=(k,s)=>{const x=gl.createShader(k);gl.shaderSource(x,s);gl.compileShader(x);return x;};
   const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,HZ_PFX_VS));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,HZ_PFX_FS));gl.linkProgram(p);
   if(!gl.getProgramParameter(p,gl.LINK_STATUS))return null;
-  const buf=gl.createBuffer(),f=new Float32Array(9*6*700),aP=gl.getAttribLocation(p,"p"),aC=gl.getAttribLocation(p,"c"),aL=gl.getAttribLocation(p,"l"),uR=gl.getUniformLocation(p,"res");let n=0;
-  const v=(x,y,r,g,b,a,lx,ly,k)=>{if(n>=4200)return;const o=n*9;f[o]=x;f[o+1]=y;f[o+2]=r;f[o+3]=g;f[o+4]=b;f[o+5]=a;f[o+6]=lx;f[o+7]=ly;f[o+8]=k;n++;};
+  const buf=gl.createBuffer(),f=new Float32Array(9*6*1600),aP=gl.getAttribLocation(p,"p"),aC=gl.getAttribLocation(p,"c"),aL=gl.getAttribLocation(p,"l"),uR=gl.getUniformLocation(p,"res");let n=0;
+  const v=(x,y,r,g,b,a,lx,ly,k)=>{if(n>=9600)return;const o=n*9;f[o]=x;f[o+1]=y;f[o+2]=r;f[o+3]=g;f[o+4]=b;f[o+5]=a;f[o+6]=lx;f[o+7]=ly;f[o+8]=k;n++;};
   return {clear(){n=0;},count(){return n;},
     star(x,y,s,col,a,rot){if(a<.004||s<.3)return;const c=Math.cos(rot||0)*s,si=Math.sin(rot||0)*s,P=[[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]];for(const [u,w] of P)v(x+u*c-w*si,y+u*si+w*c,col[0],col[1],col[2],a,u,w,1);},
     line(x0,y0,x1,y1,wd,col,a0,a1){if(a0<.004&&a1<.004)return;const dx=x1-x0,dy=y1-y0,L=Math.hypot(dx,dy)||1,h=wd/2+1,nx=-dy/L*h,ny=dx/L*h;
@@ -74264,7 +74264,7 @@ function hzSkyBoot(){
   function buildSign(t){const cb=R(cbox());if(!cb)return null;const g=R(greetEl()),hm=home(),s_=side(),hd=R($("#hz-top")),ci=hm?null:R($("#chat-inner"));
     const colL=ci?ci.left:Math.min(cb.left,g?g.left:cb.left),colR=ci?ci.right:Math.max(cb.right,g?g.right:cb.right),left=(s_?s_.right:0)+24,top=(hd?hd.bottom:64)+16;
     const areas=[[left,top,colL-24,innerHeight*.62],[colR+24,top,innerWidth-24,innerHeight*.62],[colL+40,top,colR-40,(g&&hm?g.top:cb.top)-20],[colL,(g&&hm?g.bottom:cb.top-120)+14,colR,cb.top-10]].filter(a=>a[2]-a[0]>150&&a[3]-a[1]>110);
-    if(!areas.length)return null;signPlace=(signPlace+1+Math.floor(Math.random()*2))%areas.length;if(hm&&areas.length===4&&(hzS.signK=(hzS.signK||0)+1)%2)signPlace=3;const [x0,y0,x1,y1]=areas[signPlace%areas.length];   // every other one above the box (6b621)
+    if(!areas.length)return null;signPlace=(signPlace+1+Math.floor(Math.random()*2))%areas.length;if(hm&&areas.length===4&&(hzS.signK=(hzS.signK||0)+1)%2)signPlace=3;if(hzS.signForce!=null&&areas.length===4){signPlace=hzS.signForce;}hzS.signForce=null;const [x0,y0,x1,y1]=areas[signPlace%areas.length];   // the landing's sign above the greeting (6b621)   // every other one above the box (6b621)
     const pts=nearStars(x0,y0,x1,y1,t);if(pts.length<4)return null;
     const seed=pts[Math.floor(Math.random()*pts.length)];pts.sort((a,b)=>Math.hypot(a.sx-seed.sx,a.sy-seed.sy)-Math.hypot(b.sx-seed.sx,b.sy-seed.sy));
     const P=pts.slice(0,4+Math.floor(Math.random()*3)),inT=[0],edges=[];
@@ -74278,14 +74278,49 @@ function hzSkyBoot(){
     sign.edges.forEach(([i,j],k)=>{const u=Math.max(0,Math.min(1,(age-k*per)/per));if(u<=0)return;const e=u*u*(3-2*u),[x0,y0]=P[i],[x1,y1]=P[j],hx=x0+(x1-x0)*e,hy=y0+(y1-y0)*e;
       pfx.line(x0,y0,hx,hy,.7,ICE,.24*fa*ultraE,.34*fa*ultraE);if(u<1)pfx.star(hx,hy,3.2,WHITE,.85*ultraE*workF,0);else lit.add(j);});
     lit.forEach(i=>pfx.star(P[i][0],P[i][1],4.6,WHITE,.6*fa*ultraE,0));}
+  // THE STARS' LANDING (6b621, per Patrick: "push the star effect when somebody hits ultra a lot harder while still not
+  // being tacky", then "send the stars effect through the roof a little bit"): at the release a wave of star births
+  // sweeps out from the composer's top edge into the open sky (each star's moment set by its distance, eased: 150 ms at
+  // the composer to 1.5 s at the far corners), 450 in Full (225 in Balanced), of four kinds: pin-points (.5-.8 px, sharp
+  // twinkle, three in ten), stars (1.3-3.1 px), four-point glints (a soft cross that rises and falls once as it blooms,
+  // one in four) and a few slow bright stars (one in 25: 3-4 px, blooming over 2.5 s); 30 of them arrive as trails
+  // streaking out from the composer (500-750 ms, a fading tail) before they settle; four in ten sit on a deeper, smaller,
+  // dimmer layer. Each blooms in on the smootherstep (900 ms; never a flash), so the sky is about three times as dense
+  // through the hang; from 3.3-5 s they dissolve over 1.2 s, all but 60 (30) that stay in the richer rest, twinkling and
+  // drifting a few px. At Ultra the stars answer the hand: those within ~90 px of the pointer brighten softly while it
+  // moves, and typing sets a light shimmer through the field above the box. Never over the greeting, the composer or the
+  // header; the home's only; Calm and reduced motion none (the sky's arrival is gated by lift()).
+  let wave=[],ptrAt=0,typeAt=0;
+  addEventListener("pointermove",()=>{ptrAt=performance.now();},{passive:true});
+  document.addEventListener("input",e=>{if(e.target&&e.target.id==="input")typeAt=performance.now();},true);
+  function buildWave(nowT){const cb=R(cbox());if(!cb||!home())return [];const hd=R($("#hz-top")),s_=side(),x0=(s_?s_.right:0)+16,x1=innerWidth-16,y0=(hd?hd.bottom:64)+8,y1=cb.top-6,ex=rects(),cx=cb.left+cb.width/2,cy=cb.top;
+    const full=skyMode==="full",n=full?450:225,keep=full?60:30,trails=full?30:15,out=[],dmax=Math.max(1,Math.hypot(Math.max(cx-x0,x1-cx),(cy-y0)*1.4));let tries=0;
+    while(out.length<n&&tries++<n*8){const x=x0+Math.random()*(x1-x0),y=y0+Math.random()*(y1-y0);if(ex.some(r=>inR(x,y,r,8)))continue;
+      const dn=Math.min(1,Math.hypot(x-cx,(y-cy)*1.4)/dmax),far=Math.random()<.4,k=Math.random(),pin=k<.3,big=!pin&&k>.96,i=out.length;
+      out.push({x,y,bt:nowT+150+1350*Math.pow(dn,.8)+Math.random()*120,s:pin?.5+Math.random()*.3:big?3+Math.random():far?.7+Math.random()*.4:1.3+Math.random()*1.8,
+        a:pin?.5+Math.random()*.3:big?.85:far?.25+Math.random()*.15:.45+Math.random()*.4,far,bloom:big?2500:900,
+        end:i<keep?0:nowT+3300+Math.random()*1700,col:big?WHITE:HZ_UCOL[Math.floor(Math.random()*HZ_UCOL.length)],w:2*Math.PI/(2+Math.random()*5),ph:Math.random()*6.28,
+        sh:pin||Math.random()<.3,g:big||Math.random()<.25,tr:i>=keep&&i<keep+trails?{x:cx+(x-cx)*.35,y:cy+(y-cy)*.35,d:500+Math.random()*250}:null});}
+    return out;}
+  function drawWave(nowT,t){const pe=Math.max(0,1-(nowT-ptrAt)/1200),te=Math.max(0,1-(nowT-typeAt)/900);
+    for(let i=wave.length-1;i>=0;i--){const p=wave[i],age=nowT-p.bt;if(age<0)continue;const u=Math.min(1,age/p.bloom);let a=p.a*ss5(u);
+      if(p.end){if(nowT>p.end+1200){wave.splice(i,1);continue;}if(nowT>p.end)a*=1-ss5((nowT-p.end)/1200);}
+      const tw=Math.sin(t*p.w+p.ph);a*=p.sh?.35+.65*Math.pow(.5+.5*tw,4):.6+.4*(.5+.5*tw);
+      let x=p.x,y=p.y+(p.far?2:3)*Math.sin(t*.12+p.ph);
+      if(p.tr&&age<p.tr.d){const v=age/p.tr.d,e=1-Math.pow(1-v,3),hx=p.tr.x+(p.x-p.tr.x)*e,hy=p.tr.y+(p.y-p.tr.y)*e,tl=Math.min(e,.45);   // a trail: out from the composer, its tail fading
+        pfx.line(p.tr.x+(p.x-p.tr.x)*(e-tl),p.tr.y+(p.y-p.tr.y)*(e-tl),hx,hy,1,[.86,.91,1],0,.8*Math.min(1,v*4)*(1-v*.6)*ultraE*workF);x=hx;y=hy;a=Math.max(a,.8*Math.min(1,v*4));}
+      if(pe>0&&ptr.x>-900){const dx=x-ptr.x,dy=y-ptr.y,q=dx*dx+dy*dy;if(q<32400)a*=1+.6*pe*Math.exp(-q/8100);}   // the hand's shimmer
+      pfx.star(x,y,p.s*2.2,p.col,a*ultraE*workF,0);if(u<1&&p.g)pfx.star(x,y,p.s*(p.bloom>1000?3.2:4.5)*(1-.4*u),WHITE,(p.bloom>1000?.6:.45)*Math.sin(Math.PI*u)*ultraE*workF,u*.3);}
+    if(te>0&&field&&field.hm)for(let k=0;k<field.P.length;k+=3){const p=field.P[k],f=.5+.5*Math.sin(nowT*.012+p.ph*7);if(f>.8)pfx.star(p.x,p.y,p.s*3.4,WHITE,.35*te*(f-.8)*5*ultraE,0);}}   // typing: a light shimmer through the field
   // the column the shooting stars keep clear of
   function column(){if(!home()){const ci=R($("#chat-inner"));if(ci)return ci;}const a=R(greetEl()),b=R(cbox());if(!b)return null;return {left:Math.min(a?a.left:b.left,b.left),right:Math.max(a?a.right:b.right,b.right)};}
   function streak(m,nowT,len,head,amp){const u=(nowT-m.t0)/m.d;if(u<0)return true;if(u>=1)return false;const e=1-Math.pow(1-u,2),a=Math.min(1,u/.15)*Math.min(1,(1-u)/.35)*ultraE*amp*(m.band?1:workF),hx=m.x0+m.dx*e,hy=m.y0+m.dy*e,tl=Math.min(e,len);
     pfx.line(m.x0+m.dx*(e-tl),m.y0+m.dy*(e-tl),hx,hy,1.1,[.86,.91,1],0,.9*a);pfx.star(hx,hy,head,WHITE,a,0);return true;}
   function skyFx(nowT,t,dt){if(!pfx)return;pfx.clear();const on=lift(),hmOn=on&&home();   // the star signs, constellations and shooting stars are the home's (6b580)
-    workF=home()?1:Math.max(0,workF-dt/.9);if(!workF){cons=null;shoot=null;shower.length=0;rain.length=0;sign=null;}   // a conversation: what is showing fades over .9 s, never a cut (6b621)
+    workF=home()?1:Math.max(0,workF-dt/.9);if(!workF){cons=null;shoot=null;shower.length=0;rain.length=0;sign=null;wave.length=0;}   // a conversation: what is showing fades over .9 s, never a cut (6b621)
     drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,hmOn);
-    if(ultraE<.002&&!ultraWant){cons=null;shoot=null;rain.length=0;shower.length=0;}
+    drawWave(nowT,t);   // the stars' landing and the stars it leaves (6b621)
+    if(ultraE<.002&&!ultraWant){cons=null;shoot=null;rain.length=0;shower.length=0;wave.length=0;}
     else{
     if(cons){const age=nowT-cons.t0,fade=age<1100?1:Math.max(0,1-(age-1100)/1200);if(fade<=0)cons=null;else{
       const P=cons.P.map(p=>toScreen(p.qx,p.qy,t)),lit=new Set();
@@ -74455,14 +74490,14 @@ function hzSkyBoot(){
     else{if(chand&&!chandOff)chandOff=n;if(uTwAt||uTwFrom){uTwFrom=uTwDeg(n);uTwTo=0;uTwAt=n;}}
     if(on&&lift()&&!smash){if(!field)setTimeout(()=>{if(ultraWant&&!field)field=buildField(false);},16);}
     else if(on&&lift()){surgeAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
-      nextShoot=n+700+Math.random()*500;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1800+Math.random()*800;sign=null;nextShower=n+1300;landing=true;   // (6b621) a shooting star in the hang (was 4-7 s), a star sign and a bigger shower in the landing
+      nextShoot=n+700+Math.random()*500;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1500+Math.random()*300;sign=null;hzS.signForce=2;wave=[];setTimeout(()=>{if(ultraWant&&lift())wave=buildWave(n);},16);nextShower=n+1300;landing=true;   // (6b621) a shooting star in the hang (was 4-7 s), a star sign and a bigger shower in the landing
       if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
       requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
     shoot:!!shoot,shower:shower.length,rain:rain.length,aur:{cx:+AW.cx.toFixed(3),w:+AW.w.toFixed(3),spl:+AW.spl.toFixed(3),rch:+AW.rch.toFixed(3)},breath:breath(performance.now()),hmix:+hmix.toFixed(3),held,fw:+fw.toFixed(3),calm:+calm.toFixed(3),
     matrix:field?[field.x0,field.y0,field.x1,field.y1].map(v=>Math.round(v)):null,twist:+(twistNow*180/Math.PI).toFixed(2),
-    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,surge:+AW.sga.toFixed(3),draws:S.draws||0,gpu:S.renderer||"",atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
+    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,surge:+AW.sga.toFixed(3),draws:S.draws||0,gpu:S.renderer||"",atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,wave:wave.length,waveLit:wave.filter(p=>performance.now()>=p.bt).length,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
   addEventListener("resize",()=>{S.size();field=null;if(ultraWant)S.ultra(true,null,null,false);if(hzFxLevel()==="calm")S.once();});
   mode(lvKey());c2E=c2To;spd=spdTo;calm=calmTo;fw=fwTo;tw=twTo;neonBase=neonTo;   // the first level is not eased in
   S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
