@@ -5281,10 +5281,10 @@ check("the marginalia lives outside the prose and survives streaming (6b528; rep
       and "root.appendChild(box);" in page
       and "const keepTree=" not in page and "insertAdjacentHTML(\"beforeend\",restHTML)" not in page
       and 'const aside=body.querySelector(":scope>aside.behind");if(aside&&isHz())div.appendChild(aside);' in page
-      and "const dripTick=()=>{\n      if(dripOff)return;" in page and "  if(dripOff)return;" in page   # a late drip frame never repaints the landed prose (integration, from review)
+      and "const dripTick=(now)=>{\n      if(dripOff)return;" in page and "  if(dripOff)return;" in page   # a late drip frame never repaints the landed prose (integration, from review; 6b580: the tick takes the frame's time)
       and "dripOff=true;                    // from here the prose is the landing's; a late drip frame paints nothing\n  // no loose srcRow here any more" in page
       and ".hz #main:not(:has(#hero)) #chat-scroll.scrolled{-webkit-mask-image:" in page and 'scroller.classList.toggle("scrolled",on)' in page   # the header fade only once scrolled (integration)
-      and ".msg.ai>aside.behind{grid-column:2;grid-row:1/span 5" in page
+      and ".hz.hz-flow .msg.ai>aside.behind{display:block;grid-column:2;grid-row:1/span 12;" in page   # 6b580: the column is the flow, beside the answer only while the chat has room
       and "if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}" in page)
 # 6b554, a hotfix: every streamed answer ended with "Couldn't send.
 # dripOff is not defined" from beta 1 on. The page is "use strict"; dripOff was
@@ -9803,7 +9803,7 @@ _fs_src = _MILLENAI_SRC[_FS0:_FS1]
 _fs = _fs_run(_fs_src)
 _fs_mut = [_fs_src.replace("  chatPinned=false;chatJumpPaint();\n},{passive:true});", "  chatJumpPaint();\n},{passive:true});", 1),
            _fs_src.replace("if(top<chatLastTop-1&&gap>4)chatPinned=false;", "if(false)chatPinned=false;", 1),
-           _fs_src.replace("  if(chatPinned)chatToBottom(smooth);", "  if(chatGap()<140)chatToBottom(smooth);", 1),
+           _fs_src.replace("  if(chatPinned){if(smooth===\"ease\")chatEase();else chatToBottom(smooth);}", "  if(chatGap()<140){if(smooth===\"ease\")chatEase();else chatToBottom(smooth);}", 1),   # (6b580: the eased follow beside the jump)
            _fs_src.replace("function chatPin(smooth){chatPinned=true;", "function chatPin(smooth){", 1),
            _fs_src.replace('if(h>0)scroller.style.setProperty("--cwh",h+"px");', "", 1),
            _fs_src.replace("  chatPinned=false;chatJumpPaint();\n});", "  chatJumpPaint();\n});", 1)]
@@ -18371,7 +18371,8 @@ check("6b458: the picker's rows carry no description; only Max says 'all models'
 # touches the chat pane (switchLane/modeShow redraw the tabs, forms and sidebar only)
 _ls_bad = [n for n, ok in [
     ("the reveal is zeroed only for a RESET it has not seen",
-     "if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;" in page       # (6b539: the hold follows on the next lines)
+     "if(cut>=0&&cut!==dripCut){dripCut=cut;body.classList.remove(\"prov\");" in page       # (6b539: the hold follows on the next lines)
+     and "swapLen=dripShown;swapWords=hzWords(hzStarNodes(body).nodes.map(o=>o.n.data).join(\" \"));dripShown=0;}\n        else{dripShown=0;" in page   # both paths zero it (6b580)
      and "streamEnded=false,dripCut=-1;" in page),
     ("the old every-chunk reset is gone", "if(cut>=0)dripShown=0;" not in page),
     ("modeShow leaves the message pane alone",
@@ -39617,9 +39618,10 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and "caretIn(" not in page and ".caret{" not in page   # the caret stays retired (6b257, per Patrick; integration)
       and '/* MODE NAMES (6b526) */\nconst MODE_NAMES={"Vera Rubin":"Deep"};\nconst modeName=t=>MODE_NAMES[t]||t;' in page
       and "/* HORIZON TOKENS (6b526) */" in page and "--hz-ink-read:#e8ebf5;" in page
-      and ".msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;" in page
+      and ".hz .msg.ai{display:grid;grid-template-columns:minmax(0,640px);align-items:start;margin:0 0 40px}" in page   # 6b580: one column; the flow's 240 only with room
+      and ".hz.hz-flow .msg.ai{grid-template-columns:minmax(0,640px) 240px;column-gap:40px}" in page
       and ".msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;" in page
-      and "--hz-font-read:'Space Grotesk',system-ui,sans-serif;" in page
+      and "--hz-font-read:'Inter',-apple-system,system-ui,sans-serif;" in page   # Inter (6b580, per Patrick: "super sharp, super clean")
       and "@media (max-width:860px){\n  .hz .msg.ai{grid-template-columns:minmax(0,1fr)}" in page
       and "millen.codeLines" in page and "millen.rail" in page and "millen.showModels" in page
       and 'id="rail-btn"' in page and "body.rail" not in page   # one fold (integration): the button drives horizon's state
@@ -42536,7 +42538,7 @@ check("6b529 the page: the sheet is a modal dialog with a focus trap that Escape
       and "imp-glow" not in page          # its breathing oval went (per Patrick: no big circles or ovals in any effect)
       and "@media (prefers-reduced-motion:reduce){\n  .imp-dot.live" in page
       and "body.novideo .imp-dot.live" in page and ".msg.ai .who.imp{display:flex" in page
-      and "--hz-font-ui:'Space Grotesk'" in page and "Instrument Sans" not in page
+      and "--hz-font-ui:'Inter'" in page and "Instrument Sans" not in page   # Inter for the UI (6b580); Space Grotesk the greeting's
       and "Newsreader" not in page and "Geist Mono" not in page)
 # BRING YOUR CHATS, INTEGRATED (per Patrick: "integrate it more tightly, but not as a main
 # feature"): no pill on the home at any Effects level; Import Chats… in the app menu, wired to
@@ -43322,7 +43324,7 @@ def _c542_sky(js, css):
             # (6b555, the preview's sky) Balanced and Full at the display's rate (per Patrick: smooth); 15 fps only while a local engine writes
             and 'const gap=hzS.gen&&hzS.genLocal?1000/15:0;      // Balanced and Full at the display\'s own rate (6b542); only a local engine\'s writing holds the sky to 15 fps\n    if(gap&&nowT-S.last<gap)return;' in js
             and 'const lk=lvKey();if(lk!==skyMode)mode(lk);\n    const still=skyMode==="calm"||hzS.reduced;' in js
-            and 'const br=breath(nowT);if(!still)skyClock+=dt*br[1];const t=skyClock,m=S.vmap(t);' in js          # the clock held: dust, grain and shafts still
+            and 'const br=breath(nowT);if(!still)skyClock+=dt*br[1]*(home()?1:HZ_CONV_STARS.clock);const t=skyClock,m=S.vmap(t);' in js          # the clock held: dust, grain and shafts still (6b580: half speed behind a conversation)
             and 'const ke=still?1:1-Math.exp(-dt/EASE_S);' in js                                            # Calm's one frame lands at its level, no ease
             and 'if(skyMode!=="full"&&!lift())S.boost=0;else S.boost+=(S.boostTo-S.boost)*(1-Math.pow(.97,dt*60));' in js
             and 'S.setNeon=function(){const m=eff();neonTo=m==="full"?S.lvl+(busyOn?.28:0):m==="bal"?.1:0;};' in js   # Calm no neon; Balanced one soft curtain, never lifted by the work
@@ -43352,7 +43354,7 @@ check("6b542 the sky by level: Calm no footage, no neon, no loop (one still on b
       and not _c542_sky(_hz_js.replace("    S.free();\n    S.W=", "    S.W="), _hz_css)
       and not _c542_sky(_hz_js.replace("&&!hzS.reduced&&!calm)S.raf=", "&&!hzS.reduced)S.raf="), _hz_css)
       and not _c542_sky(_hz_js.replace('if(skyMode!=="full"&&!lift())S.boost=0;else ', ""), _hz_css)
-      and not _c542_sky(_hz_js.replace('const br=breath(nowT);if(!still)skyClock+=dt*br[1];', 'const br=breath(nowT);skyClock+=dt*br[1];'), _hz_css)          # Calm's clock running
+      and not _c542_sky(_hz_js.replace('const br=breath(nowT);if(!still)skyClock+=dt*br[1]*', 'const br=breath(nowT);skyClock+=dt*br[1]*'), _hz_css)          # Calm's clock running (6b580: the conversation's half speed after it)
       and not _c542_sky(_hz_js.replace('const feedOn=(calm<.999||warm||skyMode==="bal")&&!still;', 'const feedOn=(calm<.999||warm||skyMode==="bal");'), _hz_css), "")   # passes in Calm
 def _c542_gated(js, css, pg):
     return ('function hzFxFull(){return hzMotionOK()&&hzFxLevel()==="full";}' in js
@@ -43377,7 +43379,7 @@ def _c542_gated(js, css, pg):
             and ".hz:not(.hz-full) .msg.ai.live .liveline em{background:none;color:var(--hz-ink-2);animation:none}" in css
             and ".hz:not(.hz-full) .msg.ai .who b.shim,.hz:not(.hz-full) .msg.ai .who b.shim.soft{background:none;color:#e2e7f5;animation:none}" in css
             and ".hz:not(.hz-full) .msg.ai.live .who .st{display:none}" in css
-            and ".hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}" in css
+            and ".hz #hz-machines .hz-rig{display:none}" in css and ".hz.hz-full .hz-mdot{display:none}" not in css   # 6b580: the chips folded into the dot's card at every level
             and '<div class="hz-mdot\'+(working?" working":"")+(awake?"":" asleep")+\'" role="listitem" tabindex="0" aria-label="\'' in js
             # the opening in Calm: a fade, first launch only, then the home
             and 'if(hzFxLevel()==="calm"){\n    root.classList.add("hz-calmopen");' in js and 'at(1900,()=>root.classList.add("hz-markout"));' in js
@@ -43396,20 +43398,15 @@ check("6b542 Calm and Balanced: Full's show is present and gated behind Effects 
       and not _c542_gated(_hz_js, _hz_css.replace(".hz:not(.hz-full) #hz-cglow{display:none}", ""), page)
       and not _c542_gated(_hz_js, _hz_css, page + ".hz #hz-mark .hz-glint{animation:hzGlint 11s infinite}")      # the glint back
       and not _c542_gated(_hz_js, _hz_css, page.replace("const hzq=isHz();   // no token counts beside Horizon's chats", "const hzq=false;")), "")
+# 6b542's Details link went with the column (6b580, per Patrick: "change the dynamics of the right panel ... a cool flow
+# showing what's going on"): the flow beside the answer while there is room, the proof line under it when there is not
+# (the 6b580 block tests both). What stays here: no Details link, no .details fold, anywhere.
 def _c542_details(css, pg, js):
-    return ('if(role==="assistant"&&isHz()&&!foot.querySelector(".hz-details")){' in pg
-            and 'd.className="hz-details";d.setAttribute("aria-expanded","false");d.textContent="Details";' in pg
-            and 'const b=e.target.closest&&e.target.closest(".hz-details");if(!b)return;' in js
-            and 'm.classList.toggle("details",open);' in js and 'b.textContent=open?"Hide details":"Details";' in js
-            and ".hz:not(.hz-full) .msg.ai{grid-template-columns:minmax(0,640px)}" in css
-            and ".hz:not(.hz-full) .msg.ai>aside.behind{display:none;grid-column:1;grid-row:auto;padding-top:0;margin-top:8px;order:6}" in css
-            and ".hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}" in css
-            and ".hz.hz-full .hz-details,.hz .msg.ai:not(:has(>aside.behind)) .hz-details{display:none}" in css
-            and ".hz .srcrow{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0}" in pg)   # the sources stay a quiet numbered row in the prose
-check("6b542 Details: the marginalia folds behind one small link under the answer, closed by default, in Calm and Off; Full keeps the column; the sources stay in the prose; the mutants are caught",
+    return ('className="hz-details"' not in pg and ".hz-details" not in css and 'm.classList.toggle("details",open);' not in js
+            and "// DETAILS (6b542) went with the column (6b580): the proof line under the answer opens its card (proofPaint)" in pg)
+check("6b542 Details is retired (6b580): no Details link and no fold under the answer; the flow and the proof line say how it was made; the mutant is caught",
       _c542_details(_hz_css, page, _hz_js)
-      and not _c542_details(_hz_css.replace(".hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}", ".hz:not(.hz-full) .msg.ai>aside.behind{display:flex}"), page, _hz_js)
-      and not _c542_details(_hz_css, page, _hz_js.replace('m.classList.toggle("details",open);', "")), "")
+      and not _c542_details(_hz_css + ".hz .hz-details{font:12.5px var(--hz-font-ui)}", page, _hz_js), "")
 # BALANCE: the golden-ratio placement, run in node (the pure rule the page sets the wrap's padding from)
 _c542_bal_js = _jsfn(_hz_js, "function hzBalanceFor(H,compH){")   # (6b555) nothing under the composer any more
 def _c542_balance(src):
@@ -43453,7 +43450,7 @@ def _c542_sting(css, js, ember):
             and ".hz #send svg{stroke-width:1.5;transform:translateY(-.5px)}" in css
             and ".hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}" in css
             and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
-            and css.count("var(--hz-ember)") == 8 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the beam's keyboard pill, 6b544; 6b555: the keyboard's rings on the send key, the filled send key, a lane and a row; the text-and-focus border gone)
+            and css.count("var(--hz-ember)") == 10 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the beam's keyboard pill, 6b544; 6b555: the keyboard's rings on the send key, the filled send key, a lane and a row; the text-and-focus border gone)
             and ':root{--hz-r-composer:14px;--hz-ember:' in css
             and "rotate(45deg);transition:transform 120ms ease}" not in css and ".hz .hz-elevel{font-family:var(--hz-font-mono)" not in css   # the beam's diamond and caps went in 6b552
             and ".hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}" in css and ".hz .hz-pick{height:36px;border-radius:8px;" in css   # the row's controls all 36 (6b555)
@@ -43668,27 +43665,28 @@ def _star544(pg):
             and 's.el.style.transform="translate("+s.x.toFixed(2)+"px,"+s.y.toFixed(2)+"px)"' in fr
             and aim.count("getBoundingClientRect") == 2 and "s.reads++" in aim                                   # one aim: the range and the message, at the paint
             and "s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}" in land and "el.remove()" in land and 'div.classList.add("landed")' in land
-            and '{duration:400,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"}' in land
-            and '{duration:350,easing:"cubic-bezier(.3,0,.2,1)"}' in _jsfn(pg, "function hzStarSweep(body){")
-            and "m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>320)m.shift();" in pg   # the ink's window: 320 ms (6b555)
+            and 'const a=el.animate([{opacity:1},{opacity:0}],{duration:200,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});' in land and "translate(" not in land   # 6b580: a fade, no flight
+            and _jsfn(pg, "function hzStarSweep(body){").startswith("function hzStarSweep(body){\n  return;   // 6b580")   # the pass retired with the dissolve
+            and "m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();" in pg   # the ink's window: 200 ms (6b580; 320 in 6b555)
             and 'function hzStarOK(){return isHz()&&typeof hzMotionOK==="function"&&hzMotionOK()&&typeof hzFxLevel==="function"&&hzFxLevel()!=="calm";}' in pg
             and ".hz .hz-star{display:none;position:absolute;left:0;top:0;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;" in pg
             and "s.tx=rr.right-mr.left+6;" in aim                                                                 # 5 px after the word (the 4 px star's edge at +4)
-            and ".hz .hz-ink.go{animation:hzInkIn .3s cubic-bezier(.2,.7,.2,1) both,hzInkWght .28s cubic-bezier(.2,.7,.2,1) both}" in pg   # the ink (6b555)
-            and '@keyframes hzInkWght{from{font-variation-settings:"wght" var(--hz-w0)}to{font-variation-settings:"wght" var(--hz-w1)}}' in pg
-            and ".hz .hz-ink.c{animation:hzInkFade .22s ease both}" in pg and ".hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}" in pg
-            and ".hz .msg.ai.landed>.ans-foot .hz-details{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}" in pg
+            and ".hz .hz-ink.go{animation:hzWordIn .18s cubic-bezier(.16,1,.3,1) both}" in pg   # the ink (6b580: the fade alone)
+            and "@keyframes hzWordIn{from{opacity:0;filter:blur(1px)}to{opacity:1;filter:blur(0)}}" in pg
+            and ".hz .hz-ink.c{animation:hzInkFade .18s ease both}" in pg and ".hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}" in pg
+            and ".hz .msg.ai.landed>.hz-proof{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}" in pg   # the proof line in Details' place (6b580)
             and ".hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}" in pg
             and "@media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}" in pg
             and "cometFor(" not in pg and "rippleAt(" not in pg and 'id="comets"' not in pg and "function cometsDraw(){" not in pg
             and ".msg.ai.live .body{color:#fff;text-shadow" not in pg and "#composer.finish" not in pg and "hzLandSweep" not in pg
             and 'function answerLanded(){\n  try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}\n}' in pg)
-check("6b544 the writing star: one star at the end of the newest text (aimed once per paint from a Range, moved by transform alone), the words' reveal (the ink, 6b555), the 350 ms pass at the polish swap, the 400 ms lift to the byline's dot that retires it, Details and the actions 120 ms apart; Calm the fade alone, reduced motion none; no comets, no glow, no light round the composer; the mutants are caught",
+check("6b544 the writing star, 6b580's end point: one 4 px mark at the end of the newest text (aimed once per paint from a Range, moved by transform alone), the words' reveal (the ink, 6b580's fade), no pass at the polish swap, a 200 ms fade where the text ends that retires it, the proof line and the actions 120 ms apart; Calm the fade alone, reduced motion none; no comets, no glow, no light round the composer; the mutants are caught",
       _star544(page)
       and not _star544(page + 'if(!/^\\(no answer/.test(d.t||""))cometFor(d.m,aiDiv);')                                                                                     # a comet left in
       and not _star544(page.replace("s.on=false;if(s.raf){cancelAnimationFrame(s.raf);s.raf=0;}", "s.on=false;"))                                                            # the star never retiring
       and not _star544(page.replace("const dt=s.at?Math.min(64,t-s.at):16;s.at=t;", "const dt=s.at?Math.min(64,t-s.at):16;s.at=t;s.ty=s.el.getBoundingClientRect().top;")), "")    # a layout read per frame
 # ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): end ====
+
 
 # ==== settings-look (6b551): begin ====
 # Settings in the front's look (per Patrick: "It looks perfect as far as layout, but it doesn't match our
@@ -43950,27 +43948,24 @@ def _ch554_kb(css, js):
             and ".hz.hz-kb #composer.hastext #send:not(:disabled):not(.stop):focus-visible{outline:0;box-shadow:0 0 0 2px var(--hz-night),0 0 0 3px var(--hz-ember)}" in css
             and ".hz.hz-kb #hz-lanes button:focus-visible,.hz.hz-kb #sidebar .chat-item:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}" in css)
 def _ch554_ink(css, pg):
-    """the ink: one word to a box, its width read at the rest weight BEFORE the weight moves (one read per paint), the
-    weight 320 > 400 (bold and headings 450 > 600) in 280 ms, the wet-ink light fading in 300 ms; text-wrap: wrap and no
-    kerning while streaming; Calm a plain fade; reduced motion none"""
+    """the ink, as 6b580 set it (per Patrick: "super clean, super smooth"): one word to a box only while it fades (no width
+    pinned, no layout read in the wrap), opacity and a 1 px blur to exactly 0 in 180 ms; no weight morph, no light, no
+    sideways motion; the wrap and the kerning the landing's own; Calm a plain fade; reduced motion none"""
     try:
-        wrap = _jsfn(pg, "function hzStarWrap(nodes,segs){")   # the conversation's js, in the page
+        wrap = _jsfn(pg, "function hzStarWrap(nodes,segs){")
     except ValueError:
         return False
-    i_read, i_go = wrap.find("getBoundingClientRect"), wrap.find('classList.add("go")')
-    return (0 < i_read < i_go and wrap.count("getBoundingClientRect") == 1
-            and 'x.style.width=wd[i]+"px";' in wrap and "toFixed" not in wrap                   # the exact width: a rounded one nudges what follows
-            and "if(ws>=A&&ws<B)" in wrap and "if(calm||!ink.length)return;" in wrap
-            and ".hz .hz-ink{display:inline-block;--hz-w0:320;--hz-w1:400}" in css
-            and ".hz .msg.ai .body strong .hz-ink,.hz .msg.ai .body b .hz-ink,.hz .msg.ai .body h1 .hz-ink,.hz .msg.ai .body h2 .hz-ink,.hz .msg.ai .body h3 .hz-ink{--hz-w0:450;--hz-w1:600}" in css
-            and ".hz .msg.ai.live .body{text-wrap:wrap;font-kerning:none}" in css
-            and "@keyframes hzInkIn{0%{opacity:0;transform:translateY(1px);filter:blur(2px) drop-shadow(0 0 6px rgba(255,255,255,.6))}" in css
-            and "100%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}" in css
-            and ".hz .msg.ai .body.swapout{opacity:.12;filter:blur(1.5px);transition:opacity .22s ease,filter .22s ease}" in css
-            and ".hz .msg.ai .body.swapin{animation:hzInkShimmer .62s var(--hz-ease-out) both}" in css
-            and ".hz.hz-calm .msg.ai .body.swapin{animation:hzInkFade .4s ease both}" in css
-            and "@media (prefers-reduced-motion:reduce){.hz .hz-ink{animation:none!important}" in css
-            and "family=Space+Grotesk:wght@300..700&" in _MILLENAI_SRC                            # the variable face, 300 to 700
+    kf = re.search(r"@keyframes hzWordIn\{.*?\}\}", css)
+    kf = kf.group(0) if kf else ""
+    blurs = [float(x) for x in re.findall(r"blur\(([\d.]+)px\)", kf)]
+    ink_rules = [m.group(0) for m in re.finditer(r"[^{}]*hz-ink[^{}]*\{[^{}]*\}", css)]
+    return ("getBoundingClientRect" not in wrap and "style.width" not in wrap and "if(ws>=A&&ws<B)" in wrap and "return ink;" in wrap
+            and kf and blurs and max(blurs) <= 1 and "blur(0)" in kf and "drop-shadow" not in kf and "translate" not in kf
+            and "hzInkWght" not in css and "font-variation-settings" not in "".join(ink_rules) and "drop-shadow" not in "".join(ink_rules)
+            and ".hz .msg.ai .body,.hz .msg.ai.live .body{text-wrap:wrap;font-kerning:normal}" in css and "font-kerning:none" not in css
+            and "@keyframes hzLineRise{from{transform:translateY(4px)}to{transform:translateY(0)}}" in css   # a new line rises 4 px, never sideways
+            and "@media (prefers-reduced-motion:reduce){.hz .hz-ink,.hz .hz-chg,.hz .msg.ai .body.hz-chgall{animation:none!important}}" in css
+            and "family=Space+Grotesk:wght@300..700&" in _MILLENAI_SRC
             and "hzi?640:300);\n            dripTick();},hzi?220:170);" in _MILLENAI_SRC)       # Classic's swap keeps its 170 / 300
 def _ch554_tokens(css):
     return all(t in css for t in (
@@ -44014,11 +44009,12 @@ check("6b555 the keyboard's ring, keyboard only: html.hz-kb after Tab, an arrow,
       and not _ch554_kb(_hz_css, _hz_js.replace('addEventListener("pointerdown",()=>root.classList.remove("hz-kb"),true);', ""))       # a click leaves it
       and not _ch554_kb(_hz_css, _hz_js.replace("/^(Tab|Arrow|Home$|End$|Page)/", "/^(Tab|Arrow|Home$|End$|Page|Enter)/"))          # Enter turns it on
       and not _ch554_kb(_hz_css.replace(".hz:not(.hz-kb) .hz-sl:has(input:focus-visible)::after{box-shadow:none}", ""), _hz_js), "")   # the slider's ring after a click
-check("6b555 the ink: one word to a box at its rest weight's width (read once per paint, before the weight moves; exact, never rounded), the weight 320 > 400 and 450 > 600 in 280 ms, the wet-ink light gone in 300 ms, text-wrap: wrap and no kerning while it streams, the calm dissolve (.12 and 1.5 px in 220 ms, a 620 ms shimmer; Calm a 400 ms fade), Space Grotesk the variable 300-700; the mutants are caught",
+check("6b580 the ink, no weight morph and no glow: a word fades in 180 ms with a 1 px blur to exactly 0, no width pinned or read, no light, no sideways motion; a new line rises 4 px; text-wrap: wrap and the landing's kerning while it streams; the mutants are caught",
       _ch554_ink(_hz_css, page)
-      and not _ch554_ink(_hz_css, page.replace('  const wd=ink.map(x=>x.getBoundingClientRect().width);', '  ink.forEach(x=>x.classList.add("go"));const wd=ink.map(x=>x.getBoundingClientRect().width);'))   # measured mid-weight
-      and not _ch554_ink(_hz_css, page.replace('x.style.width=wd[i]+"px";', 'x.style.width=wd[i].toFixed(1)+"px";'))            # a rounded width
-      and not _ch554_ink(_hz_css.replace(".hz .msg.ai.live .body{text-wrap:wrap;", ".hz .msg.ai.live .body{text-wrap:pretty;"), page)   # pretty re-breaks earlier lines
+      and not _ch554_ink(_hz_css + '.hz .hz-ink.go{animation:hzWordIn .18s both,hzInkWght .28s both}@keyframes hzInkWght{from{font-variation-settings:"wght" 320}}', page)   # the weight morph back
+      and not _ch554_ink(_hz_css.replace("@keyframes hzWordIn{from{opacity:0;filter:blur(1px)}", "@keyframes hzWordIn{from{opacity:0;filter:blur(1px) drop-shadow(0 0 6px #fff)}"), page)   # the wet-ink light back
+      and not _ch554_ink(_hz_css.replace("@keyframes hzWordIn{from{opacity:0;filter:blur(1px)}", "@keyframes hzWordIn{from{opacity:0;filter:blur(2px)}"), page)   # a softer blur
+      and not _ch554_ink(_hz_css.replace("{text-wrap:wrap;font-kerning:normal}", "{text-wrap:pretty;font-kerning:normal}"), page)   # pretty re-breaks earlier lines
       and not _ch554_ink(_hz_css, page.replace("if(ws>=A&&ws<B)", "if(ws+w[0].length>A&&ws<B)")), "")                             # a shown word starting over
 check("6b555 no circles or rings in the chrome's css (no 50 % radius, no radial glow, no pill rings, no ring keyframes), and its rules stay under .hz; the mutants are caught",
       _ch554_round(_ch554_block) and _hz_scoped(_ch554_block)
@@ -44159,7 +44155,7 @@ def _sl549_field(css, js, pg):
                and all(inside(p, cb) and clear(p, r["cc"]) for p in r["chat"]))
     return (home_ok and chat_ok and r["none"] is None                                           # no room: no field
             and '<div id="hz-scrim"></div>\n  </div>' in pg and 'id="hz-ufield"' not in pg         # no DOM field: the sky draws it, behind everything
-            and "drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,on);" in js
+            and "drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,hmOn);" in js   # 6b580: the star signs are the home's
             and "#hz-fxgl{position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:40}" in css   # the burst's canvas never takes a pointer
             and ".hz.hz-calm #hz-fxgl,.hz .novideo #hz-fxgl{display:none}" in css
             and "const n=Math.round((full?40:20)*(home?1:.5)),P=[];let glints=home?(full?4:2):0;" in js
@@ -44325,7 +44321,7 @@ def _arr553(css, js, pg):
             and max(float(x) for x in re.findall(r"opacity:([.\d]+)", re.search(r"@keyframes hzUEdgeBal\{.*?\}\}", a).group(0))) <= .6
             and 'cb.style.setProperty("--hz-kx",' in js
             # the burst (6b555, on the GPU): three waves from the knob (60, 36, 24; half in Balanced) and the knob's glint
-            and "b.burst(hzS.ukx,c.top,!full);b.glint(hzS.ukx,c.top);" in fire and "[[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));" in js
+            and "const ax=hzUAnchor(!!$(\"#hero\"),c,hzS.ukx);b.burst(ax,c.top,!full);b.glint(ax,c.top);" in fire and "[[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));" in js
             # the field launches from the box's edge (each after 80-340 ms), two or three going further, and hangs
             and "hzSkyUltra(true,true);" in fire and "P.forEach((p,i)=>{p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1300+Math.random()*300;" in js
             and "while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))" in js
@@ -44409,11 +44405,11 @@ def _liv553(css, js):
             # the shooting stars (6b555, the sky's): beside the column every 6-10 s in Full (10-16 s in Balanced), the band's
             # own above the box every 12-18 s (25-35 s); the friend page's streak: 1.1 px, its tail over the last 42 %,
             # 120-260 px at 18-32 deg in 500 ms; only with Ultra lifting the sky (never Calm or reduced motion) and the page live
-            and "if(on&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot){nextShoot=nowT+(skyMode===\"full\"?6000+Math.random()*4000:10000+Math.random()*6000);" in js
+            and "if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot){nextShoot=nowT+(skyMode===\"full\"?6000+Math.random()*4000:10000+Math.random()*6000);" in js   # the home's (6b580)
             and 'f.nextBand=nowT+(skyMode==="full"?12000+Math.random()*6000:25000+Math.random()*10000);' in js
             and "ang=(18+Math.random()*14)*Math.PI/180" in js and "L=Math.min(260,120+Math.random()*140,r[1]-r[0]-10)" in js and "shoot={x0,y0,dx,dy,t0:nowT,d:500};" in js
             and "if(shoot&&!streak(shoot,nowT,.42,4.5,1))shoot=null;" in js and "pfx.line(m.x0+m.dx*(e-tl),m.y0+m.dy*(e-tl),hx,hy,1.1,[.86,.91,1],0,.9*a);" in js
-            and "const on=lift();" in js
+            and "const on=lift(),hmOn=on&&home();" in js
             # every star a core and four arms falling off: no disc
             and 'a=exp(-dot(q,q)*90.)*1.3+exp(-dot(q,q)*9.)*.16+(exp(-abs(q.x)*26.)*exp(-abs(q.y)*3.)+exp(-abs(q.y)*26.)*exp(-abs(q.x)*3.))*.7;' in js and "length(q)" not in js
             # paused when hidden: the css's pause rule names every animation
@@ -44428,8 +44424,8 @@ check("6b553 the living Ultra: the rim's comet every 8 s in Full only, the field
       and not _liv553(_hz_css.replace(".hz.hz-ultra:not(.hz-calm) #composer>.hz-uglow{display:block;", ".hz.hz-ultra #composer>.hz-uglow{display:block;"), _hz_js)            # the glow in Calm
       and not _liv553(_hz_css.replace('.hz.hz-pause #composer>.hz-urim>i,', '.hz.hz-pause'), _hz_js)                                                                       # the comet running while hidden
       and not _liv553(_hz_css.replace('.hz.hz-pause .hz-sl-led::after{animation-play-state:paused}', ''), _hz_js)                                                       # the marquee running while hidden
-      and not _liv553(_hz_css, _hz_js.replace("if(on&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)", "if(on&&ultraE>.9&&nowT>nextShoot&&!shoot)"))                       # a streak while hidden
-      and not _liv553(_hz_css, _hz_js.replace("if(on&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)", "if(ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)"))                # a streak in Calm (ultraE is 1 there)
+      and not _liv553(_hz_css, _hz_js.replace("if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)", "if(hmOn&&ultraE>.9&&nowT>nextShoot&&!shoot)"))                       # a streak while hidden
+      and not _liv553(_hz_css, _hz_js.replace("if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)", "if(ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)"))                # a streak in Calm (ultraE is 1 there)
       and not _liv553(_hz_css, _hz_js.replace("a=exp(-dot(q,q)*90.)*1.3+", "a=smoothstep(1.,.9,length(q))*1.3+"))                                                     # a round star (a disc)
       and not _liv553(_hz_css.replace("background:linear-gradient(0deg,rgba(196,216,255,1),rgba(196,216,255,0));", "background:radial-gradient(ellipse at 50% 100%,rgba(196,216,255,1),rgba(196,216,255,0) 70%);"), _hz_js)   # an oval glow
       and not _liv553(_hz_css.replace("@keyframes hzUGlow{from{opacity:.06}to{opacity:.08}}", "@keyframes hzUGlow{from{opacity:.06}to{opacity:.2}}"), _hz_js)            # a loud glow
@@ -44980,6 +44976,213 @@ check("6b555 the header, one row, with Settings and updates in it, over a bare h
       and any(v.get("rows", 0) > 0 for v in (_b3_h_mut2.get("home") or {}).values()),
       json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "home": _b3_h_ok.get("home"), "mut_bad": len(_b3_hdr_bad(_b3_h_mut))})[:900])
 # ==== beta-3 the sky and Ultra (6b555): end ====
+
+# ==== 6b580 flow: begin ====
+# THE FLOW, THE PROOF LINE, THE STARS IN A CONVERSATION AND THE DELIVERY (6b580, per Patrick: "change the dynamics of the
+# right panel, so it's not just a list of information; it's a cool flow showing what's going on"; "why are they shoved off
+# to the right? ... we don't have to litter the place with stars"; "a prettier streaming or query delivery effect. Keep
+# it super clean, super smooth"). The pure pieces run in node on the page's own functions; a headless Chromium run streams
+# a long stand-in answer through the real page at 1440 and 1000 wide; each rule has a mutant the same predicate catches.
+print("== the flow beside the answer, the proof line under it, the conversation's stars, the clean delivery (6b580) ==")
+def _b4_js(pg):
+    js = _spine_js(pg)
+    js += "const HZ_UCOL=[[1,1,1],[.9,.95,1]];\n"
+    for h in ("const PF_LEAVES=", "const PF_SHIELD=", "const FL_CHECK=", "const HZ_CONV_STARS="):   # one line each
+        i_ = pg.index(h); js += pg[i_:pg.index("\n", i_) + 1]
+    for h in ("function proofFacts(o){", "function flowTag(c){", "function flowRows(o){", "function flowHTML(o){", "function hzUAnchor(home,c,kx){",
+              "function hzBurstConv(c,half,rnd){", "function hzWordsIn(s,a,b){", "function hzCadTarget(inRate,back,ended){", "function hzNextStop(s,p,ended){",
+              "function hzMdClose(t){", "function hzWords(t){", "function hzChangedWords(a,b){"):
+        i_ = pg.index(h); j_ = pg.index("\n", i_)
+        js += (pg[i_:j_ + 1] if pg[i_:j_].rstrip().endswith("}") and pg[i_:j_].count("{") == pg[i_:j_].count("}") else _jsfn(pg, h))
+    return js
+_B4_RUN = r'''
+const U=[{r:"search",m:"Gemma 4 26B",w:"local",i:420,o:38,d:900},{r:"draft",m:"Gemma 4 26B",w:"local",i:2100,o:310,d:4100},
+ {r:"draft",m:"Qwen 3.6 35B MoE",w:"local",i:2100,o:280,d:3600},{r:"draft",m:"Ollama1 · gpt-oss:20b",w:"server",i:2100,o:330,d:2900},
+ {r:"review",m:"Ollama1 · gpt-oss:20b",w:"server",i:1800,o:120,d:2100},{r:"final",m:"Ollama1 · gpt-oss:20b",w:"server",i:5200,o:410,d:6200,n:16384}];
+const S=[{id:"search",s:"done",d:"3 sources"},{id:"council",s:"done",d:"3 of 3"},{id:"review",s:"done",d:"2 notes"},{id:"polish",s:"done"}];
+const D=[{m:"Gemma 4 26B",t:"a"},{m:"Qwen 3.6 35B MoE",t:"b"},{m:"Ollama1 · gpt-oss:20b",t:"c"},{m:"Ollama1 · gpt-oss:20b (review)",t:"notes"}];
+const W=[{u:"https://www.nasa.gov/x",t:"How far"},{u:"https://en.wikipedia.org/wiki/L",t:"Lunar"}];
+const C={steps:S,usage:U,drafts:D,srcs:W,run:{t:14.6},rateS:5.2};
+const one={usage:[{r:"",m:"Ollama1 · gpt-oss:20b",w:"server",i:640,o:31,d:900}],run:{t:1.4}};
+const T=rs=>rs.map(r=>r.t),G=rs=>rs.map(r=>r.tag||"");
+const html=flowHTML(C),bare=html.replace(/<div class="fl-num">[\s\S]*?<\/div>/g,"");
+const live=flowRows({steps:[{id:"search",s:"done"},{id:"council",s:"run",d:"1 of 2"}],usage:[U[0],U[1]],drafts:[D[0]],running:["Ollama1 · gpt-oss:20b"],srcs:W,live:true});
+const pf=(o)=>proofFacts(o).local;
+const c={left:400,top:780,width:640},b=hzBurstConv(c,false,Math.random),bh=hzBurstConv(c,true,Math.random),xs=b.map(p=>p.x);
+const tbl="Intro words\n| a | b |\n|---|---|\n| 1 | 2 |";
+const out={
+ council:T(flowRows(C)),councilTags:G(flowRows(C)),one:T(flowRows(one)),oneTag:G(flowRows(one)),
+ liveStates:live.map(r=>r.t+":"+r.state),
+ numsHidden:!/\d[\d,.]*K? (in|out)\b|tok\/s/.test(bare)&&/<div class="fl-num"><span>[\d,]+ in<\/span>/.test(html),
+ time:/Took 15 s/.test(html),safeCouncil:/Stayed on your machines/.test(html),safeOne:/Stayed on your machines/.test(flowHTML(one)),
+ nodes:(html.match(/class="fl-node"/g)||[]).length,
+ where:[proofFacts(C).where,proofFacts(C).effort,proofFacts(one).where,proofFacts(one).effort,proofFacts({usage:[{r:"",m:"Gemma 4 26B",w:"local",i:1,o:1}]}).where],
+ local:[pf(one),pf({...one,steps:[{id:"search",s:"done"}]}),pf({...one,srcs:[{u:"https://x.org/a"}]}),pf({...one,srcs:[{u:"know:chat:1",p:"Old chat"}]}),
+   pf({usage:[...one.usage,{r:"verify",m:"g",w:"groq",i:1,o:1}]}),pf({}),pf({...one,steps:[{id:"geo",s:"done"}]})],
+ burst:{n:b.length,nh:bh.length,mean:xs.reduce((a,x)=>a+x,0)/xs.length,min:Math.min(...xs),max:Math.max(...xs),y:b.every(p=>p.y===780),dur:Math.max(...b.map(p=>p.dur)),t0:Math.max(...b.map(p=>p.t0))},
+ anchor:[hzUAnchor(true,c,1100),hzUAnchor(false,c,1100)],
+ cad:[hzCadTarget(30,10,false),hzCadTarget(100,10,false),hzCadTarget(5,10,false),hzCadTarget(30,2,false),hzCadTarget(30,1,false),hzCadTarget(30,100,false),hzCadTarget(30,300,true),hzCadTarget(30,0,true)],
+ stop:[hzNextStop("Hello wor",0,false),hzNextStop("Hello wor",5,false),hzNextStop("Hello wor",5,true),hzNextStop(tbl,11,false),hzNextStop(tbl+"\nNext",11,false),
+   hzNextStop("```js\nx=1\ny=2\n",0,false),hzNextStop("```js\nx=1\ny=2\n",6,false)],
+ close:[hzMdClose("**bold wor"),hzMdClose("say `code"),hzMdClose("```js\nx"),hzMdClose("a **b** c"),hzMdClose("**b `c")],
+ diff:[hzChangedWords(["a","b","c"],["a","x","c"]),hzChangedWords(["a","b"],["a","b"]),hzWordsIn("  two words ",0,12)]};
+process.stdout.write(JSON.stringify(out));
+'''
+def _b4_out(pg):
+    try:
+        return _node_json(_b4_js(pg) + _B4_RUN, "flow580.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b4_ok(o):
+    bu = o.get("burst") or {}
+    return (o.get("council") == ["Sources", "First draft", "Second draft", "Third draft", "Review", "Polish", "Answer"]   # a node per real step
+            and o.get("councilTags") == ["", "Your Mac", "Your Mac", "Ollama1", "Ollama1", "Ollama1", ""]
+            and o.get("one") == ["Answer"] and o.get("oneTag") == ["Ollama1"]                                           # a one-pass answer: one node
+            and o.get("liveStates") == ["Sources:done", "First draft:done", "Second draft:live", "Answer:wait"]
+            and o.get("numsHidden") is True and o.get("time") is True and o.get("nodes") == 7
+            and o.get("safeCouncil") is False and o.get("safeOne") is True                                              # the privacy line only when true
+            and o.get("where") == ["Your machines", "3 drafts, reviewed", "Made on Ollama1", "One pass", "On this Mac"]
+            and o.get("local") == [True, False, False, True, False, False, False]                                       # a search, a web source, the cloud, no record, a map: no promise
+            and bu.get("n") == 60 and bu.get("nh") == 30                                                                # half the home's 120 (Balanced half again)
+            and abs(bu.get("mean", 0) - 720) <= 0.04 * 640 and bu.get("min", 9e9) <= 400 + 0.15 * 640 and bu.get("max", 0) >= 1040 - 0.15 * 640
+            and bu.get("y") is True and bu.get("dur", 9e9) <= 2100 and bu.get("t0", 9e9) <= 400                         # over the top edge, short-lived
+            and o.get("anchor") == [1100, 720]                                                                          # the knob on the home, the centre in a conversation
+            and o.get("cad", [None])[:3] == [30, 45, 25] and 0 < o["cad"][3] < 25 and o["cad"][4] == 0 and o["cad"][5] <= 60 and o["cad"][6] == 300 and o["cad"][7] == 45
+            and o.get("stop") == [5, None, 9, None, 42, 6, 10]                                                         # whole words; a table only whole; code a line at a time
+            and o.get("close") == ["**bold wor**", "say `code`", "```js\nx\n```", "a **b** c", "**b `c`**"]
+            and o.get("diff") == [[1], [], 2])
+_b4_o = _b4_out(page)
+check("6b580 the flow and the proof line, pure: a node per real step (Sources, each draft with its machine, Review, Polish, Answer; one node for a one-pass answer), the live node from the frames, the tokens and pace only inside the numbers, the privacy line only when the run stayed on your machines (no search, no web source, no map, no cloud, a record of its calls), the chip words",
+      _b4_ok(_b4_o), "%r" % (_b4_o,))
+_b4_m = [
+    ("a node not from the data (a Polish every time)", 'if(nd>1||R.some(r=>r.k==="review"))R.push({k:"polish"', 'if(true)R.push({k:"polish"'),
+    ("the privacy line forgets the web search", "!steps.some(s=>PF_LEAVES.indexOf(s.id)>=0)&&", ""),
+    ("the numbers outside the numbers", "'<div class=\"fl-num\">'+r.nums", "'<div class=\"fl-nums\">'+r.nums"),
+    ("the burst from the knob in a conversation", "function hzUAnchor(home,c,kx){if(home)return kx;", "function hzUAnchor(home,c,kx){return kx;"),
+    ("the conversation's burst at the home's count", "const HZ_CONV_STARS={share:.5,", "const HZ_CONV_STARS={share:1,"),
+    ("the cadence never slows as the buffer runs low", "  if(back<4)t*=Math.max(0,back-1)/3;\n", ""),
+    ("a part-written word shown", "return e>=n&&!ended?null:e;", "return e;"),
+]
+_b4_mr = [(d_, _b4_ok(_b4_out(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _b4_m]
+check("6b580 the flow's mutants are each caught: %s" % "; ".join(d_ for d_, _ in _b4_mr), all(r_ is False for _, r_ in _b4_mr), "%r" % (_b4_mr,))
+# the css: the column only with room (hz-flow, the chat at least 1000 wide), the proof line otherwise; rounded-square nodes,
+# no circles in the block; the header's chips folded into the dot's card; the byline and the working line share one row
+_b4_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE PROOF LINE AND THE READING (6b580"):_MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
+def _b4_layout(css, js):
+    return (".hz .msg.ai>aside.behind{display:none}" in _MILLENAI_SRC
+            and ".hz.hz-flow .msg.ai>aside.behind{display:block;grid-column:2;grid-row:1/span 12;align-self:start;position:sticky;top:96px;" in css
+            and ".hz.hz-flow .msg.ai>.hz-proof,.hz.hz-flow .msg.ai>.hz-card{display:none}" in css
+            and "const HZ_FLOW_MIN=1000;" in js and "const on=s.clientWidth>=HZ_FLOW_MIN;" in js
+            and ".hz .fl-node{position:relative;flex:none;width:17px;height:17px;margin-top:0;box-sizing:border-box;border-radius:6px;" in css
+            and _ch554_round(css) and _hz_scoped(css)
+            and ".hz #hz-machines .hz-rig{display:none}" in _hz_css and "+hzMachineHw(m,esc_)).join(\"\")" in _MILLENAI_SRC
+            and ".hz .msg.ai.live:not(.writing)>.who{display:none}" in css and ".hz .msg.ai.writing>.liveline{display:none}" in css
+            and ".hz .msg.ai>.who,.hz .msg.ai.live>.liveline{height:16px;min-height:0;margin:0 0 12px;padding:0;border:0;line-height:16px;box-sizing:content-box}" in css
+            and "const step=t=>{chatEaseRaf=0;if(!chatPinned)return;" in _MILLENAI_SRC                      # the eased follow stops the moment the reader scrolls up
+            and "if(chatPinned){if(smooth===\"ease\")chatEase();else chatToBottom(smooth);}" in _MILLENAI_SRC)
+check("6b580 the layout: the flow's column only while the chat has room (1000 px; the proof line otherwise), its nodes rounded squares (radius 6) and no circle or ring in the block, the header's chips in the status dot's card, the byline and the working line on one 16 px row, the eased follow held by the reader's scroll; the mutants are caught",
+      _b4_layout(_b4_css, _hz_js + _MILLENAI_SRC)
+      and not _b4_layout(_b4_css + ".hz .fl-node{border-radius:50%}", _hz_js + _MILLENAI_SRC)                                           # a circle
+      and not _b4_layout(_b4_css.replace(".hz.hz-flow .msg.ai>.hz-proof,.hz.hz-flow .msg.ai>.hz-card{display:none}", ""), _hz_js + _MILLENAI_SRC)   # both forms at once
+      and not _b4_layout(_b4_css.replace(".hz .msg.ai.live:not(.writing)>.who{display:none}", ".hz .msg.ai.live>.who{display:none}"), _hz_js + _MILLENAI_SRC), "")   # the byline back at the landing
+# LIVE, IN HEADLESS CHROMIUM (the same harness as 6b555's stream): a ~560-word stand-in (a draft, a RESET, a polish with a
+# list, a table and code) through the real page. At 1440: the flow beside the answer, the proof line hidden; no layout
+# shift in the 1.8 s around the landing; at most 150 word boxes at once while it streams and none after; a wheel up while
+# it streams holds the view (it does not creep back down). At 1000: the proof line, one line, every chip hittable, the
+# flow hidden. Mutants served in place of the page: the byline coming back at the landing (a shift), the follow ignoring
+# the reader (the view creeps), the reveal's window never closing (word boxes pile up).
+_B4_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 140000);") + r'''  const W = +process.argv[9] || 1440;
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");}catch(e){}
+    (function(){const real=window.fetch.bind(window);window.__sent=0;
+      window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){window.__sent++;
+        const enc=new TextEncoder(),N=String.fromCharCode(0),F=(t,j)=>N+t+":"+JSON.stringify(j)+N,plan=[];let t=120;
+        let r=7;const rnd=()=>{r=(r*16807)%2147483647;return (r-1)/2147483646;};
+        const push=s=>{const w=s.split(/(?<=\\s)/);let i=0;while(i<w.length){const n=2+Math.floor(rnd()*7);plan.push([t,w.slice(i,i+n).join("")]);i+=n;t+=25+rnd()*90;}};
+        plan.push([0,N+"STATUS:Thinking"+N]);
+        push("Backups come down to three copies on two kinds of storage with one away from home. ");t+=300;plan.push([t,N+"RESET"+N]);t+=50;
+        const P=[];for(let k=0;k<6;k++)P.push("A good home backup keeps **three copies** of anything you care about, on two kinds of storage, with one copy somewhere other than your house, and it is checked "+k+" times a year so a quiet failure never waits for the bad day. The rule is old, but it still covers a drive dying, a laptop stolen, a burst pipe, or a mistake you notice a week later.");
+        P.splice(2,0,"- **The NAS:** a two-bay model with snapshots.\\n- **Two drives:** NAS-rated, 8 TB each.\\n- **Offsite:** an encrypted bucket.");
+        P.splice(4,0,"| Option | Cost | Monthly |\\n|---|---|---|\\n| NAS | $450 | $0 |\\n| Cloud | $0 | $10 |");
+        P.splice(5,0,"\`\`\`bash\\nrsync -a \\"$HOME/Documents/\\" nas:/backup/\\nfind /backup/trash -mtime +30 -delete\\n\`\`\`");
+        push(P.join("\\n\\n")+" Stand-in answer complete.");
+        plan.push([t+60,F("USAGE",{r:"final",m:"Ollama1 \\u00b7 gpt-oss:20b",w:"server",i:2400,o:820,d:9000})]);plan.push([t+70,F("DONE",{f:1.2,t:14,mode:"Thinking"})]);
+        const body=new ReadableStream({start(c){for(const [at,s] of plan)setTimeout(()=>c.enqueue(enc.encode(s)),at);setTimeout(()=>c.close(),t+200);}});
+        return Promise.resolve(new Response(body,{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","X-Models":"Ollama1 \\u00b7 gpt-oss:20b","X-Web-Search":"0"}}));}
+        return real(u,o);};})();`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&!!document.querySelector("#send")&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await new Promise(r => setTimeout(r, 1200));
+  await ev(`(()=>{const R=window.__b4={shifts:[],ink:0,land:0};try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)R.shifts.push([performance.now(),e.value]);}).observe({type:"layout-shift"});}catch(e){}
+    const tk=()=>{const a=[...document.querySelectorAll(".msg.ai")].pop();if(a&&a.classList.contains("live")){R.ink=Math.max(R.ink,a.querySelectorAll(".hz-ink").length);
+      const b=a.querySelector(".body"),br=b.getBoundingClientRect(),mr=a.getBoundingClientRect();if(b.textContent.trim()){R.top=br.top-mr.top;R.h=br.height;}}else if(a&&!R.land&&R.ink)R.land=performance.now();setTimeout(tk,16);};tk();
+    const i=document.querySelector("#input");i.focus();i.value="How should I back up my home office?";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+  out.sent = true;
+  // the reader scrolls up while it streams (once there is somewhere to scroll up to): the view must hold
+  for (let i = 0; i < 100; i++) { await new Promise(r => setTimeout(r, 200)); if (await ev(`document.querySelector("#chat-scroll").scrollTop>150||!document.querySelector(".msg.ai.live")`)) break; }
+  const t0 = await ev(`document.querySelector("#chat-scroll").scrollTop`);
+  await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: Math.round(W * .55), y: 400, deltaX: 0, deltaY: -120 });
+  await new Promise(r => setTimeout(r, 120)); const t1 = await ev(`document.querySelector("#chat-scroll").scrollTop`);
+  await new Promise(r => setTimeout(r, 900)); const t2 = await ev(`document.querySelector("#chat-scroll").scrollTop`);
+  out.hold = { t0, t1, t2, held: t1 < t0 && t2 <= t1 + 1, live: await ev(`!!document.querySelector(".msg.ai.live")`) };
+  for (let i = 0; i < 300; i++) { await new Promise(r => setTimeout(r, 150)); if (await ev(`!!window.__b4.land`)) break; }
+  await new Promise(r => setTimeout(r, 1800));
+  const st = await ev(`(()=>{const R=window.__b4,a=[...document.querySelectorAll(".msg.ai")].pop(),b=a.querySelector(".body"),vis=e=>!!e&&e.getBoundingClientRect().width>0&&getComputedStyle(e).display!=="none";
+    const pf=a.querySelector(".hz-proof"),fl=a.querySelector(":scope>aside.behind .fl"),br=b.getBoundingClientRect(),mr=a.getBoundingClientRect();
+    const moved=[+(br.top-mr.top-R.top).toFixed(2),+(br.height-R.h).toFixed(2)];if(pf){document.querySelector("#chat-scroll").style.scrollBehavior="auto";pf.scrollIntoView({block:"center"});}
+    const chips=pf?[...pf.querySelectorAll(".pf-chip,.srcchip")].map(c=>{const r=c.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!h&&(h===c||c.contains(h));}):[];
+    return {land:R.land,moved,cls:R.shifts.filter(s=>s[0]>R.land-300&&s[0]<R.land+1500).reduce((x,s)=>x+s[1],0),ink:R.ink,after:b.querySelectorAll(".hz-ink,.hz-chg").length,
+      text:/Stand-in answer complete/.test(b.textContent),table:b.querySelectorAll("table").length,code:b.querySelectorAll(".codecard").length,
+      flow:vis(fl),proof:vis(pf),proofH:pf?Math.round(pf.getBoundingClientRect().height):0,chips,sw:document.documentElement.scrollWidth,iw:innerWidth}})()`);
+  Object.assign(out, st || {}); out.landed = !!(st && st.land);
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _b4_stream(fx, width, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="b4cdp-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_B4_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, fx,
+            os.path.join(d_, "mut.json") if mutation else "", str(width)]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=150)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b4_wide_ok(r):
+    return (not r.get("err") and not r.get("errs") and r.get("landed") and r.get("text") and r.get("table") == 1 and r.get("code") == 1
+            and r.get("flow") is True and r.get("proof") is False and r.get("cls", 1) == 0 and r.get("moved") == [0, 0] and 0 < r.get("ink", 0) <= 150 and r.get("after") == 0
+            and (r.get("hold") or {}).get("held") is True and (r.get("hold") or {}).get("live") is True and (r.get("hold") or {}).get("t0", 0) > 150
+            and r.get("sw") == r.get("iw"))
+def _b4_narrow_ok(r):
+    return (not r.get("err") and not r.get("errs") and r.get("landed") and r.get("flow") is False and r.get("proof") is True
+            and 0 < r.get("proofH", 0) <= 30 and r.get("chips") and all(r["chips"]) and r.get("cls", 1) == 0 and r.get("moved") == [0, 0] and r.get("sw") == r.get("iw"))
+_b4_w = _b4_stream("balanced", 1440); _b4_n = _b4_stream("balanced", 1000)
+check("6b580 live (headless Chromium, a ~560-word stand-in with a list, a table and code): at 1440 the flow beside the answer, no layout shift at the landing, at most 150 word boxes while it streams and none after, a wheel up holds the view; at 1000 the proof line on one line, its chips hittable, the flow folded; nothing scrolls sideways",
+      _b4_wide_ok(_b4_w) and _b4_narrow_ok(_b4_n), json.dumps({"w": _b4_w, "n": _b4_n})[:900])
+_b4_mw = [
+    ("the byline back at the landing", [[".hz .msg.ai.live.writing>.who{display:flex}", ".hz .msg.ai.live.writing>.who{display:none}"]], lambda r: (r.get("moved") or [0])[0] != 0),
+    ("the follow ignoring the reader", [["const step=t=>{chatEaseRaf=0;if(!chatPinned)return;", "const step=t=>{chatEaseRaf=0;"],   # (the hold: the view moved up by the wheel, then crept back)
+                                        ["if(chatPinned){if(smooth===\"ease\")chatEase();else chatToBottom(smooth);}", "if(smooth===\"ease\")chatEase();else if(chatPinned)chatToBottom(smooth);"]],
+     lambda r: (r.get("hold") or {}).get("held") is False),
+    ("the reveal's window never closing", [["while(m.length>2&&now-m[1].t>200)m.shift();", "while(m.length>2&&now-m[1].t>600000)m.shift();"]], lambda r: r.get("ink", 0) > 150),
+]
+_b4_mr2 = []
+for d_, m_, caught_ in _b4_mw:
+    r_ = _b4_stream("balanced", 1440, m_)
+    _b4_mr2.append((d_, r_.get("mutated") == 1 and caught_(r_), {k: r_.get(k) for k in ("cls", "moved", "ink", "hold", "errs", "mutated")}))
+check("6b580 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _b4_mr2),
+      all(ok_ for _, ok_, _ in _b4_mr2), json.dumps(_b4_mr2)[:900])
+# ==== 6b580 flow: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

@@ -20492,3 +20492,153 @@ the spine harness (+signMode), three 6b346 mutation anchors that followed the wa
 - The ink's per-word dissolve applies to the final writer's words as before; the provisional draft uses the existing
   swap (hold, dim, shimmer in), not the preview's word-level LCS dissolve (not ported in 6b555 either).
 - Verified in Blink (headless Chromium), not in the app's WKWebView.
+
+## 6b580 — beta-4-panel: the panel a live flow, the proof line, the conversation's stars, a clean delivery, Inter and a flat working view (7.0 beta 4, per Patrick)
+
+Patrick, on a conversation screenshot: "We don't have to litter the place with stars, but why are they shoved off to
+the right? And let's start working on getting that right panel cleaned up and, coming from a marketing aspect, a little
+more exciting and not just a ton of information. Or completely remove it even." Then, as the work went: "change the
+dynamics of the right panel, so it's not just a list of information; it's a cool flow showing what's going on"; "a
+prettier streaming or query delivery effect. Keep it super clean, super smooth"; "feels too full, maybe it's font size";
+"very sharp. Think how Claude looks"; Inter for the UI and the reading ("super sharp, super clean"); "Claude-sharp chrome
+plus GPT-grade motion, somewhere in the middle"; "super GPT smooth and beautiful, but Claude very tight and to the
+point". Branch `beta-4-panel` off `beta-3` (c5d44c5). Horizon only: Classic keeps its spine, its swap and its look.
+
+**The flow (the right panel, rebuilt).** `flowRows(o)` / `flowHTML(o)` replace the spine's list under Horizon, from the
+same frames (STEP, DRAFT, RUN's running list, USAGE, SOURCES, DONE): one vertical 1 px hairline and a 17 px node per
+REAL stage, radius 6 (rounded squares, never circles): Sources (the count; the domains slide in as 20 px chips as they
+are read), each draft with the machine that wrote it ("Your Mac", a server by its own name, a provider), Review, Polish
+(only when there were several drafts or a review), Check (the fact-check), Answer. While it runs a short silver segment
+travels down the hairline into the live node (1.6 s, the in-out curve), the live node's label wears the silver sweep and
+a small counter (its seconds, or the words on the page for the writing node; `flowTick` in place between rebuilds); a
+finished node takes a crisp check and goes calm. At the landing one pass of light runs down the line (900 ms), then
+rest. The foot: "Took 15 s", "Stayed on your machines" with a shield only when true (below), "Show the numbers" (the
+tokens in and out, the seconds and the writer's tok/s per node, hidden by default: `.fl-num`). A reopened answer shows
+the completed flow at rest (`srcBox` draws it). It shows from the first frame (no 5 s hold) and for a one-pass answer
+too (`paintSteps` runs under Horizon with no steps). The column: 640 of reading, 40, 240 of flow, `position: sticky`
+under the header, the composer aligned to the reading column (`--hz-gutter`/`--hz-marg-w` set only under `hz-flow`).
+`hzFlowFit` sets `html.hz-flow` from `#chat-scroll`'s width (at least 1000 px: about 1100 wide with the sidebar shut,
+1250 with it open) on a ResizeObserver, never during a paint, so the reading column never moves while it runs. Narrower,
+the column folds into the proof line.
+
+**The proof line and its card (the narrow form).** `proofFacts(o)` (pure) and `proofPaint(div,o)` under each finished
+answer, live at the landing and on a reopened chat: one line of 26 px silver hairline chips, radius 6, 12 px Inter 450,
+no fill, no colour except the ember keyboard ring, no circles (the source numbers are 3 px-radius tags):
+- where it was made: "Made on Ollama1" (one server), "On this Mac" (only this Mac; "On this PC"), "Your machines" (a mix),
+  "Made with Claude" (cloud only), "Your machines and Claude" (both);
+- the effort: "3 drafts, reviewed", "One draft, reviewed", "2 drafts", "…, checked", or "One pass" (a triaged answer);
+- the sources as numbered chips (the first three, then "+N"), each opening its source;
+- "Stayed on your machines" with a shield, ONLY when every call ran on this Mac or your own servers, none in the cloud,
+  no web search, no web source, no map lookup, and the record of its calls exists (an old answer makes no promise).
+The line is one line at every width (on a phone the shield alone and the sources by number); a click anywhere on it but
+a source opens the card in place (the first chip is the button: aria-expanded, aria-controls). The card: the journey as
+3-5 step chips on one hairline with a soft check ("Searched — Drafted ×3 — Reviewed — Polished"), "Took 15 s", the
+sources with their titles, and "Show the numbers" (a `<details>` holding the spine's figures). #141416, a 1 px hairline,
+radius 10, 16 padding, a 220 ms rise; the steps slide in 40 ms apart. The default view has no tokens, pace or hardware.
+The prose's own sources row is hidden under Horizon (the flow and the line carry them; the [n] citations still open
+them). The 6b542 Details link and fold are gone.
+
+**The header.** The MLX / NVIDIA machine chips are folded into the status dot's card at every level ("Your machines":
+each machine, its state, and under it the chip's word and hardware, `hzMachineHw`); the chips stay in the DOM, hidden,
+for the colours `machineColours` reads. The header reads lanes · picker · effort · dot · gear.
+
+**The stars in a conversation.** The burst and the field spawned from the knob's x, which in a conversation is the
+header's slider at the top right, so they clumped at the composer's right end. `hzUAnchor(home,c,kx)`: the knob on the
+home (unchanged), the composer's centre in a conversation (the burst, its glint, the sky's Ultra and the matrix's sweep).
+`hzBurstConv`: in a conversation the burst rises from across the composer's top edge (its width less 24 px each side),
+14-46 px up, gone in 1.3-2.1 s, half the home's count (60; Balanced 30). The field above the box shows for 3.6 s and
+fades (`HZ_CONV_STARS.life`, kept across a re-seat); no star signs, constellations, shooting stars, showers or star rain
+behind a conversation; the sky's clock at half speed there. The home keeps today's show.
+
+**The delivery (per Patrick: "super clean, super smooth").**
+- Cadence: a small buffer between the wire and the page. `hzCadTarget`: the model's own pace (an EMA of its words a
+  second) held to 25-45 words a second, up to 60 when far behind; easing toward nothing as the buffer runs low (under 4
+  words) so a model that pauses makes the text pause instead of stuttering; at the end the rest within about a second.
+  The rate is eased on the clock (250 ms), a breath (0.6 of a word) after a sentence, a frame never bursts more than
+  three words. `hzNextStop`: a word only once whole; a table only once whole (then all of it, fading as one); code a
+  line at a time in its card. `hzMdClose` closes an open fence, inline code or bold for the renderer, so the words in
+  place never change their look when the closer arrives.
+- Words: each fades in over 180 ms from 0 with a 1 px blur to exactly 0 (`hzWordIn`); no weight morph, no light, no
+  sideways motion; a word on a new line also rises 4 px (`hzLineRise`, one rect read per paint). Settled words are plain
+  text again within 200 ms (the reveal's window). The 6b555 weight morph, the wet-ink light and the dissolve are gone.
+- No reflow at the landing: the wrap and the kerning are the landing's own while it streams (`text-wrap: wrap`,
+  `font-kerning: normal`); the byline and the working line share one 16 px row (the line until the first word, the
+  byline from then on), so neither the first words nor the landing move anything.
+- The view follows the reading edge on an eased glide (`chatEase`, a 110 ms time constant), stops the moment the reader
+  scrolls up (6b425's `chatPinned`) and resumes only at the end.
+- The end point: a 4 px silver mark (radius 1), no glow, a slow breath, gliding after the text; it fades where the text
+  ends at the landing (200 ms). The 350 ms pass at the swap is retired.
+- Draft to final: the draft stays at full ink (no dim) while the polish gathers; then only the words that changed
+  cross-fade in over 250 ms (`hzChangedWords`, a word LCS; past 1.6 M cells the whole answer fades once); unchanged text
+  is never touched.
+- Calm: a plain fade. Reduced motion: the words simply appear. Balanced and Full share the same text motion.
+
+**The reading (per Patrick: "feels too full", "very sharp").** Inter for the UI and the reading (`--hz-font-ui`,
+`--hz-font-read`, `--sl-ui`); Space Grotesk stays for the greeting, Michroma for the wordmark. The answer 15 / 1.6,
+-0.01em, 400, ink 88 % white, bold 600, headings 17 / 600, paragraphs .8em apart, a 66ch measure; tabular figures in
+tables, the flow and the chips, not in prose (Inter's tnum widens the hyphen: "light - second"); the
+byline 12 px at 55 %, 12 px to the words; citations 9.5 px mono silver at 70 %, no box; the question a quiet
+right-aligned bubble (#1f1f22, radius 14, 85 % ink), 24 px to the answer; antialiased, no text-shadow on settled text.
+The working view: a flat near-black ground (#0f0f11 at .74 at the edges, .9 behind the column) over the sky, so the sky
+and its footage sit at about 10-25 %; the scrim is a gradient, no blur. Under 860 px the column shares the composer's
+24 px left edge. THE FONT FILE: `HZ_FONT_FILES` serves `fonts/InterVariable.woff2` (weights 100-900, `format("woff2")`)
+when it is present, beside `fonts/OFL-Inter.txt`. **Neither file is committed**: the official release (rsms/inter,
+Inter-4.1.zip, OFL 1.1) needs downloading, which needs Patrick's OK. Until then the stack falls to the system's own
+sans (SF on a Mac). The stills here used a local copy of InterVariable.woff2 (from Raycast's bundle, 345,588 bytes),
+not committed.
+
+**For the chat-behaviour helper (beta-4-chat).** This branch changes three shared tokens: `--hz-font-ui` and `--sl-ui` to
+Inter (the composer, the sidebar rows and Settings follow), and `--hz-gutter`/`--hz-marg-w` (0 by default, 40/240 under
+`hz-flow`), which position the composer under the reading column. The message actions are untouched except that
+`msgActions` no longer adds the Details link; the user bubble's `.ans-foot` sits under it, right-aligned.
+
+**The gauntlet.** Re-pinned at the same strength (each with its reason in the comment): 6b528's marginalia check (the
+drip's head takes the frame's time; the column is the flow's, under `hz-flow`), 6b463's RESET (both paths zero the
+reveal), 6b528's grid and reading face, 6b529's UI face, 6b542's sky clock, machines and ember count (10: the two "Show
+the numbers" keyboard rings), 6b544's star (a fade, no flight, the 200 ms window, the new ink), 6b553's burst pin, 6b555's
+shooting stars and star signs (the home's). Retired: 6b542 Details (now: no Details anywhere, with a mutant). Rewritten:
+6b555's ink check, as 6b580's "no weight morph and no glow" (five mutants: the morph back, the light back, a 2 px blur,
+pretty wrapping, a shown word starting over). New block `6b580 flow`: the pure pieces in node (a node per real step, one
+node for a one-pass answer, the live node, the numbers only in `.fl-num`, the privacy line's seven cases, the chip
+words, the conversation's burst centred and spread and half, the anchor, the cadence, the stops, the closer, the diff)
+with seven mutants; the layout (the column only with room, rounded-square nodes and no circle in the block, the chips
+in the dot's card, the shared row, the follow held by the reader) with three mutants; and a headless Chromium run of a
+~560-word stand-in (a list, a table, code; a draft, a RESET, a polish) at 1440 and 1000 (the flow / the proof line, CLS
+0 at the landing, word boxes bounded and none after, a wheel up holds the view, one line, chips hittable, no sideways
+scroll) with three mutants served in place of the page (the byline back at the landing, the follow ignoring the
+reader, the reveal's window never closing). Run in isolation (the full gauntlet was not: beta 3's run held 9901-9903): `hz-chat (6b528)`
+(as far as the section runner reaches; its 6b570 in-process checks need the full run's namespace and fail the same way
+on beta-3's own head), the 6b528 marginalia and 6b463 RESET checks, 6b542, 6b544, 6b551, 6b552, both 6b553 blocks, both
+6b555 blocks and `6b580 flow`, against a dev copy of this branch: 43 of 43 green, the live Chromium checks and their
+mutants included. A pin checker over the whole file: no `in` pin that held on beta-3 fails now, and no mutant's
+anchor went missing or became ambiguous (two did: 6b553's shooting-star mutants and 6b542's clock mutant, re-pinned; one
+collision this branch caused, 6b528's estimate mutant anchoring on the flow's copy of a line, was fixed in the code).
+The 6b580 block sits after `beta-3 the sky and Ultra (6b555)`, whose `_B3_CDP` and `_b3_chromium` it reuses.
+
+**Measured.** On a dev copy (MILLENAI_DEV, its own home, port 9912), headless Chromium (Playwright's, mock keychain,
+closed after each run), stand-in streams through the real send path:
+- the delivery, a ~560-word answer with a list, a table and code, a draft, a RESET and a polish: no layout shift in the
+  1.5 s around the landing (CLS 0; the answer's top and height identical before and after), no word box left after the
+  landing (at most 52 at once, the flush at the end), 5-12 changed-word cross-fades at the swap, the reveal at 21-27
+  words a second median (p90 43-51; p10 14-17 through the stand-in's 1.4 s pause), the page's own paint work per frame
+  `hzStarPaint` p95 1.2 ms and `renderMD` p95 0.2 ms. Whole-frame time in this headless software-GL browser: p95 17.7-18.5
+  ms streaming against 16.3-17.2 idle (the frame is bound by the browser's own compositing here, not the text);
+- the stars: the Ultra burst in a conversation at x 704 = the composer's centre (384 + 640/2), the field 20 stars, no
+  signs, constellations, shooting stars or rain;
+- the layout at 2000, 1440, 760 and 390: no sideways scroll; every proof chip hittable (elementFromPoint); the line one
+  line (28 px); the chips' ink 7.8:1 on the ground; the flow's waiting labels raised to .5 white (5.3:1).
+Stills and clips: scratchpad `b4p/shots/` (before-*, after-*, final-*, stream-10s-realspeed.mp4,
+stream-landing-half-speed.mp4, ultra-conversation-4s.mp4).
+
+**Unverified / for Patrick.**
+- Everything was measured in Blink (headless Chromium), not the app's WKWebView: the sticky flow column, `:has()`, the
+  details card, the 1 px blur fade and `text-wrap` are worth a look in the real window.
+- 120 Hz: the headless browser here draws at 60 or below on software GL, so "p95 under 10 ms at 120 Hz" is not proven;
+  the text's own script work is about 1.5 ms a paint.
+- Inter's file is not in the repo (above). Until it is, the app falls back to SF Pro / system-ui, which looks close but
+  is not Inter.
+- The working view's flat ground and the user's bubble overlap the chat-behaviour helper's composer and message work;
+  the composer's own radius (12) and glow were left to that branch.
+- The flow's Answer node shows no Polish for a single draft rewritten by the same model (it is not a separate stage in
+  the frames); a reopened chat from before 6b528 has no record of its calls, so it shows the flow without the privacy
+  line, by design.

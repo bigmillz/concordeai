@@ -38714,18 +38714,27 @@ def hz_debug_spec(path: str, dev: bool):
 # with no network. Space Grotesk and IBM Plex Mono load as the app always
 # has (the Google stylesheet in the head); bundling them is a follow-up.
 # Any OFL file placed in fonts/ and named here is served the same way.
-HZ_FONT_FILES = (("Michroma", "Michroma-Regular.ttf", "normal"),)
+# INTER (6b580, per Patrick: "super sharp, super clean"): the reading and the UI
+# are Inter, the variable face (weights 100-900 in one file, InterVariable.woff2
+# from the rsms/inter release, OFL; its licence beside it as fonts/OFL-Inter.txt).
+# Space Grotesk stays for the greeting and Michroma for the wordmark. Until the
+# file is in fonts/ the stack falls to the system's own sans (SF on a Mac).
+HZ_FONT_FILES = (("Michroma", "Michroma-Regular.ttf", "normal"),
+                 ("Inter", "InterVariable.woff2", "normal", "100 900", "woff2"))
 _HZ_FONT_RX = re.compile(r"/static/fonts/([A-Za-z0-9_-]+\.(?:ttf|otf|woff2?))")
 
 
 def hz_font_css() -> str:
     """@font-face for each bundled face whose file is present."""
     out = []
-    for fam, fn, style in HZ_FONT_FILES:
+    for row in HZ_FONT_FILES:
+        fam, fn, style = row[:3]
+        wt = row[3] if len(row) > 3 else "400"
+        fmt = row[4] if len(row) > 4 else "truetype"
         if os.path.exists(resource("fonts", fn)):
             out.append('@font-face{font-family:"%s";src:local("%s"),'
-                       'url(/static/fonts/%s) format("truetype");font-weight:400;'
-                       'font-style:%s;font-display:swap}' % (fam, fam, fn, style))
+                       'url(/static/fonts/%s) format("%s");font-weight:%s;'
+                       'font-style:%s;font-display:swap}' % (fam, fam, fn, fmt, wt, style))
     return "\n".join(out)
 
 
@@ -51812,8 +51821,8 @@ body.gen #chip-model{color:var(--accent)}
    ================================================================================ */
 @keyframes hzRise{from{opacity:0;transform:translateY(10px)}}
 @keyframes hzBreathe{0%,100%{opacity:.5}50%{opacity:1}}
-/* ---- the column: 640 of reading, a 56 gutter, 236 of marginalia */
-.hz #chat-inner{max-width:1012px;padding:var(--hz-col-top,36px) var(--hz-col-side,40px) 150px}
+/* ---- the column: 640 of reading, centred (6b580: the marginalia's 56 gutter and 236 column are gone) */
+.hz #chat-inner{max-width:720px;padding:var(--hz-col-top,36px) var(--hz-col-side,40px) 150px}
 .hz .msg{margin-bottom:0;animation:hzRise var(--hz-t-slow) var(--hz-ease-out) both}
 .hz .msg.settled{animation:none}
 /* ---- the person's words: the sans, plain on the sky, 560 wide; files as chips */
@@ -51833,7 +51842,7 @@ body.gen #chip-model{color:var(--accent)}
 .hz .msg.user .sentimgs img{border-radius:var(--hz-r-md);border:1px solid var(--hz-hair-2)}
 .hz .msg.user .ans-foot{margin-top:6px;min-height:28px}
 /* ---- the answer: a hairline, the byline, the prose, with the marginalia beside */
-.hz .msg.ai{display:grid;grid-template-columns:minmax(0,640px) 236px;column-gap:56px;align-items:start;margin:0 0 40px}
+.hz .msg.ai{display:grid;grid-template-columns:minmax(0,640px);align-items:start;margin:0 0 40px}
 .hz .msg.ai .who{grid-column:1;display:flex;align-items:center;gap:10px;border-top:1px solid var(--hz-hair);
   padding-top:22px;margin:0 0 16px;font-family:var(--hz-font-ui);font-size:13.5px;font-weight:500;color:#e2e7f5;
   letter-spacing:0;text-transform:none;line-height:1.3}
@@ -51853,7 +51862,7 @@ body.gen #chip-model{color:var(--accent)}
 .hz .msg.ai .who .st:empty{display:none}
 .hz .msg.ai>.body{grid-column:1;min-width:0}
 .hz .msg.ai>.ans-foot,.hz .msg.ai>.retrybtn,.hz .msg.ai>.ghostnote{grid-column:1}
-.hz .msg.ai>aside.behind{grid-column:2;grid-row:1/span 5;padding-top:22px;align-self:start}
+.hz .msg.ai>aside.behind{display:none}   /* the live spine rides hidden; at the landing its figures move into the proof card (6b580) */
 /* THE LIVE LINE (OVERRIDE 3): the die of the machine at work, the words, the figures ticking in mono */
 .hz .msg.ai>.liveline{grid-column:1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-height:24px;margin:-6px 0 14px}
 .hz .liveline .lstep{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--hz-ink-2)}
@@ -52222,7 +52231,6 @@ body.gen #chip-model{color:var(--accent)}
 @media (max-width:860px){
   .hz .msg.ai{grid-template-columns:minmax(0,1fr)}
   .hz .msg.ai>.liveline .lstats{margin-left:0}
-  .hz .msg.ai>aside.behind{grid-column:1;grid-row:auto;padding-top:0;margin-top:22px}
   .hz .behind .spine li{padding-bottom:14px}
   .hz .msg.ai>.ans-foot{order:5}
 }
@@ -52287,9 +52295,9 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
   --hz-ease-spring:cubic-bezier(.16,1,.3,1);   /* no bounce anywhere: the arrival curve */
   --hz-t-fast:120ms; --hz-t-mid:200ms; --hz-t-slow:320ms;
   --hz-shadow:0 1px 2px rgba(0,0,0,.18),0 12px 32px -8px rgba(0,0,0,.34),0 40px 96px -32px rgba(0,0,0,.55);
-  --hz-font-ui:'Space Grotesk',system-ui,sans-serif;
-  --hz-font-display:'Space Grotesk',system-ui,sans-serif;
-  --hz-font-read:'Space Grotesk',system-ui,sans-serif;
+  --hz-font-ui:'Inter',-apple-system,system-ui,sans-serif;          /* Inter (6b580, per Patrick: "super sharp, super clean") */
+  --hz-font-display:'Space Grotesk',system-ui,sans-serif;              /* the greeting keeps its face */
+  --hz-font-read:'Inter',-apple-system,system-ui,sans-serif;
   --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
   --hz-ink-read:#e8ebf5; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:186,176,255;
   --hz-hair:rgba(241,230,206,.09); --hz-hair-2:rgba(241,230,206,.15); --hz-glass-lit:rgba(243,235,216,.32);
@@ -52308,7 +52316,7 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
   /* small labels over the sky: a tight near-black halo (invisible on the black) */
   --hz-halo-dark:1px 0 1px rgba(3,3,5,.7),-1px 0 1px rgba(3,3,5,.7),0 1px 1px rgba(3,3,5,.7),0 -1px 1px rgba(3,3,5,.7),1px 1px 2px rgba(3,3,5,.5),-1px -1px 2px rgba(3,3,5,.5),0 0 4px rgba(3,3,5,.75),0 0 9px rgba(3,3,5,.45);
 }
-:root{--hz-read-w:640px;--hz-gutter:56px;--hz-marg-w:236px}
+:root{--hz-read-w:640px;--hz-gutter:0px;--hz-marg-w:0px}   /* no marginalia (6b580): the composer centres under the column */
 __HZ_FONTS__
 .hz body{background:#030305;font-family:var(--hz-font-ui);-webkit-font-smoothing:antialiased}
 .hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}
@@ -52767,22 +52775,15 @@ __HZ_FONTS__
 .hz:not(.hz-full) .chat-item.hz-live .ct{background:none;color:inherit;animation:none}
 .hz:not(.hz-full) .chat-item.hz-landed,.hz:not(.hz-full) #hz-sb.ping{animation:none}
 .hz:not(.hz-full) .msg{animation:none}
-/* ---- Details (6b542): the marginalia folds behind one small link under the answer, closed by
-   default; Full keeps the column beside the answer */
-.hz:not(.hz-full) .msg.ai{grid-template-columns:minmax(0,640px)}
-.hz:not(.hz-full) .msg.ai>aside.behind{display:none;grid-column:1;grid-row:auto;padding-top:0;margin-top:8px;order:6}
-.hz:not(.hz-full) .msg.ai.details>aside.behind{display:flex}
-.hz:not(.hz-full) .msg.ai>.ans-foot{order:5}
-.hz .hz-details{font:12.5px var(--hz-font-ui);color:var(--hz-ink-3);background:none;border:0;padding:0 4px;height:28px;border-radius:4px;cursor:pointer;transition:color var(--hz-t-fast)}
-.hz .hz-details:hover{color:var(--hz-ink)}
-.hz.hz-full .hz-details,.hz .msg.ai:not(:has(>aside.behind)) .hz-details{display:none}
+/* ---- Details (6b542) went with the column (6b580): the proof line opens its card at every level */
+.hz .msg.ai>.ans-foot{order:5}
 .hz:not(.hz-full) .ans-foot .mact{opacity:1}
 /* ---- the sidebar (6b542): no token counts beside the chats (renderChats writes none under
    Horizon), no estimate note, no memory meter or telemetry cluster, no token total in the foot */
 .hz #telemetry,.hz #sb-today,.hz .cfoot,.hz .ctok,.hz .ctot{display:none}
 /* ---- the machines (6b542): Calm shows one small status dot whose tooltip names each machine
    and its state; Full shows the dies */
-.hz:not(.hz-full) #hz-machines .hz-rig,.hz.hz-full .hz-mdot{display:none}
+.hz #hz-machines .hz-rig{display:none}   /* 6b580: the MLX and NVIDIA chips folded into the status dot's card ("Your machines") at every level */
 .hz .hz-mdot{position:relative;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;cursor:default;outline:0}
 .hz .hz-mdot:hover{background:rgba(255,255,255,.06)}
 .hz .hz-mdot .dot{width:6px;height:6px;border-radius:50%;background:#cfd6e6}
@@ -52829,7 +52830,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    ice ring; on the composer only while it holds words and the focus (the composer has the focus
    from the first frame, so an ember border on focus alone would never be a moment) */
 .hz .hz-ib:focus-visible,.hz #hz-lanes button:focus-visible,.hz .hz-rig:focus-visible,.hz .hz-mdot:focus-visible,.hz #look-sel:focus-visible,.hz #fx-level:focus-visible,
-.hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-details:focus-visible,.hz .chat-item:focus-visible,
+.hz .cbtn:focus-visible,.hz .hz-pick:focus-visible,.hz .hz-opt:focus-visible,.hz .mab:focus-visible,.hz .hz-proof .pf-open:focus-visible,.hz .chat-item:focus-visible,
 .hz #newchat:focus-visible,.hz .srcchip:focus-visible,.hz .showm:focus-visible,.hz .retrybtn:focus-visible,.hz #sb-foot #settings-btn:focus-visible,.hz #sb-foot #rail-btn:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
 /* ---- an error: a small ember rule at its left, nothing else */
 .hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}
@@ -53051,11 +53052,11 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-calm .hz-star,.hz .novideo .hz-star{display:none!important}
 .hz .msg.ai .who .dot.lit{animation:hzDotLit .5s cubic-bezier(.3,0,.2,1) both}
 @keyframes hzDotLit{0%{opacity:1;box-shadow:0 0 12px #fff,0 0 4px #fff}100%{opacity:.55;box-shadow:0 0 10px rgba(159,192,255,.9)}}
-.hz .msg.ai.landing>.ans-foot .hz-details,.hz .msg.ai.landing>.ans-foot .mact{opacity:0}
-.hz .msg.ai.landed>.ans-foot .hz-details{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}
+.hz .msg.ai.landing>.hz-proof,.hz .msg.ai.landing>.ans-foot .mact{opacity:0}
+.hz .msg.ai.landed>.hz-proof{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .12s backwards}
 .hz .msg.ai.landed>.ans-foot .mact{animation:hzFadeIn .3s cubic-bezier(.3,0,.2,1) .24s backwards}
 @media (prefers-reduced-motion:reduce){.hz .hz-star{display:none!important}
-  .hz .hz-ink,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.ans-foot .hz-details,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
+  .hz .hz-ink,.hz .msg.ai .who .dot.lit,.hz .msg.ai.landed>.hz-proof,.hz .msg.ai.landed>.ans-foot .mact{animation:none}}
 /* ---- SETTINGS LOOK (6b551, per Patrick: "It looks perfect as far as layout, but it doesn't match our
    current look"). The same rail and pane, in the front's language (beta/DESIGN.md): one neutral glass
    over a black scrim, champagne hairlines, Space Grotesk 14 for rows and 13 for notes, mono 11 caps for
@@ -53069,7 +53070,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
   --sl-glass:linear-gradient(180deg,rgba(255,255,255,.065),rgba(255,255,255,.03));
   --sl-dense:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03)),rgba(8,8,10,.78);
   --sl-shadow:0 1px 2px rgba(0,0,0,.22),0 16px 40px -8px rgba(0,0,0,.42),0 48px 120px -32px rgba(0,0,0,.6);
-  --sl-ui:'Space Grotesk',-apple-system,system-ui,sans-serif;--sl-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
+  --sl-ui:'Inter',-apple-system,system-ui,sans-serif;--sl-mono:'IBM Plex Mono',ui-monospace,Menlo,monospace}
 .hz #about-veil{background:rgba(3,3,5,.72);-webkit-backdrop-filter:blur(12px) saturate(40%);backdrop-filter:blur(12px) saturate(40%);
   --text:var(--sl-ink);--dim:var(--sl-ink2);--faint:var(--sl-ink3);--line:var(--sl-hair2);--line-soft:var(--sl-hair);--line-hi:var(--sl-line);
   --panel:rgba(255,255,255,.03);--panel2:transparent;--accent:var(--sl-ink);--accent-hot:#fff;--helv:var(--sl-ui);--sans:var(--sl-ui);--disp:var(--sl-ui);--mono:var(--sl-mono)}
@@ -53436,32 +53437,10 @@ html:not(.hz) .sl-sel{display:none}
    (the effort sits at the right there), between the chat's title and the controls */
 .hz #hz-lanes{flex:none}
 @media (prefers-reduced-motion:reduce){.hz #hz-lanes .hz-seg-hi,.hz #hz-lanes button{transition:none}.hz #hz-lanes .hz-fstar{animation:none!important}}
-/* ---- THE INK (hzStarWrap): one word to a box while it lands, at its rest weight's width (zero reflow); it fades in over
-   300 ms with a 1 px rise and a 2 px blur coming sharp, its neutral white light fading (the wet-ink edge on the newest
-   three or four words), and settles from a lighter weight in 280 ms ("wght" 320 > 400; bold and headings 450 > 600;
-   code does not morph). While the answer streams it wraps plainly (text-wrap: wrap, never pretty) and kerning is off,
-   so a settled word unwrapped to plain text sits where its box did. Calm: a plain 220 ms fade. Reduced motion: none. */
-.hz .msg.ai.live .body{text-wrap:wrap;font-kerning:none}
-.hz .hz-ink{display:inline-block;--hz-w0:320;--hz-w1:400}
-.hz .msg.ai .body strong .hz-ink,.hz .msg.ai .body b .hz-ink,.hz .msg.ai .body h1 .hz-ink,.hz .msg.ai .body h2 .hz-ink,.hz .msg.ai .body h3 .hz-ink{--hz-w0:450;--hz-w1:600}
-.hz .msg.ai .body code .hz-ink{--hz-w0:400;--hz-w1:400}
-.hz .hz-ink.go{animation:hzInkIn .3s cubic-bezier(.2,.7,.2,1) both,hzInkWght .28s cubic-bezier(.2,.7,.2,1) both}
-.hz .hz-ink.c{animation:hzInkFade .22s ease both}
-@keyframes hzInkWght{from{font-variation-settings:"wght" var(--hz-w0)}to{font-variation-settings:"wght" var(--hz-w1)}}
-@keyframes hzInkIn{0%{opacity:0;transform:translateY(1px);filter:blur(2px) drop-shadow(0 0 6px rgba(255,255,255,.6))}
-  40%{filter:blur(.8px) drop-shadow(0 0 6px rgba(255,255,255,.38))}
-  73%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,.14))}
-  100%{opacity:1;transform:none;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}
+/* ---- THE INK (hzStarWrap; 6b555's weight morph, wet-ink light and draft dissolve retired in 6b580): see THE DELIVERY
+   (6b580) in the proof line's block, which sets the fade, the line rise, the end point and the changed-word cross-fade */
 @keyframes hzInkFade{from{opacity:0}to{opacity:1}}
-/* draft > polish, calmly: the shown draft dims to .12 under a 1.5 px blur in 220 ms, then the polish shimmers in over
-   620 ms (opacity and the blur gone by 55 %, the same neutral light fading out); Calm a plain fade out and a 400 ms fade
-   in; reduced motion none (the polish replaces the draft at once) */
-.hz .msg.ai .body.swapout{opacity:.12;filter:blur(1.5px);transition:opacity .22s ease,filter .22s ease}
-.hz .msg.ai .body.swapin{animation:hzInkShimmer .62s var(--hz-ease-out) both}
-@keyframes hzInkShimmer{0%{opacity:0;filter:blur(1.5px) drop-shadow(0 0 6px rgba(255,255,255,.6))}55%{opacity:1;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,.35))}
-  100%{opacity:1;filter:blur(0) drop-shadow(0 0 6px rgba(255,255,255,0))}}
 .hz.hz-calm .msg.ai .body.swapout{opacity:0;filter:none;transition:opacity .2s ease}
-.hz.hz-calm .msg.ai .body.swapin{animation:hzInkFade .4s ease both}
 @media (prefers-reduced-motion:reduce){.hz .hz-ink{animation:none!important}
   .hz .msg.ai .body.swapout,.hz .msg.ai .body.swapwait{opacity:1;filter:none;transition:none}.hz .msg.ai .body.swapin{animation:none}}
 /* ---- the sidebar: the glass over the night (a denser near-black where it is a drawer over the page) */
@@ -53530,6 +53509,200 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
 .hz #hz-top.hz-hd4 #hz-settings.hz-upd::after{display:block}
 /* the status dot says what it shows: its card opens with a heading */
 .hz .hz-mdot .tip::before{content:"Your machines";font:500 11px/1.2 var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--hz-ink-3)}
+/* ==== THE PROOF LINE AND THE READING (6b580, per Patrick: "let's start working on getting that right panel cleaned up
+   ... a little more exciting and not just a ton of information. Or completely remove it even."; "feels too full, maybe
+   it's font size"; "very sharp. Think how Claude looks"; "Claude-sharp chrome plus GPT-grade motion") ==== */
+/* the working view: flat near-black over the sky (the sky at about 30 %, slowed in the sky's loop); no gradient, no glow */
+.hz #hz-scrim{transition:opacity .9s var(--hz-ease-out),background-color .9s var(--hz-ease-out)}
+.hz #main:not(:has(#hero)) #hz-scrim,.hz.hz-work #hz-scrim{opacity:1;
+  background:linear-gradient(90deg,rgba(15,15,17,.74),rgba(15,15,17,.9) 26%,rgba(15,15,17,.9) 74%,rgba(15,15,17,.74))}   /* the sky at about 10-25 %, the reading on a near-solid ground */
+/* crisp ink on the dark ground: antialiased, no text-shadow on settled words, whole-pixel sizes */
+.hz #chat-inner{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.hz .msg.ai .body,.hz .msg.ai .body *,.hz .msg.user .body{text-shadow:none}
+/* the answer, in Inter: 15 on 1.6, -0.01em, weight 400, ink at 88 % white; bold 600 and 17/600 headings carry the
+   emphasis; .8em between paragraphs; a measure of about 66 characters */
+.hz .msg.ai .body{font-family:var(--hz-font-read);font-size:15px;line-height:1.6;letter-spacing:-.01em;font-weight:400;color:rgba(255,255,255,.88);
+  max-width:66ch}   /* proportional figures in prose (Inter's tnum widens the hyphen); tabular in tables and the flow */
+.hz .msg.ai .body p{margin:0 0 .8em}
+.hz .msg.ai .body ul,.hz .msg.ai .body ol{margin:0 0 .8em}
+.hz .msg.ai .body li{margin:0 0 .3em}
+.hz .msg.ai .body strong,.hz .msg.ai .body b{color:#fff;font-weight:600}
+.hz .msg.ai .body h1,.hz .msg.ai .body h2,.hz .msg.ai .body h3{font-family:var(--hz-font-read);font-size:17px;font-weight:600;line-height:1.4;letter-spacing:-.01em;color:#fff;margin:1.4em 0 .5em}
+.hz .msg.ai .body>h1:first-child,.hz .msg.ai .body>h2:first-child,.hz .msg.ai .body>h3:first-child{margin-top:0}
+.hz .msg.ai .body table{font-size:14px;font-variant-numeric:tabular-nums}
+.hz .msg.ai .body td,.hz .msg.ai .body td:first-child{color:rgba(255,255,255,.88)}
+/* citations: small and quiet, silver at about 70 %, no box */
+.hz .msg.ai .body sup.cite{font:500 9.5px/1 var(--hz-font-mono);color:rgba(214,220,232,.7);background:none;border:0;border-radius:0;padding:0 1px;margin:0 0 0 2px;vertical-align:.5em}
+.hz .msg.ai .body sup.cite:hover{color:var(--hz-ink);background:none}
+/* the question: a quiet right-aligned bubble (#1f1f22, radius 14), 85 % ink; 24 px to the answer */
+.hz .msg.user{display:flex;justify-content:flex-end;margin:0 0 24px}
+.hz .msg.user .body{font-family:var(--hz-font-read);font-size:15px;line-height:1.5;letter-spacing:-.01em;color:rgba(255,255,255,.85);background:#1f1f22;border:0;border-radius:14px;
+  padding:9px 14px;max-width:min(560px,85%);width:fit-content}
+.hz .msg.user .ans-foot{position:absolute;right:0;bottom:-30px}
+.hz .msg.user{position:relative}
+/* the byline: tiny, metadata ink (12 px at 55 %), 12 px to the words; its dot flat silver */
+.hz .msg.ai .who{border-top:0;padding-top:0;font-family:var(--hz-font-ui);font-size:12px;letter-spacing:-.005em;color:rgba(255,255,255,.55);margin:0 0 12px}
+.hz .msg.ai .who b{color:rgba(255,255,255,.62);font-weight:500}
+.hz .msg.ai .who .dot{box-shadow:none;width:5px;height:5px;background:rgba(255,255,255,.55)}
+/* the sources in the prose: the proof line carries them once the answer lands */
+.hz .msg.ai.proofed>.body .srcrow{display:none}
+/* THE LINE: silver hairline chips, 26 tall, radius 6, one line; no colour but the ember on keyboard focus; no circles */
+.hz .hz-proof{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-width:0;max-width:100%;margin:18px 0 0;cursor:pointer;overflow:hidden;padding:1px 0}
+.hz .hz-proof .pf-chip,.hz .hz-proof .srcchip{flex:none;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;box-sizing:border-box;
+  border:1px solid rgba(255,255,255,.1);border-radius:6px;background:none;box-shadow:none;font:450 12px/1 var(--hz-font-ui);letter-spacing:-.005em;font-variant-numeric:tabular-nums;
+  color:rgba(255,255,255,.62);white-space:nowrap;text-decoration:none;max-width:none;transition:border-color .12s var(--hz-ease-out),color .12s var(--hz-ease-out)}
+.hz .hz-proof .pf-open{cursor:pointer;margin:0}
+.hz .hz-proof .pf-eff{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;display:block;line-height:24px}
+.hz .hz-proof .srcchip{padding:0 8px 0 4px;gap:5px}
+.hz .hz-proof .srcchip .sn{width:auto;min-width:16px;height:16px;padding:0 3px;box-sizing:border-box;border-radius:3px;background:rgba(255,255,255,.08);
+  font:500 10px/16px var(--hz-font-mono);color:rgba(255,255,255,.7);text-align:center;display:inline-block}
+.hz .hz-proof .srcchip .sd{overflow:hidden;text-overflow:ellipsis;max-width:120px}
+.hz .hz-proof .pf-safe svg{flex:none;color:rgba(255,255,255,.7)}
+.hz .hz-proof .pf-chev{flex:none;width:6px;height:6px;margin:0 4px 0 2px;border-right:1px solid rgba(255,255,255,.45);border-bottom:1px solid rgba(255,255,255,.45);
+  transform:translateY(-2px) rotate(45deg);transition:transform .2s var(--hz-ease-out)}
+.hz .hz-proof.open .pf-chev{transform:translateY(1px) rotate(225deg)}
+.hz .hz-proof:hover .pf-chip,.hz .hz-proof:hover .srcchip{border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.78)}
+.hz .hz-proof .srcchip:hover{border-color:rgba(255,255,255,.34);color:var(--hz-ink)}
+.hz .hz-proof.open .pf-chip,.hz .hz-proof.open .srcchip{color:rgba(255,255,255,.78)}
+/* THE CARD, in place under the line: the journey on one hairline, the time, the sources, the numbers folded */
+.hz .hz-card{margin:10px 0 0;padding:16px;border:1px solid rgba(255,255,255,.08);border-radius:10px;background:#141416;display:flex;flex-direction:column;gap:16px;
+  animation:hzCardIn .22s var(--hz-ease-out) both}
+.hz .hz-card[hidden]{display:none}
+@keyframes hzCardIn{from{opacity:0;transform:translateY(-4px)}}
+.hz .pf-trip{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.hz .pf-steps{list-style:none;margin:0;padding:0;display:flex;align-items:center;gap:20px;position:relative;flex:0 1 auto;min-width:0;flex-wrap:wrap;row-gap:8px}
+.hz .pf-steps li{position:relative;display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;border:1px solid rgba(255,255,255,.1);border-radius:6px;
+  background:#141416;font:450 12px/1 var(--hz-font-ui);letter-spacing:-.005em;color:rgba(255,255,255,.78);white-space:nowrap;margin:0}
+.hz .pf-steps li+li::before{content:"";position:absolute;right:100%;top:50%;width:20px;height:1px;background:rgba(255,255,255,.14)}
+.hz .pf-steps li svg{color:rgba(255,255,255,.55);flex:none}
+.hz .pf-steps li{animation:hzStepIn .26s var(--hz-ease-out) both}
+.hz .pf-steps li:nth-child(2){animation-delay:.04s}.hz .pf-steps li:nth-child(3){animation-delay:.08s}.hz .pf-steps li:nth-child(4){animation-delay:.12s}.hz .pf-steps li:nth-child(5){animation-delay:.16s}
+@keyframes hzStepIn{from{opacity:0;transform:translateX(-4px)}}
+.hz .pf-time{margin-left:auto;font:400 12px/1 var(--hz-font-mono);color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hz .pf-h{font:500 11px/1 var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.5);margin:0 0 8px}
+.hz .hz-card .howsrc a{padding:5px 6px;border-radius:6px}
+.hz .hz-card .howsrc .sn{border-radius:3px;width:auto;min-width:18px;padding:0 3px;box-sizing:border-box;background:rgba(255,255,255,.08)}
+.hz .hz-card .howsrc .st{color:rgba(255,255,255,.82)}
+.hz .hz-card .howsrc .sd{color:rgba(255,255,255,.5)}
+.hz .pf-num{border-top:1px solid rgba(255,255,255,.08);padding-top:12px}
+.hz .pf-num>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font:450 12.5px/1 var(--hz-font-ui);color:rgba(255,255,255,.55);
+  height:24px;border-radius:6px;padding:0 2px}
+.hz .pf-num>summary::-webkit-details-marker{display:none}
+.hz .pf-num>summary::after{content:"";width:5px;height:5px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s var(--hz-ease-out)}
+.hz .pf-num[open]>summary::after{transform:translateY(1px) rotate(225deg)}
+.hz .pf-num>summary:hover{color:var(--hz-ink)}
+.hz .pf-num>summary:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
+.hz .pf-num .pf-hide,.hz .pf-num[open] .pf-show{display:none}
+.hz .pf-num[open] .pf-hide{display:inline}
+.hz .pf-num .behind.pf-behind{display:flex;flex-direction:column;gap:16px;margin-top:14px}
+.hz .pf-behind .bh,.hz .pf-behind .bsrc,.hz .pf-behind .mnote{display:none}
+.hz .pf-behind .bfacts{margin-top:0}
+.hz .pf-behind .spine li .node{border-radius:1px;width:5px;height:5px;left:4px;top:7px}
+.hz .pf-behind .mrow .die,.hz .pf-behind .spine .who2 .die{box-shadow:none}
+/* the status dot's card: each machine's word and hardware under its name (the chips folded in) */
+.hz .hz-mdot .tip{min-width:220px;background:#141416;border-radius:10px;box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.hz .hz-mdot .tip .hw{display:block;margin:-3px 0 4px;font-size:12px;color:rgba(255,255,255,.5);white-space:nowrap}
+/* THE FLOW beside the answer (hz-flow: the chat at least 1000 wide): 640 of reading, 40, 240 of flow; the reading column
+   never moves while it runs (the column is reserved from the first frame). Narrower: the proof line under the answer. */
+.hz.hz-flow{--hz-gutter:40px;--hz-marg-w:240px}
+.hz.hz-flow #chat-inner{max-width:1000px}
+.hz.hz-flow .msg.ai{grid-template-columns:minmax(0,640px) 240px;column-gap:40px}
+.hz.hz-flow .msg.user{max-width:640px}
+.hz.hz-flow .msg.ai>aside.behind{display:block;grid-column:2;grid-row:1/span 12;align-self:start;position:sticky;top:96px;padding-top:2px;min-width:0}
+.hz.hz-flow .msg.ai>aside.behind.warm{opacity:1;max-height:none;overflow:visible}   /* the flow shows from the first frame (the spine's 5 s hold is Classic's) */
+.hz.hz-flow .msg.ai>.hz-proof,.hz.hz-flow .msg.ai>.hz-card{display:none}
+/* the working line and the byline share one 16 px row: the line while it works, the byline from the first word on,
+   so neither the first words nor the landing move anything */
+.hz .msg.ai>.who,.hz .msg.ai.live>.liveline{height:16px;min-height:0;margin:0 0 12px;padding:0;border:0;line-height:16px;box-sizing:content-box}
+.hz .msg.ai.live:not(.writing)>.who{display:none}
+.hz .msg.ai.live.writing>.who{display:flex}
+.hz .msg.ai.writing>.liveline{display:none}
+.hz .msg.ai.live>.liveline .lstep{font-size:12px;line-height:16px}
+.hz .msg.ai.live>.liveline .lstats{font-size:11px;line-height:16px}
+.hz .msg.ai.proofed>.body .srcrow,.hz .msg.ai.live>.body .srcrow{display:none}   /* the sources ride in the flow and the proof line */
+.hz .fl{list-style:none;margin:0;padding:0;position:relative;display:flex;flex-direction:column;gap:16px}
+.hz .fl::before{content:"";position:absolute;left:8px;top:9px;bottom:9px;width:1px;background:rgba(255,255,255,.1)}
+.hz .fl-n{position:relative;display:flex;gap:12px;align-items:flex-start;margin:0;padding:0;min-height:16px;animation:hzFlIn .24s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzFlIn{from{opacity:0;transform:translateY(4px)}}
+.hz .msg.settled .fl-n,.hz aside.folded:not(.landed) .fl-n{animation:none}
+.hz .fl-node{position:relative;flex:none;width:17px;height:17px;margin-top:0;box-sizing:border-box;border-radius:6px;border:1px solid rgba(255,255,255,.18);background:#0f0f11;
+  display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8);transition:border-color .2s cubic-bezier(.16,1,.3,1),background-color .2s cubic-bezier(.16,1,.3,1)}
+.hz .fl-n.done .fl-node{border-color:rgba(255,255,255,.28);background:#17171a}
+.hz .fl-n.wait .fl-node{border-color:rgba(255,255,255,.1)}
+.hz .fl-n.live .fl-node{border-color:rgba(255,255,255,.6);background:#1c1c20}
+/* the light travelling down the hairline into the live node: a short silver segment, no glow */
+.hz .fl-n.live::before{content:"";position:absolute;left:8px;top:-16px;width:1px;height:18px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.75));
+  animation:hzFlRun 1.6s cubic-bezier(.65,0,.35,1) infinite}
+.hz .fl-n.live:first-child::before{display:none}
+@keyframes hzFlRun{0%{opacity:0;transform:translateY(-14px)}40%{opacity:1}100%{opacity:0;transform:translateY(0)}}
+.hz .fl-b{min-width:0;flex:1;display:flex;flex-direction:column;gap:6px}
+.hz .fl-h{display:flex;align-items:baseline;gap:8px;min-height:17px;flex-wrap:wrap;padding-top:0}
+.hz .fl-t{font:500 13px/17px var(--hz-font-ui);letter-spacing:-.005em;color:rgba(255,255,255,.82)}
+.hz .fl-n.wait .fl-t{color:rgba(255,255,255,.5)}   /* 5.3:1 on the ground: AA */
+.hz .fl-n.live .fl-t{background:linear-gradient(90deg,rgba(255,255,255,.55) 0%,rgba(255,255,255,.55) 36%,#fff 49%,rgba(255,255,255,.55) 62%,rgba(255,255,255,.55) 100%);
+  background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:hzLbl 2s linear infinite}
+.hz .fl-tag,.hz .fl-meta,.hz .fl-live{font:450 12px/17px var(--hz-font-ui);letter-spacing:-.005em;color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hz .fl-live{color:rgba(255,255,255,.62)}
+.hz .fl-chips{display:flex;flex-wrap:wrap;gap:4px}
+.hz .fl-src{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;height:20px;padding:0 6px;box-sizing:border-box;border:1px solid rgba(255,255,255,.1);border-radius:6px;
+  font:450 11px/18px var(--hz-font-ui);color:rgba(255,255,255,.6);animation:hzFlSrc .26s cubic-bezier(.16,1,.3,1) both;animation-delay:calc(var(--i,0)*60ms)}
+@keyframes hzFlSrc{from{opacity:0;transform:translateX(-4px)}}
+.hz aside.folded .fl-src{animation:none}
+.hz .fl-num{display:none;flex-wrap:wrap;gap:2px 10px;font:400 11px/16px var(--hz-font-mono);color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums}
+.hz aside.behind.nums .fl-num{display:flex}
+.hz .fl-foot{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin:16px 0 0 29px}
+.hz .fl-clock{font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55);font-variant-numeric:tabular-nums}
+.hz .fl-clock:empty{display:none}
+.hz .fl-safe{display:inline-flex;align-items:center;gap:6px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.62)}
+.hz .fl-safe svg{color:rgba(255,255,255,.7)}
+.hz .fl-shownum{font:450 12px/24px var(--hz-font-ui);color:rgba(255,255,255,.5);background:none;border:0;padding:0;cursor:pointer;height:24px}
+.hz .fl-shownum:hover{color:var(--hz-ink)}
+.hz .fl-shownum:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember);border-radius:4px}
+/* the landing: one pass of light down the line, then rest */
+.hz aside.behind.landed .fl::after{content:"";position:absolute;left:8px;top:0;width:1px;height:40px;background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.7),rgba(255,255,255,0));
+  animation:hzFlPass .9s cubic-bezier(.65,0,.35,1) both}
+@keyframes hzFlPass{from{transform:translateY(-40px);opacity:1}to{transform:translateY(calc(var(--fl-h,240px)));opacity:0}}
+.hz aside.behind.landed .fl-n.done .fl-node{animation:hzFlTick .3s cubic-bezier(.16,1,.3,1) both}
+@keyframes hzFlTick{from{border-color:rgba(255,255,255,.6)}}
+.hz.hz-calm .fl-n,.hz.hz-calm .fl-src,.hz.hz-calm .fl-n.live::before,.hz.hz-calm aside.behind.landed .fl::after,.hz.hz-calm .fl-n.live .fl-t{animation:none}
+.hz.hz-calm .fl-n.live .fl-t{background:none;color:#fff}
+@media (prefers-reduced-motion:reduce){.hz .fl-n,.hz .fl-src,.hz .fl-n.live::before,.hz aside.behind.landed .fl::after,.hz .fl-n.live .fl-t,.hz aside.behind.landed .fl-n.done .fl-node{animation:none}
+  .hz .fl-n.live .fl-t{background:none;color:#fff}}
+/* THE DELIVERY (6b580, per Patrick: "Keep it super clean, super smooth"; "very sharp"): each new word fades in over
+   180 ms from nothing with a 1 px blur to exactly 0; no weight morph, no light, no sideways motion; a word on a new line
+   rises 4 px into place; settled words are plain text (the reveal re-wraps only the newest); the wrap and the kerning
+   are the landing's own, so nothing reflows when the answer lands; the draft is shown at full ink and only its changed
+   words cross-fade at the swap (250 ms); the end point is a 4 px silver mark gliding after the text, no glow, a slow
+   breath at most, fading at the landing. Calm: a plain fade. Reduced motion: the words simply appear. */
+.hz .msg.ai .body,.hz .msg.ai.live .body{text-wrap:wrap;font-kerning:normal}
+.hz .hz-ink{display:inline-block;width:auto!important}
+.hz .hz-ink.go{animation:hzWordIn .18s cubic-bezier(.16,1,.3,1) both}
+.hz .hz-ink.go.rise{animation:hzWordIn .18s cubic-bezier(.16,1,.3,1) both,hzLineRise .22s cubic-bezier(.16,1,.3,1) both}
+.hz .hz-ink.c{animation:hzInkFade .18s ease both}
+@keyframes hzWordIn{from{opacity:0;filter:blur(1px)}to{opacity:1;filter:blur(0)}}
+@keyframes hzLineRise{from{transform:translateY(4px)}to{transform:translateY(0)}}
+.hz .hz-chg{animation:hzInkFade .25s cubic-bezier(.16,1,.3,1) both}
+.hz .msg.ai .body.hz-chgall{animation:hzInkFade .25s cubic-bezier(.16,1,.3,1) both}
+.hz .msg.ai .body.prov{opacity:1}
+.hz .hz-star{width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:1px;background:rgba(232,234,240,.85);box-shadow:none;animation:hzEndBreath 1.6s ease-in-out infinite}
+.hz .hz-star::before,.hz .hz-star::after{display:none}
+@keyframes hzEndBreath{0%,100%{opacity:.85}55%{opacity:.5}}
+@media (prefers-reduced-motion:reduce){.hz .hz-ink,.hz .hz-chg,.hz .msg.ai .body.hz-chgall{animation:none!important}}
+/* a phone: the line stays one line: the shield alone, the sources by number */
+@media (max-width:600px){
+  .hz .hz-proof .pf-safe span,.hz .hz-proof .srcchip .sd{display:none}
+  .hz .hz-proof .pf-safe{padding:0 7px}
+  .hz .hz-proof .srcchip{padding:0 4px}
+  .hz .pf-steps{gap:8px}.hz .pf-steps li+li::before{width:8px}
+  .hz .pf-steps li{padding:0 7px;font-size:11.5px}
+  .hz .pf-steps li svg{display:none}
+  .hz .pf-time{margin-left:0;flex-basis:100%}
+  .hz .hz-card{padding:14px 12px}
+}
+/* one left edge for the question's column, the answer and the composer when the window is narrow (the composer sits 24 in) */
+@media (max-width:860px){.hz #main:not(:has(#hero)) #chat-inner{max-width:none;--hz-col-side:24px}}
+@media (prefers-reduced-motion:reduce){.hz .hz-card,.hz .pf-steps li{animation:none}}
+.hz.hz-calm .hz-card,.hz.hz-calm .pf-steps li{animation:none}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -56943,11 +57116,196 @@ function srcBox(srcs){
   const m=howCtx.m||{};
   const has=(srcs&&srcs.length)||(m.steps&&m.steps.length)||(m.usage&&m.usage.length)||(m.drafts&&m.drafts.length);
   if(!has)return "";
+  const o={steps:m.steps||[],usage:m.usage||[],drafts:m.drafts||[],run:m.run||null,running:[],live:false,
+      secs:0,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]};
   return '<aside class="behind worktree folded" aria-label="Behind this answer">'
-    +spineHTML({steps:m.steps||[],usage:m.usage||[],drafts:m.drafts||[],run:m.run||null,running:[],live:false,
-      secs:0,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]})
+    +(isHz()?flowHTML(o):spineHTML(o))   // the flow at rest (6b580); Classic keeps the spine
     +'</aside>';
 }
+// THE FLOW (6b580, per Patrick: "change the dynamics of the right panel, so it's not just a list of information; it's a
+// cool flow showing what's going on"). The column beside the answer is one vertical hairline with a small rounded-square
+// node per REAL stage of the run, from the same frames the spine reads: Sources, each draft with the machine that wrote
+// it, the review, the polish, the check, the answer. While it runs a soft silver light travels down the hairline into
+// the live node, whose label shimmers silver with a small live counter (its seconds, or the words written); sources slide
+// in as chips beside the Sources node as they are read; a finished node takes a crisp check and goes calm. At the landing
+// one pass of light runs down the line, then rest; the foot says the total time and, only when it is true, "Stayed on
+// your machines". "Show the numbers" opens the tokens and the pace on each node. Under the flow's width (hz-flow off) the
+// column folds into the proof line under the answer. Pure: the run in, the nodes out.
+function flowTag(c){if(!c)return "";if(isCloud(c))return whereName(c.w);if(c.w==="server")return machineOf(c);return IS_PC?"Your PC":"Your Mac";}
+function flowRows(o){
+  o=o||{};
+  const steps=(o.steps||[]).filter(Boolean),u=(o.usage||[]).filter(Boolean),used=new Set(),live=!!o.live,srcs=o.srcs||[];
+  const take=pred=>{const k=u.findIndex((x,j)=>!used.has(j)&&pred(x));if(k<0)return null;used.add(k);return u[k];};
+  const nums=c=>{const a=[];if(!c)return a;const est=c.x?"~":"";if(c.i)a.push(est+fmtTok(c.i)+" in");if(c.o)a.push(est+fmtTok(c.o)+" out");   // (not "const t=": 6b528's mutant anchors on spineRows' line)
+    if(c.d>0)a.push(fmtSecs(c.d/1000));return a;};
+  const st=id=>steps.find(s=>s.id===id),run=s=>live&&s&&s.s!=="done";
+  const real=(o.drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||""));
+  const R=[];
+  const w=st("wake");if(w)R.push({k:"wake",t:run(w)?"Waking your server":(w.l||"Woke your server"),state:run(w)?"live":"done",nums:[]});
+  const s1=st("search")||st("read"),webs=srcs.filter(s=>!/^know:/.test(s.u||""));
+  if(s1||webs.length){const c=take(x=>x.r==="search"),going=run(st("search"))||run(st("read"));
+    R.push({k:"search",t:"Sources",meta:srcs.length?srcs.length+(srcs.length===1?" source":" sources"):(going?"searching":""),state:going?"live":"done",tag:"",nums:nums(c),srcs:srcs});}
+  const pl=st("geo")||st("places");if(pl){const c=take(x=>x.r==="places");R.push({k:"places",t:"Places",state:run(pl)?"live":"done",nums:nums(c)});}
+  real.forEach((d,i)=>{const c=take(x=>x.r==="draft"&&x.m===d.m)||{m:d.m,w:String(d.m).indexOf(SRV_SEP)>0?"server":"local"};
+    R.push({k:"d"+i,t:(ORDINAL[i]||"Next")+" draft",tag:flowTag(c),state:"done",nums:nums(c)});});
+  if(live)(o.running||[]).forEach((m,j)=>{if(real.some(d=>d.m===m))return;const i=real.length+j;
+    R.push({k:"d"+i,t:(ORDINAL[i]||"Next")+" draft",tag:flowTag({m:m,w:String(m).indexOf(SRV_SEP)>0?"server":"local"}),state:"live",nums:[]});});
+  const nd=Math.max(real.length,u.filter(c=>c.r==="draft").length);
+  const rv=st("review");if(rv||u.some(c=>c.r==="review"||c.r==="peer")){const c=take(x=>x.r==="review"||x.r==="peer");
+    R.push({k:"review",t:"Review",tag:flowTag(c),state:run(rv)?"live":"done",nums:nums(c)});}
+  const fin=st("polish")||st("draft"),going=live&&!o.done;
+  const fc=take(x=>x.r==="final"||!x.r),fn=nums(fc);
+  if(fc&&fc.o&&!fc.x&&o.rateS>0){const t=fc.o/o.rateS;fn.push((t>=100?Math.round(t):t.toFixed(1))+" tok/s");}
+  const polishing=going&&(fin?fin.s!=="done":R.length>0&&!R.some(r=>r.state==="live"));
+  if(nd>1||R.some(r=>r.k==="review"))R.push({k:"polish",t:"Polish",tag:flowTag(fc),state:polishing?"live":(going&&!fin?"wait":"done"),nums:fn});
+  const vf=st("verify");if(vf){const c=take(x=>x.r==="verify");R.push({k:"verify",t:"Check",tag:flowTag(c),state:run(vf)?"live":"done",nums:nums(c)});}
+  const writing=going&&!R.some(r=>r.state==="live");
+  R.push({k:"answer",t:"Answer",tag:R.some(r=>r.k==="polish")?"":flowTag(fc),state:going?(writing?"live":"wait"):"done",
+    nums:R.some(r=>r.k==="polish")?[]:fn,words:true});
+  return R;
+}
+const FL_CHECK='<svg viewBox="0 0 12 12" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.6 6.2 2.1 2.1 4.7-4.9"/></svg>';
+function flowHTML(o){
+  o=o||{};
+  const rows=flowRows(o),f=proofFacts(o),live=!!o.live&&!o.done;
+  const t=o.run&&o.run.t>0?o.run.t:(o.secs>0?o.secs:0);
+  const li=r=>'<li class="fl-n '+r.state+'" data-k="'+esc(r.k)+'"><i class="fl-node" aria-hidden="true">'+(r.state==="done"?FL_CHECK:"")+'</i>'
+    +'<div class="fl-b"><div class="fl-h"><span class="fl-t">'+esc(r.t)+'</span>'+(r.tag?'<span class="fl-tag">'+esc(r.tag)+'</span>':"")
+    +(r.state==="live"?'<span class="fl-live"></span>':"")+(r.meta&&r.state!=="live"?'<span class="fl-meta">'+esc(r.meta)+'</span>':"")+'</div>'
+    +(r.srcs&&r.srcs.length?'<div class="fl-chips">'+r.srcs.slice(0,6).map((s,i)=>{let d="";if(/^know:/.test(s.u||""))d=s.p?String(s.p).split(/[\\/]/).pop():"note";
+      else{try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){d="";}}
+      return d?'<span class="fl-src" title="'+esc(s.t||d)+'" style="--i:'+i+'">'+esc(d)+'</span>':"";}).join("")+(r.srcs.length>6?'<span class="fl-src">+'+(r.srcs.length-6)+'</span>':"")+'</div>':"")
+    +(r.nums&&r.nums.length?'<div class="fl-num">'+r.nums.map(n=>'<span>'+esc(n)+'</span>').join("")+'</div>':"")
+    +'</div></li>';
+  return '<ol class="fl" aria-label="How this answer is made">'+rows.map(li).join("")+'</ol>'
+    +'<div class="fl-foot">'+(live?'<span class="fl-clock">'+(t>0?esc(fmtSecs(t)):"")+'</span>':(t>0?'<span class="fl-clock">Took '+esc(fmtSecs(t))+'</span>':""))
+    +(!live&&f.local?'<span class="fl-safe">'+PF_SHIELD+'Stayed on your machines</span>':"")
+    +(!live&&rows.some(r=>r.nums&&r.nums.length)?'<button type="button" class="fl-shownum" aria-expanded="false">Show the numbers</button>':"")+'</div>';
+}
+// between rebuilds: the live node's counter (its seconds, or the words on the page) and the clock
+function flowTick(box,secs){
+  const now=performance.now();box._starts=box._starts||{};
+  box.querySelectorAll(".fl-n.live").forEach(n=>{const k=n.dataset.k;if(!box._starts[k])box._starts[k]=now;
+    const c=n.querySelector(".fl-live");if(!c)return;let v;
+    if(k==="answer"||k==="polish"){const b=stepHost||null,tx=b?b.textContent.trim():"";const wc=tx?tx.split(/\s+/).length:0;v=wc?wc+(wc===1?" word":" words"):fmtSecs((now-box._starts[k])/1000);}
+    else v=fmtSecs((now-box._starts[k])/1000);
+    if(c.textContent!==v)c.textContent=v;});
+  const cl=box.querySelector(".fl-clock");if(cl&&box.classList.contains("live")){const v=secs>0?fmtSecs(secs):"";if(cl.textContent!==v)cl.textContent=v;}
+}
+// "Show the numbers": the tokens and the pace on each node; delegated, as the flow is rebuilt while it runs
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".fl-shownum");if(!b)return;
+  const box=b.closest("aside.behind");if(!box)return;const on=!box.classList.contains("nums");
+  box.classList.toggle("nums",on);b.setAttribute("aria-expanded",on?"true":"false");b.textContent=on?"Hide the numbers":"Show the numbers";
+});
+// the flow's width: the column beside the answer while the chat has room for it (640 + 40 + 240 and its margins),
+// else the proof line under the answer. Set once per resize, never during a run's paint, so the reading never moves.
+const HZ_FLOW_MIN=1000;
+function hzFlowFit(){const s=$("#chat-scroll");if(!s)return;const on=s.clientWidth>=HZ_FLOW_MIN;
+  if(document.documentElement.classList.contains("hz-flow")!==on)document.documentElement.classList.toggle("hz-flow",on);}
+// THE PROOF LINE (6b580, per Patrick: "let's start working on getting that right panel cleaned up and, coming from a
+// marketing aspect, a little more exciting and not just a ton of information. Or completely remove it even."). The
+// "Behind this answer" column is gone; under each finished answer one quiet line of silver hairline chips says where
+// it was made, the effort it took, the sources, and the privacy promise only when the run really stayed home. A click
+// on the line opens a compact card in place: the journey as step chips on one hairline, the time it took, the sources
+// with their titles, and "Show the numbers" folding today's figures (the spine) for whoever wants them. The default
+// view has no tokens, no pace and no hardware. Pure: the saved record or the live run in, the facts out.
+const PF_LEAVES=["search","read","geo","places"];   // steps that send words off your machines (a web search, a map lookup)
+function proofFacts(o){
+  o=o||{};
+  const u=(o.usage||[]).filter(Boolean),steps=(o.steps||[]).filter(Boolean),srcs=o.srcs||[];
+  const mine=u.filter(c=>!isCloud(c)),cloud=[...new Set(u.filter(isCloud).map(c=>whereName(c.w)))];
+  const homes=[...new Set(mine.map(c=>c.w==="server"?"s:"+machineOf(c):"l"))];
+  let where="";
+  if(homes.length===1&&!cloud.length)where=homes[0]==="l"?(IS_PC?"On this PC":"On this Mac"):"Made on "+homes[0].slice(2);
+  else if(homes.length>1&&!cloud.length)where="Your machines";
+  else if(!homes.length&&cloud.length)where="Made with "+cloud.join(" and ");
+  else if(homes.length&&cloud.length)where="Your machines and "+cloud.join(" and ");
+  const realDrafts=(o.drafts||[]).filter(d=>d&&!/^\(no answer/.test(d.t||"")&&!/\((review|rewrite)\)$/.test(d.m||"")).length;
+  const nd=Math.max(realDrafts,u.filter(c=>c.r==="draft").length);
+  const did=id=>steps.some(s=>s.id===id)||u.some(c=>c.r===id);
+  const reviewed=did("review")||did("peer"),checked=did("verify"),searched=did("search")||did("read")||srcs.some(s=>!/^know:/.test(s.u||""));
+  let effort="";
+  if(u.length||steps.length||nd){
+    if(nd<=1&&!reviewed&&!checked)effort="One pass";
+    else effort=(nd>1?nd+" drafts":"One draft")+(reviewed?", reviewed":"")+(checked?", checked":"");
+  }
+  // the privacy promise, only when it is true: every call on your machines (a Mac or your own servers), none in the
+  // cloud, and nothing looked up on the web or a map; an answer with no record of its calls makes no promise
+  const local=u.length>0&&!cloud.length&&!steps.some(s=>PF_LEAVES.indexOf(s.id)>=0)&&!u.some(c=>c.r==="search"||c.r==="places")
+    &&!srcs.some(s=>!/^know:/.test(s.u||""));
+  // the journey: three to five steps on one hairline
+  const J=[];
+  if(searched)J.push("Searched");
+  if(did("geo")||did("places"))J.push("Found places");
+  if(nd>1)J.push("Drafted ×"+nd);else if(nd===1&&(reviewed||checked))J.push("Drafted");
+  if(reviewed)J.push("Reviewed");
+  J.push(nd>1||reviewed?"Polished":(J.length?"Wrote":"One pass"));
+  if(checked)J.push("Checked");
+  const t=o.run&&o.run.t>0?o.run.t:(o.secs>0?o.secs:0);
+  return {where,effort,local,journey:J.slice(0,5),time:t>0?fmtSecs(t):"",srcs};
+}
+const PF_SHIELD='<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.75 2.75 3.6v4.1c0 3.1 2.2 5.4 5.25 6.55 3.05-1.15 5.25-3.45 5.25-6.55V3.6z"/><path d="m5.6 8.1 1.7 1.7 3.1-3.3"/></svg>';
+const PF_CHECK='<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 6.3 2.2 2.2 4.8-5"/></svg>';
+// a source in the line: its number and its domain (a personal one: its name), opening as the prose's pills do
+function proofSrc(s,i){
+  if(/^know:/.test(s.u||"")){const chat=/^know:chat:/.test(s.u),name=chat?(s.p||"chat"):(((s.p||"").split(/[\\/]/).pop())||"file");
+    return '<a class="srcchip know pf-src" href="#" data-know="'+esc(s.u)+'" title="'+esc(s.t||name)+'"><span class="sn">'+(i+1)+'</span><span class="sd">'+esc(name)+'</span></a>';}
+  let d="";try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){return "";}
+  return '<a class="srcchip pf-src" href="'+esc(s.u)+'" target="_blank" rel="noopener" title="'+esc(s.t||d)+'"><span class="sn">'+(i+1)+'</span><span class="sd">'+esc(d)+'</span></a>';
+}
+let PF_SEQ=0;
+function proofHTML(f,numbers){
+  const id="pfc"+(++PF_SEQ),say=[f.where,f.effort,f.local?"Stayed on your machines":""].filter(Boolean).join(". ");
+  const more=f.srcs.length>3?'<span class="pf-chip pf-more">+'+(f.srcs.length-3)+'</span>':"";
+  const line='<div class="hz-proof" role="group" aria-label="How this answer was made">'
+    +'<button type="button" class="pf-chip pf-open" aria-expanded="false" aria-controls="'+id+'" aria-label="'+esc(say)+'. Show how it was made">'+esc(f.where||f.effort)+'</button>'
+    +(f.where&&f.effort?'<span class="pf-chip pf-eff">'+esc(f.effort)+'</span>':"")
+    +f.srcs.slice(0,3).map(proofSrc).join("")+more
+    +(f.local?'<span class="pf-chip pf-safe" title="Stayed on your machines">'+PF_SHIELD+'<span>Stayed on your machines</span></span>':"")
+    +'<i class="pf-chev" aria-hidden="true"></i></div>';
+  const card='<div class="hz-card" id="'+id+'" hidden>'
+    +'<div class="pf-trip"><ol class="pf-steps">'+f.journey.map(s=>'<li>'+PF_CHECK+'<span>'+esc(s)+'</span></li>').join("")+'</ol>'
+    +(f.time?'<span class="pf-time">Took '+esc(f.time)+'</span>':"")+'</div>'
+    +(f.srcs.length?'<div class="pf-srcs"><div class="pf-h">Sources</div>'+srcList(f.srcs)+'</div>':"")
+    +(numbers?'<details class="pf-num"><summary><span class="pf-show">Show the numbers</span><span class="pf-hide">Hide the numbers</span></summary>'
+      +'<aside class="behind pf-behind" aria-label="The numbers">'+numbers+'</aside></details>':"")
+    +'</div>';
+  return line+card;
+}
+// draws the line and its card under a finished answer (live at the landing, or a reopened chat), once; the marginalia
+// that rode along while it worked goes, its figures redrawn inside the card
+function proofPaint(div,o){
+  if(!div||!isHz())return;
+  div.querySelectorAll(":scope>.hz-proof,:scope>.hz-card").forEach(x=>x.remove());
+  const f=proofFacts(o);
+  if(!f.where&&!f.effort&&!f.srcs.length)return;
+  // the flow beside the answer, settled: rebuilt from the record; a live one takes the landing's one pass of light
+  let fl=div.querySelector(":scope>aside.behind");const wasLive=!!(fl&&fl.classList.contains("live"));
+  if(!fl){fl=document.createElement("aside");fl.className="behind worktree folded";fl.setAttribute("aria-label","Behind this answer");div.appendChild(fl);}
+  fl.classList.remove("live","warm");fl._sig="";
+  fl.innerHTML=flowHTML({steps:o.steps||[],usage:o.usage||[],drafts:o.drafts||[],run:o.run||null,running:[],live:false,secs:o.secs||0,rateS:o.rateS||0,srcs:o.srcs||[]});
+  if(wasLive&&typeof hzMotionOK==="function"&&hzMotionOK()){const ol=fl.querySelector(".fl");if(ol)fl.style.setProperty("--fl-h",ol.offsetHeight+"px");
+    fl.classList.add("landed");setTimeout(()=>fl.classList.remove("landed"),1200);}
+  const u=(o.usage||[]).filter(Boolean);
+  const numbers=(u.length||(o.steps||[]).length)?spineHTML({steps:o.steps||[],usage:u,drafts:o.drafts||[],run:o.run||null,running:[],
+    live:false,secs:o.secs||0,first:o.first||0,rateS:o.rateS||0,srcs:[]}):"";
+  const body=div.querySelector(":scope>.body");
+  const tmp=document.createElement("div");tmp.innerHTML=proofHTML(f,numbers);
+  const at=body&&body.nextSibling;
+  [...tmp.children].forEach(n=>div.insertBefore(n,at||null));
+  div.classList.add("proofed");
+}
+// the line opens and closes its card; delegated, since a reopened chat redraws it (the 6b242 lesson)
+function proofToggle(line){
+  const b=line.querySelector(".pf-open"),card=b&&document.getElementById(b.getAttribute("aria-controls"));if(!card)return;
+  const open=card.hidden;card.hidden=!open;b.setAttribute("aria-expanded",open?"true":"false");line.classList.toggle("open",open);
+}
+inner.addEventListener("click",e=>{
+  const line=e.target.closest&&e.target.closest(".hz-proof");
+  if(!line||e.target.closest("a"))return;   // a source chip opens its source
+  proofToggle(line);
+});
 // THE CLAUDE TREATMENT, per Patrick: a place answer renders as a dark
 // multi-pin map with a card rail — the model hands over structured
 // places in a [[PLACES]] trailer, pins geocode through /api/geo, and
@@ -57128,7 +57486,7 @@ async function mountPin(id,la,lo,nm){
 let steps=[],stepHost=null;
 // what the spine beside the live answer reads (6b528): the run's USAGE frames,
 // its DRAFT frames, who is running now (RUN), the page's live pace and status
-let stepUsage=[],stepDrafts=[],stepRunning=[],stepRate=0,stepStatus="",stepComp="";
+let stepUsage=[],stepDrafts=[],stepRunning=[],stepRate=0,stepStatus="",stepComp="",stepSrcs=[];   // stepSrcs: the sources as read, for the flow (6b580)
 // what THIS run is expected to do (set at stream start) + live signals
 let stepPlan=[],answerChars=0,streamDone=false;
 // 6b257, per Patrick: the bar the user SEES is a tween chasing the
@@ -57314,7 +57672,8 @@ function paintSteps(){
   const sig=spineSig(o)+(nowBtn?(hurriedNow?"|h":"|n"):"")+(wakeSkipNow?"|w":"");
   if(box._sig===sig&&box.firstChild){spineTick(box,shown,el2,etaTxt);return;}
   box._sig=sig;
-  box.innerHTML=spineHTML(o);
+  if(isHz()){o.srcs=stepSrcs||[];box.classList.add("live");box.innerHTML=flowHTML(o);}   // the live flow (6b580)
+  else box.innerHTML=spineHTML(o);
   spineTick(box,shown,el2,etaTxt);
   if(!box.classList.contains("warm"))follow();
 }
@@ -57323,7 +57682,7 @@ function paintSteps(){
 // the in-place fast path above keeps each tick to one style write.
 // Hidden windows still skip (the rAF trap: nothing advances there).
 setInterval(()=>{
-  if(stepHost&&steps.length&&!streamDone&&!document.hidden)paintSteps();
+  if(stepHost&&(steps.length||isHz())&&!streamDone&&!document.hidden)paintSteps();   // Horizon's flow runs from the first frame (6b580)
 },200);
 // ANSWER NOW (6b257): delegated like the chevron — the card is
 // re-cloned from its HTML string on every drip frame, so a listener
@@ -57365,8 +57724,9 @@ function collapseSteps(srcs,info){
   // the machines and the sources under it: what the saved message shows again
   // when the chat is reopened (srcBox draws it from the record)
   box.classList.add("folded");
-  box.innerHTML=spineHTML({steps:steps,usage:info.usage||[],drafts:info.drafts||[],run:info.run||null,running:[],
-    live:false,secs:info.secs||0,first:info.first||0,rateS:info.rateS||0,srcs:srcs||[]});
+  {const o={steps:steps,usage:info.usage||[],drafts:info.drafts||[],run:info.run||null,running:[],
+    live:false,secs:info.secs||0,first:info.first||0,rateS:info.rateS||0,srcs:srcs||[]};
+   if(isHz()){box.classList.remove("live");box.innerHTML=flowHTML(o);}else box.innerHTML=spineHTML(o);}   // the flow at rest (6b580)
   box._sig="";
   stepHost=null;
 }
@@ -57496,13 +57856,7 @@ function msgActions(div,role,text){
         +mk("good","Good",ICO.good)+mk("bad","Not good",ICO.bad)
       :mk("edit","Edit and resend",ICO.edit));
   foot.appendChild(bar);
-  // DETAILS (6b542, per Patrick: calm by default): under Horizon the marginalia ("Behind this
-  // answer": the steps, the machines, the tokens, the timings) folds behind one small link,
-  // closed by default; Full keeps the column beside the answer. The sources stay in the prose.
-  if(role==="assistant"&&isHz()&&!foot.querySelector(".hz-details")){
-    const d=document.createElement("button");d.type="button";d.className="hz-details";d.setAttribute("aria-expanded","false");d.textContent="Details";
-    foot.insertBefore(d,bar);
-  }
+  // DETAILS (6b542) went with the column (6b580): the proof line under the answer opens its card (proofPaint)
 }
 inner.addEventListener("click",offerClick);   // the way on (6b570)
 inner.addEventListener("click",e=>{
@@ -57830,13 +58184,14 @@ function spineHTML(o){
 }
 // between rebuilds only the clock and the live step's hairline move
 function spineTick(box,shown,secs,eta){
+  if(box.querySelector(".fl")){flowTick(box,secs);return;}   // the flow's counter and clock (6b580)
   const bt=box.querySelector(".bt");
   if(bt){const t=(secs>0?fmtSecs(secs):"")+(eta?' <span class="wteta">'+esc(eta)+'</span>':"");if(bt.innerHTML!==t)bt.innerHTML=t;}
   const p=box.querySelector(".spine li.live .prog i");
   if(p)p.style.transform="scaleX("+(Math.max(0,Math.min(100,shown))/100)+")";
 }
 function spineSig(o){
-  return (o.steps||[]).map(s=>s.id+s.s+(s.d||"")).join("|")+"#"+(o.usage||[]).length+"#"+(o.drafts||[]).length
+  return (o.steps||[]).map(s=>s.id+s.s+(s.d||"")).join("|")+"#"+(o.usage||[]).length+"#"+(o.drafts||[]).length+"#"+(stepSrcs||[]).length
     +"#"+(o.running||[]).join(",")+"#"+(document.body.classList.contains("showmodels")?"m":"");
 }
 // the person's words: the sans, plain on the sky; attached files as chips with
@@ -57985,7 +58340,7 @@ function hzStarStart(div){
   if(!div||!hzStarOK())return;
   let el=div.querySelector(":scope>.hz-star");
   if(!el){el=document.createElement("i");el.className="hz-star";el.setAttribute("aria-hidden","true");div.appendChild(el);}
-  hzStar.el=el;hzStar.on=true;hzStar.x=hzStar.y=hzStar.tx=hzStar.ty=NaN;hzStar.at=0;
+  hzStar.el=el;hzStar.on=true;hzStar.x=hzStar.y=hzStar.tx=hzStar.ty=NaN;hzStar.at=0;hzStar.lineTop=null;hzStar.rise=null;hzStar.noInk=false;
   if(!hzStar.raf)hzStar.raf=requestAnimationFrame(hzStarFrame);
 }
 // the prose's text nodes in order (never the sources row or a code card), each with its start offset
@@ -58002,8 +58357,64 @@ function hzStarNodes(body){
 // lighter, settling to its weight in 280 ms ("wght" 320 > 400, bold and headings 450 > 600). Its box is held at
 // the rest weight's width, read as it lands (one layout read per paint, before the weight moves: .go starts it),
 // so no word reflows. Calm: a plain 220 ms fade, no light, no weight. Splitting from the tail keeps offsets true.
+// THE CADENCE'S PIECES (6b580), pure so the gauntlet runs them in node. hzWordsIn: the words that start in s[a,b).
+function hzWordsIn(s,a,b){let n=0,w=false;for(let i=a;i<b;i++){const sp=s.charCodeAt(i)<=32;if(!sp&&!w)n++;w=!sp;}return n;}
+// the rate the reveal eases toward, in words a second: the model's own pace inside 25-45 (up to 60 when far behind);
+// slowing toward nothing as the buffer runs low while the stream is open; the rest within about a second at the end
+function hzCadTarget(inRate,back,ended){
+  if(ended)return Math.max(45,back);
+  let t=Math.max(25,Math.min(45,inRate||0));
+  if(back>24)t=Math.min(60,t+(back-24)*.8);
+  if(back<4)t*=Math.max(0,back-1)/3;
+  return t;
+}
+// where the reveal may stop next from p: the end of the next whole word; inside a code fence the end of the line; a
+// table only once it is whole (then all of it); null to wait for more of the stream
+function hzNextStop(s,p,ended){
+  const n=s.length;if(p>=n)return null;
+  const fences=(s.slice(0,p).match(/^[ \t]*```/gm)||[]).length;
+  if(fences%2===1){const e=s.indexOf("\n",p);return e<0?(ended?n:null):e+1;}
+  let q=p;while(q<n&&s.charCodeAt(q)<=32)q++;
+  if(q>=n)return ended?n:null;
+  const ls=s.lastIndexOf("\n",q-1)+1,atLine=!/\S/.test(s.slice(ls,q));
+  if(atLine&&s.startsWith("```",q)){const e=s.indexOf("\n",q);return e<0?(ended?n:null):e+1;}
+  if(atLine&&s[q]==="|"){let e=ls;
+    while(e<n){const nl=s.indexOf("\n",e);const line=s.slice(e,nl<0?n:nl);if(!/^\s*\|/.test(line))return e;if(nl<0)return ended?n:null;e=nl+1;}
+    return ended?n:null;}
+  let e=q;while(e<n&&s.charCodeAt(e)>32)e++;
+  return e>=n&&!ended?null:e;
+}
+// a part-written answer, closed for the renderer: an open code fence, an open inline code, an open bold; so the words
+// already in place never change their look when the closer arrives
+function hzMdClose(t){
+  const f=(t.match(/^[ \t]*```/gm)||[]).length;if(f%2)return t+(t.endsWith("\n")?"":"\n")+"```";
+  const blk=t.slice(t.lastIndexOf("\n\n")+1),nc=blk.replace(/`[^`\n]*`/g,"");let out=t;
+  const tick=(nc.match(/`/g)||[]).length%2===1;
+  if(((tick?nc.replace(/`[^`]*$/,""):nc).match(/\*\*/g)||[]).length%2){out+=tick?"`**":"**";}else if(tick)out+="`";
+  return out;
+}
+// the words of a text, for the draft-to-final diff
+function hzWords(t){return String(t||"").split(/\s+/).filter(Boolean);}
+// which of b's words are new against a (a longest common subsequence, by word); null when too large to be quick
+function hzChangedWords(a,b){
+  const n=a.length,m=b.length;if(!m)return [];if(n*m>1600000)return null;
+  const A=a.map(w=>w.toLowerCase()),B=b.map(w=>w.toLowerCase()),L=[];for(let i=0;i<=n;i++)L.push(new Uint16Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)L[i][j]=A[i]===B[j]?L[i+1][j+1]+1:Math.max(L[i+1][j],L[i][j+1]);
+  const keep=new Uint8Array(m);let i=0,j=0;while(i<n&&j<m){if(A[i]===B[j]){keep[j]=1;i++;j++;}else if(L[i+1][j]>=L[i][j+1])i++;else j++;}
+  const out=[];for(let k=0;k<m;k++)if(!keep[k])out.push(k);return out;
+}
+// after the swap's paint: the changed words cross-fade in, the rest stays as it was
+function hzSwapMark(body,oldWords){
+  if(!body||!oldWords||!isHz())return;
+  const t=hzStarNodes(body),words=[];
+  t.nodes.forEach(o=>{const rx=/\S+/g;let w;while((w=rx.exec(o.n.data)))words.push({n:o.n,a:w.index,b:w.index+w[0].length,w:w[0]});});
+  const ch=hzChangedWords(oldWords,words.map(x=>x.w));
+  if(ch==null){body.classList.add("hz-chgall");setTimeout(()=>body.classList.remove("hz-chgall"),300);return;}
+  for(let k=ch.length-1;k>=0;k--){const x=words[ch[k]],n=x.n;if(x.b<n.data.length)n.splitText(x.b);const mid=x.a>0?n.splitText(x.a):n;
+    const sp=document.createElement("span");sp.className="hz-chg";mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);}
+}
 function hzStarWrap(nodes,segs){
-  const ink=[],calm=hzFxLevel()==="calm",A=segs[segs.length-1].a,B=segs[0].b;
+  const ink=[],calm=hzFxLevel()==="calm",A=segs[segs.length-1].a,B=segs[0].b,now=performance.now(),rz=hzStar.rise;
   const ageAt=p=>{for(const g of segs)if(p>=g.a&&p<g.b)return g.age;return segs[segs.length-1].age;};
   for(let k=nodes.length-1;k>=0;k--){
     const o=nodes[k],n=o.n,e=o.a+n.data.length;if(e<=A)break;if(o.a>=B)continue;
@@ -58012,21 +58423,30 @@ function hzStarWrap(nodes,segs){
     for(let i=words.length-1;i>=0;i--){const la=words[i][0],lb=words[i][1];
       if(lb<n.data.length)n.splitText(lb);
       const mid=la>0?n.splitText(la):n;
-      const sp=document.createElement("span");sp.className=calm?"hz-ink c":"hz-ink";sp.style.animationDelay=(-Math.round(words[i][2]))+"ms";
-      mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);ink.push(sp);}
+      // 6b580: the fade alone (opacity and a 1 px blur to exactly 0, 180 ms); a word on a new line also rises 4 px
+      const ws=o.a+la,rise=!calm&&rz&&ws>=rz.a&&now-rz.t<240;
+      const sp=document.createElement("span");sp.className=calm?"hz-ink c":(rise?"hz-ink go rise":"hz-ink go");
+      sp.style.animationDelay=(-Math.round(words[i][2]))+"ms"+(rise?", "+(-Math.round(now-rz.t))+"ms":"");
+      sp.dataset.a=ws;mid.parentNode.insertBefore(sp,mid);sp.appendChild(mid);ink.push(sp);}
   }
-  if(calm||!ink.length)return;
-  const wd=ink.map(x=>x.getBoundingClientRect().width);     // the rest weight's width, before the weight moves
-  ink.forEach((x,i)=>{x.style.width=wd[i]+"px";x.classList.add("go");});   // exact: a rounded width would nudge what follows
+  return ink;
 }
 // after a paint of the stream: the reveal, then the aim (one layout read, here and nowhere else)
 function hzStarPaint(body){
   if(!isHz()||!hzMotionOK()||!body)return;
   const now=performance.now(),m=hzStar.marks,t=hzStarNodes(body);
   if(m.length&&m[m.length-1].len>t.len)m.length=0;          // a RESET: the text started over
-  m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>320)m.shift();
+  m.push({len:t.len,t:now});while(m.length>2&&now-m[1].t>200)m.shift();   // 6b580: the fade is 180 ms, so a word is plain text again within 200 ms
   const segs=[];for(let k=m.length-1;k>0;k--){const a=m[k-1].len,b=m[k].len;if(b>a)segs.push({a:a,b:b,age:now-m[k].t});}
-  if(segs.length)hzStarWrap(t.nodes,segs);
+  if(hzStar.noInk){hzStar.noInk=false;m.length=0;m.push({len:t.len,t:now});hzStar.lineTop=null;hzStarAim(body);return;}   // the swap's paint: nothing fades but the changed words (6b580)
+  const ink=segs.length?hzStarWrap(t.nodes,segs):null;
+  // A NEW LINE RISES (6b580): when the newest word sits lower than the last paint's, the words on that new line rise
+  // 4 px into place (one read: the newest words' tops, here, with the aim's)
+  if(ink&&ink.length&&hzFxLevel()!=="calm"){const bt=body.getBoundingClientRect().top,top0=ink[0].getBoundingClientRect().top-bt;
+    if(hzStar.lineTop!=null&&top0>hzStar.lineTop+2){let a=+ink[0].dataset.a;
+      for(const x of ink){if(Math.abs(x.getBoundingClientRect().top-bt-top0)>2)break;a=+x.dataset.a;if(!x.classList.contains("rise")){x.classList.add("rise");x.style.animationDelay=x.style.animationDelay+", 0ms";}}
+      hzStar.rise={a:a,t:now};}
+    hzStar.lineTop=top0;}
   hzStarAim(body);          // a fresh walk: the wrap split the tail node, so the list above is stale
 }
 function hzStarAim(body){
@@ -58053,6 +58473,7 @@ function hzStarFrame(t){
 // the draft-to-polish swap (6b539): one quick pass down the answer's left edge, 350 ms, while the
 // polished text crossfades in; the loop holds until the next paint aims again
 function hzStarSweep(body){
+  return;   // 6b580: retired with the dissolve; the draft-to-final swap cross-fades only the changed words
   const s=hzStar;if(!s.on||!s.el||!s.el.animate||isNaN(s.x)||s.div!==body.parentElement)return;
   const br=body.getBoundingClientRect(),mr=s.div.getBoundingClientRect();
   const x=br.left-mr.left-10,y0=br.top-mr.top+8,y1=y0+Math.max(24,br.height-16);
@@ -58071,14 +58492,12 @@ function hzStarLand(div){
   s.el=null;
   if(!div||s.div!==div){el.remove();return;}
   const dot=div.querySelector(":scope>.who .dot");
-  let over=false;const done=()=>{if(over)return;over=true;el.remove();div.classList.remove("landing");div.classList.add("landed");if(dot)dot.classList.add("lit");};
+  let over=false;const done=()=>{if(over)return;over=true;el.remove();div.classList.remove("landing");div.classList.add("landed");};
   if(!dot||!el.animate||isNaN(s.x)||!hzMotionOK()){done();return;}
   div.classList.add("landing");
-  const dr=dot.getBoundingClientRect(),mr=div.getBoundingClientRect();
-  const x=dr.left-mr.left+dr.width/2,y=dr.top-mr.top+dr.height/2;
-  const a=el.animate([{transform:"translate("+s.x.toFixed(1)+"px,"+s.y.toFixed(1)+"px)",opacity:1},
-    {transform:"translate("+x.toFixed(1)+"px,"+y.toFixed(1)+"px) scale(1.5)",opacity:1}],{duration:400,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});
-  a.onfinish=done;setTimeout(done,480);
+  // 6b580: the end point simply fades where the text ends (200 ms); no flight, no lit dot
+  const a=el.animate([{opacity:1},{opacity:0}],{duration:200,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"});
+  a.onfinish=done;setTimeout(done,260);
 }
 // when the answer lands the sky is told; the star's landing is the whole of the show (6b544): no
 // light round the composer, no pass along its edge
@@ -58170,6 +58589,7 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   if(role!=="user"&&m.role&&m.offer)offerRow(div,m.offer);   // a reopened chat keeps the way on (6b570)
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
+  if(role!=="user"&&m.role&&text&&!m.stopped)proofPaint(div,{steps:m.steps,usage:m.usage,drafts:drafts,run:m.run,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]});   // 6b580
   inner.appendChild(div);
   // a new message, a send above all, re-pins the view to the end (6b425)
   chatPin(true);
@@ -58683,8 +59103,25 @@ function chatJumpPaint(){
 }
 function autoScroll(smooth){
   chatMoved();                      // a drag that hasn't fired its event yet
-  if(chatPinned)chatToBottom(smooth);
+  if(chatPinned){if(smooth==="ease")chatEase();else chatToBottom(smooth);}
   chatJumpPaint();
+}
+// THE EASED FOLLOW (6b580): while the answer streams, the view glides after the reading edge on the clock (a 110 ms
+// time constant, the same at 60 and 120 Hz) instead of jumping a line at a time. It stops the moment the reader
+// scrolls up (chatPinned, 6b425) and resumes only when they come back to the end. Reduced motion, a hidden window or
+// Classic: the plain jump.
+var chatEaseRaf=0,chatEaseAt=0;
+function chatEase(){
+  if(document.hidden||!isHz()||!(typeof hzMotionOK==="function"&&hzMotionOK())){chatToBottom(false);return;}
+  chatRoom();if(chatEaseRaf)return;chatEaseAt=0;
+  const step=t=>{chatEaseRaf=0;if(!chatPinned)return;
+    const dt=chatEaseAt?Math.min(64,t-chatEaseAt):16;chatEaseAt=t;
+    const top=Math.max(0,scroller.scrollHeight-scroller.clientHeight),cur=scroller.scrollTop,d=top-cur;
+    if(d<=.5){chatLastTop=cur;return;}
+    scroller.style.scrollBehavior="auto";scroller.scrollTop=cur+Math.max(1,d*(1-Math.exp(-dt/110)));scroller.style.scrollBehavior="";
+    if(scroller.scrollTop<=cur)scroller.scrollTop=top;           // an engine that rounds a small step away: land it
+    chatLastTop=scroller.scrollTop;chatEaseRaf=requestAnimationFrame(step);};
+  chatEaseRaf=requestAnimationFrame(step);
 }
 function chatPin(smooth){chatPinned=true;chatToBottom(smooth);chatJumpPaint();}
 scroller.addEventListener("wheel",e=>{
@@ -58868,7 +59305,7 @@ async function send(){
   // the run's own numbers (6b528): every model call's tokens (USAGE) and the
   // server's clock (DONE); the spine beside the answer reads them live
   let usage=[],runInfo=null;
-  stepUsage=usage;stepDrafts=drafts;stepRunning=[];stepRate=0;stepStatus="";stepComp="";
+  stepUsage=usage;stepDrafts=drafts;stepRunning=[];stepRate=0;stepStatus="";stepComp="";stepSrcs=[];
   // the live line ticks on its own clock, from the first second (6b528)
   liveLinePaint(aiDiv);
   const liveT=setInterval(()=>{if(!document.hidden)liveLinePaint(aiDiv);},200);
@@ -59005,16 +59442,42 @@ async function send(){
       // other column, outside this body, so a repaint here can't touch it or
       // restart anything in it (the 6b462 lift-out is no longer needed); the
       // byline's word carries the status until the first text lands
-      body.innerHTML=annIn(myChat,()=>renderMD(txt.replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
+      if(txt&&!aiDiv.classList.contains("writing"))aiDiv.classList.add("writing");   // the working line steps aside as the words arrive (6b580): nothing moves at the landing
+      const part=txt.length<full.length||!streamEnded;   // a part-written answer is closed for the renderer (6b580)
+      body.innerHTML=annIn(myChat,()=>renderMD((part&&isHz()?hzMdClose(txt):txt).replace(/\n?\[\[PLACES\]\][\s\S]*$/,"")))
         // the sources sit under the words they back, from the first line on (6b528)
         +(searched&&sources&&sources.length?srcRow(sources):"");
       if(globalThis.hzReady&&typeof hzStarPaint==="function")hzStarPaint(body);   // the reveal and the star's aim (6b544)
       requestAnimationFrame(()=>wireFlow(body));
-      if(curChat===myChat)autoScroll();
+      if(curChat===myChat)autoScroll("ease");   // an eased follow of the reading edge (6b580)
     };
-    const dripTick=()=>{
+    // THE CADENCE (6b580, per Patrick: "a prettier streaming or query delivery effect. Keep it super clean, super
+    // smooth"). A small buffer between the wire and the page: the words leave it at a steady rate that follows the
+    // model's own pace (25-45 a second as a rule, up to 60 when far behind), with a breath after a sentence; as the
+    // buffer runs low the rate eases toward nothing, so a model that pauses makes the text pause gracefully instead of
+    // stuttering in catch-up bursts; when the stream ends the rest flows out within about a second. A word is shown
+    // only once it is whole; a table waits until it is whole and arrives whole; code arrives a line at a time
+    // (hzNextStop). The rate is eased on the clock, the same at 60 and 120 Hz.
+    const cad={rate:30,budget:0,last:0,inRate:30,inT:0,inLen:0,hold:0};
+    const cadIn=()=>{const now=performance.now();if(full.length<cad.inLen)cad.inLen=0;
+      if(!cad.inT){cad.inT=now;cad.inLen=full.length;return;}
+      const dt=(now-cad.inT)/1000;if(dt<.08)return;
+      cad.inRate=cad.inRate*.7+Math.min(200,hzWordsIn(full,cad.inLen,full.length)/dt)*.3;cad.inT=now;cad.inLen=full.length;};
+    let swapLen=0,swapWords=null;   // the draft a RESET holds on screen, for the word-by-word crossfade (6b580)
+    const dripTick=(now)=>{
       if(dripOff)return;
-      // THE DRAFT HOLDS THE SCREEN (6b539, per Patrick): the polish's RESET
+      now=typeof now==="number"?now:performance.now();
+      // DRAFT TO FINAL (6b580): the draft stays on screen at full ink while the polish gathers; then only the words
+      // that changed cross-fade in (250 ms); unchanged text is never touched, so it never flickers
+      if(swapHold&&isHz()){
+        const ready=streamEnded||full.length>=swapLen*.9||(now-swapAt>6000&&full.length>=200);
+        if(!ready){requestAnimationFrame(dripTick);return;}
+        swapHold=false;cad.last=now;
+        let L=full.length;if(!streamEnded){const m=/\s\S*$/.exec(full);L=m?m.index+1:0;}
+        dripShown=L;hzStar.noInk=true;paintStream(full.slice(0,L));hzSwapMark(body,swapWords);swapWords=null;
+        cad.hold=now+260;requestAnimationFrame(dripTick);return;
+      }
+      // THE DRAFT HOLDS THE SCREEN (6b539, per Patrick; Classic): the polish's RESET
       // used to empty the answer and start it again from nothing. The shown
       // prose now stays, dimmed, until the replacement has a few lines (or
       // the stream ends, or 4 s pass), then a short crossfade swaps them;
@@ -59037,10 +59500,21 @@ async function send(){
       if(dripShown>=full.length){dripOn=false;
         if(streamEnded)paintStream(full);
         return;}
-      const lag=full.length-dripShown;
-      dripShown=Math.min(full.length,
-        dripShown+Math.max(2,Math.ceil(lag*0.055)));
-      paintStream(full.slice(0,dripShown));
+      const dt=cad.last?Math.min(.1,(now-cad.last)/1000):.016;cad.last=now;
+      if(now<cad.hold){requestAnimationFrame(dripTick);return;}   // a cross-fade finishing
+      const ahead=full.length-dripShown,back=ahead>600?Math.round(ahead/6):hzWordsIn(full,dripShown,full.length);
+      const target=hzCadTarget(cad.inRate,back,streamEnded);
+      cad.rate+=(target-cad.rate)*(1-Math.exp(-dt/.25));
+      if(streamEnded&&cad.rate<target)cad.rate=target;           // the last of it never dawdles
+      cad.budget=Math.min(cad.budget+cad.rate*dt,3);              // a stalled frame never bursts
+      let moved=false;
+      while(cad.budget>=1){const e=hzNextStop(full,dripShown,streamEnded);if(e==null)break;
+        const chunk=full.slice(dripShown,e);dripShown=e;moved=true;
+        cad.budget-=/^\s*\|/.test(chunk)?3:1;
+        if(!streamEnded&&/[.!?]["'\u2019)\]]*$/.test(chunk.replace(/\s+$/,"")))cad.budget-=.6;   // a breath after a sentence
+      }
+      if(moved)paintStream(full.slice(0,dripShown));
+      if(dripShown>=full.length&&!streamEnded){dripOn=false;return;}   // caught up: the next chunk wakes it
       requestAnimationFrame(dripTick);
     };
     const kickDrip=()=>{if(!dripOn){dripOn=true;requestAnimationFrame(dripTick);}};
@@ -59095,7 +59569,7 @@ async function send(){
                      if(drafts.length!==draftsGot){
                        draftsGot=drafts.length;etaMark=performance.now();}
                  }catch(e){}},
-        SOURCES:j=>{try{sources=JSON.parse(j);}catch(e){}},
+        SOURCES:j=>{try{sources=JSON.parse(j);stepSrcs=sources||[];}catch(e){}},
         PHOTOS:j=>{try{photos=JSON.parse(j);}catch(e){}},
         MAP:j=>{try{mapd=JSON.parse(j);}catch(e){}},
         CTX:j=>{try{locCtx=(JSON.parse(j).loc)||"";}catch(e){}},
@@ -59142,19 +59616,24 @@ async function send(){
       // Patrick: "started streaming all over again while flickering").
       // raw keeps the marker for the rest of the stream, so testing
       // cut>=0 on every chunk zeroed the reveal every few hundred ms
-      if(cut>=0&&cut!==dripCut){dripCut=cut;dripShown=0;body.classList.remove("prov");
+      if(cut>=0&&cut!==dripCut){dripCut=cut;body.classList.remove("prov");
+        if(isHz()&&body.textContent.trim()&&!swapHold){   // the draft holds at full ink; the changed words cross-fade (6b580)
+          swapHold=true;swapAt=performance.now();swapLen=dripShown;swapWords=hzWords(hzStarNodes(body).nodes.map(o=>o.n.data).join(" "));dripShown=0;}
+        else{dripShown=0;
         // the old prose holds, at its height, until the new has words (6b539)
         if(body.textContent.trim()&&!swapHold){swapHold=true;swapAt=performance.now();
           const h=body.getBoundingClientRect().height;if(h>0)body.style.minHeight=h+"px";
-          body.classList.add("swapwait");}
+          body.classList.add("swapwait");}}
       }
       if(!answerChars&&full.length)etaMark=performance.now();  // text began (6b459)
       answerChars=full.length;  // drafting progress is real text
-      if(steps.length)paintSteps();
+      if(steps.length||isHz())paintSteps();
       liveLinePaint(aiDiv);              // the live line follows the frames (6b528)
+      cadIn();                           // the model's own pace, for the cadence (6b580)
       kickDrip();
     }
     streamEnded=true;streamDone=true;
+    kickDrip();                          // the buffer's last words flow out (6b580)
     // a card nobody answered before the run ended ran nothing (6b309)
     aiDiv.querySelectorAll(".apcard:not(.decided)").forEach(c=>{
       c.classList.add("decided","no");
@@ -59163,7 +59642,7 @@ async function send(){
     });
     if(steps.length)paintSteps();
     // let the reveal catch up (capped — a hidden window throttles rAF)
-    for(let w=0;w<60&&dripShown<full.length;w++)
+    for(let w=0;w<110&&dripShown<full.length;w++)
       await new Promise(r=>setTimeout(r,30));
     // the swap's height pin and classes go with the stream (6b539)
     body.style.minHeight="";body.classList.remove("swapwait","swapout","swapin");
@@ -59252,6 +59731,8 @@ async function send(){
       +(hereFrom.asleep?" was asleep, so ":" didn\u2019t answer, so ")+(IS_PC?"this PC":"this Mac")+" answered.</div>");
   if(full&&!isErr&&!aiDiv.querySelector(".mact"))
     msgActions(aiDiv,"assistant",stripTokens(full));
+  if(full&&!isErr&&!wasAborted)proofPaint(aiDiv,{steps:steps.map(s=>({id:s.id,l:s.l,s:"done",d:s.d})),usage:usage.slice(),drafts:drafts,run:runInfo,secs:secs0,
+    first:genT0?(genT0-t0)/1000:0,rateS:(rateInfo&&rateInfo.s)||0,srcs:searched&&sources?sources:[]});   // the proof line (6b580)
   if(!full&&!wasAborted){
     const rb=document.createElement("button");
     rb.className="retrybtn";rb.textContent="Try again";
@@ -66909,11 +67390,13 @@ function hzSkyBoot(){
     if(launch&&hm){const far=new Set();while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))far.add(Math.floor(Math.random()*n));
       P.forEach((p,i)=>{p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1300+Math.random()*300;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});}
     else P.forEach(p=>{p.born=now;});
-    return {P,...b,hm,clock:0,t0:launch&&hm?now-600:now,key:(hm?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth,nextUp:now+3000+Math.random()*3000};}
+    // in a conversation the field is short-lived (6b580, per Patrick: "we don't have to litter the place with stars"):
+    // it shows for a few seconds after Ultra arrives (HZ_CONV_STARS.life) and fades out over .9 s; the matrix stays
+    return {P,...b,hm,clock:0,t0:launch&&hm?now-600:now,life:hm?0:now+HZ_CONV_STARS.life,key:(hm?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth,nextUp:now+3000+Math.random()*3000};}
   function drawField(nowT,on,dt){if(!field)return;if(ultraE<.002&&!on){field=null;return;}
     const live=fxLive();if(live)field.clock+=dt;const H_=field.y1-field.y0,drift=field.clock*4;
-    if(++fieldChk%30===0){const cb=R(cbox());if(cb&&(home()?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth!==field.key){field=buildField(false);if(!field)return;}}   // the composer moved: re-seat it
-    const fin=Math.min(1,(nowT-field.t0)/600);
+    if(++fieldChk%30===0){const cb=R(cbox());if(cb&&(home()?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth!==field.key){const lf=field.life,hm0=field.hm;field=buildField(false);if(!field)return;if(lf&&!hm0&&!field.hm)field.life=lf;}}   // the composer moved: re-seat it (a conversation's stars keep their end, 6b580)
+    const fin=Math.min(1,(nowT-field.t0)/600)*(field.life?Math.max(0,Math.min(1,(field.life-nowT)/900)):1);
     if(live&&nowT>field.nextUp){field.nextUp=nowT+4000+Math.random()*4000;const p=field.P[Math.floor(Math.random()*field.P.length)];if(!p.up)p.up=nowT;}
     for(const p of field.P){const sw=Math.sin(field.clock*p.w+p.ph),twv=p.sh?Math.pow(.5+.5*sw,4):.5+.5*sw;
       const yw=field.y0+(((p.y-field.y0-drift)%H_)+H_)%H_;let y=yw,edge=Math.max(0,Math.min(1,(yw-field.y0)/14,(field.y1-yw)/14)),a=p.a*(1-p.amp+p.amp*twv);const born=Math.min(1,(nowT-p.born)/600);
@@ -66960,8 +67443,9 @@ function hzSkyBoot(){
   function column(){if(!home()){const ci=R($("#chat-inner"));if(ci)return ci;}const a=R(greetEl()),b=R(cbox());if(!b)return null;return {left:Math.min(a?a.left:b.left,b.left),right:Math.max(a?a.right:b.right,b.right)};}
   function streak(m,nowT,len,head,amp){const u=(nowT-m.t0)/m.d;if(u<0)return true;if(u>=1)return false;const e=1-Math.pow(1-u,2),a=Math.min(1,u/.15)*Math.min(1,(1-u)/.35)*ultraE*amp,hx=m.x0+m.dx*e,hy=m.y0+m.dy*e,tl=Math.min(e,len);
     pfx.line(m.x0+m.dx*(e-tl),m.y0+m.dy*(e-tl),hx,hy,1.1,[.86,.91,1],0,.9*a);pfx.star(hx,hy,head,WHITE,a,0);return true;}
-  function skyFx(nowT,t,dt){if(!pfx)return;pfx.clear();const on=lift();
-    drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,on);
+  function skyFx(nowT,t,dt){if(!pfx)return;pfx.clear();const on=lift(),hmOn=on&&home();   // the star signs, constellations and shooting stars are the home's (6b580)
+    if(!home()){cons=null;shoot=null;shower.length=0;rain.length=0;}
+    drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,hmOn);
     if(ultraE<.002&&!ultraWant){cons=null;shoot=null;rain.length=0;shower.length=0;}
     else{
     if(cons){const age=nowT-cons.t0,fade=age<1100?1:Math.max(0,1-(age-1100)/1200);if(fade<=0)cons=null;else{
@@ -66970,7 +67454,7 @@ function hzSkyBoot(){
         const [x0,y0]=P[i],[x1,y1]=P[j];pfx.line(x0,y0,x0+(x1-x0)*e,y0+(y1-y0)*e,.8,ICE,.3*fade*ultraE,.42*fade*ultraE);}
       lit.forEach(i=>pfx.star(P[i][0],P[i][1],5.5,WHITE,.5*fade*ultraE,0));}}
     // SHOOTING STARS: one every 6-10 s in Full (10-16 s in Balanced), 500 ms, in the upper sky beside the column, never over it
-    if(on&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot){nextShoot=nowT+(skyMode==="full"?6000+Math.random()*4000:10000+Math.random()*6000);
+    if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot){nextShoot=nowT+(skyMode==="full"?6000+Math.random()*4000:10000+Math.random()*6000);
       const ex=rects(),col=column(),s_=side(),sl=s_?s_.right+20:20;
       const regs=col?[[sl,col.left-24],[col.right+24,innerWidth-20]].filter(r=>r[1]-r[0]>=120):[];
       if(regs.length){const r=regs[Math.floor(Math.random()*regs.length)],L=Math.min(260,120+Math.random()*140,r[1]-r[0]-10),ang=(18+Math.random()*14)*Math.PI/180,dir=Math.random()<.5?1:-1;
@@ -66982,7 +67466,7 @@ function hzSkyBoot(){
         f.band={x0:dir>0?x:x+L,y0:y,dx:dir*L,dy:10+Math.random()*16,t0:nowT,d:450};f.nextBand=nowT+(skyMode==="full"?12000+Math.random()*6000:25000+Math.random()*10000);}}
     if(field&&field.band&&!streak(field.band,nowT,.45,3.6,.85))field.band=null;
     // METEOR SHOWERS: every 60-90 s in Full (110-130 s in Balanced; the first 20 s after arriving), 3-5 from one radiant
-    if(on&&ultraE>.9&&fxLive()){if(!nextShower)nextShower=nowT+(skyMode==="full"?20000:50000);
+    if(hmOn&&ultraE>.9&&fxLive()){if(!nextShower)nextShower=nowT+(skyMode==="full"?20000:50000);
       if(nowT>nextShower){nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);const hd=R($("#hz-top")),g=R(greetEl()),hm=home();
         const y0=(hd?hd.bottom:64)+18,y1=hm&&g?Math.max(y0+60,g.top-18):Math.min(innerHeight*.3,y0+160),s_=side(),x0=s_?s_.right+20:20,x1=innerWidth-20;
         if(y1-y0>=50&&x1-x0>300){const dir=Math.random()<.5?1:-1,ang=(16+Math.random()*12)*Math.PI/180,n=3+Math.floor(Math.random()*3);let tt=nowT;
@@ -66991,7 +67475,7 @@ function hzSkyBoot(){
     for(let i=shower.length-1;i>=0;i--)if(!streak(shower[i],nowT,.45,3.8,.9))shower.splice(i,1);
     if(shoot&&!streak(shoot,nowT,.42,4.5,1))shoot=null;
     // THE STAR RAIN: tiny stars falling slowly at the far left and right edges, out of the reading area
-    if(on&&ultraE>.5&&fxLive()&&nowT>nextRain&&rain.length<22){nextRain=nowT+350+Math.random()*300;const band=Math.min(innerWidth*.06,90),lf=Math.random()<.5;
+    if(hmOn&&ultraE>.5&&fxLive()&&nowT>nextRain&&rain.length<22){nextRain=nowT+350+Math.random()*300;const band=Math.min(innerWidth*.06,90),lf=Math.random()<.5;
       rain.push({x:lf?4+Math.random()*(band-4):innerWidth-4-Math.random()*(band-4),y:-10+Math.random()*innerHeight*.3,v:14+Math.random()*16,sw:2+Math.random()*4,ph:Math.random()*6.28,per:3+Math.random()*2,s:1.6+Math.random()*1.6,a:.35+Math.random()*.4,t0:nowT,col:HZ_UCOL[Math.floor(Math.random()*HZ_UCOL.length)]});}
     for(let i=rain.length-1;i>=0;i--){const d=rain[i],age=(nowT-d.t0)/1000;if(fxLive())d.y+=d.v*dt;const out=Math.max(0,Math.min(1,(innerHeight*.86-d.y)/80));if(out<=0){rain.splice(i,1);continue;}
       pfx.star(d.x+Math.sin(age*6.283/d.per+d.ph)*d.sw,d.y,d.s*2.4,d.col,d.a*(.6+.4*Math.sin(age*2.1+d.ph))*Math.min(1,age/.6)*out*ultraE,0);}
@@ -67030,7 +67514,7 @@ function hzSkyBoot(){
     if(!S.ready){S.ready=true;cv.classList.add("on");}
     const ke=still?1:1-Math.exp(-dt/EASE_S);calm+=(calmTo-calm)*ke;if(Math.abs(calmTo-calm)<.002)calm=calmTo;fw+=(fwTo-fw)*ke;tw+=(twTo-tw)*ke;c2E+=(c2To-c2E)*ke;spd+=(spdTo-spd)*ke;
     [twistNow,arcNow]=twistAt(nowT);
-    const br=breath(nowT);if(!still)skyClock+=dt*br[1];const t=skyClock,m=S.vmap(t);
+    const br=breath(nowT);if(!still)skyClock+=dt*br[1]*(home()?1:HZ_CONV_STARS.clock);const t=skyClock,m=S.vmap(t);   // slower behind a conversation (6b580)
     if(skyMode!=="full"&&!lift())S.boost=0;else S.boost+=(S.boostTo-S.boost)*(1-Math.pow(.97,dt*60));
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,vtex);
     if(hasVid){try{gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,vid);}catch(e){hzS.mediaOn=false;document.documentElement.classList.add("hz-novfx");return;}}
@@ -67118,7 +67602,7 @@ function hzSkyBoot(){
     else if(on&&lift()){surgeAt=n;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
       nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+9000+Math.random()*6000;sign=null;nextShower=0;
       if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=n+360;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
-      requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant)cons=buildCons(skyClock);}));}
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
     shoot:!!shoot,shower:shower.length,rain:rain.length,aur:{cx:+AW.cx.toFixed(3),w:+AW.w.toFixed(3),spl:+AW.spl.toFixed(3),rch:+AW.rch.toFixed(3)},breath:breath(performance.now()),hmix:+hmix.toFixed(3),held,fw:+fw.toFixed(3),calm:+calm.toFixed(3),
@@ -67154,6 +67638,7 @@ function hzBurstBoot(){
     if(parts.length){raf=requestAnimationFrame(loop);tm=setTimeout(()=>loop(performance.now()),60);}}   // a timer beside the frame: a hidden page still clears
   const go=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);};
   hzS.burst={burst(cx,cy,half){const t=performance.now(),home=!!$("#hero"),g=$("#hero .greet"),gr=g?g.getBoundingClientRect():null,cb=$("#composer"),top=cb?cb.getBoundingClientRect().top:cy;let hero=0;
+      if(!home&&cb){hzBurstConv(cb.getBoundingClientRect(),half,Math.random).forEach(q=>{q.t0+=t;parts.push(q);});go();return;}   // a conversation's lighter burst (6b580)
       const H=(hzS.sky&&hzS.sky.hangs?hzS.sky.hangs():[]).map((h,i)=>[h,i]).filter(([h])=>home&&gr&&(h[2]>gr.right+24||h[2]<gr.left-24)&&(h[2]>innerWidth/2)===(cx>innerWidth/2)).map(([,i])=>i);
       const above=Math.max(0,cy-top);
       [[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));for(let k=0;k<n;k++){const isHero=w===0&&k%10===0&&hero<6;if(isHero)hero++;const small=w>0,drift=H.length&&Math.random()<.4;
@@ -67165,6 +67650,21 @@ function hzBurstBoot(){
     glint(cx,cy){parts.push({glint:true,t0:performance.now(),x:cx,y:cy,s:16,dur:400});go();},
     off(){offAt=performance.now();go();},count(){return parts.length;}};
   return hzS.burst;
+}
+// THE STARS IN A CONVERSATION (6b580, per Patrick: "why are they shoved off to the right? ... we don't have to litter the
+// place with stars"). On the home the burst leaves the knob, as before. In a conversation the knob is the header's slider
+// at the top right, and the burst and the field used to spawn from its x, clumping at the composer's right end. There they
+// are anchored centred over the composer's top edge and spread across its width: about half the home's count (Balanced
+// half again), rising 14-46 px and gone in 1.3-2.1 s; the field above the box shows for 3.6 s and fades; no star signs,
+// constellations or shooting stars; the sky's clock at half speed. Pure, so the gauntlet runs them in node.
+const HZ_CONV_STARS={share:.5,life:3600,clock:.5,durMax:2100};
+function hzUAnchor(home,c,kx){if(home)return kx;return c&&c.width?c.left+c.width/2:kx;}
+function hzBurstConv(c,half,rnd){
+  const out=[];if(!c||!c.width)return out;const pad=Math.min(24,c.width*.06),x0=c.left+pad,w=Math.max(1,c.width-2*pad);
+  [[60,0],[36,200],[24,400]].forEach(([n,dl],wv)=>{n=Math.round(n*HZ_CONV_STARS.share*(half?.5:1));for(let k=0;k<n;k++){const f=(k+rnd())/n,small=wv>0;
+    out.push({t0:dl,x:x0+f*w,y:c.top,a:-Math.PI/2+(rnd()-.5)*.7,d:small?14+rnd()*20:20+rnd()*26,k:5+rnd()*2.5,p1:rnd()*6.28,p2:rnd()*6.28,rise:1+rnd()*2,
+      tg:null,j:[0,0],dur:1300+rnd()*(HZ_CONV_STARS.durMax-1300),s:small?2+rnd()*2.2:2.6+rnd()*2.8,c:HZ_UCOL[Math.floor(rnd()*HZ_UCOL.length)]});}});
+  return out;
 }
 function hzHourNow(){const d=new Date(hzNow());return d.getHours()+d.getMinutes()/60;}
 // the moonlight's place: the Moon's real side (waxing: right; waning: left), high
@@ -67501,11 +68001,14 @@ function hzMachinesPaint(){
   // its state. Full shows the dies. Both are drawn; the Effects level picks one in CSS.
   const esc_=ms.length?ms[0].esc:(s=>String(s)),working=ms.some(m=>m.working),awake=ms.some(m=>!m.asleep);
   const dot='<div class="hz-mdot'+(working?" working":"")+(awake?"":" asleep")+'" role="listitem" tabindex="0" aria-label="'+esc_(ms.map(m=>m.name+", "+m.st.toLowerCase()).join("; "))+'">'
-    +'<i class="dot"></i><span class="tip">'+ms.map(m=>'<span class="mr"><strong>'+esc_(m.name)+'</strong><span class="st'+(m.asleep?" off":"")+'">'+esc_(m.st)+'</span></span>').join("")+'</span></div>';
+    +'<i class="dot"></i><span class="tip">'+ms.map(m=>'<span class="mr"><strong>'+esc_(m.name)+'</strong><span class="st'+(m.asleep?" off":"")+'">'+esc_(m.st)+'</span></span>'
+      +hzMachineHw(m,esc_)).join("")+'</span></div>';   // the chip's word and the hardware under each name (6b580: the chips folded in)
   el.innerHTML=dot+ms.map(m=>'<div class="hz-rig rig '+m.v+(m.asleep?" asleep":"")+(m.working?" working":"")+(hzS.inUse&&hzS.inUse.has(m.id)?" in-use":"")+'" role="listitem" tabindex="0" data-id="'+m.esc(m.id)+'" data-machine="'+m.esc(m.name)+'">'
     +'<i class="die"></i><b>'+m.esc(m.label)+'</b><span class="tip"><strong>'+m.esc(m.name)+'</strong>'+(m.hw?'<span>'+m.esc(m.hw)+'</span>':'')+'<span class="st">'+m.esc(m.st)+'</span></span></div>').join("");
   if(document.documentElement.classList.contains("hz-ready")||hzS.rigsOn)el.querySelectorAll(".hz-rig").forEach(r=>r.classList.add("on"));
 }
+// what a header chip used to say ("MLX", "NVIDIA") and the hardware, as one quiet line under the machine's name in the dot's card
+function hzMachineHw(m,esc_){const w=[m.label&&m.label!==m.name?m.label:"",m.hw||""].filter(Boolean).join(", ");return w?'<span class="hw">'+esc_(w)+'</span>':"";}
 function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu:null;hzS.mem=mem;}
 // THE LANES (6b555, per Patrick: the preview's look in the app): Chat · Code · Funnels once, as the header's glass
 // segmented control; the lit box (.hz-seg-hi) slides to the chosen lane by the nav's data-m (css, 200 ms on --out)
@@ -67659,7 +68162,8 @@ function hzSkyUltra(on,smash){
   const S=hzS.sky;if(!S||!S.ultra)return;
   if(!on){S.ultra(false);return;}
   const cb=$("#composer"),c=cb?cb.getBoundingClientRect():null;
-  S.ultra(true,hzS.ukx!=null?hzS.ukx:(c?c.left+c.width/2:null),c?c.top:null,!!smash);
+  const x=hzUAnchor(!!$("#hero"),c,hzS.ukx);   // the knob's x on the home; the composer's centre in a conversation (6b580)
+  S.ultra(true,x!=null?x:(c?c.left+c.width/2:null),c?c.top:null,!!smash);
 }
 function hzUltraAngle(){
   const cb=$("#composer"),tr=$("#hz-effort .hz-sl-track");if(!cb||!tr)return;
@@ -67705,7 +68209,7 @@ function hzUltraFire(){
   void root.offsetWidth;root.classList.add("hz-ignite");
   hzSkyUltra(true,true);                                        // the sky's part of the release and the hang
   const full=hzFxLevel()==="full",c=cb?cb.getBoundingClientRect():null,b=hzBurstBoot();
-  if(b&&c&&hzS.ukx!=null){b.burst(hzS.ukx,c.top,!full);b.glint(hzS.ukx,c.top);}
+  if(b&&c&&hzS.ukx!=null){const ax=hzUAnchor(!!$("#hero"),c,hzS.ukx);b.burst(ax,c.top,!full);b.glint(ax,c.top);}   // 6b580: centred in a conversation
   // the greeting's rim light rides the hang: it rises as the matrix's wave reaches the greeting (Full 1.16 s, at full;
   // Balanced .86 s, at half) and fades over 1.2 s
   const g=$("#hero .greet");clearTimeout(hzS.rimT);
@@ -68264,6 +68768,7 @@ function hzInit(){
   // the header refits whenever it, its groups or the page under it change size (a window resize, the sidebar, the
   // conversation's title, the mode and effort moving in)
   if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzHeaderFit());["#hz-top","#hz-right","#hz-title","#chat-inner"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}
+  hzFlowFit();if(typeof ResizeObserver==="function"&&$("#chat-scroll"))new ResizeObserver(()=>hzFlowFit()).observe($("#chat-scroll"));   // the flow's column or the proof line (6b580)
   addEventListener("resize",()=>{hzHeaderFit();setTimeout(hzHeaderFit,120);});   // and once more after the window settles
   hzUpdateWire();
   try{if(localStorage.getItem("millen.sbhide")==="1")root.classList.add("sbhide");}catch(e){}
@@ -68287,10 +68792,7 @@ function hzInit(){
   const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything";
   // the send key is ember only while there are words to send (6b542)
   if(inp){const ht=()=>{const c=$("#composer");if(c)c.classList.toggle("hastext",!!inp.value.trim());};inp.addEventListener("input",ht);ht();hzS.hasText=ht;}
-  // the Details fold under an answer (6b542): the marginalia opens on its link
-  const scrl=$("#chat-scroll");if(scrl)scrl.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".hz-details");if(!b)return;
-    const m=b.closest(".msg");if(!m)return;const open=!m.classList.contains("details");m.classList.toggle("details",open);
-    b.setAttribute("aria-expanded",open?"true":"false");b.textContent=open?"Hide details":"Details";});
+  // the Details fold (6b542) went with the column (6b580): the proof line opens its card (proofToggle)
   addEventListener("visibilitychange",hzPauseSync);
   addEventListener("blur",()=>{clearTimeout(hzS.blurT);hzS.blurT=setTimeout(()=>{hzS.blurred=true;hzPauseSync();},60000);});
   addEventListener("focus",()=>{clearTimeout(hzS.blurT);if(hzS.blurred){hzS.blurred=false;hzPauseSync();}});
@@ -68300,8 +68802,8 @@ function hzInit(){
   const inner=$("#chat-inner");
   if(inner&&window.MutationObserver)new MutationObserver(()=>{if(!root.classList.contains("hz"))return;
     hzPlaceEffort();hzTitlePaint();hzSidebarLabel();setTimeout(hzGlowFit,80);
-    const home=!!$("#hero");if(home&&!hzS.home){hzWashBloom();hzHomePaint();}hzS.home=home;}).observe(inner,{childList:true});
-  hzS.home=!!$("#hero");
+    const home=!!$("#hero");if(home&&!hzS.home){hzWashBloom();hzHomePaint();}hzS.home=home;root.classList.toggle("hz-work",!home);}).observe(inner,{childList:true});
+  hzS.home=!!$("#hero");root.classList.toggle("hz-work",!hzS.home);   // a working view: the flat ground over the dimmed sky (6b580)
   if(root.classList.contains("hz")){
     hzStart();
     if(hzS.debug)hzDebugApply();
