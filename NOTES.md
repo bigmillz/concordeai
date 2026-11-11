@@ -21231,6 +21231,28 @@ the page's own nodes moved):
   that does nothing would be dishonest; a real light theme is its own piece of work (see Left). The web demo already
   has the cog and ⌘, (its working copy carries another helper's uncommitted edits, so it was not touched).
 
+**Servers, much cleaner** (Patrick ~06:40, on Settings › Models › Servers: "It still looks like way too much for me, bud.
+Like, we can make this much cleaner."). The card said the server's own error sentence three times (status, Sleep,
+Models), "Sent to Ollama1. The relay answered." under an error, six buttons, "Token saved" and a Code footnote. Horizon
+now draws `sxSrvCard` in place of `srvCard` (one line in `paintServers`; the same data-a and data-k, so every handler is
+the one that was there; Classic keeps its card):
+- The pane is "Servers" with one short line (the cloud-compositor disclosure); the explainer and "Advanced." go; the
+  setup guide and scripts move under each card's Advanced.
+- One card a server: the name, the host in small grey, ONE status word: Awake (it answered), Asleep (it didn't, but the
+  relay or Wake-on-LAN can wake it, or the server says so), Can't reach (ember), Not paired. The server's sentence is
+  never printed; Test still says what it found.
+- Wake, a silver key, only when asleep; pressing it shows "Waking…" in the status and the card re-reads at 20, 45 and 80 s
+  (the old "Sent to …. The relay answered." is gone; a failure says "Couldn't wake it. Try again.").
+- "Use for answers" (a squared switch). Models as chips when awake; when not, one grey line "Models show when it's awake."
+  "Sleeps after [30] min idle" with its switch, only when the setting was read (asleep, nothing to show).
+- Advanced at the card's foot: what the switch covers ("Answers in Fast, Thinking, Pro and Code. Code agents may send a
+  folder you choose to this server."), Test, Pair again, Change token, the wake relay's address and token with Save,
+  Clear and Test relay, the model sets (only when awake), Setup guide · Scripts, and Remove server in quiet ember text.
+- "Pair a server", one quiet key under the cards, opens the add form (hidden until then).
+Measured with stand-in servers only (`scratchpad/b4-polish/stub-servers.js`: one asleep through its relay, one awake;
+never the real one): no console errors, nothing hidden under anything, Chromium and WebKit at 1440, 760 and 390 (390's
+sideways overflow is the sky's own layers, the same on f9148e1).
+
 **One type system.** In Horizon `--sans` is Inter (the system's sans until the file is bundled), so everything that
 fell to Space Grotesk by default is Inter; the greeting keeps Space Grotesk by name, the wordmark Michroma. Mono is
 for code only: the table heads are 12/600 sentence case, the ordered-list numbers, citations, the flow's numbers, the
@@ -21336,6 +21358,18 @@ strength: 6b551's What's new pin follows the new header (a nightly still never s
   "Version 7.0 beta 2" (new label over the existing date and Check now); About's list labels "VERSION/CHIP/MEMORY/MODELS"
   → "Version/Chip/Memory/Models", "ACCEL" removed, the version reads "7.0 beta 2 (build 279)"; the Effects note
   "Balanced is the default. Full is the whole show." → "How much the sky moves." (Calm, Balanced, Full kept).
+- Servers: heading "Your servers" → "Servers"; "Advanced. A server you run answers faster and keeps more local. Setup
+  guide · Scripts" → removed (the links under each card's Advanced); "Pair with the code on the server's screen. Its models
+  answer when you pick them. A server that can't answer says so; nothing answers in its place. With a cloud compositor,
+  its drafts go to that provider to be combined." → "Drafts leave your machines only when a cloud model combines them.";
+  status "Paired · <the server's sentence>" / "Paired · reachable · 18 ms · Ollama 0.12.3" → "Asleep" / "Awake" / "Can't
+  reach"; "Token saved"/"No token" → removed from the card; "Wake server" → "Wake"; "Use for Fast, Thinking, Pro and
+  Code" → "Use for answers" (the detail moves to Advanced as "Answers in Fast, Thinking, Pro and Code. Code agents may
+  send a folder you choose to this server."); "Sleep when idle" + "N minutes" + "Sleeps after this long idle. Wakes when
+  you ask." → "Sleeps after N min idle"; new "Models show when it's awake."; "Waking…"; "Couldn't wake it. Try again.";
+  "Sent to Ollama1. The relay answered." → removed; "Wake relay. A service on your network that wakes the server when
+  you're away." → "Wake relay"; "×" → "Remove server"; "Add a server" form behind a new "Pair a server" key; pairing
+  placeholder "XXXX-XXXX-XXXX" + "Type the code from the server's pairing window." → "Code from the server's screen".
 - Settings, simpler: rail "Account" + "Personality" → "You" (heading too); new labels "What should Concorde call you?"
   and "Anything to keep in mind?"; placeholders "Name" → "Optional", "Be direct. I work in finance; assume I know the
   vocabulary." → "Short answers, and say what you're unsure of."; new "Advanced" disclosure in About, You and Your stuff;

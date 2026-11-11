@@ -47121,6 +47121,55 @@ for d_, m_ in _px_mw:
     _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "errs", "mutated")}))
 check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
       all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
+# (6) Servers, much cleaner (Patrick: "It still looks like way too much for me, bud"): the page's own sxSrvState and
+# sxSrvCard in node, on stand-in servers (one asleep through its relay, one awake, one gone, one unpaired)
+def _px_srv_js(pg):
+    js_ = pg[pg.index("// ==== polish-js (6b625): begin ===="):pg.index("// ==== polish-js (6b625): end ====")]
+    out_ = ("const esc=s=>String(s==null?'':s).replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));\n"
+            "var srvArmed={},srvMsgs={},srvMsgKind={},srvPairOpen={},srvTokOpen={},srvSleep={},srvSets={};\n"
+            "function srvAsleep(s){return !!(s&&s.paired&&s.only&&s.only.asleep);}\n"
+            "function srvSleepView(z){return z&&z.st==='ok'?{unknown:false,disabled:false,checked:!!z.enabled,minutes:z.minutes}:{unknown:true,disabled:true};}\n"
+            "function srvSetsHtml(s){return '<div class=\"srv-sets\">Models on '+esc(s.name)+'</div>';}\n"
+            "function srvWakeNote(){return '';}\nconst $$=()=>[{href:'https://x/guide',textContent:'Setup guide'}];\n")
+    for h in ("var sxSrvAdv=", "var SX_SRV_WORD="):
+        out_ += _px_line(js_, h)
+    return out_ + _jsfn(js_, "function sxSrvState(s){") + _jsfn(js_, "function sxSrvCard(s){")
+_PX_SRV = r"""
+const ERR="Ollama1 didn’t answer. It may be off or asleep. Nothing was sent anywhere else.";
+const asleep={id:"a",name:"Ollama1",host:"ollama1.example.net",paired:true,prefer:true,wakeable:false,relay:{url:"http://10.0.0.5:8080",has_token:true},status:{at:0,err:ERR},only:{ok:false,asleep:false},models:[]};
+const awake={id:"b",name:"Studio",host:"studio.local",paired:true,prefer:true,status:{at:1,latency_ms:9},only:{ok:true},models:[{name:"Gemma 4 26B"},{name:"Qwen 3.8 27B"}],gen:{image:true}};
+const gone={id:"c",name:"Old box",host:"old.example",paired:true,status:{at:0,err:"Old box didn’t answer."},only:{ok:false},relay:{}};
+const unp={id:"d",name:"New",host:"new.local",paired:false,status:{}};
+srvSleep.b={st:"ok",enabled:true,minutes:30};
+const T=h=>h.replace(/<[^>]+>/g," ").replace(/\s+/g," ").trim();
+const ca=sxSrvCard(asleep),cb=sxSrvCard(awake);sxSrvAdv.a=true;const co=sxSrvCard(asleep);
+const o={st:[asleep,awake,gone,unp,Object.assign({},gone,{wakeable:true}),Object.assign({},gone,{only:{asleep:true}})].map(sxSrvState),
+ asleep:[T(ca),/data-a="sxwake">Wake</.test(ca),(ca.match(/didn’t answer/g)||[]).length,/data-a="prefer"/.test(ca),/data-a="test"/.test(ca)],
+ awake:[T(cb),/data-a="sxwake"/.test(cb),/class="sx-chip">Gemma 4 26B</.test(cb),/data-a="sleepmin"[^>]*value="30"/.test(cb),/Models show/.test(cb)],
+ open:["test","repair","tok","relaysave","relaytest","rm"].map(a=>co.indexOf('data-a="'+a+'"')>=0).concat([/Remove server/.test(co),/Setup guide/.test(co),/Fast, Thinking, Pro and Code/.test(co),(co.match(/didn’t answer/g)||[]).length])};
+process.stdout.write(JSON.stringify(o));
+"""
+def _px_srv(pg):
+    try:
+        return _node_json(_px_srv_js(pg) + _PX_SRV, "srv625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _px_srv_ok(o):
+    a_, w_ = o.get("asleep") or [], o.get("awake") or []
+    return (o.get("st") == ["asleep", "awake", "unreach", "unpaired", "asleep", "asleep"]
+            and a_[:1] == ["Ollama1 ollama1.example.net Asleep Wake Use for answers Models show when it’s awake. Advanced"]
+            and a_[1:] == [True, 0, True, False]
+            and w_[:1] == ["Studio studio.local Awake Use for answers Gemma 4 26B Qwen 3.8 27B Images Sleeps after min idle Advanced"]
+            and w_[1:] == [False, True, True, False]
+            and o.get("open") == [True, True, True, True, True, True, True, True, True, 0])
+_px_s6 = _px_srv(page)
+_px_s6m = [("an error shown as the status", 'esc(waking&&st!=="awake"?"Waking…":SX_SRV_WORD[st])', 'esc((s.status||{}).err||SX_SRV_WORD[st])'),
+           ("a relay-wakeable server called unreachable", '||s.wakeable||(s.relay&&s.relay.url))return "asleep";', ')return "asleep";'),
+           ("Wake offered when awake", '(st==="asleep"&&!waking?', '(!waking?'),
+           ("Test on the card's face", "h+='<div class=\"srv-msg'+(srvMsgKind[s.id]", "h+='<button data-a=\"test\">Test</button><div class=\"srv-msg'+(srvMsgKind[s.id]")]
+_px_s6r = [(d_, _px_srv_ok(_px_srv(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _px_s6m]
+check("6b625 Servers, much cleaner (the page's sxSrvState and sxSrvCard, in node): one status word (Awake, Asleep, Can't reach), a server the relay or Wake-on-LAN can wake Asleep never an error, the server's error sentence never printed, Wake only when asleep, Use for answers, chips when awake and one grey line when not, Sleeps after N min idle, and Test, Pair again, Change token, the wake relay, the guide and Remove server only under Advanced; four mutants caught",
+      _px_srv_ok(_px_s6) and all(r_ is False for _, r_ in _px_s6r), "%r %r" % (_px_s6, _px_s6r))
 # ==== 6b625 the polish: end ====
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
