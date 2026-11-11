@@ -22928,3 +22928,128 @@ dragged from the background in one go): Pat's call. The sidebar's shut state and
 (localStorage), so a port change forgets them. The draft in the composer follows you across lanes. Tab order puts
 Attach after the mode and the effort slider, and the header last. About shows the chip as "M4 PRO". Search never
 ran here by rule (the search engines are rate-limiting this Mac's address).
+
+## 6b650 — funnels-1: the pick honours every choice, has a shape, cites what it found; the wait says what it's doing (7.0 beta 5, per Patrick)
+
+Per Patrick: "I want the queries that come back to be perfect, like Fable level, and the funnels to be just as
+perfect." Branch `funnels-1` from beta-4 (2b2d6ef, after 6b640's waiting line and pick check). The id is the next free
+one I could see; the release owner may renumber.
+
+**What was wrong (measured, before).** Ten scripted funnels (laptop, phone, NAS, apartment, used car, vacation, coffee
+machine, a gift, a gym plan, a TV; `scratchpad/fn1/scenarios.py`: a persona per scenario that clicks the option
+carrying its choice and types it when no option does) on a dev copy with this Mac's local models (Gemma 4 26B, no
+cloud, no server) and the stand-in search. Rubric /10 each: every hard choice honoured (3), a real current product
+with a price and a date (2), the trade-off in two lines (1), a cheaper and a premium alternate (1), no
+self-contradiction (1), the stage counter (1), every question sharp and necessary (1). **Before: 47.5/100.**
+- The walkthrough's bug is real and 6b640's check passes it: "MacBook Air 13-inch ... While your 14-inch preference
+  points toward the Pro" mentions 14, so `funnel_pick_conflicts` finds no conflict. It also asked "budget?" after
+  "Budget up to $1,500", then broke the lower budget it had just been given (Brooklyn Heights at "$2,200").
+- No prices, no dates, never an alternate; 2023 models as current (Pixel 8, M3 MacBook Pro "through education
+  pricing", LG C3); an invented program ("Gray Hulk Dumbbell Full Body Split"); garbage ("NVIDIA-standard",
+  "Under $ বেতন $600"); claims contradicting a click ("meets your need for low profile" for a Forester, "ultra-compact"
+  for a bean-to-cup).
+- Classic's status line still said "Stage 6…" after 5 of 5 (6b640 fixed only Horizon's line).
+- The wait showed one line for 4-20 s and nothing at all while a cold model loaded (13-22 s on the first stage).
+
+**Now.**
+- **The walls** (`funnel_walls`): the requirements' price (a ceiling unless the words say a floor, "a month" kept),
+  every number with its unit (exact; "under 40 minutes" a ceiling; "65 inches+" a floor; "14-inch to 15-inch" a range;
+  a session length a ceiling; storage a floor, 1 TB meets "512GB"), and each pick in words. Numbered into the writer.
+- **The check reads the pick itself** (`funnel_verify`): its name, specs and price, never the prose around it (the
+  6b640 gap): a number on the wrong side of a wall, a price over the ceiling, a family the choice rules out (a Windows
+  laptop for a Mac, an iPhone for Android, front-wheel drive for AWD; "Macs and a Windows PC" rules nothing out), the
+  model's own `misses`, an alternate that isn't cheaper or pricier than it claims. A pick that misses gets one rewrite
+  on the model that wrote it (the better of the two kept); one that still misses says so in a plain line on the card
+  ("Heads up: …"); an alternate that breaks a wall is dropped, and one over the budget only becomes "Nothing pricier
+  fits. The next step up, X, is $Y." A verdict that comes back in prose (no JSON twice) gets the same check on its
+  first line and the same one rewrite.
+- **The research**: the requirements' search (`funnel_queries`[0]: "best laptop under $1,500 2026") starts at stage 1
+  and is read by the next stages from the cache (`funnel_market`), so options are things the market has inside the
+  requirements; the verdict adds a search with the picks, both side by side, snippets only (no page reads), eight rows.
+  The writer takes names, prices and stores from them and cites them; the card says "Prices checked Nov 11, 2026" with
+  the hosts, or "Prices from memory, not checked online. Check before you buy." when search is off or empty.
+- **The pick has a shape**: strict JSON (`funnel_verdict_ask`, the 6b260 voice plus `FUNNEL_JSON_TAIL`), parsed and
+  mended (`_fn_json_mend`: a trailing comma, a pick left open, the object closed early — all three seen from Gemma),
+  checked, settled, rendered to markdown for the chat (follow-ups, Classic, copy) and saved with the turn as `fn` so a
+  reopened funnel draws the card. A tender decision (`_TENDER_RX`) keeps the prose verdict: a priced card is the wrong
+  voice there.
+- **The card** (Horizon): the pick as a graphite hero on the composer's 14 px corner (name 21 px Inter 600, price and
+  where, the specs, two lines of why, the miss line, "Why not the others" folded), the cheaper and premium alternates
+  as two flat cards (radius 10, one column under 640 px), "Next", the sources. No shadow, glow, circle or rose.
+- **Stages**: a question about what the requirements settle (budget with a $ in them, days a week, session length,
+  trip length) fails the gate (`_fn_settled_ok`), and a stage this Mac wrote now gets the same one more try as a
+  server's (told why); options must be concrete values ("14-inch", "macOS"), the first question the one that rules out
+  most. A local engine that fails or says nothing once is tried again before the stock "what matters most?".
+- **The wait**: `/api/funnel/progress?run=` (the page's id for the funnel), read every 700 ms while a stage or the
+  pick is coming: "Writing question 2 of 5", "Loading Gemma 4 26B · about 40 s", "Searched the web · 8 results from
+  bestbuy.com, apple.com, rtings.com", "Writing your pick", "Checking it against your choices · 5 choices to meet",
+  "Fixing the pick · it is 13-inch, not the 14-inch you chose", "Checked against your choices · meets all 5". Horizon
+  lists them under the wait's line (a 6 px square while running, the check when done); Classic's status line says the
+  newest. Classic's line uses `fnWaitLabel` now.
+- **Speed**: typing a goal (1.2 s pause, 6+ characters) calls `/api/funnel/warm`: this Mac's MLX model loads while the
+  person types (only when no cloud model or server would take the stage) and the requirements' search is made. The
+  pick is written on the stages' own model when it's a strong one (`FUNNEL_VERDICT_LOCAL`), no multi-GB swap (the
+  ladder had picked Qwen 3.6 35B MoE when it fit, which cost 13-26 s and invented street addresses).
+- Dev only: `MILLENAI_SEARCH_FIXTURE` (with `MILLENAI_SEARCH_STUB`) gives the stand-in engine recorded hits by
+  keyword; `scratchpad/fn1/search-fixture.json` is invented test data (not real listings or prices).
+
+**Measured, after: 88.5/100** (same personas, same models, same machine; `scratchpad/fn1/runs/{before,after-final}`):
+
+| scenario | before | after | after's pick |
+|---|---|---|---|
+| laptop | 1.5 | 9 | MacBook Pro 14-inch (M5) · $1,449 (v0 run before: MacBook Air 13-inch) |
+| phone | 4 | 8.25 | Google Pixel 10 · $649 (heavier than the "Lightweight" click, said) |
+| NAS | 6.5 | 8.5 | Synology DS425+ · $459.99 (its cheaper alternate is 2-bay, said in words: not caught) |
+| apartment | 3 | 9 | Prospect Lefferts Gardens · $2,700/mo, 33 min |
+| used car | 5.5 | 9.25 | 2020 Subaru Forester Premium AWD · $19,995 |
+| vacation | 5.5 | 9.25 | Hyatt Ziva Cancún, 7 nights all-inclusive + flights · $3,708 |
+| coffee | 3 | 7.75 | Breville Bambino Plus · $399.95 (wand, not the clicked carafe) |
+| gift | 6.5 | 8.5 | Haws watering can · $110 (the persona's odd "monthly delivery" path, said) |
+| gym | 5.5 | 9.5 | Dumbbell Stopgap · $0 |
+| TV | 6.5 | 9.5 | Hisense 65" U8 Mini-LED · $999.99 |
+
+Every after-pick names a real (fixture) product with its price, store and the date checked, two lines of why, and
+"Why not the others"; 10/10 structured; no pick breaks a numbered wall; counter right in all 20 runs. Alternates: 4 with
+both, 5 with one real and the honest "nothing pricier fits", 1 with one. Time (local Gemma 4 26B, a busy machine,
+load 5-14): end to end median 22.2 s → 29.6 s, the pick 4.1 s → 9.1 s (the JSON is longer and the research is in it),
+a stage 3.5 s → 3.8 s; the warm hides the first stage's cold load (8.9-13.4 s in the sweeps) behind typing.
+
+**Seen in a real WKWebView** (`scratchpad/fn1/wk`, the b4-lanes harness on this copy's real `/api/funnel`, local model, Balanced): a whole laptop funnel at 1440 (start, a stage, its wait with "Writing question 3 of 5", "Weighing your choices…" with "Searched the web · 6 results from bestbuy.com, apple.com, rtings.com" and "Writing your pick", the card) and the reopened card at 760; no sideways scroll, no console errors, Inter, the hero's 14 px corner, `elementFromPoint` hits both alternates and the fold. Two things the pane would not have shown: the steps were first an `ol`, and the answer's list counters (`.body ol>li::before`) numbered them with a box — they are divs now; the fold wore the reasoning fold's glass box (`.body details`), now reset. Stills: `scratchpad/fn1/stills/`.
+
+**Tests.** `# ==== 6b650 funnels` (5 checks, 30 mutants): the walls and the check on the pick in-process (14 cases,
+16 mutants: the pick read through its words, the price ceiling, the unit, the families, a range, a floor, the model's
+misses, a dropped alternate, the kinds, two of a kind, the mend, an early-closed object, storage, a settled budget,
+the warmed search); the wiring by source (6 mutants: the check, the rewrite, the saved card, a pick one stage early,
+the gate, the fixture outside a dev copy); the counter in node, Horizon's and Classic's lines (2 mutants); the card and
+the steps on the page's own functions plus the css (6 mutants: a javascript: link, three alternates, unescaped steps,
+a shadow, the watch never stopped, the sweep in Calm); the progress door live. Also moved pins: 6b334's `_p2_funnel`
+stand-ins gained `_fn_settled_ok`, `_fn_say`, `_fn_load_say`. Run: a trimmed copy on 9995 (the prelude, 6b622's lanes,
+6b640, 6b650, the two live funnels and the p2 funnel checks); 51/53: every funnel check passes (6b650's five, 6b622's lanes, the real funnel to its verdict, LOC-9, the two p2 funnel checks with the moved pin `cloud=use_cloud, market=_market)`); the two reds are not Funnels: 6b640's small-talk check can't find a module-level name the trim leaves out, and 6b640's find-in-chat mutant was not caught on this trimmed copy (not chased: no Funnels code is near it; worth one look in the next full run). No full gauntlet was run (one at a time on this machine).
+
+**Copy (for Patrick)** — new or changed, Horizon unless said:
+- the wait (Classic): "Stage 6…" → "Stage 6 of 6…" / "Weighing your choices…" (as Horizon), then " · " + the newest step
+- the wait's steps (new): "Writing question 2 of 5" → "Wrote question 2 of 5"; "Asking again · that question wasn't a
+  good one"; "Trying again · the model didn't answer"; "Loading Gemma 4 26B · about 40 s"; "Searching the web · <the
+  query>" → "Searched the web · 8 results from a, b, c" / "The web didn't answer · working from what the model knows";
+  "No web search here"; "Writing your pick" → "Wrote your pick"; "Checking it against your choices · 5 choices to
+  meet" → "Checked against your choices · meets all 5" / "· one doesn't fit, and it says so"; "Fixing the pick · <what
+  missed>"; "Writing it in words"
+- the card: "The pick" (kept); "Why not the others"; "Cheaper" / "Premium"; "Nothing pricier fits." + "The next step
+  up, <name>, is <price>."; "Next"; "Prices checked <date> · <hosts>"; "Sources · <hosts>"; "Prices from memory, not
+  checked online. Check before you buy."; the miss line "Heads up: it costs $1,599, over your $1,500." / "…it is
+  13-inch, not the 14-inch you chose." / "…you chose a Mac, and this isn't one."
+- the chat's copy of the verdict (Classic shows it): "**<name>** · <price> at <where>", two lines, "**Why not the
+  others**", "**Cheaper:** …", "**Premium:** …", "**Next:** …", "Prices checked <date>: <links>"
+
+**Open / worth knowing.**
+- A model can still offer an alternate that breaks a choice in words the check can't read ("lacks the requested 4
+  bays", "you lose the automatic milk texturing"), or bend a soft pick ("Lightweight"); the numbers, prices and the
+  families are what's checked.
+- Questions are better, not perfect: a "how much do you value X vs Y" axis and options that don't answer their own
+  question still slip through on Gemma 4 26B.
+- Measured against invented fixture hits, never the real web (the rule of 2026-11-11). Real search snippets carry fewer
+  prices; then the card says "Sources" and the prices are the model's, marked "about".
+- Cloud: the 6b271 audit still runs; on a structured pick its correction becomes the one rewrite's instruction rather
+  than replacing the card. Not run here (a dev copy has no keys).
+- Small safe wins that could still go into beta 4: Classic's "Stage N of M…" (one line in `fnStep`), and the
+  check-the-first-line guard on the prose verdict (it catches the walkthrough's 13-inch where 6b640's doesn't).
