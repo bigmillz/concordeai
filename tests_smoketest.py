@@ -45863,14 +45863,16 @@ ch.stderr.on("data", async d => {
   await size(1440); out.badge.none = await ev(MEASURE);
   await ev(`(async()=>{window.__upd=true;await checkUpdate();})()`); await sleep(400);
   for (const w of [1440, 760, 390]) { await size(w); out.badge["w" + w] = await ev(MEASURE); }
-  // THE HOME, BARE (per Patrick: the recent chats under the composer "look tacky"): with chats saved, back on the home
-  // there are no recent-chat rows and no suggestion chips, and the composer sits at the golden point
+  // THE HOME (6b555 bare; beta 4, per Patrick's target picture: three quiet recent chats under the composer): with chats
+  // saved, back on the home there are one to three recent-chat rows, the composer's width, and no suggestion chips, and
+  // the composer still sits at the golden point
   out.home = {};
   for (const w of [1440, 390]) { await size(w); await ev(`document.querySelector("#newchat").click()`); await sleep(900);
     out.home["w" + w] = await ev(`(()=>{const v=e=>{const r=e.getBoundingClientRect(),c=getComputedStyle(e);return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"&&+c.opacity>0;};
-      const rows=[...document.querySelectorAll('#main [aria-label="Recent chats"],#main .hz-row,#suggest button,#suggest .chip,#suggest a')].filter(v).length;
+      const rows=[...document.querySelectorAll('#main .hz-row')].filter(v).length,chips=[...document.querySelectorAll('#suggest button,#suggest .chip,#suggest a')].filter(v).length;
       const n=typeof chats!=="undefined"?chats.length:0,c=document.querySelector("#composer").getBoundingClientRect(),cy=(c.top+c.bottom)/2,gold=72+(innerHeight-72)*0.618;
-      return {rows,hero:!!document.querySelector("#hero"),chats:n,off:+(cy-gold).toFixed(2)};})()`); }
+      const r0=document.querySelector('#main .hz-row'),rr=r0&&v(r0)?r0.getBoundingClientRect():null;
+      return {rows,chips,hero:!!document.querySelector("#hero"),chats:n,off:+(cy-gold).toFixed(2),rowW:rr?Math.round(rr.width-c.width):null,below:rr?Math.round(rr.top-c.bottom):null};})()`); }
   done();
 });
 ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
@@ -45901,7 +45903,9 @@ def _b3_hdr_badge_ok(r):
             and not b_["w760"]["badge"] and b_["w760"]["gearMark"] and not b_["w390"]["badge"] and b_["w390"]["gearMark"])
 def _b3_home_ok(r):
     h_ = r.get("home") or {}
-    return set(h_) == {"w1440", "w390"} and all(v["hero"] and v["chats"] >= 1 and v["rows"] == 0 and abs(v["off"]) <= .5 for v in h_.values())
+    return set(h_) == {"w1440", "w390"} and all(v["hero"] and v["chats"] >= 1 and 1 <= v["rows"] <= 3 and v.get("chips", 1) == 0
+                                                and v.get("rowW") is not None and abs(v["rowW"]) <= 1 and 0 < v.get("below", 0) <= 40
+                                                and abs(v["off"]) <= .5 for v in h_.values())
 # 6b624: the fit's loop, per side (re-pinned from 6b555's one loop)
 _B624_LOOP = 'for(const k of HZ_HD){const f=hzHeaderSides(top);if(!f.l&&!f.r)break;\n      if(!top.classList.contains(k)&&((f.l&&HZ_HD_SIDE[k].includes("l"))||(f.r&&HZ_HD_SIDE[k].includes("r"))))top.classList.add(k);}'
 def _b3_hdr_static(css, js, pg):
@@ -45924,7 +45928,8 @@ def _b3_hdr_static(css, js, pg):
             and ".hz #hz-top.hz-hd4 #hz-update{display:none}" in css and ".hz #hz-top.hz-hd4 #hz-settings.hz-upd::after{display:block}" in css
             and not re.search(r"#hz-(settings|update)[^{}]*\{[^{}]*(text-shadow|filter:|animation:)", css)     # no shine, no glow
             # the home's recent-chat list is gone, code and all; Classic's chips stay hidden under Horizon
-            and 'id="hz-history"' not in pg and "hzHistoryPaint" not in js and "hz-row" not in css + js
+            and '<nav id="hz-history" aria-label="Recent chats" hidden></nav>' in pg and ".sort((a,b)=>(+b.ts||0)-(+a.ts||0)).slice(0,3);" in js
+            and ".hz .hz-row .k" not in css and "hzK(" not in js                                            # no counts on the rows (beta 4)
             and ".hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}" in css
             and "function hzBalanceFor(H,compH){" in js)
 _b3_h_ok = _b3_hdr_run()
@@ -45932,11 +45937,11 @@ _b3_h_mut = _b3_hdr_run([[_B624_LOOP, ""], ['if(top.getBoundingClientRect().widt
                          [".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}\n", ""], [".hz #hz-mark{min-width:max-content}\n", ""]])
 _b3_h_mut2 = _b3_hdr_run([['<button id="hz-settings" type="button" class="hz-ib"', '<button id="hz-settings" type="button" class="hz-ib" style="display:none"'],
                           ['["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});', ""],
-                          ['    <!-- (6b555, per Patrick: "we need to fix these suggestions too.', '    <nav id="hz-history" aria-label="Recent chats"><button type="button" class="hz-row">Simple hello message \u00b7 Today</button></nav>\n    <!-- (6b555, per Patrick: "we need to fix these suggestions too.']])
+                          ['  box.hidden=!mine.length;\n', '  box.hidden=true;\n']])
 _b3_h_mut3 = _b3_hdr_run([[".hz #hz-top.hz-hd5 #hz-lanes{display:none;position:absolute;", ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;"],
                           [".hz #hz-top.hz-hd5 #hz-lanemenu{display:inline-flex}", ""]])
 _b3_h_mut4 = _b3_hdr_run([[".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}", ""]])
-check("6b555 the header, one row, with Settings and updates in it, over a bare home (no recent-chat rows or suggestion chips under the composer, which sits at the golden point): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
+check("6b555 the header, one row, with Settings and updates in it, over the home (one to three quiet recent-chat rows the composer's width under it, no suggestion chips; the composer at the golden point; beta 4): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
       _b3_hdr_static(_hz_css, _hz_js, page) and not _b3_hdr_static(_hz_css.replace(".hz #hz-mark{min-width:max-content}", ""), _hz_js, page)
       and not _b3_hdr_static(_hz_css, _hz_js.replace(_B624_LOOP, ""), page)
       and not _b3_hdr_static(_hz_css.replace(".hz #hz-settings{width:32px;height:32px;border-radius:8px;", ".hz #hz-settings{width:32px;height:32px;border-radius:8px;filter:drop-shadow(0 0 6px #fff);"), _hz_js, page)   # a glowing gear
@@ -45948,7 +45953,7 @@ check("6b555 the header, one row, with Settings and updates in it, over a bare h
       and _b3_h_mut3.get("mutated", 0) >= 1 and any(c.get("below") for c in _b3_h_mut3.get("cases", []))           # 6b624: the lanes' own row, on the answer
       and _b3_h_mut4.get("mutated", 0) >= 1 and any(c.get("offc", 0) > 1 for c in _b3_h_mut4.get("cases", []))     # 6b624: the lanes off the centre
       and _b3_h_mut2.get("mutated", 0) >= 1 and not all(c["gear"] for c in _b3_h_mut2.get("cases", [])) and not _b3_hdr_badge_ok(_b3_h_mut2)
-      and any(v.get("rows", 0) > 0 for v in (_b3_h_mut2.get("home") or {}).values()),
+      and not _b3_home_ok(_b3_h_mut2) and all(v.get("rows", 1) == 0 for v in (_b3_h_mut2.get("home") or {}).values()),
       json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "home": _b3_h_ok.get("home"), "mut_bad": len(_b3_hdr_bad(_b3_h_mut)), "mut3": len(_b3_hdr_bad(_b3_h_mut3)), "mut4": len(_b3_hdr_bad(_b3_h_mut4))})[:900])
 # ==== beta-3 the sky and Ultra (6b555): end ====
 
@@ -48520,6 +48525,96 @@ _b640_mut = _MILLENAI_SRC.replace("    if relay_only:\n        r = _srv_relay_po
                                   "    if server_quiet(e):\n        return {\"ok\": False, \"kind\": \"quiet\", \"err\": \"quiet\"}\n    if relay_only:\n        r = _srv_relay_post(e)", 1)
 check("6b640 Settings' Wake up server and Test relay ignore the quiet hours (a deliberate click wins); a question's wake still keeps them; the mutant (the buttons held by the quiet hours) is caught",
       _b640_ok(_MILLENAI_SRC) and _b640_mut != _MILLENAI_SRC and not _b640_ok(_b640_mut), "")
+# THE HEADLINES (6b640, per Patrick: "I would like more variety in the headlines"; "make sure you keep that effect we
+# made with the size of the text and how it draws it"): the pool's picker run in node on the page's own functions:
+# the hours (wrapping past midnight), a lane's own lines first, never the same line twice in a row while another
+# fits, the name some of the time (never always, never never); every line through the one greeting: its face and
+# size rule to the letter, hzHeadline fits a long line to one line and never shrinks a short one, hzHeadlineShow
+# draws it in (the trace) whatever the line. Mutants: the repeat guard gone, the name always, the trace skipped, a
+# fit that shrinks every line, the greeting's size rule changed.
+_h640_fns = ("function hzGreetFits(L,c){", "function hzGreetPick(pool,c,last,rnd){")
+def _h640_run(js_src):
+    js = "".join(_jsfn(js_src, h_) for h_ in _h640_fns) + r"""
+const P=[{t:"A",h:[0,4]},{t:"B",h:[0,4]},{t:"C",h:[5,11]},{t:"D",h:[22,3]},{t:"E",lane:"code"},{t:"F",n:"F, {name}"}];
+const at=h=>({h,d:1,m:0,lane:"ai",first:false});
+let rep=0,names=0,N=400,late=new Set(),wrap=new Set(),own=new Set();
+for(let i=0;i<N;i++){const r=(i+.5)/N;
+  const k=hzGreetPick(P,at(2),"A",r);if(P[k.i].t==="A")rep++;late.add(P[k.i].t);if(k.name)names++;
+  wrap.add(P[hzGreetPick(P,at(23),"",r).i].t);
+  own.add(P[hzGreetPick(P,Object.assign(at(13),{lane:"code"}),"",r).i].t);}
+const one=hzGreetPick([{t:"Up late?",h:[0,4]}],at(1),"Up late?",.3);
+process.stdout.write(JSON.stringify({rep,share:names/N,late:[...late].sort(),wrap:[...wrap].sort(),own:[...own].sort(),one:one.i}));
+"""
+    try:
+        return _node_json(js, "h640.js")
+    except Exception as e_:
+        return {"err": str(e_)[:200]}
+def _h640_ok(r):
+    return (not r.get("err") and r["rep"] == 0 and .2 <= r["share"] <= .6 and r["late"] == ["B", "D", "F"]
+            and "D" in r["wrap"] and "A" not in r["wrap"] and r["own"] == ["E"] and r["one"] == 0)
+def _h640_static(css, js):
+    hl = _jsfn(js, "function hzHeadline(g,text){"); sh = _jsfn(js, "async function hzHeadlineShow(g){")
+    fit = _jsfn(js, "function hzGreetFit(g){"); gr = _jsfn(js, "function hzGreeting(){"); hp = _jsfn(js, "function hzHomePaint(){")
+    return (".hz #hero .greet{font-family:var(--hz-font-display);font-weight:500;font-size:clamp(44px,6.2vw,96px);line-height:1;letter-spacing:-.03em;" in css
+            and "hzGreetFit(g)" in hl and "await hzTraceIn(g," in sh and "hzHeadline(g,hzGreeting())" in hp
+            and "hzGreetPick(HZ_HEADLINES,c,last,Math.random())" in gr and "hzGreetMemo.key!==key" in gr
+            and "g.getBoundingClientRect().height>lh*1.4||g.scrollWidth>room" in fit and "k>.72" in fit and 'g.style.fontSize="";' in fit)
+_h640_r = _h640_run(_hz_js)
+_h640_m1 = _h640_run(_hz_js.replace("const fresh=p.filter(x=>x[0].t!==last);if(fresh.length)p=fresh;", ""))
+_h640_m2 = _h640_run(_hz_js.replace("name:rnd*7%1<.4", "name:true"))
+check("6b640 the headlines: a pool by hour (wrapping past midnight), lane and visit, never twice in a row, the name some of the time; every line the one greeting (its face and size rule, the draw-in, a long line fitted to one line, a short one never shrunk); the mutants are caught",
+      _h640_ok(_h640_r) and _h640_static(_hz_css, _hz_js)
+      and not _h640_ok(_h640_m1) and not _h640_ok(_h640_m2)
+      and not _h640_static(_hz_css, _hz_js.replace("await hzTraceIn(g,", "await Promise.resolve(g,"))
+      and not _h640_static(_hz_css, _hz_js.replace("g.getBoundingClientRect().height>lh*1.4||g.scrollWidth>room", "true"))
+      and not _h640_static(_hz_css.replace("font-size:clamp(44px,6.2vw,96px);line-height:1;letter-spacing:-.03em;", "font-size:clamp(36px,5vw,72px);line-height:1;letter-spacing:-.03em;", 1), _hz_js),
+      json.dumps({"ok": _h640_r, "m1": _h640_m1, "m2": _h640_m2})[:600])
+
+# FUNNELS (6b640, the walkthrough and Patrick: "the stage counter never says Stage 6 after 5 of 5"; "the final pick
+# consistent with the user's own choices"): the waiting line says "Stage N of M…" and, past the last stage, the pick
+# being made; a size or number the person clicked that the verdict contradicts is found (and gets one rewrite on the
+# same model, kept only when it holds). Mutants: the old "Stage N…", a price read as a floor, the unit ignored.
+def _f640_wait(src):
+    js = _jsfn(src, "function fnWaitLabel(picked,stages){") + r"""
+process.stdout.write(JSON.stringify([fnWaitLabel(0,5),fnWaitLabel(4,5),fnWaitLabel(5,5),fnWaitLabel(2,0)]));"""
+    try:
+        return _node_json(js, "f640.js")
+    except Exception as e_:
+        return [str(e_)[:120]]
+_F640_WANT = ["Stage 1 of 5…", "Stage 5 of 5…", "Weighing your choices…", "Stage 3…"]
+def _f640_pick(src):
+    try:
+        i_ = src.index("_FN_NUM_RX = re.compile"); j_ = src.index("def funnel_summary_sys_for")
+        ns_ = {"re": re}; exec(src[i_:j_], ns_); f_ = ns_["funnel_pick_conflicts"]
+        return [f_(["14-inch", "Under $1,500"], "Get the 13-inch model at $1,099."),
+                f_(["14-inch"], 'The 14" MacBook Pro fits, and the 13-inch is smaller.'),
+                f_(["Under $1,500"], "It costs $1,699."), f_(["Mexican"], "Tacos for 6 people."),
+                f_(["2 hours"], "This takes 3 hours."), f_(["Under 2 kg"], "It is 2 inches thick and weighs 3 kg.")]
+    except Exception as e_:
+        return [str(e_)[:120]]
+def _f640_pick_ok(r):
+    return (len(r) == 6 and r[5] == [("Under 2 kg", "3 kg")] and r[0] == [("14-inch", "13 inch")] and r[1] == [] and r[2] == [("Under $1,500", "1699 $")]
+            and r[3] == [] and r[4] == [("2 hours", "3 hours")])
+_f640_src_ok = ('_pc = funnel_pick_conflicts(picks, out)' in _MILLENAI_SRC and 'if _nw and not funnel_pick_conflicts(picks, _nw):' in _MILLENAI_SRC
+                and "esc(fnWaitLabel(fnState.picks.length,fnState.stages))" in _MILLENAI_SRC)
+check("6b640 Funnels: the waiting line never names a stage past the last (\"Stage 5 of 5…\", then \"Weighing your choices…\"); a clicked size or number the verdict contradicts is found and gets one rewrite; the mutants are caught",
+      _f640_wait(_MILLENAI_SRC) == _F640_WANT and _f640_pick_ok(_f640_pick(_MILLENAI_SRC)) and _f640_src_ok
+      and _f640_wait(_MILLENAI_SRC.replace('return m&&n>m?"Weighing your choices…":', 'return ')) != _F640_WANT
+      and not _f640_pick_ok(_f640_pick(_MILLENAI_SRC.replace('if unit == "$" and all(v <= val for v in vals):', 'if False:')))
+      and not _f640_pick_ok(_f640_pick(_MILLENAI_SRC.replace("vals = [v for u, v in said if u == unit]", "vals = [v for u, v in said]"))),
+      json.dumps({"wait": _f640_wait(_MILLENAI_SRC), "pick": _f640_pick(_MILLENAI_SRC)}, default=str)[:600])
+
+# THE CORNERS AND THE EDGE (6b640, per Patrick on the composer at Ultra: "I love these corners. They're so sexy."):
+# 6b631's live check measures them; here the rules themselves are held to the letter, so a look pass can't move them
+def _c640_ok(css, src):
+    return (".hz #main:not(:has(#hero)) #composer,.hz #main:not(:has(#hero)) #composer::before{border-radius:14px}" in css
+            and ".hz #composer{background:var(--chat-surface);border:var(--chat-hw) solid var(--chat-line);border-radius:14px;" in css
+            and ".hz #composer::before{content:\"\";position:absolute;inset:-1px;border-radius:var(--hz-r-composer);padding:1.5px;" in css
+            and ":root{--hz-r-composer:14px;" in src and "--hz-r-composer:14px; --hz-t-drift" in src)
+check("6b640 the composer's corners and Ultra's lit edge are pinned (14 px round at rest, in a conversation and at Ultra; the lit ring 1.5 px on the same radius); the mutants (a 12 px corner, a thinner ring) are caught",
+      _c640_ok(_hz_css, _MILLENAI_SRC)
+      and not _c640_ok(_hz_css.replace("border-radius:var(--hz-r-composer);padding:1.5px;", "border-radius:var(--hz-r-composer);padding:1px;"), _MILLENAI_SRC)
+      and not _c640_ok(_hz_css, _MILLENAI_SRC.replace(":root{--hz-r-composer:14px;", ":root{--hz-r-composer:12px;")), "")
 # ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====
@@ -49325,7 +49420,7 @@ ch.stderr.on("data", async d => {
   const ask = async q => { await ev(`(()=>{const i=document.querySelector("#input");i.value=${JSON.stringify(q)};i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`); };
   const started = async () => { for (let i = 0; i < 50; i++) { if (await ev(`generating`)) return true; await sleep(100); } return false; };
   const idle = async (ms = 60000) => { await started(); const t0 = Date.now(); while (Date.now() - t0 < ms) { if (await ev(`!generating`)) return true; await sleep(200); } return false; };
-  const ROW = kind => `(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop();if(!d)return null;const row=d.querySelector(':scope>.robrow[data-rob="${kind}"]'),b=row&&row.querySelector("button");
+  const ROW = kind => `(()=>{const d=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop();if(!d)return null;const row=d.querySelector(${kind === "cut" ? `':scope>.trustline[data-trust="cut"]'` : `':scope>.robrow[data-rob="${kind}"]'`}),b=row&&row.querySelector("button");
     let hit=false;if(b){b.scrollIntoView({block:"center"});const r=b.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);hit=!!h&&(h===b||b.contains(h));}
     const ll=d.querySelector(":scope>.liveline em");return {row:row?row.querySelector(".chat-err-t").textContent:null,btn:b?b.textContent:null,hit,live:ll?ll.textContent:null,sw:document.documentElement.scrollWidth<=innerWidth};})()`;
   try {
@@ -49434,9 +49529,11 @@ def _r627_page_ok(r):
                       and a_.get("newMsgs") == ["user:And apples?", "assistant"])
     c_ = S_.get("cut") or {}
     lv_, ro_ = c_.get("live") or {}, c_.get("reopened") or {}
-    k_["cut"] = (lv_.get("live") == "Cut off" and lv_.get("row") == "Gemma 4 E2B stopped before the answer finished." and lv_.get("btn") == "Try again"
+    # (beta 4) one cut line: 6b620's, the copy Patrick approved ("The connection dropped." with Continue and Try again);
+    # 6b627's engine cut sends the same CUT frame and its own line went at the merge
+    k_["cut"] = (lv_.get("row") == "The connection dropped." and lv_.get("btn") == "Continue"
                  and lv_.get("hit") is True and lv_.get("sw") is True)
-    k_["reopen"] = (ro_.get("live") == "Cut off" and ro_.get("row") == "Gemma 4 E2B stopped before the answer finished." and ro_.get("hit") is True)
+    k_["reopen"] = (ro_.get("row") == "The connection dropped." and ro_.get("hit") is True)
     f_ = S_.get("fix") or {}
     k_["fix"] = (f_.get("text") == "Gemma 4 E2B\u2019s files are damaged, so another model answered." and f_.get("btn") == "Download again"
                  and f_.get("hit") is True and f_.get("clicked") == "Downloading Gemma 4 E2B again. You can keep chatting.")
@@ -49450,15 +49547,15 @@ def _r627_page_ok(r):
     return k_
 _r627p = _r627_page(_R627, ["sendstop", "cut", "fix", "load", "quiet", "update"])
 _k627p = _r627_page_ok(_r627p)
-check("6b627 the page: the send key is Stop only in the chat that is answering (New chat: Send, a click queues \"Sends when the other chat's answer is done\", Escape stops nothing, the answer lands whole; back in that chat: Stop); a cut answer says \"Cut off\" with Try again, live and reopened; a damaged model's Download again; the loading line with its time; a long silence counted; the update check's offline line stays",
+check("6b627 the page: the send key is Stop only in the chat that is answering (New chat: Send, a click queues \"Sends when the other chat's answer is done\", Escape stops nothing, the answer lands whole; back in that chat: Stop); a cut answer says \"The connection dropped.\" with Continue and Try again (6b620's line), live and reopened; a damaged model's Download again; the loading line with its time; a long silence counted; the update check's offline line stays",
       not _r627p.get("err") and not _r627p.get("errs") and all(_k627p.values()),
       "%r" % [[k_ for k_, v_ in _k627p.items() if not v_], _r627p.get("err"), (_r627p.get("errs") or [])[:3],
               {k_: v_ for k_, v_ in (_r627p.get("S") or {}).items()}])
 _R627_PM = [
     ("the key stops any chat's answer again", ["sendstop"], [['sendBtn.addEventListener("click",()=>{ robStopHere()?', 'sendBtn.addEventListener("click",()=>{ generating?']], "sendstop"),
     ("the key not repainted on New chat", ["sendstop"], [["  robKeySync();                     // the key is Send here", "  void 0;                     // the key is Send here"]], "sendstop"),
-    ("a cut answer landing as a whole one", ["cut"], [["  robLand(aiDiv,robCut,robFix,!!full&&!isErr,wasAborted);", "  void 0;"]], "cut"),
-    ("a reopened cut answer saying nothing", ["cut"], [["m.cut&&!m.stopped)robCutPaint(div,", "m.cut&&!m.stopped&&0)robCutPaint(div,"]], "reopen"),
+    ("a cut answer landing as a whole one", ["cut"], [['  if(cutInfo&&full&&!wasAborted&&!isErr)trustLine(aiDiv,"cut");', "  void 0;"]], "cut"),
+    ("a reopened cut answer saying nothing", ["cut"], [['m.cut&&!m.stopped)trustLine(div,"cut");', 'm.cut&&!m.stopped&&0)trustLine(div,"cut");']], "reopen"),
     ("no Download again", ["fix"], [["  if(fix)robFixPaint(div,fix,answered);", "  void 0;"]], "fix"),
     ("the loading step not said", ["load"], [['  if(s&&s.id==="load")return {text:', '  if(0)return {text:']], "load"),
     ("a silence not counted", ["quiet"], [["  const robQT=setInterval(()=>robQuietTick(aiDiv,full),500);", "  const robQT=0;"]], "quiet"),
