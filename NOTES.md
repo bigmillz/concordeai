@@ -21817,3 +21817,100 @@ under Advanced; true code-only pairing needs the server to advertise itself or c
 ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
 setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
 Chromium and read back from the real WKWebView.
+## 6b627 — beta-4-robust: Stop only in the answering chat, a cut answer says so, a damaged model falls through, a load and a long silence said, offline said plainly (7.0 beta 4, per Patrick: "it has to be usable")
+
+A usability walkthrough of beta 4 (f969040; shots in the session scratchpad's `uw/shots/`) found the app failing people
+in the moments that matter: things going wrong. Branch `beta-4-robust` from f969040. No new visual effect: every new
+line borrows 6b590's kind error line (the ember hairline, plain words, a 32 px key) or the meta ink.
+
+**What was wrong (each reproduced on stand-in engines first).**
+- P0: in a new chat the send key was the stop key for the OTHER chat's answer (6b624 let that answer finish in the
+  background but left the key as it was): a click killed it (saved as `**`) and sent nothing. Escape did the same.
+- P0: an engine that died mid-answer left the words cut off but saved and shown as finished. mlx_lm (0.32) closes its
+  stream without `[DONE]` when it dies, and `stream_openai_compat` only stopped reading. A connection RESET was worse:
+  `ConnectionResetError` from the engine's socket reached the handler's "the page hung up" branch, so it was taken for
+  the person's own Stop. Any other failure ended as "⚠️ Backend error — RuntimeError: …".
+- P1: a damaged model file froze the page about 20 s (mlx_lm binds its port at once and dies loading in its generation
+  thread), then answered "The engine refused the request (HTTP 404). generation thread died", not even marked an error.
+  No other model was tried, though the code meant to: the handler emitted the error line first, which counted as
+  characters sent, so `if not sent[0]` (the rescue) could never run. Nothing offered a repair.
+- P1: a cold load showed only "Asking this Mac" for up to 110 s; a stall mid-answer showed nothing at all.
+- P1/P2: offline, the update key read "No update — <urlopen error [Errno 61] Connection refused>"; online, "You're up
+  to date" flashed on the key for 2.6 s and went.
+
+**The fixes.**
+- The key (page, the ROBUST script block): `robStopHere()` is true only while the chat on screen is the one answering
+  (`genChat`); the click and Escape use it, `robKeySync()` repaints the key on New chat and on every chat's arrival
+  (`chatArrive`). Elsewhere the key is Send and a question there queues, as Enter already did, saying "Sends when the
+  other chat's answer is done".
+- A cut answer (server, the `robust (6b627)` block before `stream_ollama`): `EngineCut`. MLX's reader notes its own end
+  mark (`[DONE]` or a `finish_reason`), Ollama's its `done` line; words then no end mark is a cut, and a read that breaks
+  mid-stream (reset, IncompleteRead, any OSError but a timeout) is a cut too (`_engine_lines`), never a Stop. With no
+  words yet it is retried as an engine that went away (run_model's respawn); with words it is not (they would repeat).
+  The handler: words already on the page means the answer was cut, so it sends `CUT {"w": model}` and no error line;
+  `turn_record` saves `cut: true` (a Stop stays `stopped`). The page: the live line says "Cut off" and one line under the
+  words, "<model> stopped before the answer finished.", with Try again (6b590's delegated key; only the chat's last
+  answer keeps it); a reopened chat draws the same from the record (the model from its usage).
+- The rescue that never ran: the failure line is now said after the rescue, and only if nothing answered
+  (`_model_said`). `sent` also counted the frames sent before the failure (RUN, a RESET), so with no model's words it
+  is zeroed first and the pinned `if not sent[0] …` lines read as they always meant. The person's server first, as
+  before, then the smallest other model on disk (a damaged one skipped), its cold load said too.
+- Plain lines: `offline_hint` never returns an exception's text. The HTTP line, the old fallback and "No MLX server on
+  that port" are now `plain_fail_line`: "⚠️ The model couldn't answer this time." (or the damaged and cut lines); the
+  detail goes to the log (`failed (<where>): <Type>: <text>`, stderr).
+- A damaged model (`ModelDamaged`, `mlx_weights_damage`): each safetensors' header must parse and its tensors must end
+  exactly at the file's end, and config.json must parse; read in milliseconds, remembered until a file changes. Checked
+  before any engine starts (run_model, ensure_mlx_engine, the loading line), so the 20 s freeze is gone: REPAIR goes
+  out, the next model answers. The page: "<model>'s files are damaged, so another model answered." with Download again
+  (or the key beside the error line when none could); `/api/model/repair` removes only the damaged files inside that
+  model's cache folder (the link and its blob) and starts the usual download.
+- The loading line: a cold MLX engine (started for this question, or its engine died) is a STEP `load`: "Loading
+  <model>" with how long it took here last time ("about 40 s", "about a minute"; `run/engine-loads.json`, an average
+  leaning on the newest, timed from the spawn to the first word, since mlx_lm's open port is not a loaded model) or
+  "the first time takes about a minute"; the first words close it ("Loaded <model> · N s"); a failure closes it as
+  "<model> didn't load". `livePhrase` shows it with the clock.
+- A long silence mid-answer: words, then nothing for 10 s, and a meta line under them counts it ("Still waiting on the
+  model · 12 s"); it goes when words come again.
+- The update check: a connection error (no name, no route, refused, timed out) answers `offline: true`, "No internet
+  connection"; any other failure "Couldn't reach the update server" (was the raw text, or "HTTP 403"). Its answer is a
+  line under Check now that stays (`#up-checked`); the key goes back to "Check now" at once.
+- Test hooks, dev copies only: `engine-port=<port>` routes every MLX model to one port and `engine-cmd=<script>`
+  starts that script there instead of mlx_lm (`_stop_other_mlx` leaves a shared port's engine alone), so the gauntlet
+  drives the real server against a stand-in engine without a model or the desktop app's 88xx engines.
+
+**Measured.** Headless Chromium and a real WKWebView against a dev copy whose engines were the stand-in (stub engine:
+answer, close mid-answer, reset, exit, 404, empty, a slow first word, a pause): New chat mid-answer, the key Send
+(hittable), the click queued, Escape stopped nothing, the answer saved whole (489 characters, not stopped), the
+queued question sent into the new chat when it landed; back in the answering chat the key Stop (both engines alike). A
+cut answer: CUT, no error line, saved `cut: true`; the live line "Cut off", the line and Try again hittable at 1440,
+760 and 390, nothing sideways (both engines); reopened from disk the same. A damaged Gemma: REPAIR and the rescue in
+0.7 s (was ~20 s and an error). The loading line 3 s into a 6 s first word: "Loading Gemma 4 E2B, about 5 s". The
+silence line at 12 s. The update line offline, still there 5 s later (both engines). Contrast (WCAG, on what is behind
+it): the cut and damaged lines 12.1:1, the silence line 6.4:1, the update line 6.2:1. No console errors.
+
+**Gauntlet.** A block `6b627 robust`, five checks: in process (the damage check on a whole, short, padded and random
+safetensors and a broken config; the plain lines; offline told from the error; the loading words; turn_record's cut;
+six mutants); live on a copy of its own (9903) with stand-in engines on a free port (the cold load, three cuts saved
+cut, a refusal rescued with no error shown, nothing answering in one plain line, a damaged model known at once and
+repaired, the update check offline); the page over the DevTools protocol on that copy (the key across two chats, the
+cut line live and reopened, Download again, the loading line, the silence line, the update line) with eight mutants
+served in place of the page; and four mutated copies of the app (the end mark not checked, the old order that never
+rescued, the raw exception, damaged weights never noticed). Re-pinned at the same strength: 6b519's "the send
+button's first press stops it cleanly" (the key's handler is `robStopHere()?(rubinStop()||abortCtl.abort())`, and
+robStopHere's own rule is pinned beside it). Four in-process checks that lift `stream_ollama` / `stream_openai_compat`
+into their own namespaces (6b314's giant on Ollama, 6b325's usage ledger, 6b522's paths, 6b533's Muse) get
+`EngineCut` and `_engine_lines` too (6b522's as a pass-through). The page's `FRAME_TAGS` line is pinned, so the two new
+tags ride `FRAME_TAGS_ALL`.
+
+**Overlap with trust-1 (6b620 in its own worktree, uncommitted, from beta 3).** It also marks a cut answer: per-stream
+`stream_done` flags (Claude, the cloud, Ollama, MLX) read once at the end, the same `CUT` frame and `cut: true`, and a
+line "The connection dropped." with Continue and Try again. This branch covers the local engines with an exception
+instead, adds the broken-read case (trust-1's flag is skipped when the read raises) and the handler's plain lines and
+rescue. Merging both: keep one CUT path (the frame and the record key already agree), one line under the answer.
+
+**Left.** The PDF chip's "tokens" and Settings' jargon ("Tokens in", "Cache hit", "Accel MLX", "passages to read for
+meaning") are untouched (P2, Settings is 6b625's). The loading line is said on the single-model paths (Fast and a hand
+pick), not yet for each seat of a council. A question with a picture or a file typed in another chat while an answer
+runs still does nothing on Send (it can't queue); the text stays. Not checked against a real mlx_lm death on a real
+model (the helpers' rule): the stand-in reproduces mlx_lm 0.32's stream ending, 404 and port behaviour as read from its
+source.
