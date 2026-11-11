@@ -122,6 +122,8 @@ MACHINE_STATE = frozenset((
     "_bench", "_bench_busy", "_bench_live", "_bench_hw",
     # the backdrops, the search proxy, provider quirks, locks' depth
     "_sky_jobs", "_sky_tls", "_SEARCH_PROXY", "_stream_usage_off",
+    "_NET_STATE",            # 6b626: whether this computer reached the internet just now
+
     "_cloud_depth", "_usage_thread",
     # the local-record test hook's list (6b339): dev copies only
     "_LOCAL_CALLS",
@@ -6031,6 +6033,8 @@ def needs_search(prompt: str) -> bool:
         return False
     if self_contained_reasoning(p):
         return False         # the person's own numbers, nothing to look up (6b518)
+    if answer_kind(p):
+        return False         # sums, the chat itself, a plain how-to (6b626)
     low = p.lower()
     if any(w in low for w in _FRESH_WORDS):
         return True
@@ -6145,7 +6149,8 @@ def _thread_terms(messages, avoid: str = "") -> str:
             toks = [w for w in _place_terms(c).split()
                     if w not in _REL_WORDS]
             if toks and (needs_search(c)
-                         or _BOOKING_RX.search(c.lower())):
+                         or _BOOKING_RX.search(c.lower())
+                         or answer_kind(c) == "howto"):   # its subject still threads (6b626)
                 # what the new query already says is not worth repeating;
                 # the leftovers are the location it is missing
                 fresh = [w for w in toks if w not in skip]
@@ -6153,6 +6158,827 @@ def _thread_terms(messages, avoid: str = "") -> str:
     except Exception:
         pass
     return ""
+
+
+# ==== 6b626 answers: begin ====
+# USABLE ANSWERS (6b626, per Patrick: "it has to be usable"). The beta-4
+# walkthrough asked plain things and got wrong turns. "How do I hard-boil an
+# egg?" right after "What is the capital of Australia?" searched "Australia
+# hard-boil egg capital": every turn after a searched one carried that turn's
+# evidence and its words, follow-up or not. "What is 17 times 23?" searched
+# the web, and the writer added "I didn't find the result of this
+# multiplication, though they mention these numbers in various contexts such
+# as film titles". "What was the first thing I said to you in this chat?"
+# searched "first chat". "A good coffee shop near the Eiffel Tower" geocoded
+# "tower", spent 72 s on lookups before the first frame (OpenStreetMap's two
+# mirrors timing out one after the other, then the closure check) and drew
+# no map. Offline, the weather answer blamed its "training data". Rules
+# only, no model; each has a gauntlet check and a mutant.
+
+# ---- what needs no web: a sum, the chat itself, a plain how-to
+_AK_LEAD_RX = re.compile(
+    r"^\s*(?:(?:so|ok|okay|and|quick(?:ly)?|um+|hey)[,\s]+)?"
+    r"(?:(?:what's|what’s|whats|what)(?:\s+(?:is|are|does|do|would\s+be|will\s+be))?|"
+    r"how\s+much\s+(?:is|are|does|do)|calculate|compute|work\s+out|solve|evaluate|"
+    r"(?:can|could)\s+you\s+(?:calculate|compute|work\s+out|tell\s+me|do)|tell\s+me|please)\b\s*", re.I)
+_AK_TAIL_RX = re.compile(
+    r"\s*(?:,?\s*(?:please|thanks)|\b(?:equal|equals|make|makes|come\s+to|comes\s+to|give|gives|be|"
+    r"(?:in|as)\s+(?:a\s+)?(?:decimal|fraction|percent(?:age)?))\b)\s*$", re.I)
+_AK_NUM = r"\d[\d,]*(?:\.\d+)?%?|\.\d+%?"
+_AK_OP = (r"[-+*/x×÷^−()=]|plus|minus|times|multiplied\s+by|divided\s+by|over|"
+          r"to\s+the\s+power\s+of|squared|cubed|percent\s+of|(?:the\s+)?(?:sum|product)\s+of|add|"
+          r"of|mod|modulo|(?:the\s+)?(?:square|cube)\s+root\s+of|sqrt|and")
+_AK_EXPR_RX = re.compile(r"(?:\s*(?:%s|%s))+\s*" % (_AK_NUM, _AK_OP), re.I)
+_AK_OPS_RX = re.compile(r"[-+*/x×÷^−]|\b(?:plus|minus|times|multiplied|divided|over|power|"
+                        r"squared|cubed|percent|of|add|mod|modulo|root|sqrt)\b", re.I)
+_AK_CHAT_RX = re.compile(
+    r"\b(?:did|do)\s+(?:i|you|we)\s+(?:just\s+|already\s+|ever\s+|first\s+)?(?:say|ask|tell|write|type|"
+    r"mention|mean|talk|discuss|decide|agree|send)\b|"
+    r"\b(?:what|which|when|who|how)\b[^?]{0,60}?\b(?:i|you|we)\s+(?:just\s+|first\s+|last\s+|originally\s+|"
+    r"earlier\s+|already\s+)?(?:said|asked|told|wrote|typed|mentioned|meant|talked|discussed|decided|"
+    r"agreed|sent)\b|"
+    r"\b(?:my|your)\s+(?:very\s+)?(?:first|last|previous|earlier|original|latest)\s+(?:question|message|"
+    r"answer|reply|prompt|point)\b|"
+    r"\b(?:in|of|from|earlier\s+in|so\s+far\s+in|at\s+the\s+start\s+of|throughout)\s+(?:this|our)\s+"
+    r"(?:chat|conversation|thread|discussion)\b|"
+    r"^\W*(?:summari[sz]e|recap|repeat|quote|shorten|simplify)\b.{0,30}\b(?:this|our|that|your)\s+"
+    r"(?:chat|conversation|thread|discussion|answer|reply|last\s+answer)\b|"
+    r"^\W*(?:say|repeat)\s+(?:that|it)\s+again\b", re.I)
+_AK_HOWTO_RX = re.compile(
+    r"^\W*(?:(?:so|ok|okay|and|also|quick\s+question)[,:\s]+)?(?:"
+    r"how\s+(?:do|can|should|would|could|might)\s+(?:i|you|we|one|someone|people)\b|how\s+to\b|"
+    r"how\s+(?:does|do)\s+(?:a|an|the)\b[^?]{0,40}\bwork\b|"
+    r"what(?:'s|’s|s|\s+is)\s+the\s+(?:best|easiest|right|proper|fastest|quickest)\s+way\s+to\b|"
+    r"(?:give|tell)\s+me\s+(?:a\s+few\s+|some\s+|\w+\s+)?(?:tips|steps|ways|ideas)\b|"
+    r"(?:any\s+)?tips\s+(?:for|on)\b|explain\s+how\b|walk\s+me\s+through\b|steps\s+to\b|"
+    r"teach\s+me\s+(?:how\s+)?to\b)", re.I)
+# a how-to whose answer moves with the world: software and devices, money,
+# rules and paperwork, travel, anything named or dated
+_AK_WORLD_RX = re.compile(
+    r"\b(?:install|download|update|upgrade|configure|set\s*up|setup|sign\s*up|log\s*in|login|register|"
+    r"renew|apply|cancel|refund|subscribe|unsubscribe|contact|reach|vote|file|claim|book|order|buy|sell|"
+    r"price|cost|cheap|cheapest|afford|pay|tax|taxes|visa|passport|license|licence|permit|insurance|law|"
+    r"legal|rules?|regulations?|near|nearby|get\s+to|travel|fly|drive\s+to|move\s+to|app|apps|website|"
+    r"account|phone|iphone|ipad|android|windows|mac|macos|linux|laptop|computer|software|version|latest|"
+    r"new|newest|current|stock|stocks|crypto|bitcoin|invest|investing|loan|mortgage|rent|job|jobs|hire|"
+    r"salary|ticket|tickets)\b", re.I)
+
+
+def _ak_arith(p: str) -> bool:
+    s = _AK_LEAD_RX.sub("", p.strip().rstrip("?!. "), count=1)
+    s = _AK_TAIL_RX.sub("", s).strip(" ,")
+    if not s or not _AK_EXPR_RX.fullmatch(s):
+        return False
+    nums = re.findall(_AK_NUM, s)
+    return bool(_AK_OPS_RX.search(s)) and (
+        len(nums) >= 2 or (len(nums) == 1 and bool(re.search(r"squared|cubed|root|sqrt", s, re.I))))
+
+
+def answer_kind(text: str) -> str:
+    """"arith" (17 times 23), "chat" (what did I say first) or "howto" (how
+    do I hard-boil an egg) for a question answered without the web (6b626);
+    "" for anything else. A how-to that names something, carries a figure or
+    turns on the world (software, money, rules, travel, anything current)
+    still searches."""
+    p = strip_greeting(str(text or "")).strip()
+    p = _PREAMBLE_RX.sub("", p, count=1).strip() or p
+    if not p or len(p) > 300:
+        return ""
+    if _ak_arith(p):
+        return "arith"
+    if _AK_CHAT_RX.search(p):
+        return "chat"
+    if _AK_HOWTO_RX.match(p):
+        low = p.lower()
+        if (not _AK_WORLD_RX.search(low) and not _sc_entities(p) and not re.search(r"\d", p)
+                and not (_VENUE_RX.search(low) or _ZIP_RX.search(low) or _NEARBY_RX.search(low))
+                and not any(w in low for w in _FRESH_WORDS)
+                and not any(rx.search(low) for rx in _FRESH_PATTERNS)):
+            return "howto"
+    return ""
+
+
+# ---- a follow-up, or a new subject: whether the last searched turn rides along
+_FU_LEAD_RX = re.compile(
+    r"^\W*(?:and|also|but|so|then|plus|what\s+about|how\s+about|what\s+else|why|why\s+not|how\s+come|"
+    r"more|tell\s+me\s+more|explain|elaborate|expand|go\s+on|continue|keep\s+going|compare|"
+    r"which\s+one|pick\s+one|"
+    r"the\s+same|same|really|are\s+you\s+sure|is\s+that\s+(?:right|true|correct))\b", re.I)
+# "is it safe to…", "is there a…": an "it" or a "there" that points at nothing
+_FU_DUMMY_RX = re.compile(
+    r"\b(?:is|was|isn'?t|wasn'?t|will|would|does|did)\s+it\s+(?:safe|possible|true|ok(?:ay)?|worth|"
+    r"better|bad|good|normal|legal|hard|easy|necessary|healthy|dangerous|wise|smart|cheaper|faster|"
+    r"common|rude|too\s+late|too\s+early)\b|\bit\s+(?:is|was|'?s)\s+(?:raining|snowing|sunny|cold|hot|"
+    r"late|early)\b|\b(?:is|are|was|were)\s+there\b|\bthere\s+(?:is|are|was|were|'?s)\b", re.I)
+
+
+def _fu_stems(words) -> set:
+    return {re.sub(r"(?:ing|ed|es|s)$", "", re.sub(r"['’]s$", "", str(w).lower()))
+            for w in words if len(str(w)) >= 3}
+
+
+def grounded_followup(text: str, prior_question: str = "") -> bool:
+    """Does this turn lean on the person's last searched turn (6b626)? Only
+    then does that turn's evidence ride along and its words join this one's
+    search (6b518); a new subject searches fresh, or not at all. A follow-up:
+    it mentions another assistant's reply, opens like one ("and…", "what
+    about…", "why"), asks nothing new ("explain more"), points back at
+    something ("cool them after that"), is a short elliptical ask ("what's
+    the population?") or shares the earlier question's subject."""
+    t = strip_greeting(str(text or "")).strip()
+    t = _PREAMBLE_RX.sub("", t, count=1).strip() or t
+    if not t or answer_kind(t) in ("arith", "chat"):
+        return False
+    if _OTHER_AI_RX.search(t) or _FU_LEAD_RX.match(t):
+        return True
+    new = followup_new_terms(t)
+    if not new:
+        return True
+    n = len(t.split())
+    bare = _FU_DUMMY_RX.sub(" ", t)
+    if n <= 16 and _REFERS_BACK_RX.search(bare):
+        return True
+    if n <= 10 and _FOLLOWUP_RX.search(bare):
+        return True
+    if n <= 6 and len(new) <= 1:
+        return True
+    return bool(prior_question and _fu_stems(new) & _fu_stems(followup_new_terms(prior_question)))
+
+
+def thread_borrow(query: str) -> bool:
+    """Does a searched question borrow the thread's subject (6b626)? One
+    that points back at it ("is it open tomorrow"), or a venue question
+    with no place of its own ("any bars open late"). One that names its
+    place ("near the Eiffel Tower") or uses a dummy "it" ("is it safe to
+    eat raw eggs") does not."""
+    q = str(query or "")
+    return bool(_entity_thin(_FU_DUMMY_RX.sub(" ", q))
+                or (_VENUE_RX.search(q) and not place_anchor(q)[0]))
+
+
+# ---- the place a place question names
+_PA_RX = re.compile(
+    r"\b(near|by|around|close\s+to|next\s+to|beside|outside|opposite|across\s+from|"
+    r"walking\s+distance\s+(?:of|from|to)|in|at)\s+(?=[^?!.,;:()]{2})", re.I)
+_PA_STOP_RX = re.compile(
+    r"\s+(?:that|which|who|where|with|for|and|or|but|to|on|open|opens|tonight|today|tomorrow|now|right|"
+    r"this|late|early|please|near|by|around|in|at|if|so|because|when|while|during|before|after|under|"
+    r"over)\b.*$", re.I | re.S)
+_PA_NOT = frozenset(
+    "me here us you home there it this that my our your their his her a an area neighborhood neighbourhood "
+    "city town place spot vicinity way morning afternoon evening night minutes minute hours hour advance "
+    "person mind general total time moment".split())
+_PA_LANDMARK = ("near", "by", "around", "close to", "next to", "beside", "outside", "opposite", "across from")
+
+
+def place_anchor(query: str) -> tuple:
+    """(place, landmark) that a place question names (6b626): "a coffee shop
+    near the Eiffel Tower" -> ("Eiffel Tower", True), "is ables in bushwick
+    open tonight" -> ("bushwick", False), "bars near me" -> ("", False). The
+    last one named wins ("in Paris near the Louvre" is the Louvre). A
+    landmark is a point to search around; an "in" is an area."""
+    best = ("", False)
+    q = str(query or "")
+    for m in _PA_RX.finditer(q):
+        prep = re.sub(r"\s+", " ", m.group(1).lower())
+        ph = re.split(r"[?!.,;:()]", q[m.end():], maxsplit=1)[0][:80]
+        ph = _PA_STOP_RX.sub("", ph).strip(" '\"’")
+        ph = re.sub(r"^(?:the|a|an)\s+", "", ph, flags=re.I).strip()
+        words = ph.lower().split()
+        if not words or len(words) > 5 or words[0] in _PA_NOT:
+            continue
+        if all(w in _PA_NOT or w in _PLACE_FILLER for w in words):
+            continue
+        if re.match(r"\d", ph) and not re.fullmatch(r"\d{5}", ph):
+            continue                    # "at 2am", "in 20 minutes": a time, not a place
+        land = prep in _PA_LANDMARK or prep.startswith("walking")
+        if not land and _VENUE_RX.search(ph):
+            continue                    # "interested in jazz bars": the venue, not the place
+        best = (ph, land)
+    return best
+
+
+def place_fits(locq: str, full: str) -> bool:
+    """Did the geocoder land on the place asked about (6b626)? Any word of
+    it, four letters or a number, in the place's full name: "Eiffel Tower"
+    lands on "Tour Eiffel, … Paris", which the old test (its last word,
+    "tower", inside the name) refused, so the answer drew no map."""
+    lq = str(locq or "").lower().strip()
+    if not lq:
+        return True
+    f = str(full or "").lower()
+    words = [w for w in re.findall(r"[^\W_]+", lq) if len(w) >= 4 or w.isdigit()]
+    return any(w in f for w in words) if words else lq in f
+
+
+def place_town(geo) -> str:
+    """The town of a geocoded place (Nominatim's address), '' when none."""
+    return str((geo or {}).get("town") or "")[:40]
+
+
+# ---- the place lookups, on their own thread behind the headers
+PLACE_TOTAL_S = 32.0       # then the answer goes on with what is in hand
+PLACE_OSM_S = 14.0         # OpenStreetMap's venues, beside the web search
+PLACE_PENDING = "(the place lookup is under way)"
+
+
+def _place_osm(terms: str, loc: str) -> tuple:
+    """(rows, tz, tz_place): osm_places on a pool thread, with the clock it set."""
+    rows = osm_places(terms, loc) if loc else []
+    return rows, getattr(_tl_search, "tz", ""), getattr(_tl_search, "tz_place", "")
+
+
+class PlaceLookup:
+    """One place question's lookups (6b626): the web search, OpenStreetMap's
+    venues beside it (at most PLACE_OSM_S), the closure check, the pin. It
+    runs on its own thread, started where the handler used to run them
+    inline before the headers (72 s of nothing on the screen), and is
+    waited for after them with a step per phase. Its thread-local results
+    are carried back in apply()."""
+
+    _KEEP = ("rows", "photos", "osm", "thin_closed", "tz", "tz_place")
+
+    def __init__(self, query: str, tz=("", "")):
+        self.query = str(query or "")
+        self.anchor, self.landmark = place_anchor(self.query)
+        self.tz0 = tuple(tz or ("", ""))
+        self.snippets, self.matched = "", False
+        self.rows, self.photos, self.osm, self.thin_closed = [], [], [], 0
+        self.tz, self.tz_place = self.tz0
+        self.geo, self.locq, self.offline, self.error = None, "", False, ""
+        self.phase, self.t = "search", {}
+        self.done = threading.Event()
+        self._tick = threading.Event()
+
+    def start(self):
+        ctx_thread(target=self._run, daemon=True).start()
+        return self
+
+    def _set(self, ph: str):
+        self.phase = ph
+        self._tick.set()
+
+    def wait(self, on_phase=None, timeout: float = PLACE_TOTAL_S):
+        end, last = time.time() + timeout, None
+        while True:
+            if self.phase != last:
+                last = self.phase
+                if on_phase is not None:
+                    try:
+                        on_phase(last, self)
+                    except Exception:
+                        pass
+            if self.done.is_set() or time.time() >= end:
+                break
+            self._tick.wait(min(0.25, max(0.01, end - time.time())))
+            self._tick.clear()
+        return self
+
+    def _run(self):
+        try:
+            self._work()
+        except Exception as exc:
+            self.error = repr(exc)[:200]
+        finally:
+            for k in self._KEEP:
+                setattr(self, k, getattr(_tl_search, k, getattr(self, k)))
+            self._set("done")          # the phase first: the wait sees "done" before it stops
+            self.done.set()
+
+    def _work(self):
+        import concurrent.futures as _cf
+        query = self.query
+        _tl_search.tz, _tl_search.tz_place = self.tz0
+        _tl_search.rows, _tl_search.photos, _tl_search.osm = [], [], []
+        _tl_search.thin_closed = 0
+        _terms = _place_terms(query)
+        pt_ = _terms.split()
+        if self.anchor:
+            _loc, self.locq = self.anchor.lower()[:60], self.anchor
+        else:
+            # THE LOCALITY IS WHAT'S LEFT AFTER THE CATEGORY (6b244)
+            _loc = " ".join(w for w in pt_ if not _VENUE_RX.search(w)
+                            and w not in _REL_WORDS)[:60]
+            self.locq = pt_[-1] if len(pt_) > 1 else ""
+        # A LANDMARK IS SEARCHED NEAR ITSELF, IN ITS TOWN (6b626): "coffee
+        # shop eiffel tower" alone came back from wherever the search engine
+        # thinks this computer is (Campinas)
+        near = ""
+        here = _geocode(_loc) if (_loc and self.landmark) else None
+        if self.landmark:
+            town = place_town(here) if (here and place_fits(self.locq, here.get("full"))) else ""
+            near = "near %s%s" % (self.anchor, (" " + town) if town and
+                                  town.lower() not in self.anchor.lower() else "")
+        t0 = time.time()
+        ex = ctx_executor(1)
+        try:
+            f_osm = ex.submit(_place_osm, _terms, _loc)
+            snippets, matched = place_search(query, near)
+            self.rows = list(getattr(_tl_search, "rows", None) or [])   # the step's count, live
+            self.t["search"] = round(time.time() - t0, 2)
+            self._set("venues")
+            try:
+                _osm, _tz, _tzp = f_osm.result(timeout=max(0.5, PLACE_OSM_S - (time.time() - t0)))
+            except Exception:
+                _osm, _tz, _tzp = [], "", ""
+        finally:
+            ex.shutdown(wait=False, cancel_futures=True)
+        self.t["venues"] = round(time.time() - t0, 2)
+        if _tz:
+            _tl_search.tz, _tl_search.tz_place = _tz, _tzp
+        if _osm:
+            _tl_search.osm = _osm
+            _open = [p for p in _osm if p.get("open")]
+            _tl_search.thin_closed = len(_osm) if (len(_osm) <= 3 and not _open) else 0
+            _lines = "\n".join(
+                "- %s%s — %s%s" % (
+                    p["n"], (" (" + p["d"] + ")") if p["d"] else "",
+                    p["h"] or "hours not published",
+                    "  [OPEN NOW]" if p.get("open") else "")
+                for p in _osm)
+            snippets = (
+                "VENUE DATA (OpenStreetMap, authoritative for "
+                "hours — prefer these over any hours mentioned "
+                "in the web snippets below; %d of %d are open "
+                "right now):\n%s\n"
+                "This list covers NEARBY venues, not the "
+                "whole neighbourhood: a nothing-is-open "
+                "verdict must say it covers the listed "
+                "spots and add ONE call-ahead clause.\n"
+                "NAME VENUES ONLY FROM THIS VENUE DATA. The "
+                "web snippets below may describe same-named "
+                "places in OTHER CITIES (a Williamsburg "
+                "cafe in Virginia answered a Brooklyn "
+                "question — seen live); snippets give "
+                "colour and context, never venue names.\n\n%s"
+                % (len(_open), len(_osm), _lines, snippets or ""))
+            matched = True
+        self.osm = list(_osm or [])            # the step's count, live
+        if not getattr(_tl_search, "rows", None) and not _osm and net_offline():
+            self.offline = True                # no connection: nothing more to try
+            self.snippets, self.matched = snippets, matched
+            return
+        self._set("check")
+        # closure evidence rides above the venue data, once
+        # the OSM rows and web sources are both known (6b278)
+        snippets = closure_notices(query) + (snippets or "")
+        self.t["check"] = round(time.time() - t0, 2)
+        if matched:
+            # a pin only counts when the geocoder landed on the place asked
+            # about (6b244, "food bushwick" once pinned Edinburgh); the
+            # LOCALITY is geocoded, not the whole phrase
+            g_ = here or _geocode(_loc or _place_terms(query))
+            if g_ and place_fits(self.locq, g_.get("full")):
+                self.geo = g_
+                if not _tz:              # no venue rows to set it: the place's own clock
+                    try:
+                        _tl_search.tz = _tz_of(g_["lat"], g_["lon"])
+                        _tl_search.tz_place = (g_.get("name") or _loc).split(",")[0][:40]
+                    except Exception:
+                        pass
+        self.snippets, self.matched = snippets, matched
+
+    def apply(self) -> tuple:
+        """Its results onto the handler's own thread-local: (snippets, matched)."""
+        for k in self._KEEP:
+            setattr(_tl_search, k, getattr(self, k))
+        _tl_search.geo, _tl_search.locq = self.geo, self.locq
+        if not self.done.is_set():
+            return (self.snippets or "No snippets found."), True
+        return self.snippets, self.matched
+
+
+def place_start(query: str, tz=("", "")) -> PlaceLookup:
+    """Begin a place question's lookups (never raises)."""
+    pl = PlaceLookup(query, tz)
+    try:
+        return pl.start()
+    except Exception as exc:
+        pl.error = repr(exc)[:200]
+        pl.done.set()
+        pl.phase = "done"
+        return pl
+
+
+def place_steps(step, status):
+    """The live steps of a PlaceLookup, for its wait (6b626)."""
+    def _on(ph, pl):
+        if ph == "search":
+            status("Searching the web…")
+            step("search", "Searching the web", "run", pl.anchor or "")
+        elif ph == "venues":
+            n = len(pl_rows(pl))
+            step("search", "Searched the web", "done", "%d source%s" % (n, "" if n == 1 else "s"))
+            status("Checking what’s open nearby…")
+            step("read", "Checking what’s open nearby", "run", "")
+        elif ph == "done" and pl.offline and not said:
+            said.append(ph)
+            step("read", "Couldn’t check what’s open", "done", "")
+        elif ph in ("check", "done") and not said and not pl.offline:
+            said.append(ph)
+            n = len(getattr(pl, "osm", None) or [])
+            if n:
+                step("read", "Checked what’s open nearby", "done",
+                     "%d place%s" % (n, "" if n == 1 else "s"))
+            else:
+                step("read", "No opening hours nearby", "done", "")
+    said = []
+    return _on
+
+
+def pl_rows(pl) -> list:
+    """The web rows a lookup has so far (its thread's, until it finishes)."""
+    return list(getattr(pl, "rows", None) or [])
+
+
+# ---- the clock line every searched question carries (6b264)
+def clock_line() -> str:
+    return ("[for time-sensitive parts: it is %s%s]\n"
+            % (_venue_stamp("%A %-I:%M%p"),
+               "" if getattr(_tl_search, "tz", "") else " where I am"))
+
+
+# ---- no internet connection: said plainly, and the rest answered
+NET_PROBE_URL = "https://duckduckgo.com/"
+NET_CACHE_S = 20.0
+_NET_STATE = {"t": 0.0, "off": False}
+
+
+def net_err_offline(exc) -> bool:
+    """A connection error (no route, no name, refused, timed out) rather
+    than a server's answer (6b626). An HTTP status is an answer: online."""
+    if isinstance(exc, urllib.error.HTTPError):
+        return False
+    r = getattr(exc, "reason", exc)
+    return isinstance(r, (OSError, TimeoutError)) or isinstance(exc, (OSError, TimeoutError))
+
+
+def _net_probe():
+    req = urllib.request.Request(NET_PROBE_URL, method="HEAD", headers={
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+                      "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"})
+    with urllib.request.urlopen(req, timeout=4) as r:
+        r.read(0)
+
+
+def net_offline(probe=None, now=None) -> bool:
+    """True when this computer can't reach the internet (6b626). Asked only
+    after a lookup came back empty, so a working connection costs nothing;
+    one small request, its verdict kept NET_CACHE_S."""
+    now = time.time() if now is None else now
+    if now - _NET_STATE["t"] < NET_CACHE_S:
+        return _NET_STATE["off"]
+    off = False
+    try:
+        (probe or _net_probe)()
+    except Exception as exc:
+        off = net_err_offline(exc)
+    _NET_STATE.update(t=now, off=off)
+    return off
+
+
+OFFLINE_WHAT = {"weather": "the live weather", "place": "what’s open or nearby",
+                "web": "anything online"}
+OFFLINE_REST = {
+    "weather": "the place's usual weather for the time of year and what to plan for",
+    "place": "the kinds of places worth looking for there, and any long-standing, well-known one "
+             "you can vouch for, said to be unchecked",
+    "web": "everything you reliably know, with a current figure marked as possibly out of date"}
+OFFLINE_STEP = "No internet connection"
+
+
+def offline_line(kind: str = "web") -> str:
+    """The answer's first sentence when the internet can't be reached."""
+    return ("I can’t reach the internet right now, so I can’t check %s."
+            % OFFLINE_WHAT.get(kind, OFFLINE_WHAT["web"]))
+
+
+def offline_turn(query: str, kind: str = "web") -> str:
+    """The user turn when a lookup found no connection (6b626): one plain
+    line says so, then the rest is answered from what is known. The weather
+    answer used to blame its "training data"."""
+    return ("[No internet connection: this computer could not reach the internet, so nothing "
+            "could be looked up. Begin with exactly this sentence: \"%s\" Then answer what you can "
+            "without it: %s. Never give a reading, hours, a price or a score as if it were live, "
+            "and never mention training data, a cutoff, a search or sources.]\n\nPROMPT: %s"
+            % (offline_line(kind), OFFLINE_REST.get(kind, OFFLINE_REST["web"]), query))
+
+
+# ---- the post-pass: a sentence that narrates what the search returned
+_ANS_GAP_RX = re.compile(
+    r"\b(?:I (?:didn['’]t|did not|couldn['’]t|could not) find|(?:isn|aren|wasn|weren)['’]t in what "
+    r"I found|nothing I found|no source)\b", re.I)
+_ANS_NARRATE_RX = re.compile(
+    r"\b(?:though|but|although|however|only|instead)\b[^.!?\n]{0,60}\b(?:they|it|these|those|the results?|"
+    r"the pages?|what I found|sources?)\s+(?:only\s+)?(?:mention|mentions|mentioned|refer|refers|discuss|"
+    r"discusses|cover|covers|talk about|talks about|show|shows)\b|\bin various contexts\b", re.I)
+
+
+def answer_drop_noise(text: str) -> tuple:
+    """(text, n): each sentence that admits a gap AND narrates what the
+    search happened to return ("I didn't find the result, though they
+    mention these numbers in various contexts such as film titles [1]")
+    dropped, when the answer has something else to say (6b626). The rules
+    already ban narrating off-topic results; this is the backstop."""
+    t = str(text or "")
+    if "```" in t:
+        return t, 0
+    parts = re.split(r"(?<=[.!?])(\s+)", t)
+    keep, n = [], 0
+    for i in range(0, len(parts), 2):
+        s = parts[i]
+        if _ANS_GAP_RX.search(s) and _ANS_NARRATE_RX.search(s):
+            n += 1
+            continue
+        keep.append(s + (parts[i + 1] if i + 1 < len(parts) else ""))
+    out = "".join(keep).rstrip()
+    if not n or not out.strip():
+        return t, 0
+    return out + ("\n" if t.endswith("\n") else ""), n
+
+
+def place_turn(query: str, snippets: str, matched: bool, placey: bool,
+               bookish: bool, is_weather: bool) -> str:
+    """The user turn of a searched answer that is not a grounded one: the
+    place, booking, weather and listings paths (lifted out of /api/chat in
+    6b626, word for word, so a place question can build it after its
+    lookups finish behind the headers, its steps live)."""
+    if placey and matched:
+        # the closed-day check is MECHANICAL, not left to the
+        # model: whether "Closed on Tuesday" survives into a
+        # given run's snippets — and whether a 4-bit model
+        # notices it — is a coin flip (Lucali came back "open
+        # tonight 5-11pm" on a Tuesday, twice in three runs)
+        wd = time.strftime("%A", _venue_now())
+        closed_hit = re.search(
+            r"(close[sd]?[^.\n]{0,40}\b%s|\b%s[^.\n]{0,15}"
+            r"close[sd]?)" % (wd[:3], wd[:3]), snippets, re.I)
+        warn = ("READ FIRST: today is %s, and a source above "
+                "says it is CLOSED on %ss. Unless a source "
+                "clearly contradicts that, your first "
+                "sentence must be exactly: \"Closed tonight "
+                "— it's %s, and they're closed %ss.\" Then "
+                "continue the shape below.\n"
+                % (wd, wd, wd, wd)) if closed_hit else (
+                "Today is %s — never name any other weekday "
+                "as today.\n" % wd)
+        strictness = warn + (
+            "The data above is your ONLY source for hours, "
+            "phone numbers, addresses and prices — never "
+            "estimate or invent one. Write ENTIRELY in your "
+            "own words: pasting any line, menu or form text "
+            "from the data is a failure.\n"
+            "ANSWER SHAPE, exactly:\n"
+            "1. First sentence = the verdict, and it must NAME "
+            "today's weekday ('Closed tonight — it's Tuesday, "
+            "and they close Tuesdays' / 'Open tonight, Friday "
+            "hours are 5-11pm'). Before writing it, check "
+            "every source for a closed-day that matches "
+            "today's weekday — a listed 'Closed Monday and "
+            "Tuesday' beats a generic hours range.\n"
+            "2. Then at most three options as short bold-name "
+            "lines: **Name** — what it is — tonight's hours.\n"
+            # 6b304: this '+' was missing since 6b281, so the
+            # literal above was CALLED with the tuple below and
+            # every venue-hours question raised TypeError before
+            # headers were sent — the client saw a dropped line
+            + (("THIN LIST: only %d venue(s) could be checked "
+              "and none is open — say 'of the %d I could "
+              "check' in those words, never 'nothing is "
+              "open', and name the late-night or early "
+              "category (24-hour pharmacy chain, diner, "
+              "bodega) as the honest move.\n"
+              % (getattr(_tl_search, "thin_closed", 0),
+                 getattr(_tl_search, "thin_closed", 0)))
+             if getattr(_tl_search, "thin_closed", 0) else "") +
+            "CLOSED MEANS CLOSED: if any source marks a "
+            "place permanently closed, it is closed — its "
+            "own website is the LAST source to trust, "
+            "never the reason to recommend it. Hours or "
+            "prices that come ONLY from a venue's own "
+            "website are 'listed, unverified' — say so in "
+            "those words, never 'open now' or 'opens at "
+            "noon today' on that alone (6b278: a site "
+            "from 2015 was quoted as today's hours). And "
+            "the data is a sample, not the town: never say "
+            "'nothing is open' from a handful of rows — "
+            "say what's open among what was found and "
+            "name the late-night or early category that "
+            "usually is (a 24-hour pharmacy chain, a "
+            "diner, a bodega) as the honest fallback.\n"
+            "3. When everything named is CLOSED at this "
+            "hour, still commit: name ONE real place "
+            "likely open right now (a 24-hour spot from "
+            "the data or one you know is long-standing, "
+            "flagged honestly) or state the earliest "
+            "reopening time — 'try a delivery app' or "
+            "'a 24-hour bodega' with no name is a "
+            "non-answer. A 'best X' ask still gets a "
+            "best (and one runner-up) even when the "
+            "verdict is 'closed until noon'.\n"
+            "4. One practical heads-up if the data supports one. "
+            "Nothing else: no 'best bet is to check', no filler, "
+            "under 120 words. If the data truly lacks the answer, "
+            "say that in ONE sentence and stop.\n"
+            "When you state hours, a price or a phone number, "
+            "credit the source — 'per their site', 'per "
+            "OpenStreetMap' — ONCE, at its first use; "
+            "stamping every line reads as pipeline residue.\n"
+            "THEN, as the very last line, write [[PLACES]] "
+            "followed by a compact JSON array of the real "
+            "places you named — like [[PLACES]] [{\"n\":"
+            "\"Lucali\",\"d\":\"thin-crust pizza, BYOB\","
+            "\"h\":\"5-11pm\"}] — max 4, only places from "
+            "the data, nothing after it.\n")
+    elif placey:
+        # nothing in any engine mentions the place — a flat
+        # "couldn't find any information" is a dead end for the
+        # user; be a local who's honest AND still helpful.
+        # The first sentence is DICTATED (the code knows the
+        # entity) — asked politely, the model opened with
+        # "Two familiar ones:" on a compliance coin-flip.
+        # last term is the locality, the rest is the name:
+        # "qzxvbn cafe bushwick" -> "Qzxvbn Cafe" in "Bushwick"
+        pt = _place_terms(query).split()
+        _existence = re.match(
+            r"\s*(is|are)\s+there\b|\s*any\b", query, re.I)
+        if _existence or len(pt) > 4:
+            # "is there a supermarket that sells X" is a
+            # CATEGORY question, not a venue named
+            # "Supermarket Sells X" (6b261, the drill
+            # caught the script firing at exactly the old
+            # 6-term boundary) — and no venue is named by
+            # five-plus words of leftover prose either.
+            # Answer it as a question, honestly.
+            strictness = (
+                "The searches found nothing directly "
+                "relevant. Answer from your own knowledge, "
+                "be plain about what you're unsure of, and "
+                "never invent a venue, price or hour. Do "
+                "NOT claim you searched for a place by "
+                "name.\n")
+            pt = []
+        ent = (" ".join(pt[:-1]) or pt[0]).title() if pt \
+            else "that"
+        loc = (" in " + pt[-1].title()) if len(pt) > 1 else ""
+        if pt: strictness = (
+            "IMPORTANT: nothing you found actually mentions "
+            "the place the user asked about. Do not pretend "
+            "it does, and never present other places as if "
+            "they were the answer.\n"
+            "Write EXACTLY this reply:\n"
+            "First sentence, word for word: \"I can't find a "
+            "spot called %s%s — it might go by a different "
+            "name or only live on Instagram or Google "
+            "Maps.\"\n" % (ent, loc) +
+            "Middle, ONLY if one or two genuinely similar "
+            "real places appear in what you found: each as "
+            "'**Name** — what it is'. Otherwise skip the "
+            "middle. Never invent hours, phone numbers or "
+            "addresses.\n"
+            "Last sentence, word for word: \"Got the exact "
+            "spelling or a cross street? I'll take another "
+            "look.\"\n")
+    elif bookish:
+        # thin snippets + an eager 4-bit model = invented
+        # sub-programs, participant caps and price tables
+        # dressed as fact (seen live, twice)
+        strictness = (
+            "Name ONLY businesses, programs, prices and "
+            "dates that appear in what you found — never "
+            "add one it doesn't contain, and never invent "
+            "details like group sizes or start dates. Where "
+            "what you found is thin, recommend the honest "
+            "CATEGORY and the listing site to browse (one "
+            "you actually found). Speak as yourself — 'I "
+            "found', 'I can see' — never 'the results', "
+            "'the snippets' or 'the excerpt you shared'; "
+            "the reader never sees those.\n"
+            "Shape: open with ONE human sentence to the "
+            "person in their own register — if they shared "
+            "something personal (burned out, heartbroken), "
+            "meet it in a clause; never open with a heading "
+            "or a listing. Then the real options, honestly "
+            "labeled. Close by asking for the one or two "
+            "details you'd need to narrow it down.\n"
+            "If you named real venues, add as the very last "
+            "line [[PLACES]] followed by compact JSON — "
+            "[{\"n\":\"name\",\"d\":\"five words\","
+            "\"h\":\"hours or ''\"}] — max 4, data only, "
+            "nothing after it.\n")
+    elif is_weather:
+        # both weather rungs came back empty — live numbers
+        # exist NOWHERE in this context (6b266, judged: a
+        # sunny 71°F "right now" at 10:30 PM, invented).
+        strictness = (
+            "No live weather data reached you. Do NOT "
+            "state any current temperature, sky condition, "
+            "wind or forecast number — a made-up 'right "
+            "now' is the worst possible answer. One clause "
+            "says the live numbers didn't come through and "
+            "where to glance (a weather app, weather.gov); "
+            "then give only what you truly know — the "
+            "area's seasonal pattern and any planning "
+            "advice the question implies.\n")
+    elif _LISTINGS_RX.search(query):
+        # "what movies are playing this week" once answered
+        # with ZERO titles and a homework list of other
+        # websites (6b265, judged 2.2/5). Listings retrieval
+        # is often thin, but the model KNOWS what's in wide
+        # release — the punt is a choice, and it's banned.
+        strictness = (
+            "This is a what's-on question. Sending the "
+            "reader to other sites is failure: never open "
+            "with what you can't see, never hand over a "
+            "list of places to go look instead of an "
+            "answer. Commit — name the actual current "
+            "wide releases or major events you know of "
+            "this month, plus anything the data adds, "
+            "each with a few honest words on what it is "
+            "and who it's for. NAMES ONLY: an item is "
+            "reported under its real proper title or not "
+            "at all — a description the data left in "
+            "place of a title ('the zombie sequel', 'the "
+            "Pacino true-crime project') is not a title; "
+            "drop it and name one you can vouch for. One "
+            "closing clause may say where to confirm local "
+            "times — after the real answer, never instead "
+            "of it.\n")
+    else:
+        strictness = ""
+    # data FIRST, instructions LAST — an instruction buried
+    # before 4KB of scraped pages gets forgotten, and the
+    # model answers by pasting the menu (seen live)
+    # vocabulary matters: when this block said "results" and
+    # "snippets", answers said "the snippets show…" — the
+    # model parrots whatever the scaffolding calls things.
+    # "What you just found" echoes back as "I found", which
+    # is exactly the voice we want.
+    return (
+            "What you just found on the web about "
+            f"'{query}' — the reader can NEVER see this "
+            "block, so restate anything you use:\n"
+            f"{snippets}\n\n"
+            # every searched answer gets today pinned — a
+            # generic search reply opened "Mondays can be
+            # challenging" on a Tuesday (seen live)
+            f"Today is {time.strftime('%A')}.\n"
+            # a burnout-retreat answer once NARRATED the junk
+            # the engine happened to return ("Mental Floss
+            # mentions Generation Beta") — junk is invisible
+            "Any result that does not help answer is noise: "
+            "never mention, summarize or apologize for an "
+            "off-topic result. The reader must never learn "
+            "what the search happened to return.\n"
+            # 6b266, judged 3.2: the L-train answer OPENED
+            # with "I can't pull live MTA service data from
+            # here" and spent 200 words on how-to-check
+            "Never describe your own data access — 'I "
+            "can't pull live data', 'the data I have', "
+            "'from here' are banned, and so are the "
+            "softened forms: 'I can't confirm', 'nothing "
+            "I found verifies', 'no hours were listed in "
+            "what I found'. When something live is "
+            "missing, ONE clause says what to check "
+            "and where; the rest answers from what you "
+            "actually know. Never claim lived experience "
+            "or memories of a place ('I've seen it in "
+            "enough corner stores') — you have none.\n"
+            # 6b275, judged: eggs "$3-4 right now" from
+            # memory against a BLS $2.28 released two days
+            # earlier; a movie slate from memory with
+            # "(announced date)" hedges
+            "A CURRENT PRICE, CURRENT LINEUP or WHAT'S-"
+            "PLAYING fact comes from the data WITH its "
+            "date and source in the same sentence ('$2.28 "
+            "a dozen — BLS, August'); if the data holds no "
+            "dated figure, say so in one clause and label "
+            "anything from memory with the month it was "
+            "true — never 'right now' from memory.\n"
+            f"{strictness}"
+            f"PROMPT: {query}"
+    )
+# ---- the length dial never refuses what was asked for: "Write a long,
+# detailed 1500-word essay" came back "A 1500-word deep dive would likely
+# exceed technical length limits" (there is no such limit: 8,192 tokens)
+LENGTH_ASKED = (" The person's own words win over this setting: asked for a "
+                "length or a long piece (an essay, 1,500 words, a full guide), "
+                "write it in full. Never mention a length limit, a word cap or "
+                "a 'single response' limit: there is none.")
+
+
+# ---- a chat is named from its first message that asks something: "hello!"
+# then Canberra and eggs was titled "Simple greeting"
+def title_text(texts) -> str:
+    """The message a chat's title is made from: the first of the person's
+    messages that isn't small talk (turn_triage's "chat", 6b570); '' while
+    there is none, so the page asks again after the next answer."""
+    for t in (texts if isinstance(texts, (list, tuple)) else [texts])[:6]:
+        t = str(t or "").strip()
+        if t and turn_triage(t) != "chat":
+            return t
+    return ""
+# ==== 6b626 answers: end ====
 
 
 # ------------------------------------------------------- managed engines
@@ -22585,7 +23411,7 @@ def _geocode(q: str):
     out = None
     try:
         url = ("https://nominatim.openstreetmap.org/search?format=json"
-               "&limit=1&q=" + urllib.parse.quote(q))
+               "&limit=1&addressdetails=1&q=" + urllib.parse.quote(q))
         req = urllib.request.Request(url, headers={
             "User-Agent": "MillenAI/%s (contact: millertechnology.net)"
                           % APP_VERSION})
@@ -22597,9 +23423,13 @@ def _geocode(q: str):
             # characters before its city — Katz's is "…, Manhattan
             # Community Board 3, Manh" there, so no pin was in New York
             full = rows[0].get("display_name") or ""
+            _ad = rows[0].get("address") or {}
             out = {"lat": round(float(rows[0]["lat"]), 6),
                    "lon": round(float(rows[0]["lon"]), 6),
-                   "name": full[:80], "full": full}
+                   "name": full[:80], "full": full,
+                   # the town, for a landmark's web search (6b626)
+                   "town": str(_ad.get("city") or _ad.get("town") or _ad.get("village")
+                               or _ad.get("municipality") or "")[:40]}
     except Exception:
         pass
     if len(_geo_cache) > 200:
@@ -23498,7 +24328,7 @@ def _host_score(u: str) -> int:
     return 1
 
 
-def place_search(query: str) -> tuple:
+def place_search(query: str, near: str = "") -> tuple:
     """(snippets_text, matched) for an is-it-open / where-is-it question.
 
     matched=False means NO result even mentions the place asked about —
@@ -23512,6 +24342,16 @@ def place_search(query: str) -> tuple:
         return run_search(query), True
     terms = _place_terms(query) or query
     toks = terms.split()
+    # A LANDMARK QUESTION KEEPS ITS "NEAR" (6b626): `near` is "near Eiffel
+    # Tower Paris". Stripped to "coffee shop eiffel tower hours", the engine
+    # answered with Wikipedia's Coffee and cafes in the city this computer
+    # is in (Campinas, measured); "coffee shop near Eiffel Tower Paris"
+    # stays there, and a hit naming neither the landmark nor its town goes
+    must = []
+    if near:
+        _nw = set(re.findall(r"[a-z0-9'&-]+", near.lower()))
+        toks = [w for w in toks if w not in _nw] or toks
+        must = [w for w in _nw if len(w) >= 4 and w != "near"]
     anchor = toks[0] if toks else ""
 
     def is_direct(r):
@@ -23526,7 +24366,10 @@ def place_search(query: str) -> tuple:
 
     hits, seen = [], set()
     rest = " ".join(toks[1:])
-    for q in (terms + " hours", ('"%s" %s' % (anchor, rest)).strip(), query):
+    qs = (terms + " hours", ('"%s" %s' % (anchor, rest)).strip(), query)
+    if near:
+        qs = (" ".join(toks) + " " + near, query, " ".join(toks) + " " + near + " open now")
+    for q in qs:
         for r in _ddg_text(q, 6):
             u = (r.get("href") or "").strip()
             if u and u not in seen:
@@ -23534,6 +24377,10 @@ def place_search(query: str) -> tuple:
                 hits.append(r)
         if sum(1 for r in hits if is_direct(r)) >= 2:
             break
+    if must:
+        _there = [r for r in hits if any(w in ("%s %s %s" % (
+            r.get("title") or "", r.get("body") or "", r.get("href") or "")).lower() for w in must)]
+        hits = _there if len(_there) >= 2 else hits
     # WHERE A PLACE ANSWER ACTUALLY COMES FROM (6b240). Even a perfectly
     # clean query gets pinterest boards, tiktok discovery pages,
     # venue-hire listings and printed-directory spam: "bushwick ny bars
@@ -25483,10 +26330,15 @@ GROUND_RULES = (
     "- Cite the source number in square brackets straight after each fact "
     "it supports, like [1], or [2][4] for two, using only the numbers "
     "listed above. Never cite a number that isn't listed.\n"
-    "- Where the evidence does not cover part of the question, say so in "
-    "one plain clause (what you'd check, and where). Stable background, "
-    "how a thing works, long-standing facts, may come from your own "
-    "knowledge, uncited; a current fact never does.\n"
+    # (6b626) a part the evidence does not cover is ANSWERED from what the
+    # writer knows when it is stable; only a current fact gets the clause
+    # ("17 times 23 is 391. I didn't find the result of this multiplication")
+    "- Where the evidence does not cover part of the question, answer that "
+    "part from what you reliably know when it is stable (how a thing works, "
+    "a method, a sum, a definition, a long-standing fact), uncited, and say "
+    "nothing about the search. Only a CURRENT fact the evidence lacks (a "
+    "price, hours, a score, who leads now) gets one plain clause on what to "
+    "check and where; a current fact never comes from your own knowledge.\n"
     "- Use the figures the evidence gives: a number it states beats "
     "'no source gives a price'. A slow-moving figure the question needs "
     "and the evidence lacks (a typical fare, rent, dose, size limit or pay "
@@ -25506,8 +26358,9 @@ GROUND_NONE = (
     "Today is {today}. Your training data ends before today and is out of "
     "date for anything current. Answer from what you reliably know, label "
     "any fact that may have changed with the month it was last true for you "
-    "(never present it as 'right now'), and say in one clause what to check "
-    "and where.\n")
+    "(never present it as 'right now'); only for a current fact (a price, "
+    "hours, a score, news) say in one clause what to check and where. Never "
+    "mention the search, a cutoff or your training data (6b626).\n")
 # DATING EVERY FIGURE (6b520, per Patrick): round 2's judges marked fresh
 # answers down for current figures with no date ("$2.27 a dozen", "3.75%")
 # and for stale ones stated as now. The writer dates each current figure
@@ -25561,8 +26414,9 @@ GROUND_SHAPE = (
     "stops.\n"
     "- 'The provided data', 'the available information', 'the sources do "
     "not provide', 'the search results', 'I cannot pull live data' are "
-    "banned: say what you found, and for what you didn't find, say what "
-    "to check in one clause.\n")
+    "banned, and so is 'I didn't find' about anything you can answer "
+    "yourself: answer it (6b626). Only a current fact you couldn't find "
+    "gets one clause on what to check.\n")
 # ESTIMATE WHEN ASKED (6b523) IS GONE (6b560, measured): the rule told the
 # writer to build a figure no source states "from the typical ranges you
 # know". Over three samples a side and three blind gradings, the branch with
@@ -25578,8 +26432,9 @@ GROUND_FOLLOWUP = (
     "[This is a follow-up on your previous answer, with the same evidence. "
     "Do not restate that answer: add the specifics it lacked (names, "
     "figures, dates), go deeper on the mechanism, and correct plainly what "
-    "it got wrong or left vague. Where the evidence is thin, say so in one "
-    "clause and give what you reliably know, dated.]")
+    "it got wrong or left vague. Where the evidence is thin, give what you "
+    "reliably know, a current figure dated, without remarking on the "
+    "evidence (6b626).]")
 
 
 def pack_dates(pack: str) -> dict:
@@ -37141,6 +37996,9 @@ def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
     t, n = answer_scrub(t)
     if n:
         notes.append("%d leak%s reworded" % (n, "" if n == 1 else "s"))
+    t, n = answer_drop_noise(t)           # (6b626) "…though they mention film titles"
+    if n:
+        notes.append("%d search aside%s dropped" % (n, "" if n == 1 else "s"))
     m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(r"\s*#{1,4} [^\n]{1,100}\n+", t)
     if m:
         t = t[m.end():]
@@ -44728,7 +45586,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             try:
                 _tb = json.loads(self.rfile.read(n))
-                txt = str(_tb.get("text", ""))
+                txt = title_text(_tb.get("texts") or [str(_tb.get("text", ""))])   # (6b626)
                 _tcid = str(_tb.get("chat_id") or "")
             except (ValueError, json.JSONDecodeError, AttributeError):
                 txt, _tcid = "", ""
@@ -45887,6 +46745,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         bookish = False
         placey = False
         _ground = None           # the grounded search (6b514), finished after the headers
+        _place, _offline = None, ""   # a place question's lookups; no connection (6b626)
         try:
             _oai_note = other_ai_note(strip_greeting(prompt)) if auto_web else ""
         except Exception:
@@ -45915,7 +46774,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # even when it isn't "thin": "any bars or clubs open" names
             # venues, so _entity_thin says it has a subject — but it has
             # no LOCATION, and a place search without one is worthless.
-            if _entity_thin(query) or _VENUE_RX.search(query):
+            if thread_borrow(query):          # (6b626) not when it names its place
                 prev = _thread_terms(messages, avoid=query)
                 if prev:
                     query = prev + " " + query
@@ -45942,6 +46801,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 _g_prior = ground_prior(messages)
             except Exception:
                 _g_prior = None
+            if _g_prior is not None and not grounded_followup(prompt, _g_prior.question):
+                _g_prior = None      # a new subject searches fresh, or not at all (6b626)
             if _g_prior is not None:
                 p3 = strip_greeting(prompt)
                 p3 = _PREAMBLE_RX.sub("", p3, count=1).strip() or p3
@@ -45980,7 +46841,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if snippets is not None and getattr(
                         _tl_search, "weather_src", None):
                     _tl_search.rows = [_tl_search.weather_src]
-            if snippets is not None:
+                if snippets is None and net_offline():
+                    _offline = "weather"          # no connection (6b626)
+            if _offline:
+                messages[-1] = {"role": "user", "content": offline_turn(query, _offline)}
+            elif snippets is not None:
                 # data answers need the DATA: a 3B given real degrees once
                 # replied "warm the cockles" with no numbers at all
                 messages[-1] = {
@@ -46027,73 +46892,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if _NOT_PLACEY_RX.search(query):
                     placey = bookish = False
                 if placey:
-                    snippets, matched = place_search(query)
-                    pt_ = _place_terms(query).split()
-                    _tl_search.locq = pt_[-1] if len(pt_) > 1 else ""
-                    # REAL HOURS, ON TOP OF THE SNIPPETS (6b242). Overpass
-                    # knows what is open right now; snippets almost never
-                    # do. Placed FIRST in the context and labelled as the
-                    # authority, because a blog post's stale hours must
-                    # not outrank a structured tag. Additive only — an
-                    # empty result changes nothing.
-                    # THE LOCALITY IS WHAT'S LEFT AFTER THE CATEGORY
-                    # (6b244). This took the last two words, which for a
-                    # short question is the category itself: "whats some
-                    # good bbq in bushwick?" reduces to "bbq bushwick",
-                    # and geocoding THAT returns None — so no venues, no
-                    # pins and no map, on a question that names a
-                    # neighbourhood outright. Strip the venue words and
-                    # the relative-time words; the remainder is the place.
-                    _terms = _place_terms(query)
-                    _loc = " ".join(w for w in _terms.split()
-                                    if not _VENUE_RX.search(w)
-                                    and w not in _REL_WORDS)[:60]
-                    _osm = osm_places(_terms, _loc) if _loc else []
-                    if _osm:
-                        _tl_search.osm = _osm
-                        _open = [p for p in _osm if p.get("open")]
-                        if len(_osm) <= 3 and not _open:
-                            _tl_search.thin_closed = len(_osm)
-                        else:
-                            _tl_search.thin_closed = 0
-                        _lines = "\n".join(
-                            "- %s%s — %s%s" % (
-                                p["n"], (" (" + p["d"] + ")") if p["d"] else "",
-                                p["h"] or "hours not published",
-                                "  [OPEN NOW]" if p.get("open") else "")
-                            for p in _osm)
-                        snippets = (
-                            "VENUE DATA (OpenStreetMap, authoritative for "
-                            "hours — prefer these over any hours mentioned "
-                            "in the web snippets below; %d of %d are open "
-                            "right now):\n%s\n"
-                            "This list covers NEARBY venues, not the "
-                            "whole neighbourhood: a nothing-is-open "
-                            "verdict must say it covers the listed "
-                            "spots and add ONE call-ahead clause.\n"
-                            "NAME VENUES ONLY FROM THIS VENUE DATA. The "
-                            "web snippets below may describe same-named "
-                            "places in OTHER CITIES (a Williamsburg "
-                            "cafe in Virginia answered a Brooklyn "
-                            "question — seen live); snippets give "
-                            "colour and context, never venue names.\n\n%s"
-                            % (len(_open), len(_osm), _lines, snippets or ""))
-                        matched = True
-                    # closure evidence rides above the venue data, once
-                    # the OSM rows and web sources are both known (6b278)
-                    snippets = closure_notices(query) + (snippets or "")
-                    if matched:
-                        # a pin only counts when the geocoder actually
-                        # landed in the right neighborhood — "food
-                        # bushwick" once pinned Edinburgh (seen live)
-                        # geocode the LOCALITY, not the whole phrase —
-                        # "bbq bushwick" resolves to nothing, which is
-                        # why the map card vanished too (6b244)
-                        g_ = _geocode(_loc or _place_terms(query))
-                        lt_ = _tl_search.locq.lower()
-                        if g_ and (not lt_ or lt_ in
-                                   (g_.get("full") or "").lower()):
-                            _tl_search.geo = g_
+                    # THE LOOKUPS RUN BEHIND THE HEADERS (6b626): the web search,
+                    # OpenStreetMap's venues beside it, the closure check and the
+                    # pin, on their own thread, waited for below with a step per
+                    # phase (inline here they were up to 72 s of a blank screen)
+                    _place = place_start(query, (_tl_search.tz, _tl_search.tz_place))
+                    snippets, matched = PLACE_PENDING, True
                 elif bookish:
                     pt_ = _place_terms(query).split()
                     _tl_search.locq = pt_[-1] if len(pt_) > 1 else ""
@@ -46231,264 +47035,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                               "your answer. Do NOT say you cannot show "
                               "images — describe what they show and carry "
                               "on.]" % len(_ph))
-                if placey and matched:
-                    # the closed-day check is MECHANICAL, not left to the
-                    # model: whether "Closed on Tuesday" survives into a
-                    # given run's snippets — and whether a 4-bit model
-                    # notices it — is a coin flip (Lucali came back "open
-                    # tonight 5-11pm" on a Tuesday, twice in three runs)
-                    wd = time.strftime("%A", _venue_now())
-                    closed_hit = re.search(
-                        r"(close[sd]?[^.\n]{0,40}\b%s|\b%s[^.\n]{0,15}"
-                        r"close[sd]?)" % (wd[:3], wd[:3]), snippets, re.I)
-                    warn = ("READ FIRST: today is %s, and a source above "
-                            "says it is CLOSED on %ss. Unless a source "
-                            "clearly contradicts that, your first "
-                            "sentence must be exactly: \"Closed tonight "
-                            "— it's %s, and they're closed %ss.\" Then "
-                            "continue the shape below.\n"
-                            % (wd, wd, wd, wd)) if closed_hit else (
-                            "Today is %s — never name any other weekday "
-                            "as today.\n" % wd)
-                    strictness = warn + (
-                        "The data above is your ONLY source for hours, "
-                        "phone numbers, addresses and prices — never "
-                        "estimate or invent one. Write ENTIRELY in your "
-                        "own words: pasting any line, menu or form text "
-                        "from the data is a failure.\n"
-                        "ANSWER SHAPE, exactly:\n"
-                        "1. First sentence = the verdict, and it must NAME "
-                        "today's weekday ('Closed tonight — it's Tuesday, "
-                        "and they close Tuesdays' / 'Open tonight, Friday "
-                        "hours are 5-11pm'). Before writing it, check "
-                        "every source for a closed-day that matches "
-                        "today's weekday — a listed 'Closed Monday and "
-                        "Tuesday' beats a generic hours range.\n"
-                        "2. Then at most three options as short bold-name "
-                        "lines: **Name** — what it is — tonight's hours.\n"
-                        # 6b304: this '+' was missing since 6b281, so the
-                        # literal above was CALLED with the tuple below and
-                        # every venue-hours question raised TypeError before
-                        # headers were sent — the client saw a dropped line
-                        + (("THIN LIST: only %d venue(s) could be checked "
-                          "and none is open — say 'of the %d I could "
-                          "check' in those words, never 'nothing is "
-                          "open', and name the late-night or early "
-                          "category (24-hour pharmacy chain, diner, "
-                          "bodega) as the honest move.\n"
-                          % (getattr(_tl_search, "thin_closed", 0),
-                             getattr(_tl_search, "thin_closed", 0)))
-                         if getattr(_tl_search, "thin_closed", 0) else "") +
-                        "CLOSED MEANS CLOSED: if any source marks a "
-                        "place permanently closed, it is closed — its "
-                        "own website is the LAST source to trust, "
-                        "never the reason to recommend it. Hours or "
-                        "prices that come ONLY from a venue's own "
-                        "website are 'listed, unverified' — say so in "
-                        "those words, never 'open now' or 'opens at "
-                        "noon today' on that alone (6b278: a site "
-                        "from 2015 was quoted as today's hours). And "
-                        "the data is a sample, not the town: never say "
-                        "'nothing is open' from a handful of rows — "
-                        "say what's open among what was found and "
-                        "name the late-night or early category that "
-                        "usually is (a 24-hour pharmacy chain, a "
-                        "diner, a bodega) as the honest fallback.\n"
-                        "3. When everything named is CLOSED at this "
-                        "hour, still commit: name ONE real place "
-                        "likely open right now (a 24-hour spot from "
-                        "the data or one you know is long-standing, "
-                        "flagged honestly) or state the earliest "
-                        "reopening time — 'try a delivery app' or "
-                        "'a 24-hour bodega' with no name is a "
-                        "non-answer. A 'best X' ask still gets a "
-                        "best (and one runner-up) even when the "
-                        "verdict is 'closed until noon'.\n"
-                        "4. One practical heads-up if the data supports one. "
-                        "Nothing else: no 'best bet is to check', no filler, "
-                        "under 120 words. If the data truly lacks the answer, "
-                        "say that in ONE sentence and stop.\n"
-                        "When you state hours, a price or a phone number, "
-                        "credit the source — 'per their site', 'per "
-                        "OpenStreetMap' — ONCE, at its first use; "
-                        "stamping every line reads as pipeline residue.\n"
-                        "THEN, as the very last line, write [[PLACES]] "
-                        "followed by a compact JSON array of the real "
-                        "places you named — like [[PLACES]] [{\"n\":"
-                        "\"Lucali\",\"d\":\"thin-crust pizza, BYOB\","
-                        "\"h\":\"5-11pm\"}] — max 4, only places from "
-                        "the data, nothing after it.\n")
-                elif placey:
-                    # nothing in any engine mentions the place — a flat
-                    # "couldn't find any information" is a dead end for the
-                    # user; be a local who's honest AND still helpful.
-                    # The first sentence is DICTATED (the code knows the
-                    # entity) — asked politely, the model opened with
-                    # "Two familiar ones:" on a compliance coin-flip.
-                    # last term is the locality, the rest is the name:
-                    # "qzxvbn cafe bushwick" -> "Qzxvbn Cafe" in "Bushwick"
-                    pt = _place_terms(query).split()
-                    _existence = re.match(
-                        r"\s*(is|are)\s+there\b|\s*any\b", query, re.I)
-                    if _existence or len(pt) > 4:
-                        # "is there a supermarket that sells X" is a
-                        # CATEGORY question, not a venue named
-                        # "Supermarket Sells X" (6b261, the drill
-                        # caught the script firing at exactly the old
-                        # 6-term boundary) — and no venue is named by
-                        # five-plus words of leftover prose either.
-                        # Answer it as a question, honestly.
-                        strictness = (
-                            "The searches found nothing directly "
-                            "relevant. Answer from your own knowledge, "
-                            "be plain about what you're unsure of, and "
-                            "never invent a venue, price or hour. Do "
-                            "NOT claim you searched for a place by "
-                            "name.\n")
-                        pt = []
-                    ent = (" ".join(pt[:-1]) or pt[0]).title() if pt \
-                        else "that"
-                    loc = (" in " + pt[-1].title()) if len(pt) > 1 else ""
-                    if pt: strictness = (
-                        "IMPORTANT: nothing you found actually mentions "
-                        "the place the user asked about. Do not pretend "
-                        "it does, and never present other places as if "
-                        "they were the answer.\n"
-                        "Write EXACTLY this reply:\n"
-                        "First sentence, word for word: \"I can't find a "
-                        "spot called %s%s — it might go by a different "
-                        "name or only live on Instagram or Google "
-                        "Maps.\"\n" % (ent, loc) +
-                        "Middle, ONLY if one or two genuinely similar "
-                        "real places appear in what you found: each as "
-                        "'**Name** — what it is'. Otherwise skip the "
-                        "middle. Never invent hours, phone numbers or "
-                        "addresses.\n"
-                        "Last sentence, word for word: \"Got the exact "
-                        "spelling or a cross street? I'll take another "
-                        "look.\"\n")
-                elif bookish:
-                    # thin snippets + an eager 4-bit model = invented
-                    # sub-programs, participant caps and price tables
-                    # dressed as fact (seen live, twice)
-                    strictness = (
-                        "Name ONLY businesses, programs, prices and "
-                        "dates that appear in what you found — never "
-                        "add one it doesn't contain, and never invent "
-                        "details like group sizes or start dates. Where "
-                        "what you found is thin, recommend the honest "
-                        "CATEGORY and the listing site to browse (one "
-                        "you actually found). Speak as yourself — 'I "
-                        "found', 'I can see' — never 'the results', "
-                        "'the snippets' or 'the excerpt you shared'; "
-                        "the reader never sees those.\n"
-                        "Shape: open with ONE human sentence to the "
-                        "person in their own register — if they shared "
-                        "something personal (burned out, heartbroken), "
-                        "meet it in a clause; never open with a heading "
-                        "or a listing. Then the real options, honestly "
-                        "labeled. Close by asking for the one or two "
-                        "details you'd need to narrow it down.\n"
-                        "If you named real venues, add as the very last "
-                        "line [[PLACES]] followed by compact JSON — "
-                        "[{\"n\":\"name\",\"d\":\"five words\","
-                        "\"h\":\"hours or ''\"}] — max 4, data only, "
-                        "nothing after it.\n")
-                elif is_weather:
-                    # both weather rungs came back empty — live numbers
-                    # exist NOWHERE in this context (6b266, judged: a
-                    # sunny 71°F "right now" at 10:30 PM, invented).
-                    strictness = (
-                        "No live weather data reached you. Do NOT "
-                        "state any current temperature, sky condition, "
-                        "wind or forecast number — a made-up 'right "
-                        "now' is the worst possible answer. One clause "
-                        "says the live numbers didn't come through and "
-                        "where to glance (a weather app, weather.gov); "
-                        "then give only what you truly know — the "
-                        "area's seasonal pattern and any planning "
-                        "advice the question implies.\n")
-                elif _LISTINGS_RX.search(query):
-                    # "what movies are playing this week" once answered
-                    # with ZERO titles and a homework list of other
-                    # websites (6b265, judged 2.2/5). Listings retrieval
-                    # is often thin, but the model KNOWS what's in wide
-                    # release — the punt is a choice, and it's banned.
-                    strictness = (
-                        "This is a what's-on question. Sending the "
-                        "reader to other sites is failure: never open "
-                        "with what you can't see, never hand over a "
-                        "list of places to go look instead of an "
-                        "answer. Commit — name the actual current "
-                        "wide releases or major events you know of "
-                        "this month, plus anything the data adds, "
-                        "each with a few honest words on what it is "
-                        "and who it's for. NAMES ONLY: an item is "
-                        "reported under its real proper title or not "
-                        "at all — a description the data left in "
-                        "place of a title ('the zombie sequel', 'the "
-                        "Pacino true-crime project') is not a title; "
-                        "drop it and name one you can vouch for. One "
-                        "closing clause may say where to confirm local "
-                        "times — after the real answer, never instead "
-                        "of it.\n")
-                else:
-                    strictness = ""
-                # data FIRST, instructions LAST — an instruction buried
-                # before 4KB of scraped pages gets forgotten, and the
-                # model answers by pasting the menu (seen live)
-                # vocabulary matters: when this block said "results" and
-                # "snippets", answers said "the snippets show…" — the
-                # model parrots whatever the scaffolding calls things.
-                # "What you just found" echoes back as "I found", which
-                # is exactly the voice we want.
-                messages[-1] = {
-                    "role": "user",
-                    "content": (
-                        "What you just found on the web about "
-                        f"'{query}' — the reader can NEVER see this "
-                        "block, so restate anything you use:\n"
-                        f"{snippets}\n\n"
-                        # every searched answer gets today pinned — a
-                        # generic search reply opened "Mondays can be
-                        # challenging" on a Tuesday (seen live)
-                        f"Today is {time.strftime('%A')}.\n"
-                        # a burnout-retreat answer once NARRATED the junk
-                        # the engine happened to return ("Mental Floss
-                        # mentions Generation Beta") — junk is invisible
-                        "Any result that does not help answer is noise: "
-                        "never mention, summarize or apologize for an "
-                        "off-topic result. The reader must never learn "
-                        "what the search happened to return.\n"
-                        # 6b266, judged 3.2: the L-train answer OPENED
-                        # with "I can't pull live MTA service data from
-                        # here" and spent 200 words on how-to-check
-                        "Never describe your own data access — 'I "
-                        "can't pull live data', 'the data I have', "
-                        "'from here' are banned, and so are the "
-                        "softened forms: 'I can't confirm', 'nothing "
-                        "I found verifies', 'no hours were listed in "
-                        "what I found'. When something live is "
-                        "missing, ONE clause says what to check "
-                        "and where; the rest answers from what you "
-                        "actually know. Never claim lived experience "
-                        "or memories of a place ('I've seen it in "
-                        "enough corner stores') — you have none.\n"
-                        # 6b275, judged: eggs "$3-4 right now" from
-                        # memory against a BLS $2.28 released two days
-                        # earlier; a movie slate from memory with
-                        # "(announced date)" hedges
-                        "A CURRENT PRICE, CURRENT LINEUP or WHAT'S-"
-                        "PLAYING fact comes from the data WITH its "
-                        "date and source in the same sentence ('$2.28 "
-                        "a dozen — BLS, August'); if the data holds no "
-                        "dated figure, say so in one clause and label "
-                        "anything from memory with the month it was "
-                        "true — never 'right now' from memory.\n"
-                        f"{strictness}"
-                        f"PROMPT: {query}"
-                    ),
-                }
+                messages[-1] = {"role": "user", "content": place_turn(
+                    query, snippets, matched, placey, bookish, is_weather)}
 
         # THE PASTED PAGES (6b423): read side by side, each labelled Listing
         # N with its link, and the model told to keep to them. This is the
@@ -46672,7 +47220,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _lv = 3
         _lv = max(1, min(5, _lv))
         if _LEN.get(_lv):
-            dated_system["content"] += "\n\nLENGTH: " + _LEN[_lv]
+            dated_system["content"] += "\n\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED
         if auto_web and messages:
             # THE CLOCK RIDES THE QUESTION (6b264): the system-prompt
             # binding lost to a Beijing-hosted model's own calendar
@@ -46680,10 +47228,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # open/closed verdict inverted. The user turn is the one
             # place no model ignores.
             messages[-1] = dict(messages[-1])
-            _clock_line = (
-                "[for time-sensitive parts: it is %s%s]\n"
-                % (_venue_stamp("%A %-I:%M%p"),
-                   "" if getattr(_tl_search, "tz", "") else " where I am"))
+            _clock_line = clock_line()
             messages[-1]["content"] = _clock_line + str(messages[-1]["content"])
         # (6b518) the person's own arithmetic: no search ran, and the writer
         # and the critic are told the figures are premises; a mention of
@@ -47225,6 +47770,28 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             hb_stop.set()
             return
 
+        # THE PLACE LOOKUPS, FINISHED HERE (6b626): each phase a live step;
+        # then the turn is built as before (place_turn), on the venue's clock
+        if _place is not None:
+            try:
+                _place.wait(place_steps(step, status), PLACE_TOTAL_S)
+            except Exception:
+                pass
+            snippets, matched = _place.apply()
+            if _place.offline:
+                _offline = "place"
+                _pturn = offline_turn(query, "place")
+            else:
+                _pturn = place_turn(query, snippets, matched, True, bookish, is_weather) + (
+                    ("\n\n" + _oai_note) if _oai_note else "")
+            if _clock_line:
+                _clock_line = clock_line()
+            dated_system["content"] = dated_system["content"].replace(
+                _now_local, _venue_stamp("%A, %B %-d, %Y, around %-I%p"), 1)
+            messages[-1] = dict(messages[-1])
+            messages[-1]["content"] = _clock_line + _pturn + _think_tail
+            full_messages[-1] = messages[-1]
+
         # GROUNDED SEARCH, FINISHED HERE (6b514): the plan and the fan-out
         # started before the headers; the page sees each phase as a step
         # while the reads finish, then the evidence pack takes the
@@ -47271,6 +47838,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _fu_note = (GROUND_FOLLOWUP if (_g_reuse and not _oai_note
                                             and "followup" not in quality_ablate()) else "")
             _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)
+            if not _gsrc and net_offline():
+                _offline, _gturn = "web", offline_turn(query, "web")   # (6b626)
             if getattr(_tl_search, "photos", None) and _WANTS_IMAGES.search(prompt):
                 _gturn += ("\n\n[The interface is displaying %d relevant "
                            "photo(s) from the sources directly beneath your "
@@ -47280,9 +47849,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             messages[-1]["content"] = _clock_line + _gturn + _think_tail
             full_messages[-1] = messages[-1]
 
+        if _offline:
+            step("offline", OFFLINE_STEP, "done", "")      # (6b626)
         # the search ran earlier on THIS thread — hand the client its
         # structured hits so the answer carries a clickable sources row
-        if query:
+        if query and not _offline:
             nsrc = len(getattr(_tl_search, "rows", []) or [])
             step("search", "Searched the web", "done",
                  "%d source%s" % (nsrc, "" if nsrc == 1 else "s"))
@@ -47728,7 +48299,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     _pol = (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                             and not images and (not query or bookish)
                             and not _links
-                            and _is_substantive(prompt))
+                            and _is_substantive(prompt)
+                            and answer_kind(prompt) not in ("chat", "arith"))   # (6b626)
 
                     def _revise(_d):
                         _sq = (ground_clip(full_messages[-1]["content"], 10000)
@@ -47761,6 +48333,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and not images and (not query or bookish)
                           and not _links          # (6b423) see _pol
                           and _is_substantive(prompt)
+                          # (6b626) a reviser shown only the question can't see the
+                          # chat: "what did I say first" came back as itself
+                          and answer_kind(prompt) not in ("chat", "arith")
                           and not slow_giant(lbl))
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
@@ -62051,8 +62626,10 @@ async function send(){
   if(goesUnread&&saved&&unreadDecision(true,false,false,saved.id,curChat,
       document.visibilityState!=="hidden"))setUnread(saved.id,true);
   if(saved&&!saved.named&&full&&!isErr){
-    const first=(saved.messages||[]).find(m=>m.role==="user");
-    if(first)nameChat(saved,first.content);
+    // the person's messages: the server names the chat from the first that
+    // isn't small talk, or not yet ("hello!" was titled "Simple greeting", 6b626)
+    const mine=(saved.messages||[]).filter(m=>m.role==="user").slice(0,6).map(m=>String(m.content||""));
+    if(mine.length)nameChat(saved,mine);
   }
   // an Edit & resend asked for while this answer was running (6b343)
   if(pendingEdit!==null){
@@ -62793,7 +63370,7 @@ async function nameChat(c,text){
   try{
     const r=await api("/api/title",{method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({text:text,chat_id:c.id})});
+      body:JSON.stringify(Array.isArray(text)?{texts:text,chat_id:c.id}:{text:text,chat_id:c.id})});
     const t=(await r.json()).title;
     if(!t){c.named=false;return;}
     // the title first; the chat counts as named only once it landed

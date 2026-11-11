@@ -21817,3 +21817,86 @@ under Advanced; true code-only pairing needs the server to advertise itself or c
 ollama1 protocol change). mlx-whisper brings torch (139 MB of the 354 MB): installing it on first use would cut the
 setup by about 40 %. The shell window itself wasn't captured (the screen was locked); its pages were rendered in
 Chromium and read back from the real WKWebView.
+
+## 6b626 — beta-4-answers: no needless search, no topic bleed, the landmark kept, offline said plainly (7.0 beta 4, per Patrick)
+
+Patrick: "it has to be usable". The beta-4 walkthrough asked plain things and got wrong turns, all of them server
+side. **Topic bleed (P0-1):** "How do I hard-boil an egg?" right after "What is the capital of Australia?" searched
+"Australia hard-boil egg capital". 6b518's follow-up carry took the person's last grounded turn whatever came next:
+its evidence rode along and its first query became `Grounding.topic`, which plan_queries pins onto every part that
+names nothing of its own. **Needless search and hedging (P0-2):** "What is 17 times 23?" searched (a question word
+was enough for needs_search) and the writer added "I didn't find the result of this multiplication, though they
+mention these numbers in various contexts such as film titles [1]"; "What was the first thing I said to you in this
+chat?" searched "first chat"; GROUND_RULES told the writer to name every part the evidence missed ("say so in one
+plain clause"), and answer_scrub turned the writer's "the sources do not provide" into "I didn't find". **Places
+(P1-8):** "a good coffee shop near the Eiffel Tower" kept "tower" as the place (the last word), so the pin test
+(`"tower" in "Tour Eiffel, … Paris"`) refused the geocode and no map was drawn; the lookups ran inline before the
+headers, 72.6 s of nothing on the screen (measured here: the web search 7.7 s, OpenStreetMap 52.7 s as both Overpass
+mirrors timed out one after the other, the closure check 12.0 s); stripped to "coffee shop eiffel tower hours" the
+engine answered with Wikipedia's Coffee and the cafés of Campinas, where this computer is. **Offline (P1-6):** no
+connection, the weather turn fell through to a grounded search with nothing found, and GROUND_NONE's "your training
+data ends before today" came back as "my training data does not include real-time updates". **P2:** "Write a long,
+detailed 1500-word essay" opened "would likely exceed technical length limits" (there is none: 8,192 tokens), and
+"hello!" then three questions was titled "Simple greeting".
+
+**What changed.** One block, `# ==== 6b626 answers ====` after `_thread_terms`, and one-line hooks.
+- `answer_kind()`: "arith" (17 times 23, 15% of 80, the square root of 144), "chat" (what did I say first, my last
+  question, summarize our conversation) or "howto" (how do I hard-boil an egg, tips for sleeping better, how does a car
+  engine work). A how-to that names something (a capitalised word), carries a figure, or turns on the world (software
+  and devices, money, rules and papers, travel, anything current) is not one. needs_search asks it first; those
+  answer from what the model knows. `_thread_terms` still takes a how-to's subject, so "How long should I cool them
+  after that?" searches "hard-boil egg How long cool after".
+- `grounded_followup()` gates 6b518's carry: the earlier turn's evidence and words ride only a turn that leans on it
+  (opens like a follow-up, points back past a dummy "it"/"there", asks nothing new, is a short ellipsis like "what's
+  the population?", or shares the earlier question's subject). Anything else searches fresh, or not at all.
+  `thread_borrow()` keeps a venue question that names its own place from borrowing the thread's.
+- `place_anchor()` keeps the place whole ("near the Eiffel Tower" is the Eiffel Tower, a landmark; "in bushwick" an
+  area; "near me", "at 2am", "in jazz bars" are none; the last one named wins); `place_fits()` accepts a pin when any
+  word of four letters of the place is in its full name. A landmark is geocoded first (Nominatim's address now gives
+  its town) and searched as "coffee shop near Eiffel Tower Paris", and a hit naming neither drops when two others do.
+- `PlaceLookup`: the web search, OpenStreetMap beside it (at most 14 s, PLACE_OSM_S), the closure check and the pin
+  run on their own thread, started where the handler ran them; the handler sends its headers and waits with a step per
+  phase (Searching the web, Searched the web N sources, Checking what's open nearby, Checked what's open nearby N
+  places / No opening hours nearby), then builds the turn with `place_turn()`: the handler's old builder lifted out word
+  for word (weather, booking and listings use it too, before the headers as before), on the venue's clock (the clock
+  line and the system prompt's RIGHT NOW re-read; with no venue rows, the pin's own time zone).
+- No connection: `net_offline()` (one HEAD to duckduckgo.com, asked only after a lookup came back empty, kept 20 s;
+  an HTTP status is an answer, a refused/unresolved/timed-out connection is not). The weather, place and web paths
+  then build `offline_turn()`: the answer begins "I can't reach the internet right now, so I can't check the live
+  weather." (the place's: "what's open or nearby"; the web's: "anything online"), answers the rest, and never mentions
+  training data; the steps show "No internet connection" instead of "Searched the web, 0 sources".
+- The rules: a part the evidence misses is answered from what the writer knows when it is stable (a method, a sum, a
+  definition), saying nothing about the search; only a current fact gets the clause on where to check; "I didn't find"
+  about anything answerable is banned (GROUND_RULES, GROUND_SHAPE, GROUND_NONE, GROUND_FOLLOWUP). The post-pass drops a
+  gap sentence that narrates the search's off-topic results (`answer_drop_noise`, note "1 search aside dropped").
+- A question about the chat or a sum is written once: the polish pass's reviser sees only the question, and in the
+  one real-model run it turned a right "The first thing you said was 'What is the capital of Australia?'" into the
+  question itself. LENGTH_ASKED rides the length line ("the person's own words win … never mention a length limit").
+  /api/title takes the person's messages (`texts`) and names the chat from the first that isn't small talk
+  (turn_triage's "chat"); none yet, no title, and the page asks again after the next answer.
+
+**Measured.** The place question on a dev copy (Cloud Only, no keys: the frames without a model): headers and the
+first step at 0.0 s (were 72.6 s), the web search done at 10.5-11.4 s, OpenStreetMap capped at 14 s (Overpass was
+timing out all session, so no venue rows either way), the map at 17.7 s with `CTX {"loc": "Eiffel Tower"}` and the
+sources Paris's (Time Out Paris, toureiffel.paris, Café de l'Homme; were Campinas's). An area question ("any bars
+open late in bushwick") searches as before, with no "near" and no town added. Offline (a dev copy behind a dead proxy): the weather, the
+Eiffel question and the F1 question each show "No internet connection" within 0.2 s. One real-model pass, before the
+rule against them was re-read (it should not have run: the dev copy reached the resident Gemma 4 26B, no server, no
+cloud, five short Fast answers): Canberra grounded (17.5 s); the egg answered with no search (14.5 s); "cool them"
+searched "hard-boil egg How long cool after" and answered "one to 15 minutes"; "17 times 23" unsearched, "The answer
+is **391**." in 1.7 s; "the first thing I said" unsearched, right in the draft, wrong after the polish (now skipped,
+not re-run). The title flow in Chromium and in a real WKWebView (b4-lanes' wklanes harness): "hello!" sends
+`texts:["hello!"]` and gets no title, the next answer names the chat from "What is the capital of Australia?"; no
+console errors in either.
+
+**Checks.** A 6b626 block of 26 checks (24 in process out of the source, the page's naming, one live) and 27 mutants.
+Re-pinned at the same strength: 6b514's place_search pin (now the lookup's start in the handler and
+`place_search(query, near)` in the source), 6b518's needs_search names (answer_kind's), 6b523's and the council
+check's post-pass names (answer_drop_noise's), the review-fixes title pin (`{texts:…}:{text:…}`). The trimmed run
+(prelude, 6b514, quality-2, fresh-1, quality-3, quality-4, 6b626) on 9975-9977: see the report.
+
+**Left.** OpenStreetMap's public Overpass was timing out or refusing all session and overpass.kumi.systems no longer
+answers: the venue rows (real opening hours) need a working mirror, or a paid provider, to come back. The polish
+pass's reviser still sees only the question on every unsearched follow-up, not just the chat questions skipped here;
+giving it the conversation is the real fix. The how-to rule is deliberately narrow (a capitalised word or a figure
+sends it to the web), so "how do I make French toast" still searches.

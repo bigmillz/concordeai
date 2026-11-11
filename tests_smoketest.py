@@ -12126,7 +12126,8 @@ _CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "
                 "_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
                 "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
                 "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
-                "answer_polish", "shown_answer", "quality_ablate"}
+                "answer_polish", "shown_answer", "quality_ablate",
+                "answer_drop_noise", "_ANS_GAP_RX", "_ANS_NARRATE_RX"}     # 6b626
 _rc26["DEV_HOME"] = ""
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
                     "PEER_INSTRUCTION", "_srv_think", "server_think"} | _CRAFT_NAMES)
@@ -12238,7 +12239,7 @@ check("review fixes: the glitch checks and rests under the lock, `off` removes u
       _seen26 == [("live", 1), ("rest", 1)]
       and "with _cloud_txn():\n                    try:\n                        self.ctx.remove(CLOUD_NAME)" in _ks
       and _ks.index("cloud_revive(found + [model])") > _ks.index('"status": "ok"},\n                                         make_active=True)')
-      and "body:JSON.stringify({text:text,chat_id:c.id})" in _MILLENAI_SRC
+      and "{texts:text,chat_id:c.id}:{text:text,chat_id:c.id})" in _MILLENAI_SRC   # 6b626: the messages, per chat
       and "_last_cloud.get((self.ctx.name, _tcid))" in _MILLENAI_SRC
       and '$("#turbo").checked=!on;' in _MILLENAI_SRC
       and "Cloud models are off. Turn them on in Settings > Models > Cloud." in _MILLENAI_SRC
@@ -37922,7 +37923,9 @@ check("the planner asks the fastest free model: the person's server, a cloud uti
       "server_side_text(ask, _ctx, max_tokens=120)" in _hs14
       and "gate_ladder(fast_cloud_ladder(utility=True)," in _hs14
       and "_engine_lock.acquire(blocking=False)" in _hs14
-      and "snippets, matched = place_search(query)" in _hs14
+      # (6b626) the place lookups run on their own thread, started in the handler, waited for after the headers
+      and "_place = place_start(query, (_tl_search.tz, _tl_search.tz_place))" in _hs14
+      and "snippets, matched = place_search(query, near)" in _MILLENAI_SRC
       and "snippets = weather_snippets(query)" in _hs14
       and "snippets = run_search_deep(srch, pages=3)" in _hs14
       and "site:rottentomatoes.com" in _hs14, "")
@@ -38399,7 +38402,10 @@ _exec_names(_g18, {"_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "
                    "_sc_entities", "reasoning_parts", "self_contained_reasoning", "SC_HINT",
                    "needs_search", "_NO_SEARCH", "_FRESH_WORDS", "_SELF_CONTAINED", "_VENUE_RX", "_ZIP_RX",
                    "_NEARBY_RX", "_WORLDLY_RX", "_SRV_WORD", "_SRV_STEM", "_SRV_FAMILY", "_srv_flags",
-                   "srv_role_ok"})
+                   "srv_role_ok",
+                   # (6b626) needs_search asks answer_kind first: a sum, the chat itself, a plain how-to
+                   "answer_kind", "_ak_arith", "_AK_LEAD_RX", "_AK_TAIL_RX", "_AK_NUM", "_AK_OP", "_AK_EXPR_RX",
+                   "_AK_OPS_RX", "_AK_CHAT_RX", "_AK_HOWTO_RX", "_AK_WORLD_RX"})
 _g18["server_label"] = lambda l: isinstance(l, str) and " · " in l
 _g18["SERVER_SEP"] = " · "
 _Q27 = ("A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 "
@@ -42501,6 +42507,7 @@ _POLISH523 = {"_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EX
               "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
               "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
               "answer_polish", "shown_answer", "_RECAP_RX", "trim_recap", "quality_ablate",
+              "answer_drop_noise", "_ANS_GAP_RX", "_ANS_NARRATE_RX",     # 6b626: a sentence narrating the search
               "_ANS_FORM_ASK_RX", "_ANS_SUM_ASK_RX", "_ans_asked"}   # 6b560: what the person asked for stays
 
 
@@ -48405,6 +48412,386 @@ _b620_mut = _MILLENAI_SRC.replace("    if relay_only:\n        r = _srv_relay_po
 check("6b620 Settings' Wake up server and Test relay ignore the quiet hours (a deliberate click wins); a question's wake still keeps them; the mutant (the buttons held by the quiet hours) is caught",
       _b620_ok(_MILLENAI_SRC) and _b620_mut != _MILLENAI_SRC and not _b620_ok(_b620_mut), "")
 # ==== 6b620 beta-4 integration: end ====
+
+# ==== 6b626 answers: begin ====
+# USABLE ANSWERS (6b626, per Patrick: "it has to be usable"). The beta-4 walkthrough: "How do I hard-boil an egg?"
+# after "What is the capital of Australia?" searched "Australia hard-boil egg capital" (every turn after a searched
+# one carried its evidence and words); "What is 17 times 23?" searched and the writer added "I didn't find the
+# result of this multiplication, though they mention ... film titles"; "What was the first thing I said to you in
+# this chat?" searched "first chat"; "a coffee shop near the Eiffel Tower" geocoded "tower", sat 72 s before the
+# first frame and drew no map; offline, the weather blamed its "training data"; "Write a 1500-word essay" claimed
+# "technical length limits"; "hello!" then three questions was titled "Simple greeting". The routing, the follow-up
+# gate, the place parsing, the lookups (stubbed), the offline line, the rules and the post-pass run out of the
+# source here; the handler's wiring from the text; two live asks on the copy. Each rule has a mutant below.
+print("== answers: no needless search, no topic bleed, the landmark kept, offline said plainly (6b626) ==")
+import concurrent.futures as _cf626
+
+_N626 = {"_VENUE_RX", "_ZIP_RX", "_NEARBY_RX", "_FRESH_WORDS", "_REL_WORDS", "_FOLLOWUP_RX", "_REFERS_BACK_RX",
+         "_entity_thin", "_PLACE_FILLER", "_place_terms", "needs_search", "_NO_SEARCH", "_WORLDLY_RX",
+         "_SELF_CONTAINED", "_LISTINGS_RX", "_CHAT_WORD", "_CHAT_RE", "_CHAT_LEAD_RE", "_CHAT_NOT_RE", "turn_triage",
+         "_is_substantive", "_GREETING_RE", "_thread_terms", "_FUNNEL_PICK_RX", "place_search", "_host_score",
+         "_GOOD_HOSTS", "_JUNK_HOSTS", "_stash_sources"} | _POLISH523
+
+
+def _ns626(src):
+    """The grounded section (6b520's stubs) plus 6b626's block and what it reads, all out of `src`."""
+    g = _ns520(src)
+    g.update({"threading": _th14, "HAS_SEARCH": True, "Ctl": _Ctl523, "NUL": "\0"})
+    lo, hi = src.index("# ==== 6b626 answers: begin ===="), src.index("# ==== 6b626 answers: end ====")
+    l0, l1 = src.count("\n", 0, lo) + 1, src.count("\n", 0, hi) + 1
+    for n in _ast.parse(src).body:
+        nm = getattr(n, "name", None)
+        if nm is None and isinstance(n, _ast.Assign):
+            nm = next((getattr(t, "id", None) for t in n.targets), None)
+        if nm in _N626 or l0 <= n.lineno < l1:
+            exec(_ast.get_source_segment(src, n), g)
+    g["_tl_search"] = _th14.local()
+    g["ctx_thread"] = lambda target, ctx=None, bind=True, **kw: _th14.Thread(target=target, **kw)
+    g["ctx_executor"] = lambda n: _cf626.ThreadPoolExecutor(max_workers=n)
+    g["_venue_now"] = lambda tz=None: time.localtime()
+    g["_venue_stamp"] = lambda fmt: time.strftime(fmt.replace("%-", "%"))
+    g["_tz_of"] = lambda lat, lon: "Europe/Paris"
+    g["_fetch_pages"] = lambda urls, cap=1600, meta=None: []
+    return g
+
+
+_EIFFEL626 = {"lat": 48.85826, "lon": 2.294501, "name": "Tour Eiffel, 5, Avenue Anatole France, Paris 7e Arrond",
+              "full": "Tour Eiffel, 5, Avenue Anatole France, Quartier du Gros-Caillou, Paris 7e Arrondissement, "
+                      "Paris, Île-de-France, France", "town": "Paris"}
+
+
+def _pl626(g, osm_sleep=0.0, osm_rows=(), web=True, offline=False):
+    """One PlaceLookup on stubs: (lookup, steps said, place_search's (query, near), seconds, the handler's state)."""
+    said, asked, geo_asked = [], [], []
+
+    def _ps(query, near=""):
+        asked.append((query, near))
+        rows = ([{"title": "Café de l'Homme - Paris", "href": "https://cafedelhomme.com/"},
+                 {"title": "Coffee near the Eiffel Tower - Time Out Paris", "href": "https://www.timeout.com/paris/x"}]
+                if web else [])
+        g["_stash_sources"](rows)
+        return ("- Café de l'Homme: by the tower" if web else "No snippets found."), bool(web)
+
+    def _osm(terms, loc, limit=8):
+        time.sleep(osm_sleep)
+        g["_tl_search"].tz, g["_tl_search"].tz_place = "Europe/Paris", "Tour Eiffel"
+        return [dict(r) for r in osm_rows]
+    g.update(place_search=_ps, osm_places=_osm, closure_notices=lambda q: "",
+             _geocode=lambda q: (geo_asked.append(q), _EIFFEL626 if "eiffel" in q.lower() else None)[1],
+             net_offline=lambda probe=None, now=None: offline)
+    g["PLACE_OSM_S"] = 0.4
+    t0 = time.time()
+    pl = g["place_start"]("Find me a good coffee shop near the Eiffel Tower", ("America/New_York", "Bushwick"))
+    pl.wait(g["place_steps"](lambda sid, l, s="run", d="": said.append((sid, l, s, d)),
+                             lambda x: said.append(("status", x))), 5.0)
+    secs = time.time() - t0
+    g["_tl_search"].rows, g["_tl_search"].geo = [], None          # the handler's own thread-local, as it was
+    sn, mt = pl.apply()
+    tl = g["_tl_search"]
+    return pl, said, asked, secs, {"snippets": sn, "matched": mt, "rows": list(tl.rows), "geo": tl.geo,
+                                   "locq": tl.locq, "tz": tl.tz, "osm": list(tl.osm), "geo_asked": geo_asked}
+
+
+def _c626_all(src):
+    out = {}
+    try:
+        g = _ns626(src)
+    except Exception as e_:
+        return {"the section runs: %r" % (e_,): False}
+    K, NS, NET = g["answer_kind"], g["needs_search"], g["net_offline"]      # (the lookups below stub net_offline)
+    # ---- what needs no web
+    kinds = {"What is 17 times 23?": "arith", "17*23": "arith", "whats 2+2": "arith", "what's 15% of 80?": "arith",
+             "what is the square root of 144": "arith",
+             "What was the first thing I said to you in this chat?": "chat", "what did you say about eggs earlier?": "chat",
+             "summarize our conversation": "chat", "what was my last question?": "chat",
+             "How do I hard-boil an egg?": "howto", "how to make french toast": "howto",
+             "Give me three tips for sleeping better.": "howto", "how does a car engine work?": "howto",
+             "How do I install Python on my Mac?": "", "how do I get to JFK from Manhattan": "",
+             "how should I price my consulting work?": "", "how does the stock market work": "",
+             "how do I renew my passport": "", "what year was 1984 published": "", "what is 2026": "",
+             "what is the capital of australia?": "", "What do you think about the new iPhone?": "",
+             "is it safe to eat raw eggs?": "", "what did Einstein say about time?": "",
+             "what's the latest in the discussion about AI rules?": ""}
+    bad = {q: K(q) for q, w in kinds.items() if K(q) != w}
+    out["a sum, the chat itself and a plain how-to are answered without the web; a how-to that names something, "
+        "carries a figure or turns on the world (software, money, rules, travel) is not one"] = not bad
+    nos = [q for q, w in kinds.items() if w and NS(q)]
+    yes = [q for q in ("How do I install Python on my Mac?", "how do I renew my passport", "what is the capital of australia?",
+                       "is it safe to eat raw eggs?", "Find me a good coffee shop near the Eiffel Tower",
+                       "who won the most recent formula 1 race?") if not NS(q)]
+    out["needs_search says no to those, and still yes to a world question, a named how-to and a place"] = not nos and not yes
+    # ---- the follow-up gate
+    P = "What is the capital of Australia?"
+    fu = {"How do I hard-boil an egg?": False, "is it safe to eat raw eggs?": False, "What is 17 times 23?": False,
+          "What was the first thing I said to you in this chat?": False, "Who won the most recent Formula 1 race?": False,
+          "what is the best way to learn piano?": False,
+          "what's the population?": True, "and Melbourne?": True, "explain more": True, "Is it far from Sydney?": True,
+          "who designed it?": True, "how many people live there": True, "Why is it the capital rather than Sydney?": True,
+          "tell me more about the parliament house in canberra": True,
+          "I feel like Claude's response beat you. explain more": True,
+          "Is Canberra bigger than Australia's other inland cities?": True}
+    badf = {q: g["grounded_followup"](q, P) for q, w in fu.items() if g["grounded_followup"](q, P) != w}
+    out["only a real follow-up carries the earlier turn (it opens like one, points back, asks nothing new, is a short "
+        "ellipsis or shares the subject); a new subject, a sum or a question about the chat does not"] = not badf
+    # the bleed itself: the earlier turn grounded (web stubbed), then the next question
+    try:
+        g["_ground_cache"].clear()
+        t1 = g["ground_start"](P, turn_key=g["_ground_key"](P))
+        t1.wait(None, 10.0)
+        msgs = [{"role": "user", "content": P}, {"role": "assistant", "content": "Canberra."},
+                {"role": "user", "content": "How do I hard-boil an egg?"}]
+        prior = g["ground_prior"](msgs)
+        carried = g["plan_queries"]("How do I hard-boil an egg?", topic=prior.queries[0]) if prior else []
+        alone = g["plan_queries"]("How do I hard-boil an egg?")
+        out["the bleed, measured: carried, the egg question plans 'Australia ... capital'; the gate drops the "
+            "earlier turn, and the question alone plans no Australia"] = (
+            prior is not None and any("australia" in q.lower() for q in carried)
+            and not g["grounded_followup"]("How do I hard-boil an egg?", prior.question)
+            and not any("australia" in q.lower() for q in alone)
+            and g["grounded_followup"]("and what's its population?", prior.question))
+    except Exception as e_:
+        out["the bleed, measured: %r" % (e_,)] = False
+    # ---- the place a place question names
+    pa = {"Find me a good coffee shop near the Eiffel Tower": ("Eiffel Tower", True),
+          "is ables in bushwick open tonight": ("bushwick", False), "late night restaurants in 11221": ("11221", False),
+          "bars near me": ("", False), "coffee in Paris near the Louvre": ("Louvre", True),
+          "bars open at 2am in bushwick": ("bushwick", False), "interested in jazz bars": ("", False),
+          "pizza near times square at night": ("times square", True), "coffee near my hotel": ("", False),
+          "restaurants in the west village": ("west village", False), "any bars or clubs open": ("", False)}
+    badp = {q: g["place_anchor"](q) for q, w in pa.items() if g["place_anchor"](q) != w}
+    out["the place is kept whole ('near the Eiffel Tower' is the Eiffel Tower, a landmark; 'in bushwick' an area); "
+        "'near me', a time and a venue are no place; the last one named wins"] = not badp
+    tb = g["thread_borrow"]
+    out["a venue question borrows the thread's place only when it names none; a dummy 'it' points at nothing"] = (
+        not tb("Find me a good coffee shop near the Eiffel Tower") and tb("any bars or clubs open late")
+        and tb("is it open tomorrow") and not tb("is it safe to eat raw eggs") and tb("How long should I cool them after that?"))
+    out["the pin lands: 'Eiffel Tower' fits 'Tour Eiffel, … Paris' (the old test, 'tower' inside the name, refused it); "
+        "a wrong town still doesn't"] = (
+        g["place_fits"]("Eiffel Tower", _EIFFEL626["full"]) and "tower" not in _EIFFEL626["full"].lower()
+        and not g["place_fits"]("bushwick", "Edinburgh, City of Edinburgh, Scotland")
+        and g["place_fits"]("bushwick", "Bushwick, Brooklyn, New York") and g["place_fits"]("", "anything")
+        and g["place_town"](_EIFFEL626) == "Paris")
+    # ---- the landmark's web search: "near" kept, its town added, another town's hits dropped
+    qs = []
+
+    def _dt(q, limit=5, timelimit=None):
+        qs.append(q)
+        return [{"title": "TOP 10 BEST Coffee & Cafes in Campinas - SP, Brazil - Yelp", "href": "https://www.yelp.com/search?find_loc=Campinas",
+                 "body": "coffee cafes Campinas"},
+                {"title": "Café de l'Homme", "href": "https://www.cafedelhomme.com/en", "body": "coffee facing the Eiffel Tower, Paris"},
+                {"title": "Best coffee shops near the Eiffel Tower - Time Out", "href": "https://www.timeout.com/paris/en/cafes",
+                 "body": "coffee shop Eiffel Tower Paris"}]
+    g["_ddg_text"] = _dt
+    g["_tl_search"].rows = []
+    try:
+        g["place_search"]("Find me a good coffee shop near the Eiffel Tower", "near Eiffel Tower Paris")
+        rows = [r["u"] for r in g["_tl_search"].rows]
+        out["a landmark's search keeps 'near' and its town ('coffee shop near Eiffel Tower Paris'), and a hit from the "
+            "town this computer is in (Campinas) is dropped"] = (
+            qs[:1] == ["coffee shop near Eiffel Tower Paris"] and rows and not any("campinas" in u.lower() for u in rows))
+        qs.clear()
+        g["place_search"]("is ables in bushwick open tonight")
+        out["an area question searches as before (6b240)"] = qs[:1] == ["ables bushwick hours"]
+    except Exception as e_:
+        out["the landmark's search: %r" % (e_,)] = False
+    # ---- the lookups behind the headers: live steps, the venues capped, results carried back
+    try:
+        pl, said, asked, secs, st = _pl626(g, osm_sleep=3.0)
+        steps = [s for s in said if s[0] != "status"]
+        out["the lookups run on their own thread with a step per phase, OpenStreetMap capped (a 3 s stall costs "
+            "under 2 s), and the results land on the handler's thread"] = (
+            secs < 2.0 and steps[0] == ("search", "Searching the web", "run", "Eiffel Tower")
+            and ("search", "Searched the web", "done", "2 sources") in steps
+            and ("read", "Checking what\u2019s open nearby", "run", "") in steps
+            and steps[-1] == ("read", "No opening hours nearby", "done", "")
+            and asked == [("Find me a good coffee shop near the Eiffel Tower", "near Eiffel Tower Paris")]
+            and st["geo"] is _EIFFEL626 and st["locq"] == "Eiffel Tower" and len(st["rows"]) == 2
+            and st["tz"] == "Europe/Paris" and st["matched"] and "Café de l'Homme" in st["snippets"])
+        pl2, said2, _a2, _s2, st2 = _pl626(g, osm_rows=[{"n": "Le Bailli", "d": "cafe", "h": "Mo-Su 07:00-23:00", "open": True},
+                                                        {"n": "Café Constant", "d": "cafe", "h": "", "open": None}])
+        out["with venues in time: the venue data leads the turn, the step counts them"] = (
+            st2["snippets"].startswith("VENUE DATA (OpenStreetMap") and "Le Bailli" in st2["snippets"]
+            and ("read", "Checked what\u2019s open nearby", "done", "2 places") in said2 and len(st2["osm"]) == 2)
+        pl3, said3, _a3, _s3, st3 = _pl626(g, web=False, offline=True)
+        out["offline: the lookup says so, stops (no pin asked for), and the step says it couldn't check"] = (
+            pl3.offline and ("read", "Couldn\u2019t check what\u2019s open", "done", "") in said3
+            and st3["geo_asked"] == ["eiffel tower"] and st3["geo"] is None)
+    except Exception as e_:
+        out["the lookups: %r" % (e_,)] = False
+    # ---- the turn a place question becomes (lifted out of the handler word for word)
+    try:
+        g["_tl_search"].thin_closed = 0
+        T = g["place_turn"]
+        a = T("is lucali open tonight", "- Lucali: closed on %s" % time.strftime("%a"), True, True, False, False)
+        b = T("is qzxvbn cafe in bushwick open", "No snippets found.", False, True, False, False)
+        c = T("weather in lisbon", "", True, False, False, True)
+        out["the place turn is the old one: the closed-day verdict, closed means closed, the [[PLACES]] line, the "
+            "not-found script, the weather guard, the question last"] = (
+            "READ FIRST: today is" in a and "CLOSED MEANS CLOSED" in a and "[[PLACES]]" in a
+            and a.rstrip().endswith("PROMPT: is lucali open tonight") and a.index("- Lucali") < a.index("READ FIRST")
+            and "I can't find a spot called Qzxvbn Cafe in Bushwick" in b
+            and "No live weather data reached you" in c)
+    except Exception as e_:
+        out["the place turn: %r" % (e_,)] = False
+    # ---- no internet connection
+    import urllib.error as _ue626
+    E = g["net_err_offline"]
+    out["a connection error is offline (refused, no name, timed out); an HTTP status is an answer"] = (
+        E(_ue626.URLError(ConnectionRefusedError(61, "refused"))) and E(_ue626.URLError(socket.gaierror(8, "nodename")))
+        and E(socket.timeout("timed out")) and E(OSError(51, "Network is unreachable"))
+        and not E(_ue626.HTTPError("https://duckduckgo.com/", 403, "Forbidden", {}, None)) and not E(ValueError("x")))
+    calls = []
+
+    def _probe_off():
+        calls.append(1)
+        raise _ue626.URLError(socket.gaierror(8, "nodename nor servname provided"))
+    g["_NET_STATE"].update(t=0.0, off=False)
+    off1 = NET(_probe_off, now=1000.0)
+    off2 = NET(lambda: calls.append(2), now=1010.0)
+    on = NET(lambda: calls.append(3), now=1000.0 + g["NET_CACHE_S"] + 1)
+    out["the probe runs once per NET_CACHE_S and its verdict is kept"] = off1 and off2 and not on and calls == [1, 3]
+    ot = g["offline_turn"]("What's the weather in Lisbon tomorrow?", "weather")
+    out["offline, the answer opens with one plain line, answers the rest, and never blames its training data"] = (
+        g["offline_line"]("weather") == "I can\u2019t reach the internet right now, so I can\u2019t check the live weather."
+        and ('Begin with exactly this sentence: "%s"' % g["offline_line"]("weather")) in ot
+        and "usual weather for the time of year" in ot and "never mention training data" in ot
+        and ot.rstrip().endswith("PROMPT: What's the weather in Lisbon tomorrow?")
+        and g["offline_line"]("nonsense") == g["offline_line"]("web") and g["OFFLINE_STEP"] == "No internet connection")
+    # ---- the rules: answer what you know; a gap is named only for a current fact
+    gt = g["grounded_turn"]("How long should I cool hard-boiled eggs?", "[1] Eggs \u2014 a.com \u2014 2026-02-01\n"
+                            "    https://a.com\n    Boil the eggs for 10 minutes.")
+    gn = g["grounded_turn"]("what is the newest gpu", "")
+    out["the grounded turn: a part the evidence misses is answered from what the writer knows, saying nothing about "
+        "the search; only a current fact gets the clause; 'I didn't find' about the answerable is banned"] = (
+        "answer that part from what you reliably know when it is stable" in gt and "say nothing about the search" in gt
+        and "Only a CURRENT fact the evidence lacks" in gt and "say so in one plain clause" not in gt
+        and "so is 'I didn't find' about anything you can answer yourself" in gt
+        and "does not cover part of the question" in gt and "'The provided data'" in gt and "are banned" in gt
+        and "never mention the search, a cutoff or your training data" not in gn
+        and "Never mention the search, a cutoff or your training data" in gn and "found nothing usable" in gn
+        and "without remarking on the evidence" in g["GROUND_FOLLOWUP"])
+    # ---- the post-pass: a sentence narrating what the search returned
+    pp = g["answer_polish"]
+    w, n = pp("17 times 23 is **391**.\n\nI didn't find the result of this multiplication, though they mention these "
+              "numbers in various contexts such as film titles [1], mathematical expressions [5][8], and wordplay [2].")
+    keep = "I didn't find the winner of the most recent race, so check formula1.com. Kimi won Mexico [8]."
+    out["a gap sentence that narrates the search's off-topic results is dropped; a real gap on a current fact stays"] = (
+        w == "17 times 23 is **391**." and n == ["1 search aside dropped"] and pp(keep) == (keep, [])
+        and g["answer_drop_noise"]("I didn't find it, though they mention it.") == ("I didn't find it, though they mention it.", 0))
+    # ---- the title, the length line
+    tt = g["title_text"]
+    out["a chat is named from the first message that asks something, not a greeting; none yet, no title"] = (
+        tt(["hello!", "What is the capital of Australia?"]) == "What is the capital of Australia?"
+        and tt(["hi there", "thanks!"]) == "" and tt("Funnel: Which laptop") == "Funnel: Which laptop"
+        and tt([]) == "")
+    out["the length dial never refuses a length the person asked for, and never claims a limit"] = (
+        "asked for a length or a long piece" in g["LENGTH_ASKED"] and "Never mention a length limit" in g["LENGTH_ASKED"])
+    # ---- the handler's wiring, from the text
+    h = src[src.index("def do_POST(self)"):]
+    hg = h[h.index("        _g_prior, _g_reuse = None, False"):h.index("        if query:\n            _tl_search.rows = []")]
+    out["the handler: the earlier turn's evidence rides only a follow-up; a venue question with its own place borrows "
+        "nothing; a how-to's subject still threads"] = (
+        "            if _g_prior is not None and not grounded_followup(prompt, _g_prior.question):\n"
+        "                _g_prior = None" in hg
+        and hg.index("_g_prior = ground_prior(messages)") < hg.index("not grounded_followup(") < hg.index("            if _g_prior is not None:\n                p3 =")
+        and "            if thread_borrow(query):" in h and "_entity_thin(query) or _VENUE_RX.search(query)" not in h
+        and 'or answer_kind(c) == "howto"):' in src and "    if answer_kind(p):\n        return False" in src)
+    hp = h[h.index("                if placey:\n"):h.index("                elif bookish:\n")]
+    hw = h[h.index("        # THE PLACE LOOKUPS, FINISHED HERE (6b626)"):h.index("        # GROUNDED SEARCH, FINISHED HERE (6b514)")]
+    out["the handler: a place question's lookups start where they ran, are waited for after the headers with live "
+        "steps, and the turn is built then, on the venue's clock"] = (
+        "_place = place_start(query, (_tl_search.tz, _tl_search.tz_place))" in hp and "osm_places(" not in hp
+        and "place_search(" not in hp and "_place.wait(place_steps(step, status), PLACE_TOTAL_S)" in hw
+        and "snippets, matched = _place.apply()" in hw
+        and "_pturn = place_turn(query, snippets, matched, True, bookish, is_weather)" in hw
+        and 'messages[-1]["content"] = _clock_line + _pturn + _think_tail' in hw and "full_messages[-1] = messages[-1]" in hw
+        and "_clock_line = clock_line()" in hw and "_now_local, _venue_stamp(" in hw
+        and h.index("        self.send_response(200)") < h.index("        # THE PLACE LOOKUPS, FINISHED HERE")
+        and h.count("place_turn(") == 2
+        and "messages[-1] = {\"role\": \"user\", \"content\": place_turn(\n                    query, snippets, matched, placey, bookish, is_weather)}" in h)
+    out["the handler: no connection is found on the weather, place and web paths, said in the turn and as a step, "
+        "and the empty search row is left out"] = (
+        "                if snippets is None and net_offline():\n                    _offline = \"weather\"" in h
+        and "            if _offline:\n                messages[-1] = {\"role\": \"user\", \"content\": offline_turn(query, _offline)}\n"
+            "            elif snippets is not None:" in h
+        and "            if _place.offline:\n                _offline = \"place\"" in hw
+        and "            if not _gsrc and net_offline():\n                _offline, _gturn = \"web\", offline_turn(query, \"web\")" in h
+        and "        if _offline:\n            step(\"offline\", OFFLINE_STEP, \"done\", \"\")" in h
+        and "        if query and not _offline:\n" in h)
+    out["the handler: a question about the chat or a sum is written once (a reviser sees only the question), and the "
+        "length line carries the asked-for rule"] = (
+        h.count('answer_kind(prompt) not in ("chat", "arith")') == 2
+        and 'dated_system["content"] += "\\n\\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED' in h
+        and 'txt = title_text(_tb.get("texts") or [str(_tb.get("text", ""))])' in h)
+    return out
+
+
+for _n626, _o626 in _c626_all(_MILLENAI_SRC).items():
+    check("6b626 answers \u2014 " + _n626, _o626, "")
+check("6b626 the page names a chat from the person's messages (the server picks the first that asks something)",
+      "const mine=(saved.messages||[]).filter(m=>m.role===\"user\").slice(0,6).map(m=>String(m.content||\"\"));" in page
+      and "if(mine.length)nameChat(saved,mine);" in page
+      and "Array.isArray(text)?{texts:text,chat_id:c.id}:{text:text,chat_id:c.id}" in page, "")
+# live, on the copy (Cloud Only: no keys, so no model and no quota; these never search either)
+_l626 = {}
+for _q626, _h626 in (("What is 17 times 23?", []), ("What was the first thing I said to you in this chat?",
+                                                    [{"role": "user", "content": "What is the capital of Australia?"},
+                                                     {"role": "assistant", "content": "Canberra."}])):
+    _s626, _hd626, _b626 = req("/api/chat", "POST", {"messages": _h626 + [{"role": "user", "content": _q626}],
+                                                     "tier": "Cloud Only"}, cookie=K, timeout=60)
+    _l626[_q626] = (_s626, {k.lower(): v for k, v in _hd626.items()}.get("x-web-search"))
+_t626 = json.loads(req("/api/title", "POST", {"texts": ["hello!", "hi there"], "chat_id": "c626"}, cookie=K)[2] or b"{}")
+check("6b626 live: a sum and a question about the chat are answered without the web; a greeting gets no title",
+      all(v == (200, "0") for v in _l626.values()) and _t626.get("title") == "", "%r %r" % (_l626, _t626))
+_C626_MUT = [
+    ("needs_search asks nothing first", "    if answer_kind(p):\n        return False         # sums, the chat itself",
+     "    if False:\n        return False         # sums, the chat itself"),
+    ("a world how-to answered from memory", "        if (not _AK_WORLD_RX.search(low) and not _sc_entities(p)", "        if (not _sc_entities(p)"),
+    ("the chat itself searched", "    if _AK_CHAT_RX.search(p):\n        return \"chat\"", "    if False:\n        return \"chat\""),
+    ("'what's' read as 'what'", "r\"(?:(?:what's|what\u2019s|whats|what)(?:", "r\"(?:(?:what|whats|what's|what\u2019s)(?:"),
+    ("every turn a follow-up (the bleed)", "    return bool(prior_question and _fu_stems(new) & _fu_stems(followup_new_terms(prior_question)))",
+     "    return True"),
+    ("a dummy 'it' taken for a pointer", "    bare = _FU_DUMMY_RX.sub(\" \", t)\n", "    bare = t\n"),
+    ("the handler carries every earlier turn", "            if _g_prior is not None and not grounded_followup(prompt, _g_prior.question):\n",
+     "            if False:\n"),
+    ("a named place borrows the thread's", "            if thread_borrow(query):          # (6b626) not when it names its place\n",
+     "            if _entity_thin(query) or _VENUE_RX.search(query):\n"),
+    ("a how-to's subject lost to the thread", "                         or answer_kind(c) == \"howto\"):   # its subject still threads (6b626)",
+     "                         or False):"),
+    ("the first place named wins", "        best = (ph, land)\n    return best", "        best = best if best[0] else (ph, land)\n    return best"),
+    ("the old pin test", "    return any(w in f for w in words) if words else lq in f", "    return lq.split()[-1] in f"),
+    ("the landmark searched without its 'near'", "            snippets, matched = place_search(query, near)", "            snippets, matched = place_search(query)"),
+    ("another town's hits kept", "        hits = _there if len(_there) >= 2 else hits", "        pass"),
+    ("OpenStreetMap waited for in full", "_osm, _tz, _tzp = f_osm.result(timeout=max(0.5, PLACE_OSM_S - (time.time() - t0)))",
+     "_osm, _tz, _tzp = f_osm.result()"),
+    ("no step while the venues are checked", "            status(\"Checking what\u2019s open nearby\u2026\")\n            step(\"read\", \"Checking what\u2019s open nearby\", \"run\", \"\")",
+     "            pass"),
+    ("the place lookups never waited for", "                _place.wait(place_steps(step, status), PLACE_TOTAL_S)", "                pass"),
+    ("an offline place pinned anyway", "            self.offline = True                # no connection: nothing more to try\n            self.snippets, self.matched = snippets, matched\n            return\n",
+     "            self.offline = True\n"),
+    ("an HTTP status taken for no connection", "    if isinstance(exc, urllib.error.HTTPError):\n        return False", "    if False:\n        return False"),
+    ("the probe asked every time", "    if now - _NET_STATE[\"t\"] < NET_CACHE_S:", "    if False:"),
+    ("the offline weather left to the search", "                if snippets is None and net_offline():\n                    _offline = \"weather\"",
+     "                if False:\n                    _offline = \"weather\""),
+    ("the offline web turn left to 'found nothing'", "            if not _gsrc and net_offline():\n", "            if False:\n"),
+    ("the training data blamed", "and never mention training data, a cutoff, a search or sources.]", "and never mention a search or sources.]"),
+    ("the old gap rule back", '    "- Where the evidence does not cover part of the question, answer that "\n    "part from what you reliably know when it is stable',
+     '    "- Where the evidence does not cover part of the question, say so in one plain clause. "\n    "part from what you reliably know when it is stable'),
+    ("the search's asides kept", "    t, n = answer_drop_noise(t)           # (6b626)", "    n = 0           # (6b626)"),
+    ("a greeting names the chat", "        if t and turn_triage(t) != \"chat\":\n            return t", "        if t:\n            return t"),
+    ("the length line without the asked-for rule", '"\\n\\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED', '"\\n\\nLENGTH: " + _LEN[_lv]'),
+    ("the chat question rewritten blind", "                          and answer_kind(prompt) not in (\"chat\", \"arith\")\n", ""),
+]
+_c626_caught = []
+for _mn, _ma, _mb in _C626_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c626_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c626_all(_ms).values()):
+        _c626_caught.append((_mn, "not caught"))
+check("6b626's rules each break a check when broken (%d mutants)" % len(_C626_MUT), not _c626_caught, "%r" % _c626_caught)
+# ==== 6b626 answers: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
