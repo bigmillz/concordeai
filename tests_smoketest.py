@@ -36225,7 +36225,7 @@ def _mc_server(src):
     # the prefs key: this profile's, on this computer; a value it can't be is ignored
     cn = {}
     exec(src[src.index("def comps_ok(v) -> bool:"):src.index("# KEY-2: every value a synced key may hold.")], cn)
-    got["comps is this profile's, checked"] = ('"cloud_balance", "comps"))' in src and cn["comps_ok"]({"Thinking": "gemini", "srv:a1b2c3d4:max": "Desk · q"})
+    got["comps is this profile's, checked"] = ('"cloud_balance", "comps", "dict_lang"))' in src and cn["comps_ok"]({"Thinking": "gemini", "srv:a1b2c3d4:max": "Desk · q"})
                                               and not cn["comps_ok"]({"Thinking": 3}) and not cn["comps_ok"](["x"]) and not cn["comps_ok"]({"": "x"})
                                               and not cn["comps_ok"]({"k%d" % i: "x" for i in range(65)})
                                               and '                k == "comps" and not comps_ok(v)):' in src)
@@ -36559,7 +36559,7 @@ _MC_MUT = [
      '           "comp": cloud_comp_choices(plan)}'),
     ("a server's mode offered the cloud with cloud power off", "    if cloud_allowed():\n        rows += _comp_cloud_cands(compositor_ladder(), CLOUD_STRENGTH)",
      "    if True:\n        rows += _comp_cloud_cands(compositor_ladder(), CLOUD_STRENGTH)"),
-    ("comps not this profile's", '    "cloud_balance", "comps"))', '    "cloud_balance"))'),
+    ("comps not this profile's", '    "cloud_balance", "comps", "dict_lang"))', '    "cloud_balance", "dict_lang"))'),   # 6b641 added dict_lang
     ("comps unchecked", "    return (isinstance(v, dict) and len(v) <= 64\n", "    return True or (isinstance(v, dict) and len(v) <= 64\n"),
     # a server's Max
     ("a server's Max not parsed", '_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro|max))?")', '_SRV_ONLY_RX = re.compile(r"srv:([0-9a-f]{8})(?::(fast|think|pro))?")'),
