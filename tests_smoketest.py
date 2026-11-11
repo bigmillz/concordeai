@@ -25846,9 +25846,14 @@ check("servers (live): Cloud Only never seats a server model; Pro seats the serv
       and any(_SVN in m_ for m_ in _tiOn["Pro"]["models"])
       and _pf0[1].get("ok") is True and _pf0[1]["server"]["prefer"] is False
       and not any(_SVN in m_ for k_ in ("Fast", "Thinking", "Pro") for m_ in _tiOff[k_]["models"])
-      and _pf1[1]["server"]["prefer"] is True and _tiOn["Pro"]["models"] == _tiers34["Pro"]["models"]
+      # switched back on, Pro seats exactly the server's models it seated before; this computer's own seats follow
+      # its free memory (model_fits_memory), which other work moves between two reads seconds apart (6b555: the
+      # 6b553 race again, under a full run's load), so they are not held to the earlier snapshot
+      and _pf1[1]["server"]["prefer"] is True
+      and [m_ for m_ in _tiOn["Pro"]["models"] if _SVN in m_] == [m_ for m_ in _tiers34["Pro"]["models"] if _SVN in m_]
+      and [m_ for m_ in _tiOn["Pro"]["models"] if _SVN in m_][:1] == _tiOn["Pro"]["models"][:1]   # the server's seat first, as before
       and _pfBad[1].get("err") == "Say on or off." and "ANSWER" not in _sc5[1],
-      "%r" % [_sc5[1][:200], _tiers34["Cloud Only"], _tiers34["Pro"], _tiOff["Pro"], _pf0, _pfBad])
+      "%r" % [_sc5[1][:200], _tiers34["Cloud Only"], _tiers34["Pro"], _tiOn["Pro"], _tiOff["Pro"], _pf0, _pfBad])
 # ---- THE PAGE'S OWN REQUEST (6b339, final review). The page posts the model last picked by hand beside the
 # tier (`model`, and `models` = the council), "Llama 3.2 3B" on a fresh install. The server read it: Fast ran
 # that model whatever the seats said, never reached a server seat, and Thinking and Pro warmed its engine on a
