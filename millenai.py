@@ -11552,6 +11552,19 @@ def _sha256_of(text: str) -> str:
     return m.group(1).lower() if m else ""
 
 
+def _swap_env() -> dict:
+    """The swap helper's environment, which `open` hands to the app it
+    relaunches (6b618). Behind the C++ front this server's MILLENAI_PORT is
+    the private port, and CONCORDE_PUBLIC_PORT (set only by the C++ shell)
+    the app's own; the next app, either shell, starts on the public one, so
+    the page keeps its origin and with it its own browser settings."""
+    env = dict(os.environ)
+    pub = env.pop("CONCORDE_PUBLIC_PORT", "")
+    if pub.isdigit():
+        env["MILLENAI_PORT"] = pub
+    return env
+
+
 def _app_bundle_path():
     """/Applications/MillenAI.app when running from a bundle, else None.
 
@@ -11963,7 +11976,7 @@ def _do_update():
             f.write(_SWAP_SCRIPT % {"app": app, "tmp": tmp, "log": update_log_path(),
                                     "pids": " ".join(str(x) for x in (os.getpid(), os.getppid()) if x > 1)})
         os.chmod(script, 0o755)
-        subprocess.Popen(["/bin/zsh", script], start_new_session=True)
+        subprocess.Popen(["/bin/zsh", script], start_new_session=True, env=_swap_env())
         staged = tmp = None                 # the helper owns them now
         _update["state"] = "restarting"
         ctx_timer(1.5, lambda: os._exit(0)).start()
@@ -22919,6 +22932,13 @@ def setup_status() -> dict:
     }
 
 
+def _shell_public_port() -> int:
+    """The port the C++ shell's front serves this app on (6b618): the app's
+    own public port, never a sibling's. 0 outside the native shell."""
+    v = os.environ.get("CONCORDE_PUBLIC_PORT", "") if SHELL else ""
+    return int(v) if v.isdigit() else 0
+
+
 def _other_millenai_running() -> bool:
     """Another MillenAI process on this machine — the desktop app or a
     dev copy on any port. Engines are shared by port, so our shutdown
@@ -22963,7 +22983,7 @@ def _other_millenai_running() -> bool:
     except Exception:
         pass
     for p in (8889,):     # 9889, the retired web copy's port, went (6b320)
-        if p != PORT and _port_in_use(p) and _listener_is_mine(p) is True:
+        if p not in (PORT, _shell_public_port()) and _port_in_use(p) and _listener_is_mine(p) is True:
             return True
     return False
 

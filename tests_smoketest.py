@@ -7957,6 +7957,7 @@ def _pi(attrs):
     return [_t17.SimpleNamespace(info=d) for d in _procs]
 _om = {"IS_WIN": True, "HAS_PSUTIL": True, "PORT": 8889,
        "_port_in_use": lambda p: False, "_listener_is_mine": lambda p: None,
+       "_shell_public_port": lambda: 0,     # no C++ front here (6b618)
        "subprocess": subprocess,
        "psutil": _t17.SimpleNamespace(Process=_PP, process_iter=_pi),
        "os": _t17.SimpleNamespace(getpid=lambda: 10, getppid=lambda: 1)}

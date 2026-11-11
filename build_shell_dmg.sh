@@ -26,11 +26,24 @@
 #     a Developer ID with the hardened runtime, notarized and stapled when
 #     the notary profile is there too; ad hoc, as before, when it isn't.
 #     docs/SIGNING.md is the owner's side of it.
+#
+# CONCORDE_SHELL=cpp (6b618, beta 5 on a Mac): the same DMG from the C++ shell
+# (cpp/, CMake) instead of Tauri's: the same bundle name, bundle id, executable,
+# Resources and Info.plist keys, so every step after the build (the plist stamp,
+# the helpers, signing, notarizing, the disk image, release.sh's read-back) is
+# shared. Windows keeps building from Tauri; nothing else changes.
 set -e
 cd "$(dirname "$0")"
+SHELL_KIND="${CONCORDE_SHELL:-tauri}"
+[[ "$SHELL_KIND" == "tauri" || "$SHELL_KIND" == "cpp" ]] || { echo "CONCORDE_SHELL is tauri or cpp, not $SHELL_KIND"; exit 1; }
 export PATH="$HOME/.cargo/bin:/opt/homebrew/opt/rustup/bin:$PATH"
+if [[ "$SHELL_KIND" == "tauri" ]]; then
 command -v cargo >/dev/null || { echo "cargo not found (rustup: brew install rustup)"; exit 1; }
 cargo tauri --version >/dev/null 2>&1 || { echo "tauri-cli not found: cargo install tauri-cli --version '^2' --locked"; exit 1; }
+else
+command -v cmake >/dev/null || { echo "cmake not found (brew install cmake ninja)"; exit 1; }
+command -v ninja >/dev/null || { echo "ninja not found (brew install ninja)"; exit 1; }
+fi
 
 read -r VER BUILD <<<"$(python3 packaging/shell_stamp.py)"
 [[ -n "$VER" && -n "$BUILD" ]] || { echo "could not stamp the shell from millenai.py"; exit 1; }
@@ -131,8 +144,22 @@ TARGS=(); [[ -n "$TARGET" ]] && TARGS=(--target "$TARGET")
 # and the PDF reader (6b546)
 ./shell/pdftext/build.sh
 [[ -x shell/pdftext/concorde-pdftext ]] || { echo "shell/pdftext/concorde-pdftext wasn't built"; exit 1; }
+if [[ "$SHELL_KIND" == "cpp" ]]; then
+  # the C++ shell as the app a person opens (6b618): the real bundle id, the
+  # real data folder and port rules, the updater on, no preview guard, no
+  # probe; universal unless CONCORDE_SHELL_ARCH=native
+  CARCH="arm64;x86_64"; [[ "${CONCORDE_SHELL_ARCH:-}" == "native" ]] && CARCH="$(uname -m)"
+  [[ -z "$TARGET" && "${CONCORDE_SHELL_ARCH:-}" != "native" ]] && TARGET="universal"   # cmake builds both regardless of rustup
+  CB="${CONCORDE_CPP_BUILD_DIR:-cpp/build-release}"
+  cmake -S cpp -B "$CB" -G Ninja -DCMAKE_BUILD_TYPE=Release -DCONCORDE_ALLOW_REAL_APP=ON \
+    -DCONCORDE_BUNDLE_ID=com.millen.millenai -DCONCORDE_PREVIEW=OFF -DCONCORDE_PROBE=OFF -DCONCORDE_DEVTOOLS=ON \
+    "-DCMAKE_OSX_ARCHITECTURES=$CARCH" "-DCONCORDE_SERVER_ROOT=$PWD" -DCONCORDE_ENGINE_BIN= >/dev/null
+  cmake --build "$CB" --target ConcordeAI >/dev/null
+  BUNDLE="$CB/ConcordeAI.app"
+else
 ( cd shell/src-tauri && cargo tauri build --bundles app "${TARGS[@]}" )
 BUNDLE="shell/src-tauri/target/${TARGET:+$TARGET/}release/bundle/macos/ConcordeAI.app"
+fi
 [[ -d "$BUNDLE" ]] || { echo "expected $BUNDLE but it wasn't built"; exit 1; }
 PLIST="$BUNDLE/Contents/Info.plist"
 ARCHS="$(lipo -archs "$BUNDLE/Contents/MacOS/ConcordeAI")"
