@@ -51306,7 +51306,8 @@ check("trust: a cut answer is saved with cut: true and the run's engines with it
       and _t620_r2 and _t620_r2.get("stopped") is True and "cut" not in _t620_r2
       and _t620_r3 and "cut" not in _t620_r3 and _t620_r3["run"].get("web") == ["DuckDuckGo"]
       and _t620_tm != _t620_src and not (_t620_ctm["turn_record"]("a\x00CUT:{}\x00") or {}).get("cut")
-      and "|CUT|SAVE" in _t620_ct["_TURN_TAGS"] and "|OFFER|CUT|SAVE\";" in page
+      # (beta 4) the saved turn's tags carry 6b627's REPAIR between CUT and SAVE
+      and all(("|%s|" % k_) in ("|" + _t620_ct["_TURN_TAGS"] + "|") for k_ in ("CUT", "SAVE", "REPAIR")) and "|OFFER|CUT|SAVE\";" in page
       and 'if(cutInfo&&full&&!wasAborted&&!isErr)trustLine(aiDiv,"cut");' in page
       and 'if(role!=="user"&&m.role&&m.cut&&!m.stopped)trustLine(div,"cut");' in page
       and 'const t=kind==="cut"?"The connection dropped."' in page
