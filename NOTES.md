@@ -23234,3 +23234,74 @@ GROUND_NONE pin, 6b640's SOCIAL_RULE line. quality-2's namespace gains the names
 **Left.** The how-to rule still sends a capitalised name to the web; Code-lane asks still search (the Coding agent
 keeps auto_web). Fable 5.1 as the Pro/Max compositor when a Claude key exists is costed in the report (about $0.17*
 an answer against Opus 5.5's $0.07*), not switched: Patrick's call.
+
+## 6b665 — declutter-1: the sky behind the conversation, the text dissolving into it, one Settings, one fold, the sources one count (7.0 beta 5, per Patrick)
+
+**Why.** Patrick, with a screenshot of beta 3 (build 280) in Fast at Ultra: "This still just feels clogged. Like, I
+want VFX. But it feels…". His picture: a flat navy ground behind the conversation; a crowded header (the chats
+button, the wordmark, the lanes, the mode, the effort, "Ultra", a lone status dot, a gear that duplicates the
+sidebar's Settings); copy and edit always on every question; above every answer a hairline, "● Concorde Fast", five
+past-chat pills in two columns and an always-on row of Details and five keys; answer text running under and below the
+composer (a stray "I" at its left edge); the sidebar's Pinned/Recents with a filter key, TODAY / THIS WEEK in spaced
+mono caps, "Some through the cloud", Settings and a second fold key.
+
+**Already done in beta 4 and 5** (judged on beta-5 ee18c68 in a real WKWebView and not redone): the navy is gone
+(6b631); the hairline above each answer (6b580's `.who{border-top:0}`); the keys of every message on hover or focus
+only (6b590); Details folded into the flow beside the answer at 1000 px of chat and the proof line under it below
+that (6b580), the sources there as chips; the day headers already Inter, not mono. Still there on beta 5: a near-solid
+band (.93) and a .7 scrim (.4 at Ultra) between the sky and the conversation, so the sky barely showed; the header's
+dot and the sidebar's Settings beside the gear; the sidebar's own fold key; text visible under and below the
+composer (6b631 had made the composer's band a light .5 gradient); the five pills (or three and "+2", whose squeeze
+cut "One pass" to "O" at 760); every answer's byline with its dot; no keys on the newest answer without a hover.
+
+**What changed.** One CSS block at the end of the style (`THE DECLUTTER (6b665)`) and four small script edits:
+- **The sky behind the conversation** (Balanced and Full; Calm keeps 6b621's ground): the scrim .45 (.25 at Ultra) in
+  Balanced, .35 (.18) in Full; the reading band, kept as the column's local scrim, .62 and .55 (was 1 × .93). The
+  aurora's curtain and the stars now read through the gaps between turns and faintly behind the text. Measured in
+  WKWebView (1440, 2 am, Ultra, the text cleared, the 95th-percentile sky behind the answers' lines): Balanced 23 → 31
+  of 255, Full 23 → 35; the body ink over it 14.8:1 → 13.8:1 and 13.3:1, an earlier byline (.5 white) 5.4:1; the
+  single brightest pixel behind any glyph (a star) 4.4:1 in Full. AA holds.
+- **The text dissolves at the edges**: a mask on `#chat-scroll` (transparent to 52 px, whole from 92 px; whole down
+  to 44 px above the composer's top, gone 4 px above it, from `--cwh`, which chatRoom already measures), so nothing
+  of the conversation shows below or beside the composer and the sky runs on unbroken: the header's flat band
+  (6b624's `::before`) and the composer's band are off in a conversation. A funnel's stuck question keeps its own
+  mask (`fn-stuck`). The end of the chat is 56 px clear of the fade (`--cwh + 56`, 150 at least), and Details' card
+  scrolls 48 px clear of the composer (proofReveal, was 16).
+- **The header**: no lone status dot (`#hz-machines` hidden; it said almost nothing: the Mac is never asleep, and its
+  card repeated Settings › Your machines). The gear stays the one Settings (Patrick, 6b625: "focus on having the
+  settings available"); the sidebar's Settings button is hidden (still clicked by the page's own code).
+- **One fold**: the header's chats button; the sidebar's own "<" only in the drawer (760 and under), where it is the
+  drawer's close. With nothing in it (no usage today), the sidebar's foot is gone above 760; "All on your machines" /
+  "Some through the cloud" stays, as quiet metadata, without its hairline.
+- **The sidebar's headers**: the days in plain case (Today, This week; were spaced caps), 12 px at the same ink; the
+  Recents range key only on hover or focus (always on a touch screen).
+- **The byline**: an earlier answer's "Concorde Fast" in .5 ink, without its dot or Ultra's colour; the newest keeps
+  both (so nothing moves at a landing).
+- **The keys**: the newest answer's always there (not while it streams or lands); the others and your own questions'
+  on hover or focus, as before; an earlier answer's "Show the numbers" the same.
+- **The sources**: in the flow, a settled answer's Sources node shows its count ("5 sources") as a key that opens the
+  chips in place (a live flow keeps them sliding in); in the proof line, one "5 sources" chip in place of three pills
+  and "+2" (the card it opens lists every source with its title), and the line's chips borderless until hover, focus
+  or open. `proofSrc` is gone with its last caller. Which sources an answer carries is untouched (voice-answers-2).
+
+**Copy.** No new words: "TODAY / YESTERDAY / THIS WEEK / EARLIER" → "Today / Yesterday / This week / Earlier" (case);
+the proof line's pills → "5 sources" (the flow's own words, "1 source" for one). Gone from view: the sidebar's
+"Settings" and "Hide chats" keys, the dot's "Your machines" card.
+
+**Shots** (WKWebView, a seeded dev home: one long chat with five past-chat sources, three web ones, Fast at Ultra, 2 am;
+1440 × 900 and 760 × 900, Balanced and Full, at the end and scrolled): `SP/dc1-shots/*-before.png`, `*-after.png`,
+`*-pair.png`. Scrolling in WKWebView (Full, 1440): rAF p50 17 ms, p95 18 ms, as before.
+
+**Gauntlet** (`# ==== 6b665 the declutter`, not run whole here: beta 5's full run held the machine): the served page's
+21 rules and 4 script lines to the letter, after 6b631's block, no glow, loop or circle, 13 mutants; pure (node): the
+proof line's one count, no pill, the card's five, the flow's count key (one mutant); live in headless Chromium, a chat
+seeded on the page (no model): Balanced and Full at 1440, Balanced at 760, with three mutants served in place of the
+page. Re-pinned on purpose: 6b621's conversation at Full Ultra (scrim .18, band .55; its "not receding" mutant now on
+6b665's rule), 6b625's header (`dot: False`), 6b590's keys at rest (the newest answer's 1). Run standalone against a
+dev copy: the 6b665 block 4/4 (0/4 on beta 5's page), 6b621's live conversation and its mutant, 6b590's 18, 6b625's
+1440 run, 6b624's source and page groups, 6b580's pure, layout and both live widths, 6b644's Chromium and WKWebView
+cases (their only reds, "Close not hittable" in Settings, are the same on beta 5's page in that harness).
+
+**Left.** The flow's "Answer · Your Mac / Took 6.4 s" per answer stays (Patrick asked for the flow in 6b580); a
+quieter flow for earlier answers is a next step if it still reads busy. The ice→violet fill of the effort slider and
+the "Ultra" word stay (the Ultra show is Patrick's). Calm is unchanged but for the edges' mask and the header.
