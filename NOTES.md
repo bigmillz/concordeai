@@ -21154,3 +21154,126 @@ layout check fails on a79ae7c already (6b590's `.chat-sr` rule is unscoped and i
   frame says "No answer. Nothing ran."; the card's line says Expired at once.
 - Checked in an offscreen WKWebView, not in the shipped window (its 72 px header moves the sticky trail to 72, set
   by `html.tl`, not seen live).
+
+## 6b624 — beta-4-layout: the header from its real width, the composer under the reading column, the sidebar's rows, the chat's behaviours (7.0 beta 4, per Patrick)
+
+Patrick, on the app at Ultra: "it's very important that the chat page and also obviously the code page and all that
+looks really dialed in ... I want this UI to be perfect." The daily-use audit of the chat page (scratchpad
+`audit/daily/`: `hdr-narrow.png`, `chat-W-*.png`, `zoom-sb-ghost.png`, `chat-22-scrolled-up-jump.png`,
+`panel-61-proofcard-1000.png`) found the header, the column and the sidebar rough at the widths people really use.
+Branch `beta-4-layout` from `beta-4` (f9148e1). Horizon only; Classic untouched. One CSS block, THE HEADER, THE COLUMN
+AND THE SIDEBAR (6b624), last in the main style (it wins by order over the older header rules the gauntlet still pins);
+one script block, THE SIDEBAR'S ROWS (6b624), before `loadChat`; the header's fit rewritten in place; a few one-line
+hooks.
+
+**What was rough (measured, headless Chromium and a real WKWebView, a landed ~250-word answer):**
+- at 900 and 760 with the sidebar open the fit's step 5 put the lanes on their own row, 52 px down, over the answer
+  (`hdr-narrow.png`); at 390 too. The lanes sat in the centre of the free space between the groups, not the header's
+  centre (772 vs 844 at 1440 with the sidebar, 427 vs 550 at 1100 without), so a title's length moved them.
+- the composer was not under the reading column: 140 px right of it at 1000-1100 with the sidebar shut (the
+  `max-width:1100px` rule's `margin-left:auto` while `hz-flow` was on), 22 px wider each side at 900 with it open, 6 px
+  left and 66 px wider at 760 (three media rules of three eras disagreeing with the column).
+- the drawer (760 px and under) could not be opened from the header: the chats button's click reached `#main`, whose
+  click closes the drawer, in the same event.
+- the jump key showed only while an answer streamed or had landed out of sight; New chat stopped the answer on its way;
+  "Details" opened the proof card behind the composer; the question's flying ghost (Full) landed 10 px into its row at
+  its full length, ran past the sidebar and sat over the row's own title (`zoom-sb-ghost.png`); a row's only actions were
+  a hover pin and a × (spans), rename only by double-click, no keyboard along the list; the unread dot sat on the
+  title's first letter; "Stopped" sat between the byline and the words it kept.
+
+**The header (DESIGN.md "The header (beta 3)").** One row in three columns, `minmax(0,1fr) auto minmax(0,1fr)`, 16 px
+apart, 24 px in from each side, 64 px tall in the working views (72 on the home and in the Mac shell, as before): the
+lanes at the header's exact centre (measured within 1 px at every width, sidebar open or shut). `hzHeaderFit` lays it
+out from the header's real width (so the sidebar's real state and width, the drawer, the shell's light zone) and asks
+each side separately (`hzHeaderSides`): a step that cannot help the side that overflows is skipped, so a long right group
+no longer costs the title. The order is beta 3's: 1 the title (kept while it shows 96 px, or all of a shorter one), 2 the
+wordmark to the mark, 3 the lanes compact, 4 the effort narrower, 5 the lanes folded, 6 the effort at its phone width,
+the machines out and the Update pill a mark on the gear, 7 the effort's word out, 8 (a phone) the lanes' key leaves the
+exact centre for the left group's side. In the working views under 940 px of header room (`HZ_LANES_MENU`) the lanes
+fold at once: one compact key, 32 px, `#1a1a1d`, a hairline, naming the lane ("Chat ⌄"), opening the three as a short
+flat list under itself (`#151517`, hairline, radius 10; arrows, Enter, Esc back to the key; a pick, a click elsewhere or
+Tab closes it); the list is the lanes' own tabs, so a pick is `switchLane` as ever. The home folds only when it must (its
+right group is two keys). Nothing of the header hangs below it at any width. The look is the demo's: the lanes a flat
+segmented control (track `#1a1a1d`, selected `#26262a`, no glow, no blur, 13 px at 450, the box sliding 320 ms), the
+title 13 px at 450 after a one-device-pixel hairline (the old one was drawn in `--hz-hair2`, a token that does not exist,
+so it never showed), the chats key 36, the gear 32 flat (`rgba(255,255,255,.04)`, a hairline at .2, radius 8, the icon
+16), the Update pill 24 px with a hairline. **The band:** in the working views an opaque `#0f0f11` band under the header
+with a 16 px fade below it (the home keeps its sky); the conversation's scroll mask under the header is off there (it
+showed the sky through the band's edge), and the conversation starts 32 px under the header (96).
+
+**The column.** `hzFlowFit` (the one measurement that sets `hz-flow`) now also measures the reading column
+(`hzColFit`: the chat's content box; 640 at most, less the flow's 40 + 240 while it shows) and writes `--hz-read-w`,
+`--hz-gutter` and `--hz-marg-w` on the root, so the composer's one rule, `calc(50% - (read + gutter + marg) / 2)` in its
+own box, lands on the column's left edge at the column's width; it runs on the chat's and the scroller's
+ResizeObserver, writes only on a change, and the older media rules are overruled by order. Under 860 px the column is
+centred, 640 at most (it hugged the left edge). Measured at 1440, 1100, 1000, 900, 760 and 390, sidebar open and shut,
+both engines: the composer's left edge on the answer's and its right on the question's, 0 px off everywhere.
+
+**The chat's behaviours.**
+- The jump key also shows whenever the reader is more than about a screen (0.9) above the end of a conversation, with
+  nothing streaming (`chatFar`); 6b590's fade, place, `chatPinned` and `chatUnseen` unchanged.
+- New chat no longer stops the answer on its way: it finishes in the background through the path switching already
+  used (`send()` owns `myChat`/`myMessages`, paints only while that chat is on screen), is saved whole (the request's
+  `chat_id` is the old chat; the server records the turn from the wire), and its row takes the unread dot until opened.
+  Measured: the stream never aborted, the new page stayed empty, the saved record had the whole answer, the dot cleared
+  on opening. (A follow-up typed on the new page waits for that answer, as after a switch: "Sends when this answer is
+  done".)
+- Details: once open, the chat scrolls just enough for the card's foot to clear the composer by 16 px, never past the
+  header (`proofReveal`; the card's rise is a transform, so the layout box is read). Measured at 960/1000: before, its
+  foot under the composer; after, 13-16 px clear (the end of a chat can only scroll as far as its padding).
+- The ghost (Full): it lands on the row's own title box at the title's size (13 / 17), clipped to the title's width,
+  while the row's title is held back by a rule keyed to the chat's id (survives the list's repaints) and handed back as
+  the ghost fades; no glow on it. Measured: lands within 1 px of the title, inside the sidebar (210 vs 248).
+- The sidebar's rows (the demo's flat chrome: 13 px, 30 high, hover `#1a1a1d`, selected `#1f1f22`, radius 8): a real ⋯
+  key per row (a button, "More for <title>", shown on hover or focus; the pin mark of a pinned row steps aside for it),
+  the same menu on a right-click or the menu key / Shift+F10: Pin (Unpin), Rename, Delete, each a button running the
+  action the row already had (the pin's own handler, `startRename`, `deleteChat` and its Undo). F2 renames; the arrows,
+  Home and End move along the visible rows (Enter opens, Delete deletes, as before); the rename field fills the row; the
+  hover ×  is gone (Delete is in the menu, with Undo). The unread dot sits at the row's end in silver (6 px), off while the
+  ⋯ key shows.
+- The drawer: the chats button opens it at 760 px and under (its click no longer reaches `#main`).
+- One focus ring: the 1 px ember hairline, keyboard only, on every key in the header, the sidebar and the menus.
+- "Stopped" now sits under the words the answer kept.
+
+**Measured, before (f9148e1) -> after,** headless Chromium (Playwright's, mock keychain) and WKWebView (an offscreen
+WKWebView harness, `scratchpad/b4-layout/wk/`), the same stand-in stream:
+
+| width, sidebar | composer vs column (L / R px) before | after | header overlap / below / sideways, before | after |
+|---|---|---|---|---|
+| 1440 open | 0 / 0 | 0 / 0 | none (lanes 72 px off centre) | none, centred |
+| 1440 shut | 0 / 0 | 0 / 0 | none (28 off centre) | none, centred |
+| 1100 open | 0 / 0 | 0 / 0 | none (205 off centre) | none, folded, centred |
+| 1100 shut | +140 / +140 | 0 / 0 | none (123 off centre) | none, centred |
+| 1000 open | 0 / 0 | 0 / 0 | none (157 off) | none, folded, centred |
+| 1000 shut | 0 / 0 | 0 / 0 | none (194 off) | none, centred |
+| 900 open | -22 / +22 | 0 / 0 | the lanes 52 px down, on the answer | none, folded |
+| 900 shut | 0 / 0 | 0 / 0 | none (194 off) | none, folded |
+| 760 (drawer) | -6 / +66 | 0 / 0 | the lanes on the answer (Chromium) | none, folded |
+| 390 | -6 / +6 | 0 / 0 | the lanes under the header | none, the key beside the menu |
+
+WebKit agrees with Chromium to the pixel on every case after (its 760 before: the lanes in the row but 157 px off centre
+and the composer -6 / +66). No sideways scroll anywhere, before or after. No page errors (the one console line is a
+stand-in source's 403).
+
+**Gauntlet.** Re-pinned at a stronger strength: "6b555 the header, one row, with Settings and updates in it" (its static
+pins moved to the grid, the eight steps, the room rule, the per-side loop, the light zone and the 96 px title; its
+measure now also counts anything of the header below it and the lanes' distance from the header's centre, at 1000 as
+well, 40 cases; two new mutants: the lanes' own row back (caught: below) and the header without its three columns
+(caught: off centre)). The Update pill stays a pill through step 4 (it was a mark from step 4) so the check's 1440 pill
+holds with the wider right group. New block "6b624 the header, the column and the sidebar": the source (no glow, blur
+or text shadow in the block, the band, the composer's rule, the measured column, New chat stops nothing, the jump's far
+rule, the reveal, the rows' wiring, the ghost's hold, the ring; four mutants), the page (headless Chromium over the
+DevTools protocol, a stand-in /api/chat and /api/chats/one: the column and the header at six widths and both sidebar
+states, the drawer, the jump key, New chat mid-answer, the card, the rows, the folded lanes, the ghost) and nine mutants
+served in place of the page, each caught by the part it breaks.
+
+**Left / worth knowing.**
+- Copy for Patrick: the folded lanes' key "Chat ⌄" / "Code ⌄" / "Funnels ⌄" (aria "Lane: Chat"); the row menu "Pin" /
+  "Unpin", "Rename", "Delete" and the ⋯ key's "More" (aria "More for <title>"); no other words changed.
+- The unread dot is silver now (it was `--unread` blue), per the silver-and-one-hue rule; say if the blue should stay.
+- The hover × on a row is gone (Delete lives in the ⋯ menu, with Undo); Delete/Backspace on a focused row still works.
+- New chat while an answer streams: the send key on the new page is still the stop key for the other chat's answer,
+  as after a switch.
+- The home folds its lanes only when they cannot fit (the brief's 940 px rule is applied to the working views).
+- Not checked in the shipped window or the Mac shell's corner (html.tl) live: the shell's 72 px header and its light
+  zone were exercised by the gauntlet's tl cases in headless Chromium only.

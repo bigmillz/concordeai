@@ -54971,7 +54971,7 @@ html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-ri
    menu and no keyboard. The demo's header (DESIGN.md "The header (beta 3)") in the app: one row in three columns,
    minmax(0,1fr) auto minmax(0,1fr), so the lanes sit at the header's exact centre whatever the title; hzHeaderFit lays
    it out from the header's real width (the sidebar open or shut, its real width): the title goes first, then the
-   wordmark becomes the mark, then the lanes go compact; under 940 px of header room (HZ_LANES_MENU) the lanes fold
+   wordmark becomes the mark, then the lanes go compact; under 940 px of header room (HZ_LANES_MENU) in the working views the lanes fold
    into a compact menu (hz-hd5, no longer their own row). The working views carry an opaque #0f0f11 band under the
    header with a 16 px fade below it (the home keeps its sky). These rules come last, so they win by order over the
    older header rules the gauntlet still pins. */
@@ -55021,6 +55021,8 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
 .hz #hz-top.hz-hd5 #hz-lanes button:hover{background:#1f1f22;color:var(--hz-ink)}
 .hz #hz-top.hz-hd5 #hz-lanes button[aria-selected=true]{background:#26262a;color:var(--hz-ink)}
 .hz #hz-top.hz-hd5 #hz-lanes .hz-fstar{display:inline-block}
+/* a phone: the lanes stay in the header's row (the fit folds them), never on a row of their own under it */
+@media (max-width:600px){.hz #main #hz-top:not(.hz-hd5) #hz-lanes{position:relative;left:auto;top:auto;transform:none}}
 /* a phone (hz-hd8, the last step): the key leaves the exact centre and follows the left group; the right group keeps the rest */
 .hz #hz-top.hz-hd8{grid-template-columns:auto auto minmax(0,1fr);column-gap:12px;padding-left:16px;padding-right:16px}
 /* the right group: the status dot, the update pill (24 px, a hairline) and the gear (32 px, flat, a hairline, radius 8) */
@@ -55028,6 +55030,11 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
 .hz #hz-settings:hover{background:rgba(255,255,255,.08);box-shadow:none;border-color:rgba(255,255,255,.32)}
 .hz #hz-settings svg{width:16px;height:16px}
 .hz #hz-update{height:24px;box-sizing:border-box;padding:0 10px;border-radius:6px;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);background:transparent;font:450 12px/1 var(--hz-font-ui)}
+/* the pill stays a pill through the right group's first step (a narrower effort); it becomes the gear's mark at the next */
+.hz #hz-top.hz-hd4:not(.hz-hd6) #hz-update:not([hidden]){display:inline-flex}
+.hz #hz-top.hz-hd4:not(.hz-hd6) #hz-settings.hz-upd::after{display:none}
+.hz #hz-top.hz-hd6 #hz-update{display:none}
+.hz #hz-top.hz-hd6 #hz-settings.hz-upd::after{display:block}
 /* ---- THE COLUMN (6b624): the composer under the reading column at every width. hzColFit measures the column in the
    same pass that sets hz-flow and writes --hz-read-w, --hz-gutter and --hz-marg-w, so this one rule places the composer
    (the narrower windows' own margin rules are overruled by order); under 860 px the column is centred, 640 at most */
@@ -55067,6 +55074,9 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
    and the menus; a click never leaves one */
 .hz:not(.hz-kb) #hz-top button:focus-visible,.hz:not(.hz-kb) #sidebar button:focus-visible,.hz:not(.hz-kb) #sidebar .chat-item:focus-visible,.hz:not(.hz-kb) #sb-menu button:focus-visible{outline:0;box-shadow:none}
 .hz.hz-kb #hz-top button:focus-visible,.hz.hz-kb #sidebar button:focus-visible,.hz.hz-kb #sidebar .chat-item:focus-visible,.hz.hz-kb #sb-menu button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+/* "Stopped" where the answer stopped: under the words it kept, not between the byline and them */
+.hz .msg.ai>.liveline.done.stopped{order:1;margin:8px 0 0}
+.hz .msg.ai:has(>.liveline.done.stopped)>:not(.who):not(.body):not(.liveline):not(aside){order:2}
 /* the question's flight to its row (Full): no glow, the row's own ink; the title takes over as it lands */
 .hz-ghost{text-shadow:none;color:#e6e7eb}
 .hz #chat-list .chat-item .ct{transition:opacity .12s cubic-bezier(.2,.7,.2,1)}
@@ -69518,11 +69528,11 @@ function hzKbWire(){
 // and 760 with the sidebar open the lanes took their own row and sat on the answer). The demo's grid,
 // minmax(0,1fr) auto minmax(0,1fr): the lanes at the header's exact centre, the left group (the menu, the wordmark, the
 // title) in the left column, the right group (the mode, the effort, the dot, the pill, the gear) in the right. Laid out
-// from the header's REAL width, whatever the sidebar is doing: under 940 px of it the lanes fold into a compact menu
+// from the header's REAL width, whatever the sidebar is doing: under 940 px of it the working views fold the lanes into a compact menu (the home only when it must)
 // (hz-hd5); then, only for the side that does not fit, the least compaction at which nothing overlaps, spills past its
 // column or sits in the Mac shell's traffic-light zone, in the beta-3 order: 1 the title goes (kept only while it can
 // show 96 px of itself, or all of a shorter one), 2 the wordmark becomes the mark, 3 the lanes go compact, 4 the right
-// group compact (the pill a mark on the gear), 5 the lanes as the menu, 6 the effort at its phone width and the
+// group compact (a narrower effort), 5 the lanes as the menu, 6 the effort at its phone width, the pill a mark on the gear and the
 // machines out, 7 the effort's word out, 8 (a phone) the lanes' key leaves the exact centre for the left group's side. Recomputed from nothing each time, so it never oscillates.
 var HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7","hz-hd8"],HZ_LANES_MENU=940;
 var HZ_HD_SIDE={"hz-hd1":"l","hz-hd2":"l","hz-hd3":"lr","hz-hd4":"r","hz-hd5":"lr","hz-hd6":"r","hz-hd7":"r","hz-hd8":"lr"};
@@ -69546,7 +69556,7 @@ function hzHeaderFit(){
   const top=$("#hz-top");if(!top||!document.documentElement.classList.contains("hz")||hzS.hdFit)return;
   hzS.hdFit=true;
   try{top.classList.remove(...HZ_HD);
-    if(top.getBoundingClientRect().width<HZ_LANES_MENU)top.classList.add("hz-hd5");
+    if(top.getBoundingClientRect().width<HZ_LANES_MENU&&!$("#hero"))top.classList.add("hz-hd5");   // the working views; the home folds only if it must
     for(const k of HZ_HD){const f=hzHeaderSides(top);if(!f.l&&!f.r)break;
       if(!top.classList.contains(k)&&((f.l&&HZ_HD_SIDE[k].includes("l"))||(f.r&&HZ_HD_SIDE[k].includes("r"))))top.classList.add(k);}
     if(!top.classList.contains("hz-hd5"))hzLaneMenuOpen(false);}
@@ -70319,7 +70329,8 @@ function hzInit(){
   if(hzS.debug&&hzS.debug.intro!=null&&root.classList.contains("hz"))root.classList.add("hz-intro");
   hzReady=true;
   try{if(!("registerProperty" in CSS)||!(CSS.supports("mask-composite","exclude")||CSS.supports("-webkit-mask-composite","xor")))root.classList.add("hz-ring-static");}catch(e){root.classList.add("hz-ring-static");}
-  const sbtn=$("#hz-sb");if(sbtn)sbtn.addEventListener("click",hzSidebarToggle);
+  // the drawer (760 px and under): the chats button's click no longer reaches #main, whose click closes the drawer, so it opens (6b624)
+  const sbtn=$("#hz-sb");if(sbtn)sbtn.addEventListener("click",e=>{if(innerWidth<=760)e.stopPropagation();hzSidebarToggle();});
   // the header refits whenever it, its groups or the page under it change size (a window resize, the sidebar, the
   // conversation's title, the mode and effort moving in)
   if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzHeaderFit());["#hz-top","#hz-right","#hz-title","#chat-inner"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}

@@ -45672,7 +45672,12 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const MEASURE = `(()=>{
   const V=s=>{const e=document.querySelector(s);if(!e)return null;const c=getComputedStyle(e),r=e.getBoundingClientRect();
     return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?{s,l:r.left,t:r.top,r:r.right,b:r.bottom}:null;};
-  const B=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-effort-slot","#hz-machines","#hz-update","#hz-settings"].map(V).filter(Boolean);
+  const B=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-lanemenu","#hz-effort-slot","#hz-machines","#hz-update","#hz-settings"].map(V).filter(Boolean);
+  // 6b624: nothing of the header's hangs below it (the lanes sat on the answer at 900 and 760), and the lanes (or their
+  // folded key) sit at the header's exact centre, except at a phone's last step (hz-hd8)
+  const top=document.querySelector("#hz-top"),hr=top.getBoundingClientRect(),hcs=getComputedStyle(top),below=B.filter(b=>b.b>hr.bottom+.5).map(b=>b.s);
+  const mid=V("#hz-lanes")||V("#hz-lanemenu"),hc=(hr.left+parseFloat(hcs.paddingLeft)+hr.right-parseFloat(hcs.paddingRight))/2;
+  const offc=mid&&!top.classList.contains("hz-hd8")?Math.round(Math.abs((mid.l+mid.r)/2-hc)*10)/10:0;
   const hit=(a,b)=>a.l<b.r-.5&&b.l<a.r-.5&&a.t<b.b-.5&&b.t<a.b-.5,over=[];
   for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++)if(hit(B[i],B[j]))over.push(B[i].s+" x "+B[j].s);
   const root=document.documentElement,tl=root.classList.contains("tl")&&!root.classList.contains("tl-fs");
@@ -45681,7 +45686,7 @@ const MEASURE = `(()=>{
   const clipped=(br&&br.scrollWidth>br.clientWidth+1?["#hz-brand"]:[]).concat(mv&&m.scrollWidth>Math.ceil(mv.r-mv.l)+1?["#hz-mark"]:[]);
   const t=document.querySelector("#hz-title"),tv=V("#hz-title"),title=tv?Math.round(tv.r-tv.l):0;
   const g=document.querySelector("#hz-settings"),gv=V("#hz-settings"),ge=gv?document.elementFromPoint((gv.l+gv.r)/2,(gv.t+gv.b)/2):null;
-  return {over,inZone,clipped,sw:root.scrollWidth-innerWidth,title,marks:!!mv,lanes:!!V("#hz-lanes"),gear:!!(g&&ge&&g.contains(ge)),gearTitle:g?g.title:"",
+  return {over,inZone,clipped,below,offc,sw:root.scrollWidth-innerWidth,title,marks:!!mv,lanes:!!V("#hz-lanes"),gear:!!(g&&ge&&g.contains(ge)),gearTitle:g?g.title:"",
     badge:!!V("#hz-update"),badgeText:(document.querySelector("#hz-update")||{}).textContent||"",gearMark:!!(g&&g.classList.contains("hz-upd")&&getComputedStyle(g,"::after").display!=="none"),cls:document.querySelector("#hz-top").className,bsw:[br.scrollWidth,br.clientWidth],okNow:hzHeaderOK(document.querySelector("#hz-top"))};})()`;
 let buf = "";
 ch.stderr.on("data", async d => {
@@ -45728,7 +45733,7 @@ ch.stderr.on("data", async d => {
         await sleep(300);
       }
       for (const side of [true, false]) {
-        for (const w of (tl ? [1440, 1100, 940] : [1440, 1100, 900, 760, 600, 390])) {
+        for (const w of (tl ? [1440, 1100, 940] : [1440, 1100, 1000, 900, 760, 600, 390])) {
           await size(w);
           for (let k = 0; k < 3; k++) {
             const vis = await ev(`(()=>{const e=document.querySelector("#sidebar");if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50;})()`);
@@ -45774,7 +45779,7 @@ def _b3_hdr_run(mutation=None):
     except Exception as e_:
         return {"err": repr(e_)}
 def _b3_hdr_bad(r):
-    return [c for c in r.get("cases", []) if c["over"] or c["inZone"] or c["clipped"] or c["sw"] > 0]
+    return [c for c in r.get("cases", []) if c["over"] or c["inZone"] or c["clipped"] or c["sw"] > 0 or c.get("below") or c.get("offc", 0) > 1]
 def _b3_hdr_badge_ok(r):
     b_ = r.get("badge") or {}
     if set(b_) != {"none", "w1440", "w760", "w390"}:
@@ -45786,6 +45791,8 @@ def _b3_hdr_badge_ok(r):
 def _b3_home_ok(r):
     h_ = r.get("home") or {}
     return set(h_) == {"w1440", "w390"} and all(v["hero"] and v["chats"] >= 1 and v["rows"] == 0 and abs(v["off"]) <= .5 for v in h_.values())
+# 6b624: the fit's loop, per side (re-pinned from 6b555's one loop)
+_B624_LOOP = 'for(const k of HZ_HD){const f=hzHeaderSides(top);if(!f.l&&!f.r)break;\n      if(!top.classList.contains(k)&&((f.l&&HZ_HD_SIDE[k].includes("l"))||(f.r&&HZ_HD_SIDE[k].includes("r"))))top.classList.add(k);}'
 def _b3_hdr_static(css, js, pg):
     fit = _jsfn(js, "function hzHeaderFit(){"); upd = _jsfn(js, "function hzUpdateBadge(){")
     return (".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}" in css and ".hz #hz-top>.hz-sp{flex:1 1 0;min-width:12px}" in css
@@ -45793,9 +45800,11 @@ def _b3_hdr_static(css, js, pg):
             and ".hz #hz-top.hz-hd1 #hz-title{display:none!important}" in css and ".hz #hz-top.hz-hd2 #hz-mark b{display:none}" in css
             and ".hz #hz-top.hz-hd3 #hz-lanes button{min-width:0;" in css and ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;" in css
             and "position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)" not in css                  # the lanes never at the window's absolute centre
-            and "for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);" in fit and "top.classList.remove(...HZ_HD);" in fit
-            and 'const HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7"];' in js
-            and "if(tl&&r.left<88&&r.top<56)return false;" in js and "t.width<96)return false;" in js
+            and _B624_LOOP in fit and "top.classList.remove(...HZ_HD);" in fit
+            and 'if(top.getBoundingClientRect().width<HZ_LANES_MENU&&!$("#hero"))top.classList.add("hz-hd5");' in fit
+            and 'var HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7","hz-hd8"],HZ_LANES_MENU=940;' in js
+            and ".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}" in css
+            and "if(tl&&b.left<88&&b.top<56)l=true;" in js and "tv.width<Math.min(96,t.scrollWidth))l=true;" in js
             and 'ro.observe(e);' in js and "  hzHeaderFit();\n}" in js
             # the gear and the badge: a 32 px glass key with its shortcut; the pill mirrors the app's own check, no new call
             and '<button id="hz-update" type="button" hidden>Update ready</button>' in pg and 'aria-label="Settings" title="Settings (⌘,)"' in pg
@@ -45808,23 +45817,28 @@ def _b3_hdr_static(css, js, pg):
             and ".hz #skyline,.hz #skyload,.hz #suggest,.hz #celebrate{display:none!important}" in css
             and "function hzBalanceFor(H,compH){" in js)
 _b3_h_ok = _b3_hdr_run()
-_b3_h_mut = _b3_hdr_run([["try{top.classList.remove(...HZ_HD);for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);}", "try{top.classList.remove(...HZ_HD);}"],
+_b3_h_mut = _b3_hdr_run([[_B624_LOOP, ""], ['if(top.getBoundingClientRect().width<HZ_LANES_MENU&&!$("#hero"))top.classList.add("hz-hd5");', ""],
                          [".hz #hz-sb,.hz #hz-mark,.hz #hz-right,.hz #hz-lanes{flex:none}\n", ""], [".hz #hz-mark{min-width:max-content}\n", ""]])
 _b3_h_mut2 = _b3_hdr_run([['<button id="hz-settings" type="button" class="hz-ib"', '<button id="hz-settings" type="button" class="hz-ib" style="display:none"'],
                           ['["#update-flag","#up-go"].forEach(q=>{const e=$(q);if(e)mo.observe(e,{attributes:true,attributeFilter:["hidden","disabled"]});});', ""],
                           ['    <!-- (6b555, per Patrick: "we need to fix these suggestions too.', '    <nav id="hz-history" aria-label="Recent chats"><button type="button" class="hz-row">Simple hello message \u00b7 Today</button></nav>\n    <!-- (6b555, per Patrick: "we need to fix these suggestions too.']])
+_b3_h_mut3 = _b3_hdr_run([[".hz #hz-top.hz-hd5 #hz-lanes{display:none;position:absolute;", ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;"],
+                          [".hz #hz-top.hz-hd5 #hz-lanemenu{display:inline-flex}", ""]])
+_b3_h_mut4 = _b3_hdr_run([[".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}", ""]])
 check("6b555 the header, one row, with Settings and updates in it, over a bare home (no recent-chat rows or suggestion chips under the composer, which sits at the golden point): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
       _b3_hdr_static(_hz_css, _hz_js, page) and not _b3_hdr_static(_hz_css.replace(".hz #hz-mark{min-width:max-content}", ""), _hz_js, page)
-      and not _b3_hdr_static(_hz_css, _hz_js.replace("for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);", ""), page)
+      and not _b3_hdr_static(_hz_css, _hz_js.replace(_B624_LOOP, ""), page)
       and not _b3_hdr_static(_hz_css.replace(".hz #hz-settings{width:32px;height:32px;border-radius:8px;", ".hz #hz-settings{width:32px;height:32px;border-radius:8px;filter:drop-shadow(0 0 6px #fff);"), _hz_js, page)   # a glowing gear
-      and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 36 and not _b3_hdr_bad(_b3_h_ok)
+      and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 40 and not _b3_hdr_bad(_b3_h_ok)
       and all(c["gear"] and c["gearTitle"] == "Settings (⌘,)" for c in _b3_h_ok["cases"])
       and any(c["where"] == "chat" and c["title"] >= 96 for c in _b3_h_ok["cases"])                              # the title still shows where there is room
       and _b3_hdr_badge_ok(_b3_h_ok) and _b3_home_ok(_b3_h_ok)
       and _b3_h_mut.get("mutated", 0) >= 1 and len(_b3_hdr_bad(_b3_h_mut)) >= 1
+      and _b3_h_mut3.get("mutated", 0) >= 1 and any(c.get("below") for c in _b3_h_mut3.get("cases", []))           # 6b624: the lanes' own row, on the answer
+      and _b3_h_mut4.get("mutated", 0) >= 1 and any(c.get("offc", 0) > 1 for c in _b3_h_mut4.get("cases", []))     # 6b624: the lanes off the centre
       and _b3_h_mut2.get("mutated", 0) >= 1 and not all(c["gear"] for c in _b3_h_mut2.get("cases", [])) and not _b3_hdr_badge_ok(_b3_h_mut2)
       and any(v.get("rows", 0) > 0 for v in (_b3_h_mut2.get("home") or {}).values()),
-      json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "home": _b3_h_ok.get("home"), "mut_bad": len(_b3_hdr_bad(_b3_h_mut))})[:900])
+      json.dumps({"bad": _b3_hdr_bad(_b3_h_ok)[:4], "err": _b3_h_ok.get("err") or _b3_h_ok.get("errs"), "badge": {k: [v.get("badge"), v.get("gearMark")] for k, v in (_b3_h_ok.get("badge") or {}).items()}, "home": _b3_h_ok.get("home"), "mut_bad": len(_b3_hdr_bad(_b3_h_mut)), "mut3": len(_b3_hdr_bad(_b3_h_mut3)), "mut4": len(_b3_hdr_bad(_b3_h_mut4))})[:900])
 # ==== beta-3 the sky and Ultra (6b555): end ====
 
 # ==== 6b580 flow: begin ====
@@ -46687,6 +46701,282 @@ check("6b622 live mutants, served in place of the page, are each caught: %s" % "
       all(ok_ for _, ok_, _ in _ln_mr2), json.dumps(_ln_mr2)[:1500])
 # ==== 6b622 lanes: end ====
 
+# ==== 6b624 the header, the column and the sidebar: begin ====
+print("== the header from its real width, the composer under the reading column, the sidebar's rows, the chat's behaviours (6b624) ==")
+# THE HEADER, THE COLUMN, THE SIDEBAR AND THE CHAT'S BEHAVIOURS (6b624, per Patrick: "I want this UI to be perfect"; the
+# audit of the chat page). Two parts, each with mutants the same predicate catches. (1) The source: the 6b624 CSS block
+# (the header's three columns and its band, the folded lanes, the composer's one rule, the sidebar's flat rows and menu,
+# the one focus ring) has no glow, blur or text shadow; hzFlowFit measures the column (hzColFit) and writes the three
+# column tokens; New chat stops nothing; the jump key's far rule; the card's reveal; the rows' wiring; the ghost's hold.
+# (2) Live, headless Chromium over the DevTools protocol (node's own WebSocket) on the copy's own page with a stand-in
+# /api/chat (and a stand-in /api/chats/one that returns the turn as the server would have saved it): a long answer at
+# 1440, 1100, 1000, 900, 760 and 390, the sidebar open and shut: the composer's left edge on the answer's and its right
+# edge on the question's (1 px), nothing of the header below it, the lanes at its centre, nothing sideways; the jump key
+# a screen up a long chat with nothing streaming, and not half a screen up; New chat mid-answer: the answer runs on,
+# lands whole in its own chat with the unread dot, nothing on the new page; Details at 960: the card's foot clear of the
+# composer; the sidebar: a real ⋯ key per row (hittable), its menu Pin / Rename / Delete, the same on a right-click,
+# F2 renames in a field the row's width, the arrows, Home and End move the focus; the lanes folded at 900 with the
+# sidebar open: the key opens them under itself, a pick switches and closes; the question's ghost (Full) lands on its
+# row's title inside the sidebar. Mutants served in place of the page, each caught by the part it breaks.
+_B624 = r'''// 6b624: headless Chromium over the DevTools protocol (node's own WebSocket), the copy's own page, a stand-in /api/chat
+// argv: <chromium> <base> <cookie name> <key> <token> <groups,comma> [mutation.json]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, groupsArg, mutf] = process.argv.slice(2);
+const G = new Set(groupsArg.split(","));
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-624-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { S: {}, errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 280000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const STUB = `(()=>{const real=window.fetch.bind(window);window.__aborted=0;window.__turns={};
+  const N=String.fromCharCode(0),F=(t,j)=>N+t+":"+JSON.stringify(j)+N,FE=String.fromCharCode(96,96,96);
+  const LONG="A good home backup keeps **three copies** of anything you care about, on **two kinds** of storage, with **one copy** somewhere other than your house [1].\\n\\n## What to buy\\n\\nFor most homes a two-bay NAS is the sweet spot. It mirrors two drives so one can fail without loss [2].\\n\\n- **The NAS itself:** a two-bay model with snapshot support.\\n- **Two matching drives:** NAS-rated, 8 TB or more each.\\n- **An offsite copy:** an encrypted cloud bucket, or a USB drive you swap monthly.\\n- **A small UPS:** so a power cut never interrupts a write.\\n\\n## A nightly job\\n\\n"+FE+"bash\\nrsync -a --delete $HOME/Documents/ nas:/volume1/backup/documents/\\nfind /volume1/backup/trash -mtime +30 -delete\\n"+FE+"\\n\\nOnce a quarter, restore a folder at random and open a few files [3]. Write the setup down: which drives, which jobs, where the keys live. A backup you have never restored is a hope, not a plan, so test it on a quiet evening and note how long it took.";
+  const SRC=[{t:"The 3-2-1 backup rule",u:"https://www.backblaze.com/blog/the-3-2-1-backup-strategy/"},{t:"RAID 1 and NAS basics",u:"https://www.synology.com/"},{t:"Test your backups",u:"https://www.nytimes.com/wirecutter/"}];
+  window.fetch=(u,o)=>{const url=String(u).split("?")[0];
+    if(url.endsWith("/api/chats/one")){const id=new URL(String(u),location.href).searchParams.get("id"),t=window.__turns[id];
+      if(!t)return real(u,o);
+      return Promise.resolve(new Response(JSON.stringify({chat:{id:id,title:t.title,ts:Date.now(),lane:"ai",named:true,messages:t.messages}}),{status:200,headers:{"Content-Type":"application/json"}}));}
+    if(!url.endsWith("/api/chat"))return real(u,o);
+    let b={};try{b=JSON.parse(o.body);}catch(e){}
+    const q=((b.messages||[]).slice(-1)[0]||{}).content||"",slow=/slow/i.test(q),enc=new TextEncoder(),w=LONG.split(/(?<=\\s)/),sig=o&&o.signal;
+    let said="";
+    const body=new ReadableStream({start(c){let i=0;const put=s=>{try{c.enqueue(enc.encode(s));}catch(e){}};
+      put(N+"STATUS:Thinking"+N);put(F("STEP",{id:"search",l:"Searched the web",s:"done",d:"3 sources"}));put(F("SOURCES",SRC));
+      put(F("RUN",{prov:1,w:"local",s:"",m:"stand-in"}));
+      const tick=()=>{if(sig&&sig.aborted)return;
+        if(i>=w.length){put(F("USAGE",{r:"final",m:"stand-in",w:"local",i:900,o:300,d:4000}));put(F("DONE",{f:1,t:4,mode:"Fast"}));
+          window.__turns[b.chat_id]={title:q.slice(0,40),messages:(b.messages||[]).concat([{role:"assistant",content:said}])};c.close();return;}
+        const s=w.slice(i,i+3).join("");said+=s;put(s);i+=3;setTimeout(tick,slow?90:12);};
+      setTimeout(tick,120);
+      if(sig)sig.addEventListener("abort",()=>{window.__aborted++;try{c.error(new DOMException("aborted","AbortError"));}catch(e){}});}});
+    return Promise.resolve(new Response(body,{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","X-Models":"stand-in","X-Web-Search":"1"}}));};})();`;
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(G.has("ghost") ? "full" : "calm")});localStorage.setItem("millen.hz.seen","1");}catch(e){}` + STUB });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); if (r && r.exceptionDetails) out.errs.push("eval: " + JSON.stringify(r.exceptionDetails).slice(0, 240)); return r && r.result ? r.result.value : undefined; };
+  const size = async w => { await send("Emulation.setDeviceMetricsOverride", { width: w, height: 860, deviceScaleFactor: 1, mobile: false }); await ev(`dispatchEvent(new Event("resize"))`); await sleep(350); };
+  const sideTo = async want => { for (let k = 0; k < 3; k++) { const vis = await ev(`(()=>{const e=document.querySelector("#sidebar");if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50;})()`);
+      if (vis === want) return; await ev(`document.querySelector("#hz-sb").click()`); await sleep(500); } };
+  const ask = async (q, wait = true) => { await ev(`(()=>{const i=document.querySelector("#input");i.value=${JSON.stringify(q)};i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`);
+    if (wait) { for (let i = 0; i < 150; i++) { await sleep(200); if (await ev(`!generating`)) break; } await sleep(500); } };
+  await size(1440);
+  let ready = false;
+  for (let tries = 0; tries < 2 && !ready; tries++) { await send("Page.navigate", { url: base + "/" });
+    for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#hz-top")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro&&typeof send==="function"`); } }
+  if (!ready) { out.errs.push("page not ready"); return done(); }
+  await sleep(800);
+  const S = out.S;
+  if (G.has("ghost")) {   // first, from the home: the question flies to its row and lands on its title
+    await sideTo(true);
+    const samp = ev(`new Promise(res=>{const seen=[],t0=performance.now();const tick=()=>{const g=document.querySelector(".hz-ghost");
+      if(g&&+getComputedStyle(g).opacity>.02){const a=g.getBoundingClientRect(),row=[...document.querySelectorAll("#chat-list .chat-item")].find(r=>r.dataset.id===hzS.liveChat),ct=row&&row.querySelector(".ct"),b=ct&&ct.getBoundingClientRect();
+        seen.push({gl:a.left,gr:a.right,gy:(a.top+a.bottom)/2,rl:b&&b.left,ry:b&&(b.top+b.bottom)/2,sb:document.querySelector("#sidebar").getBoundingClientRect().right,held:((document.getElementById("hz-arc-hold")||{}).textContent||"").indexOf(hzS.liveChat)>=0?0:1});}
+      if(performance.now()-t0<1600)setTimeout(tick,25);else res(seen);};tick();})`);
+    await ask("Give me a long answer on home backups", false);
+    const gs = await samp; const last = gs[gs.length - 1] || null;
+    S.ghost = { n: gs.length, last, held: gs.length ? Math.min(...gs.slice(0, Math.ceil(gs.length / 2)).map(x => x.held)) : null };
+    for (let i = 0; i < 150; i++) { await sleep(200); if (await ev(`!generating`)) break; } await sleep(500);
+  }
+  if (G.has("col")) {   // the composer under the reading column; the header from its real width
+    await ask("Give me a long answer on home backups");
+    S.col = [];
+    for (const w of [1440, 1100, 1000, 900, 760, 390]) for (const side of [true, false]) {
+      await size(w); if (w > 760) await sideTo(side); await sleep(450);
+      S.col.push(await ev(`(()=>{const R=s=>{const e=document.querySelector(s);if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?r:null;};
+        const comp=R("#composer"),ai=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),body=ai&&ai.querySelector(".body").getBoundingClientRect(),
+          ub=[...document.querySelectorAll("#chat-inner>.msg.user .body")].pop().getBoundingClientRect(),top=document.querySelector("#hz-top"),hr=top.getBoundingClientRect(),hcs=getComputedStyle(top);
+        const B=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-lanemenu","#hz-right"].map(R).filter(Boolean),mid=R("#hz-lanes")||R("#hz-lanemenu");
+        const hc=(hr.left+parseFloat(hcs.paddingLeft)+hr.right-parseFloat(hcs.paddingRight))/2;
+        return {w:innerWidth,side:${side},dL:Math.round(comp.left-body.left),dR:Math.round(comp.right-ub.right),below:B.filter(b=>b.bottom>hr.bottom+.5).length,
+          offc:mid&&!top.classList.contains("hz-hd8")?Math.round(Math.abs((mid.left+mid.right)/2-hc)):0,sw:document.documentElement.scrollWidth-innerWidth,cls:top.className};})()`));
+    }
+    // the drawer at 760: the chats button opens it (its click used to reach #main, which closed it at once)
+    await size(760); await ev(`document.body.classList.remove("sbopen");document.querySelector("#sidebar").style.transition="none"`); await ev(`document.querySelector("#hz-sb").click()`); await sleep(700);
+    S.drawer = await ev(`(()=>{const r=document.querySelector("#sidebar").getBoundingClientRect();return {open:document.body.classList.contains("sbopen"),right:Math.round(r.right)};})()`);
+    await ev(`document.body.classList.remove("sbopen");document.querySelector("#sidebar").style.transition=""`); await sleep(400);
+    await size(1440); await sideTo(true);
+  }
+  if (G.has("jump")) {   // a long chat, nothing streaming: the key a screen up, not half a screen up
+    await ev(`(()=>{const ms=[];for(let i=0;i<40;i++){ms.push({role:"user",content:"Question "+i+" about the long chat"});ms.push({role:"assistant",content:"An answer with a few lines.\\n\\n- one\\n- two\\n- three\\n\\nAnd a closing line "+i+"."});}
+      chats.unshift({id:"c624long",title:"Long 624",ts:Date.now()-5000,lane:"ai",named:true,messages:ms});loadChat("c624long");})()`);
+    await sleep(700);
+    S.jump = await ev(`(async()=>{const s=document.querySelector("#chat-scroll"),j=document.querySelector("#jumpdown"),r={end:!j.hidden};s.style.scrollBehavior="auto";
+      s.dispatchEvent(new WheelEvent("wheel",{deltaY:-120,bubbles:true}));s.scrollTop=Math.max(0,s.scrollHeight-s.clientHeight*3.2);await new Promise(x=>setTimeout(x,300));r.far=!j.hidden;
+      const b=j.getBoundingClientRect(),e=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);r.hit=!!(e&&j.contains(e));
+      s.scrollTop=s.scrollHeight-s.clientHeight*1.5;await new Promise(x=>setTimeout(x,300));r.near=!j.hidden;return r;})()`);
+  }
+  if (G.has("newchat")) {   // New chat mid-answer: the answer runs on and lands whole in its own chat, unread
+    await ev(`document.querySelector("#newchat").click()`); await sleep(300);
+    await ask("slow: Give me a long answer on home backups", false); await sleep(900);
+    const was = await ev(`curChat`);
+    await ev(`document.querySelector("#newchat").click()`); await sleep(300);
+    S.nc = { mid: await ev(`({gen:generating,hero:!!document.querySelector("#hero"),cur:curChat})`) };
+    for (let i = 0; i < 200; i++) { await sleep(200); if (await ev(`!generating`)) break; } await sleep(900);
+    S.nc.after = await ev(`(id=>{const c=chats.find(x=>x.id===id)||{},t=window.__turns[id]||{},last=((c.messages||[]).slice(-1)[0])||{},row=document.querySelector('#chat-list .chat-item[data-id="'+id+'"]');
+      return {aborted:window.__aborted,saved:(t.messages||[]).length,lastLen:(last.content||"").length,unread:!!c.unread,dot:!!(row&&row.querySelector(".cdot")),hero:!!document.querySelector("#hero"),
+        ai:document.querySelectorAll("#chat-inner .msg.ai").length,cur:curChat};})(${JSON.stringify(was)})`);
+    await ev(`loadChat(${JSON.stringify(was)})`); await sleep(500);
+    S.nc.opened = await ev(`(id=>({unread:!!(chats.find(x=>x.id===id)||{}).unread,ai:document.querySelectorAll("#chat-inner .msg.ai").length,text:([...document.querySelectorAll("#chat-inner .msg.ai .body")].pop()||{}).innerText.length}))(${JSON.stringify(was)})`);
+  }
+  if (G.has("card")) {   // Details at 960: the card's foot clear of the composer
+    await size(960); await sideTo(false);
+    await ev(`document.querySelector("#newchat").click()`); await sleep(300);
+    await ask("Give me a long answer on home backups");
+    S.card = await ev(`(async()=>{const s=document.querySelector("#chat-scroll"),line=[...document.querySelectorAll(".msg.ai .hz-proof")].pop();if(!line)return {line:false,flow:document.documentElement.classList.contains("hz-flow")};
+      s.scrollTop=s.scrollHeight;await new Promise(x=>setTimeout(x,200));
+      const c=document.querySelector("#composer").getBoundingClientRect(),lr=line.getBoundingClientRect();s.scrollTop-=(c.top-8-lr.bottom);await new Promise(x=>setTimeout(x,300));
+      line.querySelector(".pf-open").click();await new Promise(x=>setTimeout(x,1000));
+      const card=document.getElementById(line.querySelector(".pf-open").getAttribute("aria-controls")),r=card.getBoundingClientRect(),c2=document.querySelector("#composer").getBoundingClientRect();
+      return {line:true,open:!card.hidden,clear:Math.round(c2.top-(r.top+card.offsetHeight)),top:Math.round(r.top)};})()`);
+    await size(1440); await sideTo(true);
+  }
+  if (G.has("side")) {   // the rows: a real ⋯ key, its menu, the right-click, F2, the arrows, Home and End
+    await sideTo(true); await sleep(300);
+    S.side = await ev(`(async()=>{const W=ms=>new Promise(x=>setTimeout(x,ms)),rows=()=>[...document.querySelectorAll("#chat-list .chat-item")].filter(r=>r.offsetParent);
+      const it=rows().find(r=>!r.classList.contains("active"))||rows()[0];if(!it)return {rows:0};it.focus();await W(100);
+      const k=it.querySelector("button.cmore"),r={rows:rows().length,key:!!k};if(!k)return r;
+      const kr=k.getBoundingClientRect(),e=document.elementFromPoint(kr.left+kr.width/2,kr.top+kr.height/2);r.hit=!!(e&&k.contains(e));r.label=k.getAttribute("aria-label")||"";
+      const cs=getComputedStyle(it);r.rowH=Math.round(it.getBoundingClientRect().height);r.font=cs.fontSize;r.radius=cs.borderTopLeftRadius;
+      k.click();await W(150);const m=document.querySelector("#sb-menu");r.menu=!!(m&&!m.hidden);r.items=m?[...m.querySelectorAll("[role=menuitem]")].map(b=>b.tagName+":"+b.textContent):[];
+      m&&m.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));await W(100);r.esc=!!(m&&m.hidden)&&document.activeElement===it;
+      const ir=it.getBoundingClientRect();it.dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true,clientX:ir.left+30,clientY:ir.top+10}));await W(150);
+      r.ctx=!!(m&&!m.hidden);document.dispatchEvent(new PointerEvent("pointerdown",{bubbles:true}));await W(100);r.ctxClosed=!!(m&&m.hidden);
+      it.focus();it.dispatchEvent(new KeyboardEvent("keydown",{key:"F2",bubbles:true}));await W(150);const f=document.querySelector("#chat-list .crename");
+      r.f2=!!f;r.fieldW=f?Math.round(f.getBoundingClientRect().width):0;r.rowW=Math.round(ir.width);
+      if(f)f.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}));await W(150);
+      const rs=rows();rs[0].focus();rs[0].dispatchEvent(new KeyboardEvent("keydown",{key:"ArrowDown",bubbles:true}));r.down=document.activeElement===rs[1];
+      document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:"End",bubbles:true}));r.end=document.activeElement===rs[rs.length-1];
+      document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:"Home",bubbles:true}));r.home=document.activeElement===rs[0];return r;})()`);
+  }
+  if (G.has("lanes")) {   // the lanes folded at 900 with the sidebar open
+    await size(900); await sideTo(true); await sleep(300);
+    S.lanes = await ev(`(async()=>{const W=ms=>new Promise(x=>setTimeout(x,ms)),top=document.querySelector("#hz-top"),k=document.querySelector("#hz-lanemenu"),n=document.querySelector("#hz-lanes");
+      const r={folded:top.classList.contains("hz-hd5"),key:getComputedStyle(k).display!=="none"};k.click();await W(200);
+      const nr=n.getBoundingClientRect(),kr=k.getBoundingClientRect();r.open=getComputedStyle(n).display!=="none";r.exp=k.getAttribute("aria-expanded");
+      r.under=Math.round(Math.abs((nr.left+nr.right)/2-(kr.left+kr.right)/2));r.gap=Math.round(nr.top-kr.bottom);
+      const code=n.querySelector('[data-m="code"]'),cr=code.getBoundingClientRect(),e=document.elementFromPoint(cr.left+cr.width/2,cr.top+cr.height/2);r.hit=!!(e&&code.contains(e));
+      code.click();await W(400);r.mode=uiMode;r.closed=getComputedStyle(n).display==="none";r.label=k.textContent.trim();
+      switchLane("ai");await W(300);return r;})()`);
+    await size(1440);
+  }
+  done();
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
+'''
+def _b624_run(groups, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="b624-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "d.js"), "w").write(_B624)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "d.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, ",".join(groups)]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation)); args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=300)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _b624_ok(r):
+    S_ = r.get("S") or {}
+    k_ = {}
+    col = S_.get("col") or []
+    k_["col"] = len(col) == 12 and all(abs(c["dL"]) <= 1 and abs(c["dR"]) <= 1 and c["below"] == 0 and c["offc"] <= 1 and c["sw"] <= 0 for c in col)
+    d_ = S_.get("drawer") or {}
+    k_["drawer"] = d_.get("open") is True and d_.get("right", 0) >= 200
+    j_ = S_.get("jump") or {}
+    k_["jump"] = j_.get("end") is False and j_.get("far") is True and j_.get("hit") is True and j_.get("near") is False
+    n_ = S_.get("nc") or {}
+    a_, m_, o_ = n_.get("after") or {}, n_.get("mid") or {}, n_.get("opened") or {}
+    k_["newchat"] = (m_.get("gen") is True and m_.get("hero") is True and a_.get("aborted") == 0 and a_.get("saved") == 2 and a_.get("lastLen", 0) > 600
+                     and a_.get("unread") is True and a_.get("dot") is True and a_.get("hero") is True and a_.get("ai") == 0
+                     and o_.get("unread") is False and o_.get("ai") == 1 and o_.get("text", 0) > 600)
+    c_ = S_.get("card") or {}
+    k_["card"] = c_.get("line") is True and c_.get("open") is True and c_.get("clear", -99) >= 8 and c_.get("top", 0) >= 64
+    s_ = S_.get("side") or {}
+    k_["side"] = (s_.get("rows", 0) >= 2 and s_.get("key") is True and s_.get("hit") is True and s_.get("label", "").startswith("More for ")
+                  and s_.get("rowH") == 30 and s_.get("font") == "13px" and s_.get("radius") == "8px" and s_.get("menu") is True
+                  and [x.split(":")[1] for x in s_.get("items", [])][1:] == ["Rename", "Delete"] and all(x.startswith("BUTTON:") for x in s_.get("items", [])) and len(s_.get("items", [])) == 3
+                  and s_.get("esc") is True and s_.get("ctx") is True and s_.get("ctxClosed") is True and s_.get("f2") is True
+                  and s_.get("fieldW", 0) >= s_.get("rowW", 999) - 24 and s_.get("down") is True and s_.get("end") is True and s_.get("home") is True)
+    l_ = S_.get("lanes") or {}
+    k_["lanes"] = (l_.get("folded") is True and l_.get("key") is True and l_.get("open") is True and l_.get("exp") == "true" and l_.get("under", 99) <= 1
+                   and 0 <= l_.get("gap", -1) <= 12 and l_.get("hit") is True and l_.get("mode") == "code" and l_.get("closed") is True and l_.get("label") == "Code")
+    g_ = S_.get("ghost") or {}
+    gl_ = g_.get("last") or {}
+    k_["ghost"] = (g_.get("n", 0) >= 5 and gl_.get("rl") is not None and abs(gl_["gl"] - gl_["rl"]) <= 4 and abs(gl_["gy"] - gl_["ry"]) <= 4
+                   and gl_["gr"] <= gl_["sb"] + 1 and g_.get("held", 1) <= .05)
+    return k_
+# (1) the source
+_b624_css = page[page.find("/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): begin"):page.find("/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): end")]
+def _b624_src(css, js, blk):
+    nc = js[js.find('$("#newchat").addEventListener("click",()=>{'):]
+    nc = nc[:nc.find("});")]
+    col = _jsfn(js, "function hzColFit(){"); ff = _jsfn(js, "function hzFlowFit(){")
+    return (len(blk) > 2000 and not re.search(r"text-shadow:(?!none)|[^-]filter:|backdrop-filter:(?!none)|drop-shadow|0 0 (?:[2-9]|\d\d)px", blk)
+            and ".hz #main:not(:has(#hero)) #hz-top::before{" in blk and "background:linear-gradient(180deg,#0f0f11 0,#0f0f11 calc(100% - 16px),rgba(15,15,17,0))}" in blk
+            and ".hz #main:not(:has(#hero)) #composer{max-width:var(--hz-read-w);margin:0 auto 0 calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2)}" in blk
+            and "hzColFit();}" in ff and 'set("--hz-read-w",read+"px");set("--hz-gutter",g+"px");set("--hz-marg-w",marg+"px");' in col
+            and "abort" not in nc and "chatTrunc=null;" in nc
+            and "||chatFar());" in js and "function chatFar(){return !chatPinned&&!$(\"#hero\")&&scroller.clientHeight>0&&chatGap()>scroller.clientHeight*.9;}" in js
+            and "  if(open)proofReveal(card);\n" in js and "  sbRowsWire(el);" in js and "function hzArcHold(id,on){" in js
+            and ".hz.hz-kb #hz-top button:focus-visible,.hz.hz-kb #sidebar button:focus-visible," in blk and "var(--hz-ember)}" in blk)
+_c624_src = (_b624_src(page, page, _b624_css)
+             and not _b624_src(page, page, _b624_css + ".hz #hz-lanemenu{box-shadow:0 0 12px rgba(255,255,255,.3)}")      # a glow back
+             and not _b624_src(page, page.replace("  chatTrunc=null;\n  chatPlaceSave();", "  if(generating&&abortCtl)abortCtl.abort();\n  chatTrunc=null;\n  chatPlaceSave();"), _b624_css)   # New chat stops it again
+             and not _b624_src(page, page.replace("hzColFit();}", "}"), _b624_css)                                         # the column not measured
+             and not _b624_src(page, page.replace("||chatFar());", ");"), _b624_css))                                      # the key only while streaming
+check("6b624 the source: the header's, the column's and the sidebar's block has no glow, blur or text shadow; the band; the composer's one rule from the measured column (hzColFit in hzFlowFit); New chat stops nothing; the jump key's far rule; the card's reveal; the rows' wiring; the ghost's hold; the keyboard-only ember ring; four mutants caught",
+      _c624_src, "%r" % _b624_src(page, page, _b624_css))
+# (2) the page
+_r624 = _b624_run(["ghost", "col", "jump", "newchat", "card", "side", "lanes"])
+_k624 = _b624_ok(_r624)
+check("6b624 the page: the composer under the reading column and the header from its real width at 1440, 1100, 1000, 900, 760 and 390, the sidebar open and shut (no overlap below the header, the lanes at its centre, nothing sideways); the jump key a screen up; New chat mid-answer (it runs on, lands whole, unread); the card in view; the sidebar's rows (⋯, menu, right-click, F2, arrows); the lanes folded into a menu; the drawer opens at 760; the ghost on its title",
+      not _r624.get("err") and not _r624.get("errs") and all(_k624.values()),
+      "%r" % [[k_ for k_, v_ in _k624.items() if not v_], _r624.get("err"), (_r624.get("errs") or [])[:3],
+              {k_: v_ for k_, v_ in (_r624.get("S") or {}).items() if k_ in [x_ for x_, y_ in _k624.items() if not y_]}])
+_C624_M = [
+    ("the composer on its old rule (the column not measured)", ["col"], [["\n  hzColFit();}", "}"]], "col"),
+    ("the lanes on their own row again", ["col"], [[".hz #hz-top.hz-hd5 #hz-lanes{display:none;position:absolute;", ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;"], [".hz #hz-top.hz-hd5 #hz-lanemenu{display:inline-flex}", ""]], "col"),
+    ("the drawer closed by its own button's click", ["col"], [['sbtn.addEventListener("click",e=>{if(innerWidth<=760)e.stopPropagation();hzSidebarToggle();});', 'sbtn.addEventListener("click",hzSidebarToggle);']], "drawer"),
+    ("the jump key only while streaming", ["jump"], [["||chatFar());", ");"]], "jump"),
+    ("New chat stops the answer", ["newchat"], [["  chatTrunc=null;\n  chatPlaceSave();", "  if(generating&&abortCtl)abortCtl.abort();\n  chatTrunc=null;\n  chatPlaceSave();"]], "newchat"),
+    ("the card left behind the composer", ["card"], [["  if(open)proofReveal(card);\n", ""]], "card"),
+    ("the rows without their key and menu", ["side"], [["  sbRowsWire(el);", "  void 0;"]], "side"),
+    ("the lanes' key not wired", ["lanes"], [["  hzLaneMenuWire();   // the lanes as a menu", "  void 0;   // the lanes as a menu"]], "lanes"),
+    ("the ghost landing 10 px into the row at its full length", ["ghost"], [["if(ct){const cr=ct.getBoundingClientRect()", "if(0){const cr=ct.getBoundingClientRect()"]], "ghost"),
+]
+_c624m = []
+for _d624, _g624, _mu624, _want624 in _C624_M:
+    _rm624 = _b624_run(_g624, _mu624)
+    _km624 = _b624_ok(_rm624)
+    _c624m.append((_d624, _rm624.get("mutated", 0) >= 1 and _km624.get(_want624) is False))
+check("6b624 the page: %d mutants served in place of the page, each caught by the part it breaks" % len(_C624_M),
+      all(x_[1] for x_ in _c624m), "%r" % [x_ for x_ in _c624m if not x_[1]])
+# ==== 6b624 the header, the column and the sidebar: end ====
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
