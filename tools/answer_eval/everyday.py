@@ -179,7 +179,7 @@ def cmd_run(args):
     os.makedirs(run_dir, exist_ok=True)
     cases = [c for c in s["cases"] if not args.only or c["id"] in args.only.split(",")]
     wait_gauntlet()
-    lock = rb.Lock(os.path.join(args.lock_dir, "engines.lock"), "everyday %s" % args.label)
+    lock = rb.Lock("" if args.no_lock else os.path.join(args.lock_dir, "engines.lock"), "everyday %s" % args.label)
     lock.acquire()
     home = os.path.expanduser("~/Library/Application Support/MillenAI-everyday-%d" % args.port)
     copy = rb.DevCopy(args.repo, args.python, home, args.port, os.path.join(run_dir, "devcopy.log"))
@@ -188,7 +188,7 @@ def cmd_run(args):
     with open(os.path.join(args.repo, "millenai.py"), encoding="utf-8") as fh:
         if "# ==== 6b650 search fixture: begin ====" not in fh.read():
             sys.exit("refusing: %s/millenai.py has no search-fixture hook (it would search the real web)" % args.repo)
-    copy.extra_env = {"MILLENAI_TEST_HOOKS": "search-fixture=" + FIXTURE}
+    rb.SEARCH.update(real_web=False, fixture=FIXTURE)     # run_bench's DevCopy adds the hook (and refuses without it)
     if os.path.exists(os.path.join(home, "servers.json")):
         sys.exit("refusing: %s holds a servers.json" % home)
     recs = []
@@ -242,7 +242,8 @@ def judge(args, label):
         refs = {}
     d["judged_with_refs"] = bool(refs)
     wait_gauntlet()
-    lock = rb.Lock(os.path.join(args.lock_dir, "engines.lock"), "everyday judge %s" % label)
+    lock = rb.Lock("" if getattr(args, "no_lock", False) else os.path.join(args.lock_dir, "engines.lock"),
+                   "everyday judge %s" % label)
     lock.acquire()
     try:
         with sc.MlxJudge(args.python, sc.JUDGE_MODEL, args.judge_port,
@@ -380,6 +381,7 @@ def main():
         p.add_argument("--python", default=rb.DEFAULT_PY if os.path.exists(rb.DEFAULT_PY) else sys.executable)
         p.add_argument("--judge-port", type=int, default=9993)
         p.add_argument("--lock-dir", default=os.environ.get("EVAL_LOCK_DIR", rb.DEFAULT_LOCK_DIR))
+        p.add_argument("--no-lock", action="store_true", help="don't wait for the bench's engines.lock")
         if p is not r:
             p.add_argument("label")
     r.add_argument("--repo", default=rb.REPO)
