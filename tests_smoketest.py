@@ -49183,7 +49183,7 @@ def _f640_pick_ok(r):
     return (len(r) == 6 and r[5] == [("Under 2 kg", "3 kg")] and r[0] == [("14-inch", "13 inch")] and r[1] == [] and r[2] == [("Under $1,500", "1699 $")]
             and r[3] == [] and r[4] == [("2 hours", "3 hours")])
 _f640_src_ok = ('_pc = funnel_pick_conflicts(picks, out)' in _MILLENAI_SRC and 'if _nw and not funnel_pick_conflicts(picks, _nw):' in _MILLENAI_SRC
-                and "esc(fnWaitLabel(fnState.picks.length,fnState.stages))" in _MILLENAI_SRC)
+                and _MILLENAI_SRC.count("esc(fnWaitLabel(fnState.picks.length,fnState.stages))") == 2)   # Horizon and Classic
 check("6b640 Funnels: the waiting line never names a stage past the last (\"Stage 5 of 5…\", then \"Weighing your choices…\"); a clicked size or number the verdict contradicts is found and gets one rewrite; the mutants are caught",
       _f640_wait(_MILLENAI_SRC) == _F640_WANT and _f640_pick_ok(_f640_pick(_MILLENAI_SRC)) and _f640_src_ok
       and _f640_wait(_MILLENAI_SRC.replace('return m&&n>m?"Weighing your choices…":', 'return ')) != _F640_WANT

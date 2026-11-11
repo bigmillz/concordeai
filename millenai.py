@@ -65965,8 +65965,8 @@ async function fnStep(pick){
   const box=document.createElement("div");
   box.className="msg ai";
   box.innerHTML='<div class="who">Funnel</div><div class="body">'
-    +'<span class="statusline"><i class="cspin"></i> Stage '
-    +(fnState.picks.length+1)+'…</span></div>';
+    +'<span class="statusline"><i class="cspin"></i> '
+    +esc(fnWaitLabel(fnState.picks.length,fnState.stages))+'</span></div>';   // Classic too: never a stage past the last (beta 4)
   if(!fnHzStage(box))inner.appendChild(box);autoScroll();   // Horizon: a stage on the funnel's hairline (6b622)
   let d={};
   // the server saves this stage's turn (the goal, or the pick the page
