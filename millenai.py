@@ -53340,7 +53340,7 @@ __HZ_FONTS__
 .hz .hz-sl[data-lv="1"]{--hz-bloom:.15;--hz-lift:.88}
 .hz .hz-sl[data-lv="2"]{--hz-bloom:.18;--hz-lift:.92}
 .hz .hz-sl[data-lv="3"]{--hz-bloom:.22;--hz-lift:.96}
-.hz .hz-sl[data-lv="4"]{--hz-bloom:.34;--hz-lift:1}
+.hz .hz-sl[data-lv="4"]{--hz-bloom:.42;--hz-lift:1}
 .hz .hz-sl-track,.hz .hz-sl-fill,.hz .hz-sl-bloom{position:absolute;left:0;top:calc(50% - var(--hz-ph) / 2);height:var(--hz-ph);border-radius:var(--hz-sr);pointer-events:none}
 .hz .hz-sl-track{right:0;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.085));box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),inset 0 1px 2px rgba(0,0,0,.25)}
 .hz .hz-sl-fill,.hz .hz-sl-bloom{width:calc(var(--hz-ph) + (100% - var(--hz-ph)) * var(--hz-eff-u));overflow:hidden;transition:width var(--hz-snap);
@@ -53765,12 +53765,12 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-calm #hero .greet::after,.hz .novideo #hero .greet::after{display:none}
 @media (prefers-reduced-motion:reduce){.hz #hero .greet::after{display:none}}
 /* the fill at Ultra: the one cool pair, ice > soft violet and back, with the sheen on top; it flows slowly (one 2 x
-   width period every 8 s), the bloom with it; still in Calm */
+   width period every 7 s since 6b621, the demo's: ice, violet, a pale ice-blue and back), the bloom with it (.42); still in Calm */
 .hz .hz-sl-fill::after,.hz .hz-sl-bloom::after{content:"";position:absolute;inset:0;opacity:0;transition:opacity .6s var(--hz-ease-in-out);
   background:linear-gradient(180deg,rgba(255,255,255,.3),rgba(255,255,255,0) 65%) 0 0/100% 100% no-repeat,
-    linear-gradient(90deg,#8fb7ff,#a58bff 50%,#8fb7ff) 0 0/calc(var(--hz-sw) * 2) 100% repeat-x}
+    linear-gradient(90deg,#8fb7ff,#a58bff 45%,#b8ccff 55%,#a58bff 70%,#8fb7ff) 0 0/calc(var(--hz-sw) * 2) 100% repeat-x}   /* the demo's flow (6b621) */
 .hz.hz-ultra .hz-sl-fill::after,.hz.hz-ultra .hz-sl-bloom::after{opacity:1;transition:opacity .3s var(--hz-ease-out)}
-.hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 8s linear infinite}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-fill::after,.hz.hz-ultra:not(.hz-calm) .hz-sl-bloom::after{animation:hzFillFlow 7s linear infinite}
 @keyframes hzFillFlow{from{background-position:0 0,0 0}to{background-position:0 0,calc(var(--hz-sw) * -2) 0}}
 /* the light rush (6b553): a 36 px streak of white from the knob back along the fill to its start in 180 ms, as if the
    bar charged; leaving, back out to the knob */
@@ -53787,11 +53787,10 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz.hz-ultra:not(.hz-calm) .hz-elevel.lum{animation:hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) .6s infinite}
 .hz.hz-ultra:not(.hz-calm).hz-ignite .hz-elevel.lum{animation:hzLumSweep .45s cubic-bezier(.3,0,.2,1) both,hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) .6s infinite,hzUltraLit .9s cubic-bezier(.16,1,.3,1) both}
 @keyframes hzLumSweep{0%{background-position:150% 0,0 0}45%,100%{background-position:-50% 0,0 0}}
-@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 6px rgba(255,255,255,.9)}
+@keyframes hzUltraLit{0%{text-shadow:0 0 1px #fff,0 0 12px rgba(255,255,255,.95)}
   100%{text-shadow:0 0 0 rgba(255,255,255,0),0 0 0 rgba(255,255,255,0)}}
-/* the sky answers once: the rays brighten +.45 at 200 ms and settle within 2 s */
-.hz.hz-ignite #hz-aurw{animation:hzSkyBreath 2s cubic-bezier(.16,1,.3,1) both}
-@keyframes hzSkyBreath{0%{filter:brightness(1)}10%{filter:brightness(1.45)}100%{filter:brightness(1)}}
+/* the sky answers once: the GPU sky's own surge (x^2 e^(2(1-x)), peak at 1 s) carries it, as the demo's; the CSS curtains'
+   +.45 breath that stood here went in 6b621 (it whitened the rays, a 21/255 rise round the composer in 200 ms) */
 /* Calm: the rim fades in and out over 300 ms, no run, no spark, no bloom, no flow; a page without
    @property (hz-ring-static) has no run either, the rim simply shows */
 .hz.hz-calm.hz-ignite #composer::after,.hz.hz-ring-static.hz-ignite #composer::after,.hz.hz-calm.hz-ultra-out #composer::after,.hz.hz-ring-static.hz-ultra-out #composer::after,
@@ -55196,6 +55195,104 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #imp-veil button:focus-visible,.hz #imp-veil [tabindex]:focus-visible,.hz #imp-veil input:focus-visible,.hz #imp-ask button:focus-visible{box-shadow:0 0 0 1px var(--hz-ember)}
 .hz:not(.hz-kb) #imp-veil button:focus-visible,.hz:not(.hz-kb) #imp-veil [tabindex]:focus-visible{box-shadow:none}
 /* ==== THE POLISH (6b625): end ==== */
+/* ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have enough VFX going on
+   right now. But also, it's very important that the chat page and also obviously the code page and all that looks really
+   dialed in"). The demo's Ultra (beta/DESIGN.md "The Ultra moment", "The arrival's hang", "Ultra, pushed further") and
+   its working views (THE GOVERNING RULE), matched where beta 3 (6b555) had left them out. Ice #8fb7ff to violet #a58bff
+   with white only; lines, never circles; Calm and reduced motion: none of the motion. ==== */
+/* THE LIT GLASS EDGE: as Ultra arrives a line of light runs round the composer's border from the beam's angle (+400 ms,
+   600 ms; its head white with a short ice trail) and leaves a 1.5 px rim in the cool light with white highlights that
+   turns once every 6 s, with a tight glow (a 2 px copy, blurred 3 px, at .75): about 2-6 px of light, no halo. Leaving,
+   it drains back the way it came (900 ms). Calm keeps the still rim (#composer::after); so do effects off and a page
+   without @property or mask compositing. The rings clip their turning discs (overflow): a mask hides paint, not the
+   box, and the discs (112 % of the ring, square) widened the page by up to 140 px at 760. */
+@property --hz-urev{syntax:'<angle>';initial-value:0deg;inherits:true}
+.hz #composer>.hz-ulit{position:absolute;inset:-14px;pointer-events:none;z-index:1;opacity:0;--hz-urev:0deg;
+  -webkit-mask:conic-gradient(from var(--hz-a0),#000 var(--hz-urev),transparent var(--hz-urev));mask:conic-gradient(from var(--hz-a0),#000 var(--hz-urev),transparent var(--hz-urev));
+  transition:--hz-urev .9s var(--hz-ease-in-out),opacity .1s linear .9s}
+.hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit{opacity:1;--hz-urev:360deg;transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}
+.hz #composer>.hz-ulit>i,.hz #composer>.hz-ulit>b>i{position:absolute;inset:13px;border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;overflow:hidden;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+.hz #composer>.hz-ulit>i.r::before,.hz #composer>.hz-ulit>b>i::before{content:"";position:absolute;left:50%;top:50%;width:112%;aspect-ratio:1;transform:translate(-50%,-50%);
+  background:conic-gradient(from var(--hz-a0),#8fb7ff,#c9d8ff 26%,#fff 46%,#b9b0ff 62%,#dce8ff 69%,#fff 71%,#dce8ff 73%,#8fb7ff 84%)}
+.hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit>i.r::before,.hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit>b>i::before{animation:hzURimTurn 6s linear infinite}
+@keyframes hzURimTurn{from{transform:translate(-50%,-50%) rotate(0)}to{transform:translate(-50%,-50%) rotate(360deg)}}
+.hz #composer>.hz-ulit>i.h{opacity:0;filter:drop-shadow(0 0 3px #fff) drop-shadow(0 0 10px rgba(207,224,255,.85));
+  background:conic-gradient(from calc(var(--hz-a0) + var(--hz-urev) - 72deg),rgba(238,243,255,0),rgba(238,243,255,.22) 40deg,rgba(242,246,255,.7) 64deg,#fff 71deg,rgba(255,255,255,0) 72deg)}
+.hz.hz-ignite:not(.hz-calm) #composer>.hz-ulit>i.h{animation:hzUHead 1.4s linear both}
+@keyframes hzUHead{0%{opacity:0}21%,79%{opacity:1}100%{opacity:0}}
+.hz #composer>.hz-ulit>b{position:absolute;inset:0;filter:blur(3px);opacity:0;transition:opacity .9s var(--hz-ease-in-out)}
+.hz #composer>.hz-ulit>b>i{padding:2px;inset:12.5px;border-radius:calc(var(--hz-r-composer) + 1.5px)}
+.hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit>b{opacity:.75;transition:opacity .9s var(--hz-ease-out)}
+.hz.hz-ultra.hz-ignite:not(.hz-calm) #composer>.hz-ulit>b{opacity:.85;transition:opacity .4s var(--hz-ease-out) .4s}
+/* the old still rim gives way to the lit edge wherever the lit edge can show */
+.hz.hz-ultra:not(.hz-calm):not(.hz-ring-static) body:not(.novideo) #composer::after,.hz.hz-ultra-out:not(.hz-calm):not(.hz-ring-static) body:not(.novideo) #composer::after{display:none}
+.hz.hz-calm #composer>.hz-ulit,.hz.hz-ring-static #composer>.hz-ulit,.hz .novideo #composer>.hz-ulit{display:none}
+/* THE LIT GLASS: inside the composer a faint ice to violet wash, strongest along the top edge (clipped to the glass, it
+   cannot spill); beneath it one thin line of light like a horizon, 4 px under the box, 10 % in from each end */
+.hz #composer{isolation:isolate}
+.hz #composer>.hz-uitint{position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;opacity:0;transition:opacity .9s var(--hz-ease-in-out);
+  background:linear-gradient(180deg,rgba(143,183,255,.13),rgba(165,139,255,.06) 38%,rgba(165,139,255,0) 72%),linear-gradient(90deg,rgba(143,183,255,.05),rgba(165,139,255,.04) 55%,rgba(220,230,255,.04))}
+.hz #composer>.hz-uline{position:absolute;left:10%;right:10%;top:calc(100% + 4px);height:1px;pointer-events:none;opacity:0;transition:opacity .9s var(--hz-ease-in-out);
+  background:linear-gradient(90deg,rgba(143,183,255,0),rgba(143,183,255,.55) 22%,rgba(226,236,255,.95) 50%,rgba(165,139,255,.55) 78%,rgba(165,139,255,0));box-shadow:0 0 4px rgba(165,139,255,.45)}
+.hz.hz-ultra:not(.hz-calm) #composer>.hz-uitint,.hz.hz-ultra:not(.hz-calm) #composer>.hz-uline{opacity:1;transition:opacity 1s var(--hz-ease-out)}
+.hz .novideo #composer>.hz-uitint,.hz .novideo #composer>.hz-uline{display:none}
+/* THE KNOB IN THE ARRIVAL (the hang): it settles a hair (.97) while the sky holds its breath (140 ms), lifts back to 1
+   (300 ms, no overshoot) at the release and flashes once within about 6 px (white 4 px, ice 6 px, 900 ms), resting with
+   a soft still ice glow of 5 px at Ultra that fades with it on leaving. No star, no turn, no loop (6b553 holds). */
+.hz .hz-sl-core{transition:transform 120ms var(--hz-ease-out),opacity .2s var(--hz-ease-out),box-shadow .9s var(--hz-ease-in-out)}
+.hz.hz-ultra:not(.hz-calm) .hz-sl-core{box-shadow:var(--hz-ks),0 0 5px 1px rgba(143,183,255,.42)}
+.hz.hz-ant:not(.hz-calm) .hz-sl-core{animation:hzKnobSettle .14s var(--hz-ease-out) both}
+.hz.hz-ignite:not(.hz-calm) .hz-sl-core{animation:hzKnobLift .3s var(--hz-ease-out),hzKnobLit .9s var(--hz-ease-out)}
+@keyframes hzKnobSettle{from{transform:scale(1)}to{transform:scale(.97)}}
+@keyframes hzKnobLift{from{transform:scale(.97)}to{transform:scale(1)}}
+@keyframes hzKnobLit{0%{box-shadow:var(--hz-ks)}18%{box-shadow:var(--hz-ks),0 0 4px 1px #fff,0 0 6px 1px rgba(143,183,255,.55)}100%{box-shadow:var(--hz-ks),0 0 5px 1px rgba(143,183,255,.42)}}
+/* THE ORB'S RAYS: at the release eight fine rays (38 px, four along the axes and four shorter between) flare at the knob
+   and are gone in 400 ms; lines, never a ring */
+.hz .hz-sl-rays{position:absolute;top:50%;left:calc(var(--hz-ph) / 2 + (100% - var(--hz-ph)) * var(--hz-eff-u));width:38px;height:38px;margin:-19px 0 0 -19px;pointer-events:none;opacity:0;z-index:3}
+.hz .hz-sl-rays::before,.hz .hz-sl-rays::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(90deg,rgba(207,224,255,0),rgba(255,255,255,.95) 46%,#fff 50%,rgba(255,255,255,.95) 54%,rgba(207,224,255,0)) 0 calc(50% - .5px)/100% 1px no-repeat,
+             linear-gradient(180deg,rgba(207,224,255,0),rgba(255,255,255,.95) 46%,#fff 50%,rgba(255,255,255,.95) 54%,rgba(207,224,255,0)) calc(50% - .5px) 0/1px 100% no-repeat}
+.hz .hz-sl-rays::after{inset:9px;transform:rotate(45deg);opacity:.7}
+.hz.hz-ignite:not(.hz-calm) .hz-sl-rays{animation:hzURays .4s var(--hz-ease-out) both}
+@keyframes hzURays{0%{opacity:0;transform:scale(.35) rotate(-10deg)}16%{opacity:1}100%{opacity:0;transform:scale(1) rotate(8deg)}}
+.hz .novideo .hz-sl-rays{display:none}
+/* THE LABEL'S SHADE: under "Ultra" a feathered dark band (80 x 34, centred on the word, from 24 px before it) holds it at
+   AA over the lifted sky; behind the word and the slider (z-index -1 in the composer's, or the header's, own stacking
+   context: never over the letters, and never past the page's edge); in with Ultra (600 ms), out with it (900 ms);
+   shade, not a shape */
+.hz .hz-elevel::after{content:"";position:absolute;left:-24px;top:50%;width:80px;height:34px;margin-top:-17px;z-index:-1;pointer-events:none;opacity:0;transition:opacity .9s var(--hz-ease-in-out);
+  background:linear-gradient(90deg,rgba(3,3,5,0),rgba(3,3,5,.58) 30%,rgba(3,3,5,.58) 70%,rgba(3,3,5,0));
+  -webkit-mask:linear-gradient(180deg,transparent,#000 32%,#000 68%,transparent);mask:linear-gradient(180deg,transparent,#000 32%,#000 68%,transparent)}
+.hz.hz-ultra .hz-elevel::after{opacity:1;transition:opacity .6s var(--hz-ease-out)}
+/* THE MOTES: at Ultra tiny four-point stars drift round the composer (one every 170 ms, at most 40; the top edge's outer
+   thirds mostly, sometimes a side), rising 30-130 px over 5.2-7.6 s with a calm twinkle; in a working view half as many,
+   centred over the top edge, rising 10-24 px over 1.8-3 s. Leaving, they drift 24 px up and fade (800 ms). Calm,
+   reduced motion and effects off: none. */
+#hz-motes{display:none}
+.hz #hz-motes{display:block;position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;transition:opacity .8s var(--hz-ease-in-out),transform .8s var(--hz-ease-in-out)}
+.hz #hz-motes.out{opacity:0;transform:translateY(-24px)}
+.hz #hz-motes>i{position:absolute;left:0;top:0;width:2px;height:2px;margin:-1px 0 0 -1px;background:#fff;opacity:0;box-shadow:0 0 3px 1px var(--c),0 0 8px 1px var(--c);will-change:transform,opacity}
+.hz #hz-motes>i::before,.hz #hz-motes>i::after{content:"";position:absolute;left:50%;top:50%;width:var(--g,9px);height:1px;margin:-.5px 0 0 calc(var(--g,9px) / -2);
+  background:linear-gradient(90deg,transparent,var(--c),#fff 50%,var(--c),transparent)}
+.hz #hz-motes>i::after{transform:rotate(90deg)}
+.hz.hz-calm #hz-motes,.hz .novideo #hz-motes{display:none}
+/* THE WORKING VIEWS' SKY (THE GOVERNING RULE): in a conversation, Code and Funnels the sky recedes to 30 % of its home
+   strength (60 % at Ultra) over 1.2 s, over the working ground #0e0e10 (the footage to 12 %, in the sky's loop); behind
+   the column and the flow a near-solid flat band (#0e0e10 at 93 %, feathered over 160 px at its sides: a gradient, not a
+   blur), so the sky shows through at most faintly and no star sits behind text */
+.hz #hz-scrim{transition:opacity 1.2s cubic-bezier(.2,.7,.2,1)}
+.hz #main:not(:has(#hero)) #hz-scrim,.hz.hz-work #hz-scrim{opacity:.7;background:#0e0e10}
+.hz.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-work.hz-ultra #hz-scrim{opacity:.4}
+.hz #hz-band{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .8s var(--hz-ease-out);
+  background:linear-gradient(90deg,rgba(14,14,16,0) calc(var(--hz-bcx,50vw) - var(--hz-bhw,344px) - 160px),rgba(14,14,16,.93) calc(var(--hz-bcx,50vw) - var(--hz-bhw,344px)),rgba(14,14,16,.93) calc(var(--hz-bcx,50vw) + var(--hz-bhw,344px)),rgba(14,14,16,0) calc(var(--hz-bcx,50vw) + var(--hz-bhw,344px) + 160px))}
+.hz #main:not(:has(#hero)) #hz-band,.hz.hz-work #hz-band{opacity:1}
+@media (prefers-reduced-motion:reduce){
+  .hz #composer>.hz-ulit,.hz #composer>.hz-ulit>b,.hz #composer>.hz-uitint,.hz #composer>.hz-uline,.hz #hz-scrim,.hz #hz-band{transition:none!important}
+  .hz #composer>.hz-ulit>i.r::before,.hz #composer>.hz-ulit>b>i::before,.hz #composer>.hz-ulit>i.h,.hz .hz-sl-core,.hz .hz-sl-rays{animation:none!important}
+  .hz #composer>.hz-ulit>b,.hz #composer>.hz-ulit>i.h,.hz .hz-sl-rays,.hz #hz-motes{display:none}}
+.hz.hz-pause #composer>.hz-ulit>i.r::before,.hz.hz-pause #composer>.hz-ulit>b>i::before{animation-play-state:paused}
+/* ==== ultra at full strength (6b621): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -55714,8 +55811,10 @@ __CODE_ROWS__
       <div class="hz-aur" id="hz-aur1"><canvas></canvas><canvas id="hz-aur1f" style="position:absolute;inset:0"></canvas></div>
       <div class="hz-aur" id="hz-aur2"><canvas></canvas></div>
     </div>
+    <div id="hz-band"></div>
     <div id="hz-scrim"></div>
   </div>
+  <div id="hz-motes" aria-hidden="true"></div>
   <!-- THE HEADER (6b526): the chats button and the lockup (static since 6b542, per Patrick: the shining logo was "kind of tacky");
        the chat's title in a conversation; the lanes as text on the home; the
        machines as dies in their makers' colours; Settings -->
@@ -69259,7 +69358,7 @@ function hzUFieldBox(home,g,c,vw){
   return {x0:Math.max(12,c.left-30),x1:Math.min(vw-12,c.right+30),y0,y1};
 }
 function hzUFieldStar(p,b,glint,home,rnd){
-  p.x=b.x0+rnd()*(b.x1-b.x0);p.y=b.y0+rnd()*(b.y1-b.y0);p.s=1.5+rnd()*1.7+(rnd()<.12?1.4:0);p.a=(.38+rnd()*.4)*(home?1:.7);
+  p.x=home?b.x0+rnd()*(b.x1-b.x0):b.x0+(b.x1-b.x0)*(.18+.64*rnd());p.y=b.y0+rnd()*(b.y1-b.y0);p.life=home?0:2000+rnd()*2000;p.s=1.5+rnd()*1.7+(rnd()<.12?1.4:0);p.a=(.38+rnd()*.4)*(home?1:.7);   // a conversation: centred, 2-4 s lives (6b621)
   p.w=2*Math.PI/(2+rnd()*5);p.ph=rnd()*6.28;p.amp=.2+rnd()*.35;p.sh=rnd()<.3;p.col=HZ_UCOL[Math.floor(rnd()*HZ_UCOL.length)];p.up=0;p.big=false;
   if(rnd()<.4){p.x=b.x0+(Math.floor((p.x-b.x0)/11)+.5)*11;p.y=b.y0+(Math.floor((p.y-b.y0)/11)+.5)*11;if(p.x>b.x1)p.x-=11;if(p.y>b.y1)p.y-=11;}   // on the grid, still inside the band
   if(glint){p.big=true;p.s=5+rnd()*1.5;p.a=.7+rnd()*.2;p.col=[1,1,1];p.amp=.45;p.sh=false;p.w=2*Math.PI/(4+rnd()*3);}
@@ -69267,8 +69366,9 @@ function hzUFieldStar(p,b,glint,home,rnd){
 }
 function hzUFieldPlan(home,g,c,vw,full,rnd){
   const b=hzUFieldBox(home,g,c,vw);if(!b)return null;
-  const n=Math.round((full?40:20)*(home?1:.5)),P=[];let glints=home?(full?4:2):0;
+  const n=Math.round((full?60:30)*(home?1:.5)),P=[];let glints=home?(full?6:3):0;   // (6b621, per Patrick: "more stars": was 40 and 20, four glints and two)
   for(let i=0;i<n;i++)P.push(hzUFieldStar({},b,glints-->0,home,rnd));
+  if(home)for(let i=0,m=full?30:15;i<m;i++){const p=hzUFieldStar({},b,false,home,rnd);p.s=.9+rnd()*.6;p.a=.18+rnd()*.17;p.deep=1;P.push(p);}   // the deeper layer (6b621): tiny (.9-1.5 px), dim (.18-.35), drifting at half the pace
   return {box:b,P};
 }
 function hzSkyBoot(){
@@ -69354,10 +69454,17 @@ function hzSkyBoot(){
     +"col*=1.-.3*exp(-dot(col,vec3(.3,.59,.11))*28.);"
     +"float g=fract(52.9829189*fract(dot(floor(uv*res)+floor(fract(time*7.)*64.)*vec2(5.588238,5.588238),vec2(.06711056,.00583715))))-.5;col+=g*.012;"
     +"gl_FragColor=vec4(clamp(col,0.,1.),1.);}";
-  // THE AURORA: level always (a horizontal band, vertical rays, no slant, no turn); its centre wanders 10-25 % either
-  // side, its width breathes, its folds roll, the lower edge undulates in long soft waves with each ray ending at its
-  // own depth, now and then it splits in two; blue at the lower edge to violet towards the tips (DESIGN "The aurora")
-  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam;uniform vec4 grt;"
+  // THE AURORA: level always (a horizontal band, vertical rays, no slant, no turn); its folds roll, the lower edge
+  // undulates in long soft waves with each ray ending at its own depth, now and then it opens into two overlapping lobes
+  // (+-10 %); blue at the lower edge to violet towards the tips (DESIGN "The aurora"). FLUID AND CENTRED (6b621, the
+  // preview's b509fe9, DESIGN "The aurora, fluid", per Patrick: "very static still ... always left biased with a bit of
+  // drop in the centre"): the centre is three slow sines around the middle (aurWander); on a continuous clock (ft) a fold
+  // wave travels sideways (.06 sin(4x - .13t), about 30 px/s), a pulse of brightness travels across the rays (about
+  // 50 px/s) and the rays' pattern itself slides sideways and back (xn), so no dark gap parks in one place; fa is the
+  // motion's amplitude (Full 1, Balanced .6, Calm and reduced motion 0). NO DENT: the crest cap and the soft knee behind
+  // the greeting are gone; the whole curtain dims by up to 30 % in a soft full-width band at the greeting's height
+  // (feathered over 22 % of the height), where Ultra's 20 % lift is withheld.
+  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws;uniform vec4 grt;"
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
@@ -69365,32 +69472,34 @@ function hzSkyBoot(){
     +"if(t<1.)return mix(a,b,smoothstep(0.,1.,t));if(t<2.)return mix(b,c,smoothstep(1.,2.,t));if(t<3.)return mix(c,d,smoothstep(2.,3.,t));return mix(d,a,smoothstep(3.,4.,t));}"
     +"void main(){vec2 p=vec2(uv.x*asp,uv.y);float t=time;vec3 col=vec3(0.);"
     +"for(int k=0;k<2;k++){if(k==1&&c2<.005)break;float fk=float(k);"
-    +"float x=p.x+tam*(.12*sin(p.x*2.2-tph)+.05*sin(p.x*5.1+tph*1.7+fk));"
-    +"float wave=fbm(vec2(x*.9+t*.6+fk*3.7,t*.2+fk))*2.-1.;"
+    // the folded ribbon, and the fold wave travelling sideways on the continuous clock
+    +"float x=p.x+tam*(.12*sin(p.x*2.2-tph)+.05*sin(p.x*5.1+tph*1.7+fk))+fa*.06*sin(p.x*4.-ft*.13+fk*1.3);"
+    // the rays' pattern slides sideways and back (at most about 15 px/s)
+    +"x+=tws*(p.y-.62)*sin(p.x*2.6-tph*.7+fk*1.9);"   // the ribbon twist (6b621): rays lean with height, left here and right there
+    +"float xn=x+fa*(.35*sin(ft*.045)+.2*sin(ft*.071+1.3+fk));"
+    +"float wave=fbm(vec2(xn*.9+t*.6+fk*3.7,t*.2+fk))*2.-1.;"
     +"float wav=wam*(.07*sin(x*4.2+lt*1.2+fk*1.7)+.03*sin(x*7.3-lt*.35+fk));"
     +"float reach=rch*.08*smoothstep(.45,.95,nz(vec2(x*1.6+fk*3.,lt*.18)));"
     +"float b0=.6+.1*fk+.035*wave+.012*sin(x*3.1+t*2.+fk)+.03*(nz(vec2(x*.8+fk*4.,lt*.7))-.5)+wav-reach,fl=flo+.1;"
-    // under the greeting the first curtain's crests round off just below it (a smooth min), so the bright edge never
-    // crosses the text; a smooth floor one ray-tail above the composer's band: the edge rounds off, never a ruler
-    +"float gx=grt.z>grt.x&&k==0?1.-smoothstep(0.,.1,max(max(grt.x-uv.x,uv.x-grt.z),0.)):0.,cl=mix(2.,grt.y-.025,gx),hc=clamp(.5+.5*(cl-b0)/.06,0.,1.);"
-    +"b0=mix(cl,b0,hc)-.06*hc*(1.-hc);"
+    // a smooth floor one ray-tail above the composer's band: the edge rounds off, never a ruler
     +"float hs=clamp(.5+.5*(b0-fl)/.08,0.,1.),base=mix(fl,b0,hs)+.08*hs*(1.-hs);"
     +"float d=p.y-base;"
-    +"float rays=smoothstep(.25,.95,fbm(vec2(x*(18.+fk*7.)+wave*2.+t*(1.2+fk*.5),d*.9+t*.2)));"
+    +"float rays=smoothstep(.25,.95,fbm(vec2(xn*(18.+fk*7.)+wave*2.+t*(1.2+fk*.5),d*.9+t*.2)));"
     +"float body=smoothstep(-(.014+.085*rays),0.,d)*smoothstep(flo-.01,flo+.03,p.y)*exp(-max(d,0.)*(4.+fk*2.)/hb),fringe=exp(-abs(d)*55.);"
-    +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk)*(.7+.3*nz(vec2(x*1.3+fk*5.,lt)))*(.72+.28*nz(vec2(x*16.+fk*9.,d*5.-lt*1.4)));"
-    +"vec3 c=mix(vec3(.62,.78,1.),pal(x*.35+t*.15+fk*.3),.18);c=mix(c,mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d)),.82);"
+    // the travelling pulse of brightness across the rays (about 50 px/s)
+    +"float a=(body*(.25+rays*1.4)+fringe*rays*.6)*(.55-.15*fk)*(.7+.3*nz(vec2(xn*1.3+fk*5.,lt)))*(.72+.28*nz(vec2(xn*16.+fk*9.,d*5.-lt*1.4)))*(1.-.4*fa+.4*fa*(.5+.5*sin(x*3.5-ft*.2+fk*2.)));"
+    +"vec3 c=mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d));c=mix(c,pal(x*.35+t*.15+fk*.3),.18);"
     +"col+=c*a*(k==1?c2:1.);}"
-    +"float o=spl*.17,env=max(smoothstep(awd,awd*.3,abs(uv.x-acx+o)),smoothstep(awd,awd*.3,abs(uv.x-acx-o)));"
+    +"float o=spl*.1,env=max(smoothstep(awd,awd*.3,abs(uv.x-acx+o)),smoothstep(awd,awd*.3,abs(uv.x-acx-o)));"
     +"col*=env*smoothstep(0.,.05,uv.x)*smoothstep(1.,.95,uv.x)*smoothstep(.99,.8,uv.y);"
     +"float lu=dot(col,vec3(.299,.587,.114));col=max(mix(vec3(lu),col,1.+.45*rich),0.);"
     +"vec3 bv=mix(vec3(.56,.72,1.),vec3(.65,.55,1.),clamp(smoothstep(.45,.85,uv.y)+.25*cool,0.,1.));"
-    // at resting Ultra the light leans blue-violet and is exactly 20 % stronger (its measured luminance), never more;
-    // behind the greeting it keeps 25 % under its resting strength, and there, always, its light rolls off at a soft knee (AA)
+    // at resting Ultra the light leans blue-violet and is exactly 20 % stronger (its measured luminance), never more,
+    // except in the greeting's band, which dims the whole width by up to 30 % (AA, and never a local notch)
     +"vec3 lw=vec3(.2126,.7152,.0722);float l0=dot(col,lw);vec3 lean=mix(col,bv*lu,cool*.7);"
-    +"vec2 gq=max(max(grt.xy-uv,uv-grt.zw),0.)/vec2(.07,.1);float gm=grt.z>grt.x?1.-smoothstep(0.,1.,length(gq)):0.,cu=min(cool,1.);"
-    +"col=lean*(l0*(1.+.2*cu*(1.-gm)-.25*cu*gm)/max(dot(lean,lw),1e-4));"
-    +"float lk=dot(col,lw)*neon;col*=mix(1.,1./(1.+lk/.06),gm);"
+    +"float gc=(grt.y+grt.w)*.5,gh=(grt.w-grt.y)*.5,gb=grt.z>grt.x?1.-smoothstep(gh,gh+.22,abs(uv.y-gc)):0.,cu=min(cool,1.);"
+    +"col=lean*(l0*(1.+.2*cu*(1.-gb))/max(dot(lean,lw),1e-4));"
+    +"col*=1.-.3*gb;"
     +"gl_FragColor=vec4(col*neon,1.);}";
   let pF,pS,pA,pB;
   try{pF=hzProgram(gl,FEED);pS=hzProgram(gl,SHOW);pA=hzProgram(gl,AUR);pB=hzProgram(gl,HZ_BLUR_FS);}
@@ -69432,7 +69541,17 @@ function hzSkyBoot(){
   const inR=(x,y,r,m)=>x>r.left-m&&x<r.right+m&&y>r.top-m&&y<r.bottom+m;
   const fxLive=()=>!document.hidden&&!hzS.blurred;
   // ---- the level: Calm (one still frame), Balanced (the default) or Full; Ultra lifts Balanced's sky to Full
-  const SURGE_T=1,WAVE_MS=700,UTW_DEG=5.5,UTW_S=1.6,EASE_S=.3;
+  const SURGE_T=1.2,WAVE_MS=700,UTW_DEG=5.5,UTW_S=1.6,EASE_S=.3;
+  // THE ARRIVAL'S TWIST (6b621, per Patrick: "add a little bit more twist when we hit ultra"): as Ultra arrives the
+  // aurora's folds roll a little further and twist one way or the other (each arrival picks), then settle back into the
+  // resting drift. It rides the surge's own envelope x^2 e^(2(1-x)) (0 at the release, its peak at 1 s in the hang,
+  // most of it gone by 3 s; Balanced half, Calm and reduced motion none): the folds' amplitude x (1 + ATW_AMP x env)
+  // (.45 to .72 at the peak) and their phase pushed ATW_PH x env radians (.25 at the peak, about a quarter of a fold
+  // turn), its fastest push .4 rad/s against the folds' own .16-.31: a lean, never a spin. No colour, no brightness.
+  // The ribbon twist (per Patrick: "More twist, not just necessarily rotation"): ATW_SH x (ATW_REST x Ultra + the swell)
+  // of shear, x += tws (y - .62) sin(2.6 x - .7 phase): the rays lean up to about 24 deg in the swell's peak and about 6 at
+  // resting Ultra, the lean changing sign along the curtain and drifting with the folds (Balanced half, Calm none).
+  const ATW_AMP=.6,ATW_PH=.25,ATW_SH=.35,ATW_REST=.28;let twDir=1,aTwNow=[1,0,0];
   let skyMode="bal",calm=1,calmTo=1,fw=.85,fwTo=.85,tw=1,twTo=1,spd=.012,spdTo=.012,c2E=0,c2To=0,neon=.1,neonTo=.1,neonBase=.1,busyOn=false,
     ultraWant=false,ultraE=0,surgeAt=0,surgeNow=0,rich=0,starB=1,vg=0,flareNow=0,waveAt=0,waveX=0,waveY=0,waveR=0,waveA=0,auT=0,lastAur=1,warmed=false,
     skyClock=0,camX=0,camY=0,antAt=0,uTwAt=0,uTwFrom=0,uTwTo=0,twistNow=0,arcNow=0,held=false,heldAt=0,restartAt=0,hmix=1,hourAt=0;
@@ -69454,8 +69573,8 @@ function hzSkyBoot(){
   // the held breath (the arrival's anticipation): dim to .92 in 140 ms, held through the hang, back to 1 over
   // 1600-2600 ms; the sky's clock slows to a tenth for the 140 ms and eases back to full speed by 500 ms
   const ss5=u=>u*u*u*(u*(u*6-15)+10),ease=(a,b,x)=>ss5(Math.max(0,Math.min(1,(x-a)/(b-a))));
-  function breath(nowT){if(!antAt)return [1,1];const ms=nowT-antAt;if(ms>2700){antAt=0;return [1,1];}
-    return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<1600?.92:.92+.08*ease(1600,2600,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];}
+  function breath(nowT){if(!antAt)return [1,1];const ms=nowT-antAt;if(ms>3300){antAt=0;return [1,1];}   // (6b621) the hang held to 2 s, the settle to 3.2 s (was 1.6 and 2.6)
+    return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<2000?.92:.92+.08*ease(2000,3200,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];}
   const vel=u=>30*u*u*(1-u)*(1-u)/1.875;
   function uTwDeg(nowT){return uTwAt?uTwFrom+(uTwTo-uTwFrom)*ss5(Math.min(1,(nowT-uTwAt)/(UTW_S*1000))):uTwFrom;}
   function twistAt(nowT){let v=0;if(uTwAt){const u=Math.min(1,(nowT-uTwAt)/(UTW_S*1000));v=vel(u)*.8;}return [-uTwDeg(nowT)*Math.PI/180,v];}
@@ -69471,7 +69590,7 @@ function hzSkyBoot(){
       if(sx<x0||sx>x1||sy<y0||sy>y1)continue;pts.push({qx,qy,b:(h-.84)/.16,sx,sy});}
     return pts;}
   const pfx=hzPfxProgram(gl),ICE=hzHexRGB("#cfe0ff"),WHITE=[1,1,1],ptr={x:-999,y:-999};
-  let cons=null,shoot=null,nextShoot=0,rain=[],nextRain=0,chand=null,chandOff=0,field=null,fieldChk=0,sign=null,nextSign=0,signPlace=Math.floor(Math.random()*4),nextShower=0;const shower=[];
+  let cons=null,shoot=null,nextShoot=0,rain=[],nextRain=0,chand=null,chandOff=0,field=null,fieldChk=0,sign=null,nextSign=0,signPlace=Math.floor(Math.random()*4),nextShower=0,workF=1;const shower=[];
   // THE CONSTELLATION on arrival: 7-12 of the sky's brightest stars near the composer, joined by their minimum spanning
   // tree in hairlines drawing in over 260 ms each; it holds to 1.1 s and fades over 1.2 s. Lines, no circles.
   function buildCons(t){const cb=R(cbox());if(!cb)return null;const ex=rects(),g=R(greetEl());
@@ -69513,7 +69632,7 @@ function hzSkyBoot(){
     chand.P.forEach((p,i)=>{const [x,y,e,th]=P[i];if(e<=.01)return;const tw_=.72+.28*Math.sin(t*(1.1+p.w)+p.tw);
       pfx.line(p.x,0,x,y,.5,ICE,.05*fade,.16*fade);
       if(p.mid){pfx.star(p.x+(x-p.x)*p.mid,y*p.mid,2.2,ICE,.55*tw_*fade,0);}
-      pfx.star(x,y,p.s*(p.hero?1:.9),p.col,(p.hero?1:.85)*tw_*fade,0);});
+      pfx.star(x,y,p.s*(p.hero?1:.9),p.col,(p.hero?1:.85)*tw_*fade,th*2);});
     chand.links.forEach(([i,j])=>{const a=P[i],b=P[j];if(Math.min(a[2],b[2])<.9)return;pfx.line(a[0],a[1],b[0],b[1],.6,ICE,.12*fade,.12*fade);});
     chand.now=P.map(s=>[s[0],s[1]]);}
   // THE FIELD ABOVE THE BOX: hzUFieldPlan's stars, drifting up 4 px/s and wrapping (14 px soft edges), each its own
@@ -69522,22 +69641,27 @@ function hzSkyBoot(){
   function buildField(launch){const cb=R(cbox());if(!cb)return null;const hm=home(),plan=hzUFieldPlan(hm,R(greetEl()),cb,innerWidth,skyMode==="full",Math.random);if(!plan)return null;
     const b=plan.box,P=plan.P,now=performance.now(),n=P.length;
     if(launch&&hm){const far=new Set();while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))far.add(Math.floor(Math.random()*n));
-      P.forEach((p,i)=>{p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1300+Math.random()*300;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});}
+      P.forEach((p,i)=>{if(p.deep){p.born=now+400;return;}p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1700+Math.random()*400;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});   // a longer float (6b621: was 1.3-1.6 s)
+      for(let k=0,m=skyMode==="full"?8:4;k<m;k++){const q=hzUFieldStar({},b,k<2,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
     else P.forEach(p=>{p.born=now;});
-    // in a conversation the field is short-lived (6b580, per Patrick: "we don't have to litter the place with stars"):
-    // it shows for a few seconds after Ultra arrives (HZ_CONV_STARS.life) and fades out over .9 s; the matrix stays
-    return {P,...b,hm,clock:0,t0:launch&&hm?now-600:now,life:hm?0:now+HZ_CONV_STARS.life,key:(hm?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth,nextUp:now+3000+Math.random()*3000};}
+    // in a conversation the field is the short, light version (6b580, per Patrick: "we don't have to litter the place with
+    // stars"; 6b621 the preview's): half the stars, centred over the composer's top edge, each living 2-4 s (hzUFieldStar)
+    return {P,...b,hm,clock:0,t0:launch&&hm?now-600:now,key:(hm?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth,nextUp:now+3000+Math.random()*3000};}
   function drawField(nowT,on,dt){if(!field)return;if(ultraE<.002&&!on){field=null;return;}
     const live=fxLive();if(live)field.clock+=dt;const H_=field.y1-field.y0,drift=field.clock*4;
-    if(++fieldChk%30===0){const cb=R(cbox());if(cb&&(home()?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth!==field.key){const lf=field.life,hm0=field.hm;field=buildField(false);if(!field)return;if(lf&&!hm0&&!field.hm)field.life=lf;}}   // the composer moved: re-seat it (a conversation's stars keep their end, 6b580)
-    const fin=Math.min(1,(nowT-field.t0)/600)*(field.life?Math.max(0,Math.min(1,(field.life-nowT)/900)):1);
+    if(++fieldChk%30===0){const cb=R(cbox());if(cb&&(home()?"h":"c")+Math.round(cb.top/8)+"x"+innerWidth!==field.key){field=buildField(false);if(!field)return;}}   // the composer moved: re-seat it
+    const fin=Math.min(1,(nowT-field.t0)/600);
     if(live&&nowT>field.nextUp){field.nextUp=nowT+4000+Math.random()*4000;const p=field.P[Math.floor(Math.random()*field.P.length)];if(!p.up)p.up=nowT;}
     for(const p of field.P){const sw=Math.sin(field.clock*p.w+p.ph),twv=p.sh?Math.pow(.5+.5*sw,4):.5+.5*sw;
-      const yw=field.y0+(((p.y-field.y0-drift)%H_)+H_)%H_;let y=yw,edge=Math.max(0,Math.min(1,(yw-field.y0)/14,(field.y1-yw)/14)),a=p.a*(1-p.amp+p.amp*twv);const born=Math.min(1,(nowT-p.born)/600);
+      const yw=field.y0+(((p.y-field.y0-drift*(p.deep?.5:1))%H_)+H_)%H_;let y=yw,edge=Math.max(0,Math.min(1,(yw-field.y0)/14,(field.y1-yw)/14)),a=p.a*(1-p.amp+p.amp*twv);const born=Math.min(1,(nowT-p.born)/600);
       if(p.lt){const u=(nowT-p.lt)/p.lu;if(u<0)continue;const to=p.far!=null?p.far:yw;
         const u1=Math.min(1,(nowT-p.lt)/420),u2=Math.max(0,Math.min(1,(nowT-p.lt-420)/(p.lu-420))),e=.9*(u1>=1?1:1-Math.pow(2,-10*u1))+.1*ss5(u2);y=p.l0+(to-p.l0)*e;a*=Math.min(1,u*4);edge=1;
         if(p.far!=null){a*=Math.max(0,1-u);if(u>=1){p.lt=0;p.far=null;hzUFieldStar(p,field,p.big,field.hm,Math.random);p.born=nowT;continue;}}else if(u>=1)p.lt=0;}
-      if(p.up){const u=(nowT-p.up)/3000;if(u>=1){hzUFieldStar(p,field,p.big,field.hm,Math.random);p.born=nowT;continue;}y-=28*u*(2-u);a*=1-u;}
+      if(p.life){const u=(nowT-p.born)/p.life;if(u>=1){hzUFieldStar(p,field,false,false,Math.random);p.born=nowT;continue;}a*=Math.sin(Math.PI*u);}   // a conversation: each fades in and out over its life (6b621)
+      if(p.up){const u=(nowT-p.up)/3000;if(u>=1){hzUFieldStar(p,field,p.big,field.hm,Math.random);if(p.deep){p.s=.9+Math.random()*.6;p.a=.18+Math.random()*.17;}p.born=nowT;continue;}y-=28*u*(2-u);a*=1-u;}
+      // A STAR'S BIRTH (6b621): it blooms in over 1.4 s on the smootherstep with a soft four-point glint that rises and
+      // falls once (sin), turning a few degrees, then it stays in the field
+      if(p.bt){if(nowT<p.bt)continue;const u=Math.min(1,(nowT-p.bt)/1400);a*=ss5(u);pfx.star(p.x,y,p.s*5*(1-.4*u),WHITE,.5*Math.sin(Math.PI*u)*edge*fin*ultraE,u*.3);if(u>=1)p.bt=0;}
       pfx.star(p.x,y,p.s*2.2,p.col,a*edge*fin*born*ultraE,0);if(p.big)pfx.star(p.x,y,p.s*.9,WHITE,.35*a*edge*fin*born*ultraE,0);}}
   const MX={w:[{a:0},{a:0}],next:0,arr:0,kx:0,top:0,up:0};
   function matrixUniforms(nowT,dt){const f=field,on=f&&!hzS.reduced&&skyMode!=="calm",lvm=skyMode==="full"?1:.5;
@@ -69546,7 +69670,7 @@ function hzSkyBoot(){
     const live=fxLive(),W_=f.x1-f.x0,H_=f.y1-f.y0;
     if(live&&nowT>MX.next){const free=MX.w.find(w=>!w.a);if(free){const dirs=[[1,0],[-1,0],[.8,.6],[-.8,.6],[.8,-.6],[-.8,-.6]],dd=dirs[Math.floor(Math.random()*dirs.length)];
         const cs=[[f.x0,f.y0],[f.x1,f.y0],[f.x0,f.y1],[f.x1,f.y1]].map(c=>c[0]*dd[0]+c[1]*dd[1]);free.dx=dd[0];free.dy=dd[1];free.s=Math.min(...cs)-80;free.e=Math.max(...cs)+80;free.a=1;}
-      MX.next=nowT+(skyMode==="full"?3400+Math.random()*1200:5200+Math.random()*1600)*(Math.random()<.25?.4:1);}   // a sweep every 3.4-4.6 s (Balanced 5.2-6.8), one in four early so two cross
+      MX.next=nowT+(skyMode==="full"?3400+Math.random()*1200:6000+Math.random()*2000)*(Math.random()<.25?.4:1);}   // a sweep every 3.4-4.6 s (Balanced 6-8, the preview's), one in four early so two cross
     MX.w.forEach((w,i)=>{if(w.a){if(live)w.s+=dt*180;if(w.s>w.e)w.a=0;}gl.uniform4f(i?pS.U.mw1:pS.U.mw0,w.dx||1,w.dy||0,w.s||-9999,w.a?1:0);});   // 180 px/s: a dot takes about 290 ms to light, never a flash
     let am=0,as=0;if(MX.arr){const u=(nowT-MX.arr)/600;if(u>=1.5)MX.arr=0;else{as=u*(W_+H_*1.6);am=Math.min(1,u*5)*Math.max(0,Math.min(1,(1.5-u)/.6));}}
     gl.uniform4f(pS.U.marr,MX.kx,MX.top,as,am);
@@ -69566,27 +69690,27 @@ function hzSkyBoot(){
     while(inT.length<P.length){let best=null;for(const i of inT)for(let j=0;j<P.length;j++){if(inT.includes(j))continue;const dd=Math.hypot(P[i].sx-P[j].sx,P[i].sy-P[j].sy);if(!best||dd<best[2])best=[i,j,dd];}inT.push(best[1]);edges.push([best[0],best[1]]);}
     if(Math.random()<.35&&P.length>4){const b2=P.length-1;if(!edges.some(e=>(e[0]===0&&e[1]===b2)||(e[0]===b2&&e[1]===0)))edges.push([0,b2]);}
     return {P,edges,t0:performance.now(),drift:Math.random()<.35};}
-  function drawSign(nowT,t,on){if(on&&fxLive()&&!sign&&nowT>nextSign){sign=buildSign(t);nextSign=nowT+20000+Math.random()*10000;}
+  function drawSign(nowT,t,on){if(on&&fxLive()&&!sign&&nowT>nextSign){sign=buildSign(t);nextSign=nowT+14000+Math.random()*6000;}
     if(!sign)return;const age=(nowT-sign.t0)/1000,per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;
     if(age>draw+hold+fade){sign=null;return;}
-    const fa=age<draw+hold?1:1-(age-draw-hold)/fade,dy=sign.drift&&age>draw+hold?-(age-draw-hold)*9:0,P=sign.P.map(p=>{const v=toScreen(p.qx,p.qy,t);return [v[0],v[1]+dy];}),lit=new Set([sign.edges[0][0]]);
+    const fa=(age<draw+hold?1:1-(age-draw-hold)/fade)*workF,dy=sign.drift&&age>draw+hold?-(age-draw-hold)*9:0,P=sign.P.map(p=>{const v=toScreen(p.qx,p.qy,t);return [v[0],v[1]+dy];}),lit=new Set([sign.edges[0][0]]);
     sign.edges.forEach(([i,j],k)=>{const u=Math.max(0,Math.min(1,(age-k*per)/per));if(u<=0)return;const e=u*u*(3-2*u),[x0,y0]=P[i],[x1,y1]=P[j],hx=x0+(x1-x0)*e,hy=y0+(y1-y0)*e;
-      pfx.line(x0,y0,hx,hy,.7,ICE,.24*fa*ultraE,.34*fa*ultraE);if(u<1)pfx.star(hx,hy,3.2,WHITE,.85*ultraE,0);else lit.add(j);});
+      pfx.line(x0,y0,hx,hy,.7,ICE,.24*fa*ultraE,.34*fa*ultraE);if(u<1)pfx.star(hx,hy,3.2,WHITE,.85*ultraE*workF,0);else lit.add(j);});
     lit.forEach(i=>pfx.star(P[i][0],P[i][1],4.6,WHITE,.6*fa*ultraE,0));}
   // the column the shooting stars keep clear of
   function column(){if(!home()){const ci=R($("#chat-inner"));if(ci)return ci;}const a=R(greetEl()),b=R(cbox());if(!b)return null;return {left:Math.min(a?a.left:b.left,b.left),right:Math.max(a?a.right:b.right,b.right)};}
-  function streak(m,nowT,len,head,amp){const u=(nowT-m.t0)/m.d;if(u<0)return true;if(u>=1)return false;const e=1-Math.pow(1-u,2),a=Math.min(1,u/.15)*Math.min(1,(1-u)/.35)*ultraE*amp,hx=m.x0+m.dx*e,hy=m.y0+m.dy*e,tl=Math.min(e,len);
+  function streak(m,nowT,len,head,amp){const u=(nowT-m.t0)/m.d;if(u<0)return true;if(u>=1)return false;const e=1-Math.pow(1-u,2),a=Math.min(1,u/.15)*Math.min(1,(1-u)/.35)*ultraE*amp*(m.band?1:workF),hx=m.x0+m.dx*e,hy=m.y0+m.dy*e,tl=Math.min(e,len);
     pfx.line(m.x0+m.dx*(e-tl),m.y0+m.dy*(e-tl),hx,hy,1.1,[.86,.91,1],0,.9*a);pfx.star(hx,hy,head,WHITE,a,0);return true;}
   function skyFx(nowT,t,dt){if(!pfx)return;pfx.clear();const on=lift(),hmOn=on&&home();   // the star signs, constellations and shooting stars are the home's (6b580)
-    if(!home()){cons=null;shoot=null;shower.length=0;rain.length=0;}
+    workF=home()?1:Math.max(0,workF-dt/.9);if(!workF){cons=null;shoot=null;shower.length=0;rain.length=0;sign=null;}   // a conversation: what is showing fades over .9 s, never a cut (6b621)
     drawChand(nowT,t);drawField(nowT,on,dt);drawSign(nowT,t,hmOn);
     if(ultraE<.002&&!ultraWant){cons=null;shoot=null;rain.length=0;shower.length=0;}
     else{
     if(cons){const age=nowT-cons.t0,fade=age<1100?1:Math.max(0,1-(age-1100)/1200);if(fade<=0)cons=null;else{
       const P=cons.P.map(p=>toScreen(p.qx,p.qy,t)),lit=new Set();
       for(const [i,j,d0] of cons.edges){const u=Math.max(0,Math.min(1,(age-d0)/260));if(u<=0)continue;const e=1-Math.pow(1-u,3);lit.add(i);if(u>.98)lit.add(j);
-        const [x0,y0]=P[i],[x1,y1]=P[j];pfx.line(x0,y0,x0+(x1-x0)*e,y0+(y1-y0)*e,.8,ICE,.3*fade*ultraE,.42*fade*ultraE);}
-      lit.forEach(i=>pfx.star(P[i][0],P[i][1],5.5,WHITE,.5*fade*ultraE,0));}}
+        const [x0,y0]=P[i],[x1,y1]=P[j];pfx.line(x0,y0,x0+(x1-x0)*e,y0+(y1-y0)*e,.8,ICE,.3*fade*ultraE*workF,.42*fade*ultraE*workF);}
+      lit.forEach(i=>pfx.star(P[i][0],P[i][1],5.5,WHITE,.5*fade*ultraE*workF,0));}}
     // SHOOTING STARS: one every 6-10 s in Full (10-16 s in Balanced), 500 ms, in the upper sky beside the column, never over it
     if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot){nextShoot=nowT+(skyMode==="full"?6000+Math.random()*4000:10000+Math.random()*6000);
       const ex=rects(),col=column(),s_=side(),sl=s_?s_.right+20:20;
@@ -69597,7 +69721,7 @@ function hzSkyBoot(){
     // the band's own shooting star, just above the box (Full every 12-18 s, Balanced 25-35 s)
     if(on&&field&&field.hm&&ultraE>.9&&fxLive()){if(!field.nextBand)field.nextBand=nowT+(skyMode==="full"?5000:12000);
       if(nowT>field.nextBand&&!field.band){const f=field,dir=Math.random()<.5?1:-1,L=90+Math.random()*60,x=f.x0+20+Math.random()*Math.max(1,f.x1-f.x0-40-L),y=f.y0+12+Math.random()*Math.max(1,f.y1-f.y0-40);
-        f.band={x0:dir>0?x:x+L,y0:y,dx:dir*L,dy:10+Math.random()*16,t0:nowT,d:450};f.nextBand=nowT+(skyMode==="full"?12000+Math.random()*6000:25000+Math.random()*10000);}}
+        f.band={x0:dir>0?x:x+L,y0:y,dx:dir*L,dy:10+Math.random()*16,t0:nowT,d:450,band:1};f.nextBand=nowT+(skyMode==="full"?12000+Math.random()*6000:25000+Math.random()*10000);}}
     if(field&&field.band&&!streak(field.band,nowT,.45,3.6,.85))field.band=null;
     // METEOR SHOWERS: every 60-90 s in Full (110-130 s in Balanced; the first 20 s after arriving), 3-5 from one radiant
     if(hmOn&&ultraE>.9&&fxLive()){if(!nextShower)nextShower=nowT+(skyMode==="full"?20000:50000);
@@ -69612,28 +69736,38 @@ function hzSkyBoot(){
     if(hmOn&&ultraE>.5&&fxLive()&&nowT>nextRain&&rain.length<22){nextRain=nowT+350+Math.random()*300;const band=Math.min(innerWidth*.06,90),lf=Math.random()<.5;
       rain.push({x:lf?4+Math.random()*(band-4):innerWidth-4-Math.random()*(band-4),y:-10+Math.random()*innerHeight*.3,v:14+Math.random()*16,sw:2+Math.random()*4,ph:Math.random()*6.28,per:3+Math.random()*2,s:1.6+Math.random()*1.6,a:.35+Math.random()*.4,t0:nowT,col:HZ_UCOL[Math.floor(Math.random()*HZ_UCOL.length)]});}
     for(let i=rain.length-1;i>=0;i--){const d=rain[i],age=(nowT-d.t0)/1000;if(fxLive())d.y+=d.v*dt;const out=Math.max(0,Math.min(1,(innerHeight*.86-d.y)/80));if(out<=0){rain.splice(i,1);continue;}
-      pfx.star(d.x+Math.sin(age*6.283/d.per+d.ph)*d.sw,d.y,d.s*2.4,d.col,d.a*(.6+.4*Math.sin(age*2.1+d.ph))*Math.min(1,age/.6)*out*ultraE,0);}
+      pfx.star(d.x+Math.sin(age*6.283/d.per+d.ph)*d.sw,d.y,d.s*2.4,d.col,d.a*(.6+.4*Math.sin(age*2.1+d.ph))*Math.min(1,age/.6)*out*ultraE*workF,0);}
     }
     if(pfx.count()){gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,S.W,S.H);pfx.draw(innerWidth,innerHeight,true);}}
-  // THE AURORA WANDERS: a seeded walk of its centre (legs 60-120 s, 10-25 % either side, three in ten back to the
-  // centre, never within 8 % of the last), its width (.22-.38, legs 30-60 s), its folds (one turn per 20-40 s), its
-  // reach (30-60 s legs, 45 % reaching) and its height (+-12 % over 26 s); a split every 2-4 min for about 20 s.
-  // Balanced 1.6 x slower and half the amplitude; Calm and reduced motion still and centred.
+  // THE AURORA, FLUID AND CENTRED (6b621, the preview's b509fe9; DESIGN "The aurora, fluid"): its centre is three slow
+  // sines around the middle of the screen, .5 + .11 sin(2 pi t/140 + p1) + .07 sin(2 pi t/210 + p2) + .03 sin(2 pi t/85 + p3),
+  // new random phases every visit, never a random walk: it swings at most about +-20 %, never jumps, and over any 10
+  // minutes its mean sits within 2 % of the centre by construction; the whole curtain sways +-1.5 % on a 25 s cycle.
+  // Its width breathes (.22-.38, legs 30-60 s), its folds roll (one turn per 20-40 s), its reach (30-60 s legs, 45 %
+  // reaching) and its height (+-12 % over 26 s); every 2-4 min it opens into two overlapping lobes for about 20 s. The
+  // continuous clock (ft) drives the travelling fold wave, the pulse and the sliding rays at fa (Full 1, Balanced .6).
+  // Balanced: half the swing on the 1.6 x slower clock; Calm and reduced motion still and centred. Dev copies: ?hz=aur=.5
+  // pins the centre, aurlow=1 holds the reach low, aurspeed=N runs the aurora's clocks N times faster (S.aurProfile reads it back).
   const arnd=hzRng((Math.random()*4294967296)>>>0);
-  const AW={rf:0,rt:0,rT:0,rD:20,rch:0,hb:1,hbT:0,cx:.5,from:.5,to:.5,legT:0,legD:50,w:.3,wf:.3,wt:.3,wT:0,wD:40,tph:0,tT:30,tam:0,lt:0,spl:0,splT:-1,nextSplit:120+arnd()*120};
+  const AURSPD=Math.max(1,+(hzS.debug&&hzS.debug.aurspeed)||1);
+  const AW={wt0:0,ft:0,fa:0,p1:arnd()*6.2832,p2:arnd()*6.2832,p3:arnd()*6.2832,rf:0,rt:0,rT:0,rD:20,rch:0,hb:1,hbT:0,cx:.5,w:.3,wf:.3,wt:.3,wT:0,wD:40,tph:0,tT:30,tam:0,lt:0,spl:0,splT:-1,nextSplit:120+arnd()*120};
   let aurPx=null,aurFlo=.2,aurFloAt=0,aurGr=[0,0,0,0];
   function aurWander(dt){const still=hzS.reduced||skyMode==="calm",k=skyMode==="bal"?1/1.6:1,A=skyMode==="bal"?.5:1;
-    if(!still&&fxLive()){const d=dt*k;
-      AW.legT+=d;if(AW.legT>=AW.legD){AW.from=AW.to;let n;do{n=.5+(arnd()<.5?-1:1)*(.1+arnd()*.15)*(arnd()<.3?0:1);}while(Math.abs(n-AW.from)<.08);AW.to=n;AW.legD=60+arnd()*60;AW.legT=0;}
+    if(!still&&fxLive()){const d=dt*k*AURSPD;AW.wt0+=d;AW.ft+=dt*AURSPD;
       AW.wT+=d;if(AW.wT>=AW.wD){AW.wf=AW.wt;AW.wt=.22+arnd()*.16;AW.wD=30+arnd()*30;AW.wT=0;}
       AW.tph+=d*2*Math.PI/AW.tT;if(AW.tph>2*Math.PI){AW.tph-=2*Math.PI;AW.tT=20+arnd()*20;}
       AW.lt+=d*.05;AW.hbT+=d;AW.rT+=d;if(AW.rT>=AW.rD){AW.rf=AW.rt;AW.rt=arnd()<.45?.35+arnd()*.65:0;AW.rD=30+arnd()*30;AW.rT=0;}
       AW.nextSplit-=d;if(AW.nextSplit<=0&&AW.splT<0){AW.splT=0;AW.nextSplit=120+arnd()*120;}
       if(AW.splT>=0){AW.splT+=d;const u=AW.splT;AW.spl=u<6?ss5(u/6):u<14?1:u<20?1-ss5((u-14)/6):0;if(u>=20){AW.splT=-1;AW.spl=0;}}}
-    const raw=AW.from+(AW.to-AW.from)*ss5(Math.min(1,AW.legT/AW.legD)),pin=hzS.debug&&hzS.debug.aur!=null?+hzS.debug.aur:-1;
-    AW.cx=pin>=0&&pin<=1?pin:still?.5:.5+(raw-.5)*A;AW.w=still?.3:.3+((AW.wf+(AW.wt-AW.wf)*ss5(Math.min(1,AW.wT/AW.wD)))-.3)*A;AW.tam=still?0:.45*A;
+    const wt=AW.wt0,raw=.5+.11*Math.sin(2*Math.PI*wt/140+AW.p1)+.07*Math.sin(2*Math.PI*wt/210+AW.p2)+.03*Math.sin(2*Math.PI*wt/85+AW.p3),pin=hzS.debug&&hzS.debug.aur!=null?+hzS.debug.aur:-1;
+    AW.fa=still?0:skyMode==="bal"?.6:1;
+    AW.cx=pin>=0&&pin<=1?pin:still?.5:.5+(raw-.5)*A+AW.fa*.015*Math.sin(2*Math.PI*AW.ft/25);AW.w=still?.3:.3+((AW.wf+(AW.wt-AW.wf)*ss5(Math.min(1,AW.wT/AW.wD)))-.3)*A;AW.tam=still?0:.45*A;
     AW.rch=hzS.debug&&hzS.debug.aurlow==="1"?1:still?0:(AW.rf+(AW.rt-AW.rf)*ss5(Math.min(1,AW.rT/AW.rD)))*A;AW.hb=still?1:1+.12*A*Math.sin(AW.hbT*2*Math.PI/26);
     const aw=$("#hz-aurw");if(aw){const px=Math.round((AW.cx-.5)*innerWidth);if(px!==aurPx){aurPx=px;aw.style.transform="translateX("+px+"px)";}}}   // the canvas curtains follow, upright
+  // the curtain read back (for checks: its centre of mass and a 32-bin profile across the width), the preview's aur()
+  S.aurProfile=function(){const T=S.au;if(!T)return null;gl.bindFramebuffer(gl.FRAMEBUFFER,T.f);const w=T.w,h=T.h,px=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+    const col=new Float64Array(w);for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=(y*w+x)*4;col[x]+=px[i]*.2126+px[i+1]*.7152+px[i+2]*.0722;}let sm=0,mm=0;for(let x=0;x<w;x++){sm+=col[x];mm+=col[x]*(x+.5)/w;}
+    const bins=[];for(let b=0;b<32;b++){let v=0;for(let x=Math.floor(b*w/32);x<Math.floor((b+1)*w/32);x++)v+=col[x];bins.push(Math.round(v));}return {com:sm?mm/sm:.5,sum:Math.round(sm),cx:AW.cx,bins};};
   S.frame=function(nowT){
     S.raf=0;
     if(!hzS.mediaOn)return;
@@ -69678,15 +69812,16 @@ function hzSkyBoot(){
     const amp_=skyMode==="full"?1:.5;neonBase+=(neonTo-neonBase)*(still?1:1-Math.exp(-dn/.4));neon=neonBase*(1+.56*ultraE*amp_+.45*surge*amp_);surgeNow=surge*amp_;
     const fx_=surgeAt?Math.max(0,(nowT-surgeAt)/1000-.2)/.35:9,flare=fx_<6?fx_*Math.exp(1-fx_):0;flareNow=flare;
     rich=Math.min(1,.55*ultraE+.6*surge);starB=1+.3*ultraE+.3*surge+.9*flare*ultraE;vg=(.2*surge+.04)*ultraE;
-    auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);
+    auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);if(AURSPD>1)auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1)*(AURSPD-1);   // ?hz=aurspeed=N (dev copies): the flow N times faster
     if(waveAt){const wp=(nowT-waveAt)/WAVE_MS;if(wp>=1){waveAt=0;waveA=0;}else{const e=wp<.5?2*wp*wp:1-Math.pow(-2*wp+2,2)/2;waveR=waveY+(-40-waveY)*e;waveA=Math.min(1,wp/.3)*Math.pow(1-wp,1.1)*ultraE;   /* the band comes up over 210 ms: no flash (6b555) */}}
     aurWander(dt);
+    const aTw=[1+ATW_AMP*surgeNow,twDir*ATW_PH*surgeNow,lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0];aTwNow=aTw;   // THE ARRIVAL'S TWIST (6b621)
     if(nowT-aurFloAt>1000){aurFloAt=nowT;const cb=R(cbox()),g=R(greetEl()),box=r=>r?[r.left/innerWidth,1-r.bottom/innerHeight,r.right/innerWidth,1-r.top/innerHeight]:[0,0,0,0];
       aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);}   // the edge never comes within 36 px of the composer, never crosses the greeting
     if(neon>.002||lastAur>.002){gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
       gl.uniform1f(pA.U.time,auT);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,neon);gl.uniform1f(pA.U.c2,Math.max(c2E,skyMode==="bal"?rich:0));gl.uniform1f(pA.U.rich,rich);gl.uniform1f(pA.U.cool,Math.min(1.3,ultraE*(1+.3*surgeNow)));
-      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph);gl.uniform1f(pA.U.tam,AW.tam);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
-      gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow));gl.uniform1f(pA.U.rch,AW.rch);gl.uniform1f(pA.U.wam,skyMode==="full"&&!hzS.reduced?1:.5);gl.uniform1f(pA.U.flo,aurFlo);
+      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
+      gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow));gl.uniform1f(pA.U.rch,AW.rch);gl.uniform1f(pA.U.ft,AW.ft);gl.uniform1f(pA.U.fa,AW.fa);gl.uniform1f(pA.U.wam,skyMode==="full"&&!hzS.reduced?1:.5);gl.uniform1f(pA.U.flo,aurFlo);
       gl.uniform4f(pA.U.grt,aurGr[0],aurGr[1],aurGr[2],aurGr[3]);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
     lastAur=neon;
@@ -69702,7 +69837,7 @@ function hzSkyBoot(){
     gl.uniform4fv(pS.U.vmap,m);gl.uniform2f(pS.U.px,1/S.W,1/S.H);gl.uniform2f(pS.U.res,S.W,S.H);gl.uniform1f(pS.U.time,t);
     const lit=hzS.moon?hzS.moon.lit:.5,wax=!hzS.moon||hzS.moon.waxing,mR=Math.max(innerWidth,innerHeight)*.9;   // the moonlight: off the corner on the Moon's real side, no disc, no edge
     gl.uniform2f(pS.U.mpos,wax?innerWidth*1.08:-innerWidth*.08,-innerHeight*.12);gl.uniform1f(pS.U.mrad,mR);gl.uniform1f(pS.U.moon,.08+.62*lit);gl.uniform1f(pS.U.dscale,S.W/innerWidth);
-    S.footMul+=(S.footTo-S.footMul)*(1-Math.exp(-dn/.36));   // the footage eases by time, not by frame: the 60 Hz pace at 120 too (6b553)
+    S.footMul+=(S.footTo*(home()?1:.12)-S.footMul)*(1-Math.exp(-dn/.36));   // the footage eases by time, not by frame: the 60 Hz pace at 120 too (6b553); 12 % in a working view (6b621)
     gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);gl.uniform1f(pS.U.rise,hzS.clip?hzS.clip.rise:.56);gl.uniform1f(pS.U.hiT,hzS.clip?hzS.clip.hi:.36);
     gl.uniform1f(pS.U.starsOn,hzS.starCv?1:0);gl.uniform1f(pS.U.hmix,hmix);gl.uniform1f(pS.U.lim,feedOn&&!warm?1:0);
     matrixUniforms(nowT,dt);
@@ -69730,17 +69865,18 @@ function hzSkyBoot(){
   S.anticipate=function(){if(!hzS.reduced&&skyMode!=="calm")antAt=performance.now();};   // before the sky is told Ultra is on
   S.hangs=function(){return chand&&chand.now&&!chandOff?chand.now.map((p,i)=>[p[0],p[1],chand.P[i].x]):[];};
   S.ultra=function(on,x,y,smash){ultraWant=on;const n=performance.now();
-    if(on){if((!chand||chandOff)&&smash){chandOff=0;chand=null;requestAnimationFrame(()=>{if(ultraWant&&!chand&&lift())chand=buildChand();});}}   // built a frame later: the arrival's own frame stays light
+    if(on){if(!chand||chandOff){chandOff=0;chand=null;setTimeout(()=>{if(ultraWant&&!chand&&lift())chand=buildChand();},16);}}   // built a frame later: the arrival's own frame stays light
     else{if(chand&&!chandOff)chandOff=n;if(uTwAt||uTwFrom){uTwFrom=uTwDeg(n);uTwTo=0;uTwAt=n;}}
     if(on&&lift()&&!smash){if(!field)setTimeout(()=>{if(ultraWant&&!field)field=buildField(false);},16);}
-    else if(on&&lift()){surgeAt=n;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
-      nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+9000+Math.random()*6000;sign=null;nextShower=0;
-      if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=n+360;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
+    else if(on&&lift()){surgeAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
+      nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1800+Math.random()*800;sign=null;nextShower=n+1300;   // (6b621) a star sign and a shower in the landing
+      if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
       requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
     shoot:!!shoot,shower:shower.length,rain:rain.length,aur:{cx:+AW.cx.toFixed(3),w:+AW.w.toFixed(3),spl:+AW.spl.toFixed(3),rch:+AW.rch.toFixed(3)},breath:breath(performance.now()),hmix:+hmix.toFixed(3),held,fw:+fw.toFixed(3),calm:+calm.toFixed(3),
-    matrix:field?[field.x0,field.y0,field.x1,field.y1].map(v=>Math.round(v)):null,twist:+(twistNow*180/Math.PI).toFixed(2)};};
+    matrix:field?[field.x0,field.y0,field.x1,field.y1].map(v=>Math.round(v)):null,twist:+(twistNow*180/Math.PI).toFixed(2),
+    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
   addEventListener("resize",()=>{S.size();field=null;if(ultraWant)S.ultra(true,null,null,false);if(hzFxLevel()==="calm")S.once();});
   mode(lvKey());c2E=c2To;spd=spdTo;calm=calmTo;fw=fwTo;tw=twTo;neonBase=neonTo;   // the first level is not eased in
   S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
@@ -69761,13 +69897,17 @@ function hzBurstBoot(){
   function size(){const d=Math.min(2,devicePixelRatio||1);cw=innerWidth;ch=innerHeight;cv.width=Math.max(2,Math.round(cw*d));cv.height=Math.max(2,Math.round(ch*d));}
   size();addEventListener("resize",size);
   P.clear();P.star(-60,-60,1,[0,0,0],.01,0);gl.viewport(0,0,cv.width,cv.height);P.draw(cw,ch,false);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);   // warm the program once
+  // the trail's and the stream's quick stars (6b621, the preview's): each twinkles twice as it flies out and fades
+  const OK=[0,.15,.35,.55,.78,1],OA=[0,1,.45,.95,.35,0],OS=[.4,1,.8,1,.7,.3];
+  const key=(u,V)=>{for(let i=1;i<OK.length;i++)if(u<=OK[i]){const f=(u-OK[i-1])/(OK[i]-OK[i-1]);return V[i-1]+(V[i]-V[i-1])*f;}return V[V.length-1];};
   function loop(now){cancelAnimationFrame(raf);clearTimeout(tm);P.clear();const hangs=hzS.sky&&hzS.sky.hangs?hzS.sky.hangs():[];const leave=hzS.effI===4?1:Math.max(0,1-(now-offAt)/300);
     for(let i=parts.length-1;i>=0;i--){const q=parts[i],u=(now-q.t0)/q.dur;if(u<0)continue;if(u>=1||leave<=0){parts.splice(i,1);continue;}
-      if(q.glint){const b=Math.pow(Math.sin(Math.PI*u),.7);P.star(q.x,q.y,q.s*(.35+.65*b),[1,1,1],b*leave,0);P.star(q.x,q.y,q.s*.55*b,[.81,.88,1],.5*b*leave,Math.PI/4);continue;}
+      if(q.glint){const b=Math.pow(Math.sin(Math.PI*u),.7);P.star(q.x,q.y,q.s*(.35+.65*b),[1,1,1],b*leave,u*.45);P.star(q.x,q.y,q.s*.55*b,[.81,.88,1],.5*b*leave,Math.PI/4+u*.45);continue;}
+      if(q.quick){const e=1-Math.pow(1-u,4);P.star(q.x+Math.cos(q.a)*q.d*e+q.dr*e,q.y+Math.sin(q.a)*q.d*e,q.s*key(u,OS),q.c,key(u,OA)*leave,e*.7);continue;}
       const age=(now-q.t0)/1000,e=1-Math.exp(-q.k*age),fl=Math.min(1,Math.max(0,(age-.3)/.6));
       let x=q.x+Math.cos(q.a)*q.d*e+Math.sin(age*1.3+q.p1)*2.2*fl,y=q.y+Math.sin(q.a)*q.d*e+Math.sin(age*1.7+q.p2)*3*fl-q.rise*fl*age;
       if(q.tg!=null&&hangs[q.tg]){const g=Math.max(0,age-.45),gx=1-Math.exp(-g/.45),gy=1-Math.exp(-g/1.1);x+=(hangs[q.tg][0]+q.j[0]-x)*gx;y+=(hangs[q.tg][1]+q.j[1]-y)*gy;}
-      const a=Math.min(1,age/.08)*Math.min(1,(q.dur/1000-age)/.8)*(.62+.38*Math.sin(age*4.2+q.p1));P.star(x,y,q.s*(.6+.4*Math.min(1,age/.15)),q.c,a*leave,0);}
+      const a=Math.min(1,age/.08)*Math.min(1,(q.dur/1000-age)/.8)*(.62+.38*Math.sin(age*4.2+q.p1));P.star(x,y,q.s*(.6+.4*Math.min(1,age/.15)),q.c,a*leave,e*.7+age*.15);}
     gl.viewport(0,0,cv.width,cv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);P.draw(cw,ch,false);
     if(parts.length){raf=requestAnimationFrame(loop);tm=setTimeout(()=>loop(performance.now()),60);}}   // a timer beside the frame: a hidden page still clears
   const go=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);};
@@ -69782,6 +69922,8 @@ function hzBurstBoot(){
           dur:(drift?4200+Math.random()*1800:3000+Math.random()*2200),s:isHero?9+Math.random()*3:small?2.2+Math.random()*2.6:3+Math.random()*3.4,c:isHero?[1,1,1]:HZ_UCOL[Math.floor(Math.random()*HZ_UCOL.length)]});}});
       go();},
     glint(cx,cy){parts.push({glint:true,t0:performance.now(),x:cx,y:cy,s:16,dur:400});go();},
+    // as the knob lands 12 stars stream up out of it (28 ms apart, 640-860 ms) (6b621, the preview's stream)
+    stream(cx,cy){const t=performance.now();for(let k=0;k<12;k++)parts.push({quick:true,t0:t+120+k*28,x:cx,y:cy,a:-Math.PI/2+(Math.random()-.35)*1.3,d:28+Math.random()*34,dr:(Math.random()-.5)*10,dur:640+Math.random()*220,s:2+Math.random()*2.6,c:HZ_UCOL[(k*3)%HZ_UCOL.length]});go();},
     off(){offAt=performance.now();go();},count(){return parts.length;}};
   return hzS.burst;
 }
@@ -69789,9 +69931,10 @@ function hzBurstBoot(){
 // place with stars"). On the home the burst leaves the knob, as before. In a conversation the knob is the header's slider
 // at the top right, and the burst and the field used to spawn from its x, clumping at the composer's right end. There they
 // are anchored centred over the composer's top edge and spread across its width: about half the home's count (Balanced
-// half again), rising 14-46 px and gone in 1.3-2.1 s; the field above the box shows for 3.6 s and fades; no star signs,
+// half again), rising 14-46 px and gone in 1.3-2.1 s; the field above the box is half the home's, centred, each star
+// living 2-4 s (6b621, the preview's); no star signs,
 // constellations or shooting stars; the sky's clock at half speed. Pure, so the gauntlet runs them in node.
-const HZ_CONV_STARS={share:.5,life:3600,clock:.5,durMax:2100};
+const HZ_CONV_STARS={share:.5,clock:.5,durMax:2100};
 function hzUAnchor(home,c,kx){if(home)return kx;return c&&c.width?c.left+c.width/2:kx;}
 function hzBurstConv(c,half,rnd){
   const out=[];if(!c||!c.width)return out;const pad=Math.min(24,c.width*.06),x0=c.left+pad,w=Math.max(1,c.width-2*pad);
@@ -70302,7 +70445,7 @@ function hzModesPaint(){
       // star at Ultra; no stars in the track either: they live above the box, hzUField)
       +'<div class="hz-sl" data-lv="1"><i class="hz-sl-track"></i><i class="hz-sl-bloom"></i><i class="hz-sl-fill"></i><i class="hz-sl-led"></i>'
       +HZ_EFFORT.map((e,i)=>'<i class="hz-sl-dot" style="--hz-u:'+(i/HZ_EMAX).toFixed(4)+'"></i>').join("")
-      +'<i class="hz-sl-spark"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i></span>'
+      +'<i class="hz-sl-spark"></i><i class="hz-sl-rays"></i><span class="hz-sl-thumb"><i class="hz-sl-halo"></i><i class="hz-sl-core"></i></span>'
       +'<label><span class="hz-vh">Effort</span><input type="range" min="0" max="'+HZ_EMAX+'" step="1" value="1"></label></div>'
       +'<span class="hz-elevel" aria-hidden="true"></span>';
     hzControlsWire(host);
@@ -70330,6 +70473,7 @@ function hzEffortPaint(){
   root.classList.toggle("hz-ultra",i===4);root.classList.toggle("hz-maxe",i===3);
   // arriving at Ultra ignites it once; leaving drains it (a page that opens at Ultra just rests there)
   if(i===4&&was!=null&&was!==4)hzIgnite();else if(was===4&&i!==4)hzUltraOut();else if(i===4&&was==null)hzSkyUltra(true,false);   // opening at Ultra: it rests there (6b555)
+  if(i===4&&was!==4)hzMotes(true);else if(was===4&&i!==4)hzMotes(false);   // the motes round the composer (6b621)
   if(hzS.sky)hzS.sky.level(hzModeIndex(typeof tier==="string"?tier:""),i);
 }
 // ULTRA (6b544): the one moment the effects perform; the css under ULTRA does the drawing, these
@@ -70363,6 +70507,7 @@ function hzUltraEls(){
   const cb=$("#composer");if(!cb)return;
   if(!cb.querySelector(":scope>.hz-urim")){const r=document.createElement("span");r.className="hz-urim";r.setAttribute("aria-hidden","true");r.appendChild(document.createElement("i"));cb.appendChild(r);}
   if(!cb.querySelector(":scope>.hz-uglow")){const g=document.createElement("i");g.className="hz-uglow";g.setAttribute("aria-hidden","true");cb.appendChild(g);}
+  hzUltraLitEls(cb);   // the lit edge, the tint and the horizon line (6b621)
 }
 // ONCE PER ARRIVAL (6b553): from a lower level only (the caller), never again within 1.5 s of the last, and once per
 // drag (sliding about Ultra while held never re-fires it)
@@ -70382,6 +70527,7 @@ function hzIgnite(){
   hzS.ultraAt=now;hzS.ultraDrag=dragging;
   clearTimeout(hzS.igniteT);clearTimeout(hzS.fireT);root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();
   if(hzS.sky&&hzS.sky.anticipate)hzS.sky.anticipate();         // the held breath
+  root.classList.add("hz-ant");setTimeout(()=>root.classList.remove("hz-ant"),300);   // the knob settles a hair (.97) while the sky holds its breath (6b621)
   hzS.fireT=setTimeout(hzUltraFire,140);
 }
 function hzUltraFire(){
@@ -70389,10 +70535,12 @@ function hzUltraFire(){
   hzUltraAngle();
   const cb=$("#composer");
   if(cb&&!cb.querySelector(":scope>.hz-uedge")){const e=document.createElement("i");e.className="hz-uedge";e.setAttribute("aria-hidden","true");cb.appendChild(e);}
-  void root.offsetWidth;root.classList.add("hz-ignite");
+  root.classList.remove("hz-ant");void root.offsetWidth;root.classList.add("hz-ignite");
   hzSkyUltra(true,true);                                        // the sky's part of the release and the hang
   const full=hzFxLevel()==="full",c=cb?cb.getBoundingClientRect():null,b=hzBurstBoot();
-  if(b&&c&&hzS.ukx!=null){const ax=hzUAnchor(!!$("#hero"),c,hzS.ukx);b.burst(ax,c.top,!full);b.glint(ax,c.top);}   // 6b580: centred in a conversation
+  // the burst, the glint and the stream leave the knob itself on the home, up through the glass (6b621, the preview's);
+  // in a conversation centred over the composer's top edge (6b580)
+  if(b&&c&&hzS.ukx!=null){const hm=!!$("#hero"),ax=hzUAnchor(hm,c,hzS.ukx),ky=hm?hzKnobY(c):c.top;b.burst(ax,ky,!full);b.glint(ax,ky);if(hm&&b.stream)b.stream(ax,ky);}
   // the greeting's rim light rides the hang: it rises as the matrix's wave reaches the greeting (Full 1.16 s, at full;
   // Balanced .86 s, at half) and fades over 1.2 s
   const g=$("#hero .greet");clearTimeout(hzS.rimT);
@@ -70400,8 +70548,64 @@ function hzUltraFire(){
     hzS.rimT=setTimeout(()=>g.classList.remove("hz-rim"),420);},full?1160:860);
   hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);
 }
+// ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621): begin ====
+// The composer's lit edge, its tint and its horizon line (the css under ULTRA AT FULL STRENGTH), made once with the
+// living Ultra's pieces: a clip whose conic mask reveals the rim from the beam's angle, the turning rim, its blurred
+// copy and the white head of the line of light.
+function hzUltraLitEls(cb){
+  if(!cb||cb.querySelector(":scope>.hz-ulit"))return;
+  const l=document.createElement("span");l.className="hz-ulit";l.setAttribute("aria-hidden","true");
+  l.innerHTML='<i class="r"></i><b><i></i></b><i class="h"></i>';cb.appendChild(l);
+  for(const k of ["hz-uitint","hz-uline"]){const e=document.createElement("i");e.className=k;e.setAttribute("aria-hidden","true");cb.appendChild(e);}
+}
+// THE MOTES (the preview's): at Ultra a tiny four-point star every 170 ms (at most 40) drifts up from the composer's top
+// edge, its outer thirds mostly (the centre stays clear so no text is covered), or from a side, 30-130 px over 5.2-7.6 s
+// with a calm twinkle; in a working view every other one (at most 20), centred over the top edge, 10-24 px over
+// 1.8-3 s. Leaving Ultra they drift 24 px up and fade (800 ms). Calm, reduced motion, effects off and a hidden or long
+// unfocused window: none. Transform and opacity only, so the compositor runs them.
+const HZ_MOTEC=["#ffffff","#eef3ff","#dce8ff","#c6d8ff","#ffffff","#e6efff","#d9d4ff","#ffffff","#eef3ff","#dce8ff","#ffffff","#e6efff"];
+function hzMotes(on){
+  const box=$("#hz-motes");if(!box)return;clearInterval(hzS.moteI);clearTimeout(hzS.moteOutT);
+  if(on){box.classList.remove("out");if(hzS.reduced)return;hzS.moteI=setInterval(hzMoteSpawn,170);setTimeout(hzMoteSpawn,500);}
+  else{box.classList.add("out");hzS.moteOutT=setTimeout(()=>{box.textContent="";box.classList.remove("out");},950);}
+}
+function hzMoteSpawn(){
+  const box=$("#hz-motes"),cb=$("#composer");
+  if(!box||!cb||!box.animate||hzS.effI!==4||hzFxLevel()==="calm"||!hzMotionOK()||document.hidden||hzS.blurred||document.body.classList.contains("novideo"))return;
+  const work=!$("#hero");if(box.childElementCount>=(work?20:40))return;
+  if(work&&(hzS.moteOdd=!hzS.moteOdd))return;   // a working view: half as many
+  const r=cb.getBoundingClientRect();if(!r.width)return;
+  const m=document.createElement("i");hzS.moteK=(hzS.moteK||0)+1;m.style.setProperty("--c",HZ_MOTEC[hzS.moteK%HZ_MOTEC.length]);
+  let x,y,rise,dx,dur,sc,K;
+  if(work){x=r.left+r.width*(.2+.6*Math.random());y=r.top+1;rise=10+Math.random()*14;dx=(Math.random()-.5)*16;dur=1800+Math.random()*1200;sc=.6+Math.random()*.4;
+    m.style.setProperty("--g",(5+Math.random()*3).toFixed(1)+"px");K=[[0,1,0],[.3,1,.75],[.7,.8,.5],[1,.6,0]];}
+  else{const side=Math.random(),onTop=side<.6,left=side<.8;
+    x=onTop?(Math.random()<.5?r.left+24+Math.random()*r.width*.3:r.right-24-Math.random()*r.width*.3):left?r.left-6-Math.random()*20:r.right+6+Math.random()*20;
+    y=onTop?r.top+1:r.top+8+Math.random()*(r.height-16);rise=onTop?50+Math.random()*80:30+Math.random()*50;dx=onTop?(Math.random()-.5)*30:(left?-1:1)*(10+Math.random()*24);
+    dur=5200+Math.random()*2400;sc=.7+Math.random()*.5;m.style.setProperty("--g",(Math.random()<.2?10+Math.random()*3:5+Math.random()*4).toFixed(1)+"px");
+    K=[[0,1,0],[.14,1,.9],[.3,.6,.4],[.46,1.05,.85],[.62,.6,.35],[.78,.9,.7],[1,.7,0]];}
+  const tr=(f,k)=>"translate("+(x+dx*f).toFixed(1)+"px,"+(y-rise*f).toFixed(1)+"px) scale("+(sc*k).toFixed(2)+")";
+  m.style.transform=tr(0,1);box.appendChild(m);
+  const a=m.animate(K.map(([f,k,o])=>({offset:f,transform:tr(f,k),opacity:o})),{duration:dur,easing:"cubic-bezier(.3,.1,.4,1)",fill:"forwards"});
+  const done=()=>m.remove();a.onfinish=done;setTimeout(done,dur+200);
+}
+// THE READING BAND (THE GOVERNING RULE): behind the column and the flow, centred on them and 24 px wider each side, a
+// near-solid flat band (#hz-band) feathered over 160 px; refitted whenever the column moves or changes size
+function hzBandFit(){
+  const b=$("#hz-band"),c=$("#chat-inner");if(!b||!c)return;const r=c.getBoundingClientRect();if(!r.width)return;
+  const cs=getComputedStyle(c),pl=parseFloat(cs.paddingLeft)||0,pr=parseFloat(cs.paddingRight)||0,w=Math.max(0,r.width-pl-pr);
+  b.style.setProperty("--hz-bcx",Math.round(r.left+pl+w/2)+"px");b.style.setProperty("--hz-bhw",Math.round(w/2+24)+"px");
+}
+function hzBandWire(){
+  hzUltraLitEls($("#composer"));   // made at boot, so the first arrival starts from the rim's rest (a layer made in the Ultra frame would skip its reveal)
+  hzBandFit();addEventListener("resize",hzBandFit);
+  if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzBandFit());["#chat-inner","#chat-scroll"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}
+}
+// ==== ultra at full strength (6b621): end ====
+// the knob's centre line (the track's middle), where the burst leaves it on the home (6b621)
+function hzKnobY(c){const tr=$("#hz-effort .hz-sl-track"),r=tr?tr.getBoundingClientRect():null;return r&&r.height?r.top+r.height/2:c.top;}
 function hzUltraOut(){
-  const root=document.documentElement;clearTimeout(hzS.igniteT);clearTimeout(hzS.fireT);clearTimeout(hzS.rimT);root.classList.remove("hz-ignite");
+  const root=document.documentElement;clearTimeout(hzS.igniteT);clearTimeout(hzS.fireT);clearTimeout(hzS.rimT);root.classList.remove("hz-ignite","hz-ant");
   hzSkyUltra(false);if(hzS.burst)hzS.burst.off();
   const g=$("#hero .greet");if(g)g.classList.remove("hz-rim","hz-rimglide");
   if(!hzMotionOK())return;
@@ -71007,6 +71211,7 @@ function hzInit(){
     hzPlaceEffort();hzTitlePaint();hzSidebarLabel();setTimeout(hzGlowFit,80);
     const home=!!$("#hero");if(home&&!hzS.home){hzWashBloom();hzHomePaint();}hzS.home=home;root.classList.toggle("hz-work",!home);}).observe(inner,{childList:true});
   hzS.home=!!$("#hero");root.classList.toggle("hz-work",!hzS.home);   // a working view: the flat ground over the dimmed sky (6b580)
+  hzBandWire();   // the reading band behind the column (6b621)
   if(root.classList.contains("hz")){
     hzStart();
     if(hzS.debug)hzDebugApply();
