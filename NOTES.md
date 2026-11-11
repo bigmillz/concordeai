@@ -21433,6 +21433,49 @@ wash) 24 px past the edge, so the check passed or failed with the time of day, a
   a search engine; weather and place questions send the place name." → "While on, prompts leave your machines." +
   new "Details" link (the full text behind it, unchanged).
 
+**Settings, the night edition (per Patrick, 2026-11-11 ~10:20: "Clean this up. It just looks very Microsoft. Just dry.
+Tasteless."; two directions shown as stills, A "Apple System Settings, night edition" and B "Claude-sharp"; Pat picked
+A and approved its three new lines).** Horizon only; the page's own nodes, ids and handlers kept:
+- The sheet: 720 wide, sized to its content (420 to 600 high, the body scrolls past that), rgba(26,26,30,.88) graphite
+  with the sky behind blurred (the sheet 40 px, the backdrop 10 px), a 1 px top highlight, a soft shadow, radius 16.
+  The page behind (greeting, conversation, composer, header) steps back to 0 while it is open (`html.sx-setopen`, set
+  in the same `hidden` setter that runs the fade), so the sheet sits on the sky alone.
+- The rail: no "SETTINGS" eyebrow; 13 px rows 28 high, each with a 16 px line icon (General, Appearance, Models and its
+  Local, Cloud, Servers, Usage, You, About); a filled selection; the selected icon ice.
+- No footer: a quiet × at the top right (Close, Esc). The Close button stays in the page (hidden) and the × clicks it,
+  so every close path is the one it was.
+- Grouped inset lists: radius 12 on rgba(255,255,255,.045), hairlines inset 14 from the left (a background line, so no
+  pseudo-element fights the rows'), rows 40 high. General: "Updates and the microphone." under the title, then
+  "Updates" (version with What's new and Check now, channel, Check for updates) and "Microphone" (Keep microphone
+  ready); the notes open between them. Appearance, About, You (the two fields; your chats and folders), every
+  Advanced, each server, the pairing form, the roster under each grey heading, Cloud's key box and Usage's numbers,
+  chart and benchmark are groups.
+- Controls: 34 x 20 ice switches with rounded-square knobs (no circles), pill buttons (28 high, radius 14), 32 px inputs
+  with normal tracking and a soft ice ring on focus, the segmented control on a dark well. A server's state is a word
+  with a glyph: a moon asleep, a small ice square awake; model chips in ice.
+- A 150 ms pane fade; none under reduced motion. Titles 20/500; a pane's one grey line under it.
+
+**Found on the way (the trimmed gauntlet, the servers block):** three pins of other blocks that earlier 6b625 work had
+broken, each restored without touching the pin: the engine menu's Esc line again sits right above the stop line (the
+host sheet's Esc moved above it); the 6b367 Test-result mutant again finds srvCard's srv-msg line once (the 6b625 card
+words its own with single quotes); the lane hooks are guarded (`typeof sxLaneSoon`), so setAgent lifted into node by the
+rules review runs without the polish block.
+
+**Tests (night edition):** the css check re-pins the sheet (720, auto height to 600, the graphite, radius 16, the
+highlight and shadow, both blurs), no eyebrow, the rail's 28 px rows and 16 px icons, no footer, the ×, the groups and
+their inset hairlines, the grey labels, the pane fade, the page stepping back, ice switches, pills, the input ring; a
+blur is allowed only as a backdrop (the no-glow rule otherwise unchanged); seven mutants (a rounder sheet, a sheet with
+nothing softened behind it, a blur that is not the backdrop's, plus the four it had). The live check measures the
+sheet (720 x 420..600, radius 16, the graphite, the 30 % veil, a 208 rail of 28 px rows on a 10 % fill, no eyebrow and
+no caps), the × hittable and closing it with the page behind back, the footer gone, an icon on every visible rail row,
+General's two labels and its line, the backdrop blur, the page behind at 0 while open, white knobs off, every group at
+radius 12 and no bordered card inside; four more live mutants (the footer back, no ×, General ungrouped, the page behind
+left showing).
+
+**Copy, night edition (old → new):** new "Updates and the microphone." (General's line), group labels "Updates" and
+"Microphone" (all three approved by Pat); "SETTINGS" eyebrow → removed; "Close" button → a × (its label "Close", tooltip
+"Close (Esc)").
+
 **Left / worth knowing.**
 - Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
@@ -21452,3 +21495,8 @@ wash) 24 px past the edge, so the check passed or failed with the time of day, a
 - Tight: the hidden Your-stuff hint said which file types are read; it is gone from the face. If people ask "why
   wasn't my .pages file used", it may want to come back as a Details link like Cloud's.
 - Tight: the About line drops the installed-models count ("models" fact); Local lists them.
+- Night edition: two layers of backdrop blur over the GPU sky cost a little GPU while Settings is open (the page behind
+  is at 0 then, so the sky is all it blurs). Checked in an offscreen WKWebView and headless Chromium (computed style
+  has the blur); at 88 % the stills look near-solid, so whether the stars read softly through it is for the shipped
+  window to show.
+- Night edition: the sheet's height follows the pane (420 to 600), so it changes size between panes.

@@ -46707,20 +46707,29 @@ _px_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE POLISH (6b625"):_MILLEN
 def _px_css_ok(css):
     r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
     return (_hz_scoped(css)
-            and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|[^-]blur\(|box-shadow:0 0 [1-9]", r_)
-            and ".hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;" in r_
-            and ".hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;" in r_
+            and not re.search(r"text-shadow:(?!none)|(?<![-\w])glow|drop-shadow|(?<!backdrop-filter:)blur\(|box-shadow:0 0 [1-9]", r_)
+            and ".hz #about-veil{background:rgba(0,0,0,.3);-webkit-backdrop-filter:blur(10px) saturate(1.25);backdrop-filter:blur(10px) saturate(1.25);" in r_
+            and ".hz #about-veil #about-card{position:relative;width:min(720px,calc(100vw - 32px));height:auto;min-height:min(420px,calc(100vh - 48px));max-height:min(600px,calc(100vh - 48px));\n  grid-template-columns:208px minmax(0,1fr);grid-template-rows:minmax(0,1fr);\n  background:rgba(26,26,30,.88);border:var(--sx-hl) solid rgba(255,255,255,.09);border-radius:16px;\n  box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 24px 70px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);-webkit-backdrop-filter:blur(40px) saturate(1.5);backdrop-filter:blur(40px) saturate(1.5);" in r_
             and "--sx-s0:#0e0e10;--sx-s1:#141416;--sx-s2:#1a1a1d;--sx-s3:#1f1f22;--sx-s4:#2a2a2f" in r_ and "--sx-lab:rgba(255,255,255,.5)" in r_
             and ".hz #about-veil:not([hidden]){animation:sxFade .18s var(--sx-e) both}" in r_ and "@keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}" in r_
-            and ".hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}" in r_
-            and ".hz #about-veil .snav{height:30px;flex:none;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);" in r_
-            and ".hz #about-veil .snav:hover{background:var(--sx-s2);" in r_ and ".hz #about-veil .snav.on{background:var(--sx-s3);" in r_
+            and ".hz #about-veil .sx-slab{display:none}" in r_
+            and ".hz #about-veil .snav{display:flex;align-items:center;gap:9px;height:28px;flex:none;padding:0 8px;border:0;border-radius:7px;background:none;color:rgba(255,255,255,.78);font:450 13px/1 var(--hz-font-ui);" in r_
+            and ".hz #about-veil .snav:hover{background:rgba(255,255,255,.05);" in r_ and ".hz #about-veil .snav.on{background:rgba(255,255,255,.1);" in r_
+            and ".hz #about-veil .snav .sx-ico{width:16px;height:16px;flex:none;" in r_ and ".hz #about-veil #about-foot{display:none}" in r_
+            and ".hz #about-veil #sx-x{position:absolute;top:12px;right:12px;" in r_
+            and ".hz #about-veil .sx-group{display:flex;flex-direction:column;margin:0 0 12px;padding:0;border-radius:12px;" in r_
+            and "background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}" in r_
+            and ".hz #about-veil .sx-glab{margin:16px 0 6px 14px;font:500 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.5)}" in r_
+            and ".hz #about-veil .spane.on{animation:sxPaneIn .15s var(--sx-e) both}" in r_ and "@keyframes sxPaneIn{from{opacity:0}to{opacity:1}}" in r_
+            and ".hz.sx-setopen #main>:not(#hz-sky){opacity:0;" in r_
+            and ".hz #about-veil .toggle-row.on .switch,.hz #about-veil input[type=checkbox].sx-sw:checked{background:#8fb3f5;box-shadow:none}" in r_
             and "min-height:48px;padding:8px 0;margin:0;\n  border-top:var(--sx-hl) solid rgba(255,255,255,.08)" in r_
-            and ".hz #about-veil .sl-seg{height:30px;padding:2px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s2);box-shadow:none}" in r_
-            and "border-radius:6px;background:var(--sx-s4);box-shadow:none;" in r_
-            and ".hz #about-veil .switch{width:32px;height:18px;border-radius:5px;" in r_
-            and "height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);" in r_
-            and ".hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 12px;border-radius:8px;" in r_
+            and ".hz #about-veil .sl-seg{height:28px;padding:2px;border-radius:8px;border:0;background:rgba(0,0,0,.28);box-shadow:none}" in r_
+            and "border-radius:6px;background:rgba(255,255,255,.16);box-shadow:none;" in r_
+            and ".hz #about-veil .switch{width:34px;height:20px;border-radius:6px;" in r_ and "width:16px;height:16px;border-radius:4px;background:#fff;" in r_
+            and "height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);" in r_
+            and "box-shadow:0 0 0 3px rgba(159,192,255,.18)}" in r_
+            and ".hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 13px;border-radius:14px;" in r_
             and "@media (max-width:640px){" in r_ and ".hz #about-veil #set-rail{flex-direction:row;" in r_
             # one type system: no mono caps in Settings, the tables, the palette
             and "--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);" in r_ and "--sans:var(--hz-font-ui)}" in r_
@@ -46733,9 +46742,11 @@ def _px_css_ok(css):
             and ".hz #imp-sheet{border-radius:14px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:none;" in r_
             and ".hz #about-veil #sugg-toggle,.hz #about-veil #sugg-note{display:none}" in r_
             and "@media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card," in r_)
-check("6b625 the css: Settings in the demo's dialog (672 x 640, #141416, a 10 % hairline, radius 14, a 55 % backdrop, the 180 ms fade and 6 px rise), its rail (184, 11 px caps at 50 %, rows 13 px / 30 high on #1a1a1d / #1f1f22), 48 px rows, the #1a1a1d / #2a2a2f segmented control, 32 x 18 squared switches, 32 px inputs on #0e0e10, 28 px buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; five mutants caught",
+check("6b625 the css: Settings, the night edition (Pat's pick A): a translucent graphite sheet (720 wide, sized to its content up to 600, radius 16, a 1 px top highlight, a soft shadow, the sky behind blurred), no eyebrow, a 208 rail of 28 px rows with 16 px line icons and a filled selection, a quiet x and no footer, grouped inset lists (radius 12, hairlines inset 14), small grey group labels, a 150 ms pane fade, the page behind stepping back; the 180 ms fade and 6 px rise, the segmented control, 34 x 20 ice switches with squared knobs, 32 px inputs with a soft ice ring, pill buttons, a phone's full screen; Inter where mono caps were; the danger card's ember outline; no light blue; the import sheet over black; every rule Horizon's, no glow; seven mutants caught",
       _px_css_ok(_px_css)
-      and not _px_css_ok(_px_css.replace("minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;", "minmax(0,1fr);\n  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:18px;", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css.replace("rgba(255,255,255,.09);border-radius:16px;\n  box-shadow:inset", "rgba(255,255,255,.09);border-radius:20px;\n  box-shadow:inset", 1))   # a rounder dialog
+      and not _px_css_ok(_px_css.replace("-webkit-backdrop-filter:blur(40px) saturate(1.5);backdrop-filter:blur(40px) saturate(1.5);", "-webkit-backdrop-filter:none;backdrop-filter:none;", 1))   # a sheet with nothing behind it softened
+      and not _px_css_ok(_px_css + "\n.hz #about-veil .snav{filter:blur(2px)}")                                                # a blur that is not the backdrop's
       and not _px_css_ok(_px_css + "\n.hz #about-veil .snav.on{box-shadow:0 0 12px rgba(255,255,255,.3)}")                      # a glow on the rail
       and not _px_css_ok(_px_css.replace(".hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;", ".hz .msg.ai .body th{font:500 11px/16px var(--hz-font-mono);letter-spacing:.12em;text-transform:uppercase;", 1))   # mono caps heads
       and not _px_css_ok(_px_css + "\n#about-card{color:red}")                                                                  # a rule outside Horizon
@@ -46989,6 +47000,8 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       account:!!p.querySelector(".sx-advc #acct-card")&&!!p.querySelector(".sx-advc #about-forget")};})()`);
   // tight (6b625): What's new behind its link; every pane's rows 40 high, no helper sentence over six words, no boxed
   // sub-card, the roster one line a model, the pane padding 24
+  await ev(`(()=>{settingsPane("p-models");return 1;})()`);   // the roster loads on the visit: wait for its rows
+  await until(`[...document.querySelectorAll("#about-veil .ros-row")].some(e=>e.offsetParent!==null)`, 8000);
   out.tight = await ev(`(()=>{const v=document.querySelector("#about-veil"),o={long:[],rosH:0,cards:[],rows:[]};
     settingsPane("sx-p-general");const n=v.querySelector("#up-notes"),w=v.querySelector("#sx-whatsnew");
     if(n.hidden||!n.textContent.trim()){n.innerHTML="<p><b>What is new</b></p><p>Stand-in notes.</p>";n.hidden=false;}
@@ -46996,10 +47009,18 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
     for(const id of ["sx-p-general","sx-p-look","p-models","p-cloud","p-servers","p-usage","p-persona","p-about"]){settingsPane(id);const p=v.querySelector("#"+id);
       p.querySelectorAll(".tdesc,.kn-hint,.sx-cline,#fx-level-note,#micwarm-note,#sugg-note,#know-privacy,#turbo-note").forEach(e=>{if(e.offsetParent!==null&&!e.closest(".sx-advc")){const t=e.textContent.replace(/Details$/,"").trim();if(t.split(/ +/).length>6)o.long.push(id+": "+t.slice(0,48));}});
       if(id==="p-models")o.rosH=Math.max(0,...[...p.querySelectorAll(".ros-row")].filter(e=>e.offsetParent!==null).map(e=>Math.round(e.getBoundingClientRect().height)));
-      p.querySelectorAll(".us-card,#cloudkey-box,#manage-box,.plan-card,.set-card").forEach(e=>{if(e.offsetParent!==null){const c=getComputedStyle(e);if(c.borderTopWidth!=="0px"||c.backgroundColor!=="rgba(0, 0, 0, 0)")o.cards.push(id+" "+(e.id||e.className));}});
-      p.querySelectorAll(":scope>.toggle-row,:scope>#beta-row,:scope>#look-row,:scope>#fx-level-row,:scope>.sx-row:not(#sx-ver-row)").forEach(e=>{if(e.offsetParent!==null)o.rows.push(Math.round(e.getBoundingClientRect().height));});}
+      p.querySelectorAll(".us-card:not(.us-chart),.plan-card,.set-card,#acct-card").forEach(e=>{if(e.offsetParent!==null&&getComputedStyle(e).borderTopWidth!=="0px")o.cards.push(id+" boxed "+(e.id||e.className));});
+      p.querySelectorAll(".sx-group,.sx-srv,#cloudkey-box,.us-grid,.us-chart").forEach(e=>{if(e.offsetParent!==null&&getComputedStyle(e).borderTopLeftRadius!=="12px")o.cards.push(id+" group "+(e.id||e.className));});
+      p.querySelectorAll(":scope>.sx-group>.toggle-row,:scope>.sx-group>#beta-row,:scope>.sx-group>#look-row,:scope>.sx-group>#fx-level-row,:scope>.sx-group>.sx-row:not(#sx-ver-row),:scope>.toggle-row,:scope>.sx-row:not(#sx-ver-row)").forEach(e=>{if(e.offsetParent!==null)o.rows.push(Math.round(e.getBoundingClientRect().height));});}
     o.pad=getComputedStyle(v.querySelector("#about-body")).paddingLeft;
-    o.nrows=o.rows.length;o.rows=[...new Set(o.rows)];settingsPane("p-persona");return o;})()`);
+    o.nrows=o.rows.length;o.rows=[...new Set(o.rows)];
+    settingsPane("sx-p-general");const c=v.querySelector("#about-card"),x=v.querySelector("#sx-x"),xr=x&&x.getBoundingClientRect(),xh=xr&&document.elementFromPoint(xr.left+xr.width/2,xr.top+xr.height/2),cs=getComputedStyle(c);
+    o.night={x:!!xh&&(xh===x||x.contains(xh)),foot:getComputedStyle(v.querySelector("#about-foot")).display,
+      icons:[...v.querySelectorAll("#set-nav .snav")].filter(e=>e.offsetParent!==null).map(e=>!!e.querySelector("svg.sx-ico")).every(Boolean),
+      labs:[...v.querySelectorAll("#sx-p-general>.sx-glab")].map(e=>e.textContent),sub:(v.querySelector("#sx-p-general>.sx-sub2")||{}).textContent||"",
+      blur:(cs.backdropFilter||cs.webkitBackdropFilter||"").indexOf("blur(40px)")>=0,open:document.documentElement.classList.contains("sx-setopen"),
+      behind:getComputedStyle(document.querySelector("#main>:not(#hz-sky)")).opacity,h:Math.round(c.getBoundingClientRect().height)};
+    settingsPane("p-persona");return o;})()`);
   out.tabs = []; for (let i = 0; i < 30; i++) { await press("Tab", "Tab", 9); if (i % 6 === 5) out.tabs.push(await ev(`!!document.activeElement.closest("#about-veil #about-card")`)); }
   await press("Escape", "Escape", 27); await sleep(40);
   out.closing = await ev(`(()=>{const v=document.querySelector("#about-veil");return {cls:v.className,attr:v.hasAttribute("hidden"),logical:v.hidden};})()`);
@@ -47013,7 +47034,8 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
   await send("Input.dispatchKeyEvent", { type: "rawKeyDown", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 });
   await send("Input.dispatchKeyEvent", { type: "keyUp", key: ",", code: "Comma", windowsVirtualKeyCode: 188, modifiers: 4 }); await sleep(300);
   out.comma = await ev(`!document.querySelector("#about-veil").hidden`);
-  await press("Escape", "Escape", 27); await sleep(320);
+  out.xhit = await click("#about-veil #sx-x"); await sleep(320);   // the quiet x closes it, and the page behind comes back
+  out.xclose = await ev(`[document.querySelector("#about-veil").hasAttribute("hidden"),document.documentElement.classList.contains("sx-setopen")]`);
   if (MODE === "full") {
     // ---- the palette: a Code chat says Code; the return arrow is a character
     await ev(`(()=>{chats.unshift({id:"px-code-1",lane:"code",title:"Fix the nginx config",ts:Date.now(),messages:[]});palOpen();return 1;})()`); await sleep(200);
@@ -47075,24 +47097,28 @@ def _px_live(width, mode="full", mutation=None):
 def _px_tight_ok(t):
     return (t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
             and t.get("rows") == [40] and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
-            and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px")
+            and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px"
+            and _px_night_ok(t.get("night") or {}))
+def _px_night_ok(n):
+    return (n.get("x") is True and n.get("foot") == "none" and n.get("icons") is True and n.get("labs") == ["Updates", "Microphone"]
+            and n.get("sub") == "Updates and the microphone." and n.get("blur") is True and n.get("open") is True and n.get("behind") == "0")
 def _px_set_ok(r, phone=False):
     s_, o_, c_ = r.get("set") or {}, r.get("open") or {}, r.get("closing") or {}
     return (not r.get("err") and not r.get("errs") and r.get("suggest") == 0
             and o_.get("veil") == "sxFade" and o_.get("card") == "sxRise"
-            and s_.get("bg") == "rgb(20, 20, 22)" and s_.get("veil") == "rgba(0, 0, 0, 0.55)"
+            and s_.get("bg") == "rgba(26, 26, 30, 0.88)" and s_.get("veil") == "rgba(0, 0, 0, 0.3)"
             and (s_.get("w") == (s_.get("sw") or [0, 0])[1] and s_.get("radius") == "0px" and s_.get("railDir") == "row" if phone
-                 else s_.get("w") == 672 and s_.get("h") == 640 and s_.get("radius") == "14px" and s_.get("rail") == 184 and s_.get("railDir") == "column"
-                 and s_.get("lab") == ["Settings", "11px", "600", "uppercase", "block"] and s_.get("caps") == ["Settings"])
-            and s_.get("rowH") == 30 and s_.get("rowBg") == "rgb(31, 31, 34)" and s_.get("mono") == []
+                 else s_.get("w") == 720 and 420 <= (s_.get("h") or 0) <= 600 and s_.get("radius") == "16px" and s_.get("rail") == 208 and s_.get("railDir") == "column")
+            and (s_.get("lab") or [0] * 5)[4] == "none" and s_.get("caps") == []
+            and s_.get("rowH") == 28 and s_.get("rowBg") == "rgba(255, 255, 255, 0.1)" and s_.get("mono") == []
             and (s_.get("focus") or "").startswith("button.snav|General")
             and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
             and s_.get("rows") == ["General", "Appearance", "Models", "You", "About"] and s_.get("kids") == ["Local", "Cloud", "Servers", "Usage"]
             and s_.get("genCtl") == 4 and s_.get("adv") == [True]
-            and s_.get("panes") == ["sx-whatsnew,about-check,up-notes,beta-row,autochk-toggle,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,set-spec,about-site"]
+            and s_.get("panes") == ["sx-whatsnew,about-check,beta-row,autochk-toggle,up-notes,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,about-site,set-spec"]
             and bool(re.match(r"ConcordeAI \d.* \(build \d+\)", (s_.get("about") or [""])[0])) and (s_.get("about") or ["", ""])[1] == "none"
             and _px_tight_ok(r.get("tight") or {})
-            and (s_.get("look") or {}).get("notes") == ["none", "none"] and (s_.get("look") or {}).get("knobs") == ["rgb(141, 145, 155)"] * 2
+            and (s_.get("look") or {}).get("notes") == ["none", "none"] and (s_.get("look") or {}).get("knobs") == ["rgb(255, 255, 255)"] * 2
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
             and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona", "know-path"]
@@ -47101,6 +47127,7 @@ def _px_set_ok(r, phone=False):
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
             and r.get("head") == {"dot": True, "gear": True, "theme": 0, "gpu": False} and r.get("comma") is True
+            and (r.get("xhit") or {}).get("hit") is True and r.get("xclose") == [True, False]
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
             and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
 def _px_full_ok(r):
@@ -47121,7 +47148,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings in the night edition (a 720 sheet sized to its content, the sky behind blurred, a rail of line icons and 28 px rows, a quiet x that closes it, no footer, General's Updates and Microphone groups under one grey line, the page behind stepped back while open and back after) and tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -47140,12 +47167,16 @@ _px_mw = [
     ("Usage outside Models", [['if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}', ""]]),
     ("the roster two lines a model", [[".hz #about-veil .ros-row .rd{grid-column:3;grid-row:1;", ".hz #about-veil .ros-row .rd{grid-column:2/4;grid-row:2;"]]),
     ("a long helper sentence back under Cloud", [['p.textContent="While on, prompts leave your machines. ";', 'p.textContent="Optional. While on, cloud models answer and your prompts leave your machines. ";']]),
+    ("the Close footer back", [[".hz #about-veil #about-foot{display:none}", ".hz #about-veil #about-foot{display:flex}"]]),
+    ("no quiet x on the sheet", [["if(card)card.appendChild(x);", ""]]),
+    ("General's rows not grouped", [['const g1=sxGroup([g("#sx-ver-row"),g("#beta-row"),g("#autochk-toggle")],"Updates","sx-g-updates");', "const g1=null;"]]),
+    ("the page behind left showing", [['    document.documentElement.classList.toggle("sx-setopen",!x&&sxHz());   // the page behind steps back (6b625, night edition)\n', ""]]),
     ("the GPU badge on a page with no debug spec", [["function sxBoot(){\n", "function sxBoot(){\n  setTimeout(()=>{const b=document.createElement(\"div\");b.id=\"hz-gpub\";b.textContent=\"GPU sky on \\u00b7 119 fps \\u00b7 Apple GPU\";document.body.appendChild(b);},0);\n"]]),
 ]
 _px_mr = []
 for d_, m_ in _px_mw:
     r_ = _px_live(1440, "full", m_)
-    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "tight", "head", "errs", "mutated")}))
+    _px_mr.append((d_, r_.get("mutated") == 1 and not _px_full_ok(r_), {k: r_.get(k) for k in ("suggest", "closing", "pal", "dict", "fnHome", "chip", "you", "tight", "head", "xclose", "errs", "mutated")}))
 check("6b625 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _px_mr),
       all(ok_ for _, ok_, _ in _px_mr), json.dumps(_px_mr)[:2000])
 # (6) Servers, much cleaner (Patrick: "It still looks like way too much for me, bud"): the page's own sxSrvState and
