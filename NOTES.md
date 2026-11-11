@@ -20611,3 +20611,51 @@ still (`.hz.hz-calm #hz-aur1,…{animation:none}`; the audit measured Calm at 33
   couldn't be copied next to the app", "The update is older than this app", "Its signature didn't check out, so it
   wasn't installed", "It isn't signed by ConcordeAI's developer, so it wasn't installed", "macOS didn't accept it, so
   it wasn't installed".
+
+**Verified** (dev copies on 9971, 9975 and 9987 against a stand-in Groq and a recording proxy that refuses every
+CONNECT; never the real server; headless Chromium via Playwright for the page; the base is c5d44c5 run side by side):
+| | before (c5d44c5) | after (trust-1) |
+|---|---|---|
+| the audit's 29 lockout commands | all `write` (Full runs them) | all `danger` (asks at every level), plus 12 hidden forms and 26 other spellings; 31 everyday reads and writes unchanged |
+| a stream closed at word 30 | saved as finished, no frame | the 30 words, `CUT`, saved `cut: true`, "The connection dropped." with Continue / Try again on reopen |
+| the question with an unwritable folder | the connection dropped (RemoteDisconnected) | 507 and "Couldn't save your question: …" |
+| the answer with the folder made read-only mid-stream | never saved, nothing said | `SAVE {"fail": "denied"}`, saved by the 30 s retry once writable |
+| one searched question | 106 CONNECTs to 9 hosts | 12 to 2 (html.duckduckgo.com, search.brave.com); "Searched the web (DuckDuckGo and Brave)." |
+| a quit (SIGTERM) mid-answer | saved as finished | saved `stopped` |
+| a crash (SIGKILL) mid-answer | the answer lost | 283 of its characters back on the next start, `cut` |
+| a Groq answer on Fast | a 26B MLX engine loaded beside it | none |
+| the page's CSP | `default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'` | per kind (above); no violations in a page load |
+| Calm's aurora | hzSway running | none |
+
+The updater end to end with the real shell (updproof2's beta-1 bundle stamped with this source as 279 and 280, a
+stand-in GitHub on 9908, a dev folder; the scratchpad's `trust1/upd/proof.py`): 16/16 in one run. A corrupted DMG, a
+release with no `.sha256` and a DMG hdiutil can't open are each refused before the quit, the app still running and
+nothing beside it; with the bundle made immutable (`chflags uchg`) the move fails and the helper opens the old app
+(279) again; a good update swaps, opens 280, stays up past the 20 s watch and leaves nothing beside it. The proof found
+three things the helper now does: it waits by process id (its `pgrep` missed the shell, so an open handed over to the
+still-running app and went with it), it registers the bundle with Launch Services before opening (error 162 for a new
+build renamed into a path it knew), and it tries each open three times until the app is seen running.
+
+**Gauntlet:** a full run with its ports moved to 9981-9983 (9901-9903 were another run's): 1,518 / 1,537. The 17 reds
+that were this branch's (pins and mutation anchors that followed moved code, a slice that needed the stream helpers,
+two lint findings, the calm line's rules inside the Horizon block, the font link split across two literals) are fixed
+and re-run green in their sections (`6b620` 19/19 with every mutant caught; the Horizon scoping and 6b540-6b555 42/42;
+the classifier's 173 cases; the DONE clock; ISO-9; the profile lints). A second full run was stopped at 609 / 609 when
+the lead asked to hold full runs while beta 3's release run needed the memory. Two reds are not this branch's as far as
+can be told: `benchmark (live)` (the machine's memory crowded by other copies: "Other apps were using memory",
+`mem_rise` None) and `fluent (page, live)` (the answer's body also carried a numbered list of the run's own earlier
+chats, a Know citation; nothing here touches it). Neither was re-run on the base.
+
+**Left / worth knowing.**
+- The font and map files are not downloaded (Patrick's call): Space Grotesk (variable) and IBM Plex Mono 400/500/600
+  as woff2 in `fonts/`; Leaflet 1.9.4, MapLibre GL 5.24.0 and maplibre-gl-leaflet 0.1.4's five files in `vendor/`.
+  Then MapLibre's SRI (a TODO with jsDelivr's values) is moot and `PAGE_CSP` can drop unpkg and Google.
+- `'unsafe-inline'` stays in the CSP; the first-run splash still loads Michroma from Google.
+- The `.sha256` proves the download is the file the release serves, not who made it: that is the Developer ID's job
+  once Apple activates ZSKSU6BW5T (then every update must carry it and pass Gatekeeper).
+- Cut detection covers streams on the request's own thread; one from another thread that reaches the page would not be
+  marked (none does today). `done_reason: "length"` is still not called cut.
+- An answer settled by the chat's next question (`_turns_settle`) on a full disk is lost with that question's 507.
+- Funnel pictures still ask Bing's image search (`_fimg_bing`).
+- A base dev copy stopped with SIGTERM left its pre-warmed MLX engine running (seen twice on c5d44c5); not looked into.
+- Verified in Blink, not in the app's WKWebView.

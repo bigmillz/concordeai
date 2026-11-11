@@ -39171,8 +39171,7 @@ WEB_FONT_FILES = (
 )
 FONT_REMOTE_LINKS = (
     '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
-    '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700'
-    '&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">')
+    '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&family=Michroma&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">')
 _FONT_FMT = {"ttf": "truetype", "otf": "opentype", "woff": "woff", "woff2": "woff2"}
 
 
