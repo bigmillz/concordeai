@@ -22297,6 +22297,72 @@ click wins. "Test relay" is treated the same way (the coordinator's default, not
 **Inter.** TODO: bundle Inter's official woff2 as `fonts/InterVariable.woff2` once Patrick approves the download;
 `HZ_FONT_FILES` already lists it and the tokens fall back to the system's sans until then.
 
+**Later merges.** beta-4-answers (6b626), beta-4-robust (6b627), beta-4-usable (6b628), trust-1 (6b620), the
+follow-ups of beta-4-ultra (b936398: less blue, the living rays, more Ultra stars, the slider's spring, no overshoot
+until Patrick says so) and beta-4-polish (14e66b9: Settings in one design language), beta-4-look (6b631: the home
+as the demo's), then main after the 7.0 beta 3 cut (0f9cd4e: APP_BUILD 280, APP_BETA 3, so the next cut is build
+281, beta 4).
+- **trust-1's Team ID corrected** before it landed: `UPDATE_TEAM_ID` and its tests and NOTES said "ZSKSU6BW5T"; the
+  Developer ID is "Developer ID Application: Miller World Industries LLC (WNFPCU5A66)" (read back from the keychain),
+  so every signed update would have been refused. Every occurrence now says WNFPCU5A66.
+- **One cut path.** trust-1 (a stream's own end mark, `stream_done`) and 6b627 (`EngineCut`, the engine dying mid-read)
+  both send the same `CUT` frame and save `cut: true`; both detections stay (6b627's also catches a broken read). The
+  page draws ONE line, 6b620's, whose copy Patrick approved ("The connection dropped." with Continue and Try again),
+  live and on reopen; 6b627's "Cut off" line went (its server-side lines and Download again stay). 6b627's page check
+  follows that line at the same strength.
+- `FRAME_TAGS` is 6b620's (with CUT and SAVE, pinned); `FRAME_TAGS_ALL` adds 6b627's REPAIR.
+- trust-1's lockout hint (netplan try) rides 6b625's per-command danger cards too, not only the batch's card.
+- `web_fonts_local` read `HZ_FONT_FILES` as rows of three; Inter's row has five: it reads the file name by index now.
+- The footage keeps both less-blue passes (6b621's blue-excess cut, 6b631's cool cast to grey).
+- New chat mid-answer: 6b624 keeps the answer, 6b627 keeps the key as Send there, 6b628 made New chat `chatFresh()`:
+  `robKeySync()` now runs inside `chatFresh`.
+
+**The headlines (per Patrick: "I would like more variety in the headlines"; "make sure you keep that effect we made
+with the size of the text and how it draws it").** `HZ_HEADLINES` is a pool, each line with when it may show (hours,
+weekdays, months, the lane, first open or returning) and a variant with the person's name, used about two times in
+five. One line per visit to the home; never the same line twice in a row while another fits (the last one is kept in
+localStorage); a lane's own lines first. Every line is the one greeting: its face and size rule, `hzHeadline` and the
+draw-in (`hzHeadlineShow`'s trace); a line too long for one line is fitted (down to 72 %), a short one never shrinks.
+It ships with the four approved lines; the proposed list below waits for Patrick.
+
+Proposed headlines (for Patrick's approval; none ships until he says so):
+- Late night (0–4): Up late? · Still up? · Night owl hours. · Quiet hours. · Can't sleep?
+- Early (5–7): Early start. · Up early? · Good morning.
+- Morning (8–11): Good morning. · Morning. · Fresh start. · Where to start?
+- Midday (12–13): Good afternoon. · Lunch break?
+- Afternoon (14–17): Good afternoon. · Afternoon. · Back at it?
+- Evening (18–21): Good evening. · Evening. · Winding down?
+- Late evening (22–23): Late one? · Still going?
+- Weekdays: (Mon, morning) New week. · (Fri, afternoon) Friday at last. · (Sat) Slow Saturday? · (Sun) Easy Sunday.
+- Any time: What's next? · Where were we? · Ask away. · Let's begin. · What's on your mind? · Ready when you are.
+- First open: Welcome. · Hello there. · Nice to meet you.
+- Returning: Welcome back.
+- Code: What are we building? · Let's build. · Ship something. · What's broken?
+- Funnels: Let's decide. · Big decision? · Narrow it down. · Help choosing?
+- Seasons: (Dec–Feb) Winter nights. · (Mar–May) Spring again. · (Jun–Aug) Long days. · (Sep–Nov) Autumn already.
+- With the name, some of the time: Up late, {name}? · Good morning, {name}. · Good afternoon, {name}. · Good
+  evening, {name}. · Welcome back, {name}. · Evening, {name}. · Ready, {name}?
+
+**The recent chats under the composer (relayed from Patrick's target picture, the web demo's home: "quiet, 3 rows,
+title + relative day").** This brings back what 6b555 removed per Patrick ("They look tacky"), on the lead's word
+from his newer picture: three rows of the lane's latest chats, title and day only (no counts), Inter 13, one-device-
+pixel hairlines, the composer's own width, 24 px under it; not on Funnels' home (its form) or in the opening. The
+composer stays on the golden point (`hzBalance` takes the rows' height off the padding). 6b555's home check is
+re-pinned: one to three rows the composer's width just under it, no chips, the golden point; its mutant hides them.
+
+**Funnels.** The waiting line says "Stage N of M…" and, once every stage is answered, "Weighing your choices…" (it
+said "Stage 6…" after "5 of 5"). A size, length, weight, time or price the person clicked that the verdict contradicts
+("14-inch" → a 13-inch laptop; a price is a ceiling) gets one rewrite on the same model that wrote the verdict (the
+audit is cloud only, so local and server verdicts had no check); the rewrite is kept only if it no longer contradicts.
+
+**The corners and the edge (per Patrick: "I love these corners. They're so sexy.").** The composer's 14 px radius (at
+rest, in a conversation, the token) and Ultra's 1.5 px lit ring on the same radius are pinned to the letter (6b640);
+6b631's live check measures them.
+
+**Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
+DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
+(the dedicated keychain looked locked by then). See the second dry run's line below.
+
 **Verified.** GAUNTLET_LINE
 
 
