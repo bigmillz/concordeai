@@ -22517,6 +22517,25 @@ The effects level already follows prefs.json since 6b628 (fx_level); a fresh ins
   results, one useful question back with two or three things it could help with). The weather, the news, a race
   result, TV tonight and stocks still search. Live on a dev copy: X-Web-Search 0 for the first, 1 for the weather.
 
+**beta-4-voice (6b641, bfe5244) merged**, its copy approved by Patrick ("Listening. Pause or press ⌘D to finish.",
+"Dictation language" / "Same as this computer", the failure lines); the dictation language sits in Settings' Voice
+pane (6b625's split) with the microphone. **The send key is silver with text** (per Patrick: no ember fill, no rose
+anywhere), the edit's Send too; the ember keeps the strike, focus rings, errors and danger.
+
+**The reds of the voice helper's full run (1609/1630 on f969040 + its branch), classified.** Real, fixed in the app:
+the drawer under 760 stayed hidden when the sidebar had been shut on a wide window (`.hz.sbhide ... #sidebar` now
+`:not(.sbopen)`); the greeting's bloom (its ::before) made the home 24 px too wide at 390 (`#hero` clips across);
+6b625's lane hooks threw where a lifted function ran without its block (`sxLaneSoon` guarded); a bare "Concorde" in
+the You pane's label (now "What should we call you?", for Patrick's approval). Intentional changes, re-pinned at equal
+strength: the Sting's ember counted rule by rule by its places (focus, strike, error, danger) instead of a count, with
+mutants for an ember key and an ember chip; the Settings rail read from its own buttons (6b625's script names panes);
+6b630's setup line and its wizard's giants row; the unread dot silver in Horizon (6b624) and the chat landing after
+markSeen (6b590); 6b625's plural and 6b590's fold given to the node harnesses that lift their callers; the Escape order
+(the menu, the host sheet, then a stop); a mutant anchor 6b625 had doubled; 6b580's CSS slice ending at its own block;
+6b590's jump-key mutant taking 6b624's far rule too; 6b625's live harness opening Code's home with New chat (6b628);
+quality-2's lifted names with the small-talk regexes; four host globals for the lint. Checked against a dev copy one
+harness at a time (6b555 header 40 cases, 6b580 layout, 6b624 page, 6b625 live at 1440 and 390, the race, the chips).
+
 **Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
