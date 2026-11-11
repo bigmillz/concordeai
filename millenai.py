@@ -10295,15 +10295,19 @@ WHATS_NEW_CLOSE = "<!-- /whats-new -->"
 
 def user_notes(body) -> str:
     body = str(body or "")
+    # THE FIRST OPEN'S STEPS ARE THE DOWNLOAD PAGE'S (6b628; the walkthrough: About read "First open on a Mac: System
+    # Settings › Privacy & Security › Open Anyway. On Windows: More info › Run anyway." inside the app already open)
+    first = re.compile(r"\bOpen Anyway\b|\bRun anyway\b|\bfirst open\b|Privacy (?:&|and) Security", re.I)
     i = body.find(WHATS_NEW_OPEN)
     if i >= 0:
         j = body.find(WHATS_NEW_CLOSE, i)
-        return body[i + len(WHATS_NEW_OPEN):j if j >= 0 else None].strip()[:4000]
+        inner = body[i + len(WHATS_NEW_OPEN):j if j >= 0 else None]
+        return "\n".join(ln for ln in inner.splitlines() if not first.search(ln)).strip()[:4000]
     keep = []
     for ln in body.splitlines():
         if re.match(r"\s*\*\*(macOS|Windows)\*\*", ln):
             break
-        if re.search(r"\.(msi|zip|dmg|exe)\b|\binstaller\b", ln, re.I):
+        if re.search(r"\.(msi|zip|dmg|exe)\b|\binstaller\b", ln, re.I) or first.search(ln):
             continue
         keep.append(ln)
     return "\n".join(keep).strip()[:4000]
@@ -11140,6 +11144,7 @@ SYNCED_SETTINGS = frozenset((
 PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
+    "fx_level",   # the Effects level (6b628)
     "lend", "lend_pick", "studio_opts.*.neg", "mic_warm",
     "cloud_balance", "comps"))
 MACHINE = frozenset((
@@ -11158,6 +11163,8 @@ STUDIO_NEG = "neg"
 # profile-local keys that hold a real boolean and nothing else (6b429): a
 # string "true" or a 1 from a stray client is ignored, not saved
 LOCAL_BOOL = ("mic_warm",)
+# the Effects level (6b628): Calm, Balanced or Full, and nothing else
+FX_LEVELS = ("calm", "balanced", "full")
 
 
 def comps_ok(v) -> bool:
@@ -11430,7 +11437,8 @@ def split_prefs(ctx, incoming: dict, old=None) -> dict:
         if c is None or k == "studio_opts.*.neg" or (
                 c == "synced" and not synced_value_ok(k, v)) or (
                 k in LOCAL_BOOL and not isinstance(v, bool)) or (
-                k == "comps" and not comps_ok(v)):
+                k == "comps" and not comps_ok(v)) or (
+                k == "fx_level" and v not in FX_LEVELS):
             ignored.append(k)
         else:
             by[c][k] = v
@@ -22481,6 +22489,42 @@ _WS_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv",
             "dist", "build", ".next", "target", ".cache", "vendor"}
 
 
+# ==== THE FOLDER PICKER (6b628): begin ====
+# THE FOLDER PICKER (6b628, per Patrick: "it has to be usable"; the walkthrough: the Code lane's Workspace asked for a
+# typed path). The page's "Choose folder…" opens the system's folder panel. The Mac app's Tauri shell shows its own
+# (pick_folder, through the bridge's shim); pywebview's window is this process's, so its panel is shown from here
+# (a windowed dev copy, the Windows app). A windowless copy has neither and the page keeps the typed path. The path
+# picked goes through /api/workspace/set like a typed one: nothing is read until then.
+def ws_picker() -> str:
+    """"window" when this process holds pywebview's window and can show its folder panel; "" otherwise."""
+    try:
+        return "window" if HAS_WEBVIEW and len(webview.windows) > 0 else ""
+    except Exception:
+        return ""
+
+
+def ws_pick_folder(start: str = "") -> dict:
+    """The folder panel on pywebview's window, from this request's thread (pywebview runs it on the window's own
+    thread and waits): {"path": p}, {"cancel": True} when the person cancels, {"none": True} with no window."""
+    if ws_picker() != "window":
+        return {"none": True}
+    try:
+        kind = getattr(getattr(webview, "FileDialog", None), "FOLDER", None)
+        if kind is None:
+            kind = webview.FOLDER_DIALOG
+        start = os.path.expanduser(str(start or "").strip().strip('"'))
+        if not start or not os.path.isdir(start):
+            start = os.path.expanduser("~")
+        r = webview.windows[0].create_file_dialog(kind, directory=start)
+    except Exception:
+        return {"none": True}
+    if isinstance(r, str):
+        r = [r]
+    p = str((list(r or []) or [""])[0] or "")
+    return {"path": p} if p else {"cancel": True}
+# ==== THE FOLDER PICKER (6b628): end ====
+
+
 def _ws_files(root: str, cap: int = 4000) -> list:
     """Every readable source file under root — skipping the usual
     machine-generated mountains."""
@@ -27847,6 +27891,34 @@ def server_offer(emit, name: str, asleep: bool = False) -> None:
         raise
     except Exception:
         pass
+
+
+# ==== THE PICTURE MODEL, ASKED FIRST (6b628): begin ====
+def vision_offer(emit, keyed: bool = False) -> str:
+    """ASKED, NEVER STARTED (6b628, per Patrick: "it has to be usable"; the walkthrough: the first photo on a Light
+    install started a 6.6 GB download with no warning). A picture with nothing here to read it: one line says which
+    model reads pictures and how big it is, and an OFFER frame the page draws as Download and Not now under it.
+    Nothing downloads until Download is clicked (/api/model/download). A download already on its way is said
+    instead; a computer that can't run the model is told so. keyed: a Claude or Gemini key is saved, so turning on
+    cloud models reads pictures now. Returns what was said, "offer", "busy" or "cant"."""
+    lab = VISION_MODEL
+    cloud = (" Or turn on cloud models in Settings > Models > Cloud and your saved key reads pictures now."
+             if keyed else "")
+    with _setup_lock:
+        job = dict(_setup_jobs.get(lab) or {})
+    if job.get("status") in ("downloading", "queued"):
+        emit("The picture model, %s, is still downloading. Send the picture again when it\u2019s done.%s"
+             % (lab, cloud))
+        return "busy"
+    if not SUPPORTED.get(lab) or not model_fits_machine(lab):
+        emit("Reading pictures needs %s, and this computer can\u2019t run it.%s" % (lab, cloud))
+        return "cant"
+    gb = float(MODEL_INFO[lab]["gb"])
+    emit("Reading pictures needs the picture model, %s. It\u2019s a %s GB download.%s"
+         % (lab, ("%.1f" % gb).rstrip("0").rstrip("."), cloud))
+    emit(Ctl(NUL + "OFFER:" + json.dumps({"pull": lab, "gb": gb}) + NUL))
+    return "offer"
+# ==== THE PICTURE MODEL, ASKED FIRST (6b628): end ====
 
 
 def server_answer(label: str, messages: list, memit, emit, status, step,
@@ -42161,6 +42233,13 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
             got["DONE"] = d
         elif tag == "RATE" and isinstance(d, dict):
             got["RATE"] = d
+        elif tag == "OFFER" and isinstance(d, dict) and d.get("pull"):
+            # the picture model's Download and Not now come back with the chat too (6b628)
+            try:
+                _gb = round(float(d.get("gb") or 0), 1)
+            except (TypeError, ValueError):
+                _gb = 0
+            got["OFFER"] = {"pull": str(d.get("pull"))[:60], "gb": _gb}
         elif tag == "OFFER" and isinstance(d, dict):
             got["OFFER"] = dict({"server": str(d.get("server") or "")[:60]},
                                 **({"asleep": 1} if d.get("asleep") else {}))
@@ -42785,14 +42864,16 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # code in it. READ-ONLY: nothing here writes or executes
             # anything
             if (self.path.startswith("/api/workspace/set")
-                    or self.path.startswith("/api/workspace/off")):
+                    or self.path.startswith("/api/workspace/off")
+                    or self.path.startswith("/api/workspace/pick")):
                 # choosing or dropping the folder writes prefs, so it is a
                 # POST (6b320); a GET here changes nothing
                 self.send_error(405, "use POST")
                 return
             root = (profile_local(self.ctx).get("workspace") or "")
             self._send_json({"ok": bool(root), "root": root,
-                             "files": len(_ws_files(root)) if root else 0})
+                             "files": len(_ws_files(root)) if root else 0,
+                             "pick": ws_picker()})          # the window's folder panel (6b628)
             return
         elif self.path.startswith("/api/geo"):
             # pin lookups for the places module — proxied so the browser
@@ -44155,6 +44236,15 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                  lambda p: p.__setitem__("workspace", root))
             self._send_json({"ok": True, "root": root,
                              "files": len(_ws_files(root))})
+            return
+        if self.path == "/api/workspace/pick":
+            # the window's folder panel (6b628): only a path comes back; /api/workspace/set takes it from there
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            self._send_json(ws_pick_folder(str((d if isinstance(d, dict) else {}).get("start") or "")))
             return
         if self.path.startswith("/api/remote/"):
             # SSH connection + the live approval channel (6b249)
@@ -47472,22 +47562,19 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                         ", and no local vision model is installed. Add one in Settings > Models")
                      + ". Try again in a moment.")
             return cloud_only or (not _vis_local and _vis_srv is None)
-        # first image before the vision engine exists: kick the download
-        # and say so, instead of a cryptic connection error
+        # first image before the vision engine exists: ASK before any download
+        # (6b628, per Patrick: "it has to be usable"): vision_offer says which
+        # model reads pictures and its size, with Download and Not now under it
         if (images and not cloud_only and not _vis_cloud and not _vis_local
                 and not _srv_lbl and _vis_srv is None):
             try:
-                start_model_downloads(["Qwen 3.5 Vision 9B"])
                 # a Claude or Gemini key would read it with the switch on
-                # (6b326, from review): say so beside the 6.6 GB download
+                # (6b326, from review): said beside the offer
                 _pvk = _cloud_all().get("providers") or {}
                 _vkey = any((_pvk.get(p) or {}).get("key")
                             and (_pvk.get(p) or {}).get("status", "ok") == "ok"
                             for p in ("claude", "gemini"))
-                emit("Downloading the vision model (6.6 GB). Paste the image again when "
-                     "Settings > Models shows it done."
-                     + (" Or turn on cloud models in Settings > Models > Cloud and your saved key reads "
-                        "pictures now." if _vkey else ""))
+                vision_offer(emit, _vkey)
             except (BrokenPipeError, ConnectionResetError):
                 pass
             hb_stop.set()
@@ -50471,6 +50558,9 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
   font:12px var(--mono);padding:7px 9px;outline:none;min-width:0}
 #ws-path:focus{border-color:rgba(143,157,255,.6)}
 #ws-note{font-size:11px;color:var(--faint);margin-top:7px;min-height:13px}
+/* the folder picker's key (6b628): the whole width, above the typed path */
+#ws-pick{display:block;width:100%;margin:0 0 8px}
+#ws-pick[hidden]{display:none}
 /* -------------------------------------------------- remote agent */
 /* The autonomy THROTTLE (6b249, per Patrick: "be creative"). Three
    escalating segments — a lock, a bolt, a flame — cool grey to hot
@@ -54344,6 +54434,7 @@ html:not(.hz) .sl-sel{display:none}
 .hz .offerrow button:hover{background:rgba(255,255,255,.08);border-color:var(--hz-line)}
 .hz .offerrow button:active{transform:scale(.97)}
 .hz .offerrow button.sec{color:var(--hz-ink-2);background:none}
+.hz .offerrow .offerst{font:400 13px/32px var(--hz-font-ui);color:var(--chat-ink-2,var(--hz-ink-2))}   /* the download's progress (6b628) */
 .hz .ghostnote.here{border-left:0;padding-left:0;font-size:12.5px;color:var(--hz-ink-3);margin:0 0 10px}
 /* ---- a follow-up typed while an answer is on its way waits for it: said under the box */
 .hz #composer.queued::after{content:"Sends when this answer is done";position:absolute;left:18px;bottom:-19px;
@@ -55912,6 +56003,7 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
 __CODE_ROWS__
     <div id="ws-bar" hidden>
       <div class="set-h">Workspace folder</div>
+      <button class="about-btn slim" id="ws-pick" type="button" hidden>Choose folder…</button>
       <div id="ws-row" class="ctlrow">
         <input id="ws-path" placeholder="~/code/my-project"
                autocomplete="off" spellcheck="false">
@@ -57062,6 +57154,7 @@ async function storeBoot(){
 // 6b324): outside the AI lane nothing is switched, only repainted
 let codeGuess=false;             // the Code tab opened before prefs came
 function applyPrefs(){
+  if(typeof fxAdopt==="function")fxAdopt(P.fx_level);   // the saved Effects level, in a window with none (6b628)
   if(!prefMine.has("adv"))adv=P.adv&&typeof P.adv==="object"?P.adv:null;
   if(!prefMine.has("advon"))advOn=P.advon===true&&!!adv;
   if(!prefMine.has("council")&&Array.isArray(P.council)&&P.council.length
@@ -57272,7 +57365,7 @@ function setTier(name,quiet){
   if(agent){agent="";o.agent="";
     if(typeof paintAgents==="function")paintAgents();}
   if(!quiet)prefSet(o);
-  if(typeof modeShow==="function")modeShow("ai");
+  laneToChat();   // a mode is the Chat lane's: from another lane its own chat comes too (6b628)
   paintModels();                 // paints both tier and model highlights
 }
 const tierPop=$("#tierpop");
@@ -58020,7 +58113,10 @@ function modeShow(which){
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
 // path so the chip never says "Coding" under the Chat tab
-function switchLane(m){
+// how: "keep" when opening a chat moved the lane (loadChat: the chat is its caller's), "fresh" for a new chat there
+function switchLane(m,how){
+  const from=uiMode;
+  if(m!==from)LANE_LEFT[from]=curChat||null;   // the chat this lane was left on (6b628)
   modeShow(m);
   const codey=agent==="Coding"||agent==="Workspace"||agent==="Remote";
   if(m==="code"&&!codey){
@@ -58030,7 +58126,36 @@ function switchLane(m){
     else{codeGuess=true;setAgent("Coding",true);}
   }
   else if(m!=="code"&&codey)setAgent("");
+  if(m!==from&&how!=="keep")laneOpen(m,how);   // 6b628
 }
+// ==== THE LANE'S OWN CHAT (6b628): begin ====
+// THE LANE'S OWN CHAT (6b628, per Patrick: "it has to be usable"; the walkthrough: Code kept the Chat conversation on
+// screen and the next code question landed in it). Each lane remembers the chat it was left on (null: a fresh one); a
+// switch opens that, else the lane's newest chat, else a fresh one, so switching back returns to where you were. An
+// answer on its way is not stopped: it lands in its own chat, the unread dot on its row (6b624's path, the sidebar's).
+var LANE_LEFT={};   // a var, not a const: setTier reaches laneToChat at boot, above this line (the TDZ trap)
+function laneOfChat(c){const l=(c&&c.lane)||"ai";return l==="code"||l==="funnel"?l:"ai";}
+// the chat a lane opens on: the one it was left on while it still exists there, null when it was left on a fresh
+// one, else its newest (by ts), else null (a fresh one)
+function laneChatFor(m,list,left){
+  if(left===null)return null;
+  const mine=(list||[]).filter(c=>c&&laneOfChat(c)===m);
+  if(left&&mine.some(c=>c.id===left))return left;
+  let best=null;for(const c of mine)if(!best||(+c.ts||0)>(+best.ts||0))best=c;
+  return best?best.id:null;
+}
+// a mode or a server model picked from another lane goes to Chat, which opens its own chat as a tab would; in the
+// Chat lane (and at boot, before this block has run) it is modeShow as ever
+function laneToChat(){
+  if(uiMode!=="ai"&&LANE_LEFT)switchLane("ai");
+  else if(typeof modeShow==="function")modeShow("ai");
+}
+function laneOpen(m,how){
+  const id=how==="fresh"?null:laneChatFor(m,chats,LANE_LEFT[m]);
+  if(id){if(id!==curChat)loadChat(id);}
+  else if(curChat||messages.length)chatFresh();
+}
+// ==== THE LANE'S OWN CHAT (6b628): end ====
 $$("#mode-tabs .ltab").forEach(t=>
   t.addEventListener("click",()=>switchLane(t.dataset.m)));
 
@@ -58117,7 +58242,7 @@ $("#task-list").addEventListener("click",e=>{
 // survival is MillenAI-side polling — so there is nothing to ask for.
 function startTask(name,stage){
   if(!name)return;
-  if(uiMode!=="code")switchLane("code");
+  if(uiMode!=="code")switchLane("code","fresh");   // a task starts its own chat (6b628)
   const t=TASK_BY_NAME[name];
   stage=stage||0;
   if(t&&t.w&&stage<1){riskCard(t);return;}          // gate 1: risk
@@ -60140,7 +60265,8 @@ function regenNow(){
   const q=messages[u],keep=messages.slice(0,u);
   if(curChat)chatTrunc={id:curChat,to:u,hash:chatHash(keep,u)};
   messages=keep;redrawOpen();
-  input.value=q.content;
+  // a picture sent again (6b628's Ask again) carries no "🖼️ (image)" stand-in as its words
+  input.value=(typeof pendingImages!=="undefined"&&pendingImages.length&&q.content==="🖼️ (image)")?"":q.content;
   send();
 }
 // EDIT & RESEND: rewind to that question with the text in the composer
@@ -60733,6 +60859,7 @@ function hzStarLand(div){
 function offerRow(div,o){
   if(!div||!o)return;
   const old=div.querySelector(":scope>.offerrow");if(old)old.remove();
+  if(o.pull){visOfferRow(div,o);return;}   // the picture model, asked first (6b628)
   const nm=String(o.server||"")||"your server";
   const row=document.createElement("div");row.className="offerrow";
   row.innerHTML='<button type="button" data-offer="here">Answer on '+(IS_PC?"this PC":"this Mac")+'</button>'
@@ -60742,12 +60869,62 @@ function offerRow(div,o){
 }
 function offerClick(e){
   const b=e.target.closest&&e.target.closest(".offerrow button[data-offer]");
+  if(b&&b.closest(".offerrow.vis")){visOfferClick(b);return;}   // 6b628
   if(!b||generating)return;
   const row=b.closest(".offerrow");
   hereOnce=b.dataset.offer==="here"?{name:row.dataset.server,asleep:!!row.dataset.asleep}:null;
   row.remove();
   regenerate();
 }
+// ==== THE PICTURE MODEL, ASKED FIRST (6b628): begin ====
+// THE PICTURE MODEL, ASKED FIRST (6b628, per Patrick: "it has to be usable"; the walkthrough: the first photo on a Light
+// install started a 6.6 GB download unasked). The server's line names the model and its size; under it Download and
+// Not now. Download starts it (/api/model/download) and the row follows it from /api/setup: "Downloading… N %", then
+// Ask again, which sends the question again with its picture (kept for the session, annChats); Not now takes the keys
+// away. Only the chat's last answer keeps them (the offerrow css), as the server pick's way on.
+function visOfferRow(div,o){
+  const row=document.createElement("div");row.className="offerrow vis";row.dataset.pull=String(o.pull||"");
+  row.innerHTML='<button type="button" data-offer="pull">Download</button><button type="button" class="sec" data-offer="later">Not now</button>';
+  div.appendChild(row);
+}
+function visOfferSay(row,text,keys){
+  row.innerHTML='<span class="offerst" role="status">'+esc(text)+'</span>'+(keys||"");
+}
+async function visOfferClick(b){
+  const row=b.closest(".offerrow"),act=b.dataset.offer,lab=row.dataset.pull;
+  if(act==="later"){row.remove();input.focus();return;}
+  if(act==="ask"){visAgain(row);return;}
+  if(act!=="pull"||row.dataset.busy)return;
+  row.dataset.busy="1";visOfferSay(row,"Starting the download…");
+  try{await api("/api/model/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({labels:[lab]})});}
+  catch(e){delete row.dataset.busy;visOfferSay(row,"Couldn’t start the download.",'<button type="button" data-offer="pull">Try again</button>');return;}
+  visOfferPoll(row,lab);
+}
+async function visOfferPoll(row,lab){
+  while(row.isConnected){
+    let m=null;
+    try{m=((await(await api("/api/setup")).json()).models||[]).find(x=>x.label===lab)||null;}catch(e){}
+    if(!row.isConnected)return;
+    if(m&&m.status==="ready"){delete row.dataset.busy;
+      visOfferSay(row,"The picture model is ready.",'<button type="button" data-offer="ask">Ask again</button>');return;}
+    if(m&&m.status==="error"){delete row.dataset.busy;
+      visOfferSay(row,"The download stopped"+(m.note?": "+m.note:"")+".",'<button type="button" data-offer="pull">Try again</button>');return;}
+    const pct=m&&typeof m.pct==="number"&&m.pct>0&&m.pct<100?" "+Math.round(m.pct)+" %":"";
+    visOfferSay(row,"Downloading the picture model…"+pct);
+    await new Promise(r=>setTimeout(r,VIS_POLL_MS));
+  }
+}
+var VIS_POLL_MS=2000;
+// the question again, with the picture it carried (kept for this session); without it, the box asks for it
+function visAgain(row){
+  let u=messages.length-1;while(u>=0&&messages[u].role!=="user")u--;
+  const e=u<0?null:(annChats.get(curChat)||[]).filter(x=>x.at===u).pop();
+  if(!e||!e.img){visOfferSay(row,"The picture model is ready. Attach the picture again to ask.");input.focus();return;}
+  row.remove();
+  pendingImages=[e.img];paintChips();
+  regenerate();
+}
+// ==== THE PICTURE MODEL, ASKED FIRST (6b628): end ====
 function answerLanded(){
   try{document.dispatchEvent(new Event("hz-answer-done"));}catch(e){}
 }
@@ -63260,7 +63437,7 @@ function loadChat(id){
   chatTrunc=null;
   // opening a chat from another lane (⌘K reaches everything) hops the
   // tab with it, so the sidebar context always matches what's on screen
-  if((c.lane||"ai")!==uiMode)switchLane(c.lane||"ai");
+  if(laneOfChat(c)!==uiMode)switchLane(laneOfChat(c),"keep");   // the chat is this call's (6b628)
   // an in-flight answer is NOT aborted: it streams on quietly and lands
   // in its own chat — switching away no longer costs you the response
   // ...but an in-flight FUNNEL is abandoned: its option cards die with
@@ -63293,6 +63470,7 @@ async function wsRefresh(){
   if(!on)return;
   try{
     const st=await(await api("/api/workspace")).json();
+    wsPickOK=st.pick==="window";wsPickPaint();   // 6b628
     if(st.ok){
       $("#ws-path").value=st.root;
       $("#ws-note").textContent=st.files+" files indexed";
@@ -63301,8 +63479,33 @@ async function wsRefresh(){
     }
   }catch(e){}
 }
-$("#ws-set").addEventListener("click",async()=>{
-  const root=$("#ws-path").value.trim();
+$("#ws-set").addEventListener("click",()=>wsUse($("#ws-path").value.trim()));
+// ==== THE FOLDER PICKER (6b628): begin ====
+// "Choose folder…" opens the system's folder panel: the Mac app's shell (pick_folder, on the bridge's shim) or this
+// server's window (pywebview: a windowed dev copy, the Windows app). With neither the key stays hidden and the typed
+// path is the way, as before. A cancel changes nothing; a pick goes through /api/workspace/set as a typed path does.
+let wsPickOK=false,wsPicking=false;
+function wsShellPick(){const p=window.pywebview&&window.pywebview.api;return p&&typeof p.pick_folder==="function"?p:null;}
+function wsPickPaint(){const b=$("#ws-pick");if(b)b.hidden=!(wsShellPick()||wsPickOK);}
+async function wsPick(){
+  if(wsPicking)return;
+  wsPicking=true;const b=$("#ws-pick");if(b)b.disabled=true;
+  try{
+    let path=null;const sh=wsShellPick();
+    if(sh)path=await sh.pick_folder();
+    else{
+      const r=await(await api("/api/workspace/pick",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({start:$("#ws-path").value.trim()})})).json();
+      if(r.none){wsPickOK=false;wsPickPaint();$("#ws-path").focus();return;}
+      path=r.path||null;
+    }
+    if(typeof path==="string"&&path){$("#ws-path").value=path;await wsUse(path);}
+  }catch(e){$("#ws-note").textContent="Couldn’t open the folder picker. Type the path instead.";}
+  finally{wsPicking=false;if(b)b.disabled=false;}
+}
+$("#ws-pick").addEventListener("click",wsPick);
+// ==== THE FOLDER PICKER (6b628): end ====
+async function wsUse(root){
   if(!root)return;
   $("#ws-note").textContent="Checking…";
   try{
@@ -63314,7 +63517,7 @@ $("#ws-set").addEventListener("click",async()=>{
       ?st.files+" files indexed"
       :(st.err||"That didn’t work. Try again.");
   }catch(e){$("#ws-note").textContent="Couldn’t reach the app. Try again.";}
-});
+}
 
 /* ------------------------------------------------------- funnels */
 // The funnel runs in the main panel as its own conversation: each
@@ -63822,7 +64025,9 @@ document.addEventListener("keydown",e=>{
 });
 
 /* ----------------------------------------------------------- new chat */
-$("#newchat").addEventListener("click",()=>{
+$("#newchat").addEventListener("click",()=>{chatFresh();input.focus();});
+// a fresh chat on screen: the new-chat key, and a lane with no chat of its own to open (6b628)
+function chatFresh(){
   pendingEdit=null;                 // a new chat drops an edit that was waiting (6b343)
   // an answer on its way is NOT stopped (6b624, per Patrick: "I want this UI to be perfect"): it finishes in the
   // background and lands in its own chat, saved whole, with the unread dot on its row until it is opened; the same path
@@ -63832,8 +64037,7 @@ $("#newchat").addEventListener("click",()=>{
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
-  input.focus();
-});
+}
 
 /* ---------------------------------------------------------- telemetry */
 function buildMeter(el){const f=document.createElement("div");
@@ -66872,7 +67076,7 @@ function pickServerModel(label){
   if(agent){agent="";if(typeof paintAgents==="function")paintAgents();}
   council=[label];
   prefSet({tier:"",model:label,council:[label],advon:false,agent:""});
-  if(typeof modeShow==="function")modeShow("ai");
+  laneToChat();   // a mode is the Chat lane's: from another lane its own chat comes too (6b628)
   paintModels();
 }
 (function(){
@@ -71493,6 +71697,20 @@ function setFxLevel(v){
   try{localStorage.setItem("millen.fxlevel",v);}catch(e){}
   hzFxApply();
 }
+// ==== THE EFFECTS LEVEL KEPT (6b628): begin ====
+// THE EFFECTS LEVEL KEPT (6b628; the walkthrough: Effects lived in this window's storage alone, so a reinstall or a
+// new window forgot it). A pick in Settings is saved in prefs.json (fx_level) as the other settings are; a window
+// with none of its own (a reinstall, a new window) takes the saved one when the settings arrive. A window that has
+// its own keeps it: its first paint was drawn from it, before the settings could answer.
+function fxKeep(){if(typeof prefSet==="function")prefSet({fx_level:hzFxLevel()});}
+function fxAdopt(saved){
+  if(saved!=="calm"&&saved!=="balanced"&&saved!=="full")return false;
+  let own=null;try{own=localStorage.getItem("millen.fxlevel");}catch(e){return false;}
+  if(own!==null)return false;
+  try{localStorage.setItem("millen.fxlevel",saved);}catch(e){return false;}
+  hzFxApply();return true;
+}
+// ==== THE EFFECTS LEVEL KEPT (6b628): end ====
 function hzFxApply(){
   const lv=hzFxLevel(),root=document.documentElement;
   root.classList.toggle("hz-full",lv==="full");root.classList.toggle("hz-bal",lv==="balanced");
@@ -71585,7 +71803,7 @@ function hzInit(){
   const clist=$("#chat-list");
   if(clist&&window.MutationObserver)new MutationObserver(()=>{if(root.classList.contains("hz")){hzSideLive();hzRenameCheck();}}).observe(clist,{childList:true});
   const fsel=$("#fx-level");
-  if(fsel){fsel.value=hzFxLevel();fsel.addEventListener("change",()=>setFxLevel(fsel.value));}
+  if(fsel){fsel.value=hzFxLevel();fsel.addEventListener("change",()=>{setFxLevel(fsel.value);fxKeep();});}
   root.classList.toggle("hz-full",hzFxLevel()==="full");root.classList.toggle("hz-bal",hzFxLevel()==="balanced");
   const inp=$("#input");if(inp&&root.classList.contains("hz"))inp.placeholder="Ask anything";
   // the send key is ember only while there are words to send (6b542)
