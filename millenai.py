@@ -670,6 +670,8 @@ _KNOWN_ENV = frozenset((
     "MILLENAI_UPDATE_API",
     # a dev copy's stand-in search engine (beta 4): no test ever reaches a real one
     "MILLENAI_SEARCH_STUB",
+    # ...and its recorded hits (6b650): a JSON file of {keys, hits}; honoured only with the stand-in
+    "MILLENAI_SEARCH_FIXTURE",
     # a dev copy's dictation helper (6b543; missing here until 6b641, so a
     # copy that named one refused to start); honoured only when DEV_HOME is set
     "MILLENAI_DICT_HELPER",
@@ -901,6 +903,32 @@ except ImportError:
 SEARCH_STUB = bool(DEV_HOME) and os.environ.get("MILLENAI_SEARCH_STUB", "").strip() == "1"
 
 
+# RECORDED HITS FOR THE STAND-IN (6b650, funnels-1): MILLENAI_SEARCH_FIXTURE names a JSON list of
+# {"keys": [words], "hits": [{title, href, body, date}]}; a text or news query takes the hits of the entry whose keys it
+# names most (none: the made-up hits). The hits' pages are never read by the funnel, which works from snippets.
+SEARCH_FIXTURE = os.environ.get("MILLENAI_SEARCH_FIXTURE", "").strip() if SEARCH_STUB else ""
+_FIXTURE_ROWS = []
+
+
+def _fixture_hits(query, n):
+    if not SEARCH_FIXTURE:
+        return []
+    if not _FIXTURE_ROWS:
+        try:
+            with open(SEARCH_FIXTURE, encoding="utf-8") as f:
+                _FIXTURE_ROWS.extend(x for x in json.load(f) if isinstance(x, dict))
+        except Exception:
+            return []
+    q = " %s " % " ".join(re.findall(r"[a-z0-9'-]+", str(query or "").lower()))
+    best, score = None, 0
+    for e in _FIXTURE_ROWS:
+        k = sum(1 for w in e.get("keys") or () if (" %s " % str(w).lower()) in q
+                or (len(str(w)) > 4 and str(w).lower() in q))
+        if k > score:
+            best, score = e, k
+    return [dict(h, url=h.get("href", ""), source="Fixture") for h in (best or {}).get("hits", [])][:max(1, int(n or 5))]
+
+
 class _StubDDGS:
     """The stand-in engine (SEARCH_STUB): DDGS's text, news and images, made up from the query."""
     def __init__(self, *a, **k):
@@ -909,6 +937,10 @@ class _StubDDGS:
     @staticmethod
     def _hits(query, n, kind):
         q = " ".join(str(query or "").split())[:80] or "the question"
+        if kind != "images":
+            got = _fixture_hits(query, n)
+            if got:
+                return got
         out = []
         for i in range(1, max(1, min(int(n or 5), 8)) + 1):
             url = "http://127.0.0.1:9/stand-in/%s/%d" % (kind, i)
@@ -42093,6 +42125,646 @@ def funnel_sys_for(goal: str) -> str:
     return FUNNEL_SYS + (FUNNEL_CARE if _TENDER_RX.search(goal or "") else "")
 
 
+# ==== funnels-1 (6b650): begin ====
+# FUNNELS, CORRECT AND CONFIDENT (6b650, per Patrick: "I want the queries that come back to be perfect, like Fable
+# level, and the funnels to be just as perfect"). The walkthrough's faults: a clicked 14-inch came back as a 13-inch
+# laptop (the 6b640 check passed it, since the verdict said "your 14-inch preference" while naming the 13-inch); a
+# budget asked again after the requirements had set it, then broken; prices and models from memory (a 2023 phone as
+# "your phone"); and nothing to watch while it worked. Now:
+# - THE WALLS: every choice (each pick, the requirements' numbers, a typed answer) is a numbered, binding constraint,
+#   carried into the research, the writer and a check that reads the PICK ITSELF (its name, specs and price), never
+#   the prose around it;
+# - THE RESEARCH: the web is searched for current names and prices before the pick is written (warmed while the person
+#   reads the last question), and the pick cites what it used, with the date it was checked;
+# - THE PICK has a shape (a hero, two lines of why, "why not the others", a cheaper and a premium alternate), checked
+#   against the walls before it is shown; a miss gets one rewrite on the same model, and a miss that survives is said;
+# - THE PROGRESS: each wait says what it is doing (the stage, a model loading, the search, the check), read by the page
+#   from /api/funnel/progress.
+_FN_PROG = {}                       # run id -> {"t": last write, "steps": [{k, say, st, d}]}
+_FN_PROG_LOCK = threading.Lock()
+_FN_TL = threading.local()
+_FN_RUN_RX = re.compile(r"[A-Za-z0-9_-]{6,48}")
+
+
+def fn_prog_bind(run) -> None:
+    """This request's progress goes to `run` (the page's id for this funnel), or nowhere."""
+    run = str(run or "")
+    _FN_TL.run = run if _FN_RUN_RX.fullmatch(run) else ""
+    if _FN_TL.run:
+        with _FN_PROG_LOCK:
+            now = time.time()
+            for k in [k for k, v in _FN_PROG.items() if now - v["t"] > 900]:
+                _FN_PROG.pop(k, None)
+            _FN_PROG[_FN_TL.run] = {"t": now, "steps": []}
+
+
+def _fn_say(k, say, st="run", d="") -> None:
+    """One line of the wait the page shows: step k (a later call updates it), its words, run/done/err, a detail."""
+    run = getattr(_FN_TL, "run", "")
+    if not run:
+        return
+    with _FN_PROG_LOCK:
+        p = _FN_PROG.get(run)
+        if p is None:
+            return
+        p["t"] = time.time()
+        for s in p["steps"]:
+            if s["k"] == k:
+                s.update(say=str(say)[:120], st=st, d=str(d)[:160])
+                return
+        p["steps"].append({"k": str(k)[:16], "say": str(say)[:120], "st": st, "d": str(d)[:160]})
+
+
+def _fn_load_say(label) -> None:
+    """A local model about to load says so, with how long it takes here."""
+    try:
+        if engine_must_load(label):
+            _fn_say("load", "Loading %s" % label, "run", engine_load_line(label, _LOADS["at"].get(label) or 0.0))
+    except Exception:
+        pass
+
+
+def fn_prog_get(run) -> dict:
+    with _FN_PROG_LOCK:
+        p = _FN_PROG.get(str(run or ""))
+        return {"steps": [dict(s) for s in p["steps"]]} if p else {"steps": []}
+
+
+# the walls: prices (a ceiling unless the words say a floor), numbers with units, and every choice in words
+_FN_PRICE_RX = re.compile(
+    r"(?P<pre>\b(?:under|below|up\s+to|max(?:imum)?|at\s+most|no\s+more\s+than|less\s+than|within|at\s+least|over|"
+    r"more\s+than|minimum|from|budget(?:\s+(?:of|is))?)\s*)?\$\s?(?P<n>\d[\d,]*(?:\.\d+)?)\s*(?P<k>k\b)?"
+    r"(?:\s*(?:-|–|to)\s*\$?\s?(?P<n2>\d[\d,]*(?:\.\d+)?)\s*(?P<k2>k\b)?)?"
+    r"(?P<per>\s*(?:/|a|per)\s*(?:mo(?:nth)?|month|night|year|yr|week|person)\b)?", re.I)
+_FN_FLOOR_RX = re.compile(r"at\s+least|over|more\s+than|minimum|from", re.I)
+_FN_MAX_RX = re.compile(r"\b(under|below|up\s+to|max(?:imum)?|at\s+most|no\s+more\s+than|less\s+than|within|or\s+less)\s*$", re.I)
+_FN_MIN_RX = re.compile(r"\b(at\s+least|over|more\s+than|minimum)\s*$", re.I)
+_FN_MIN_AFTER_RX = re.compile(r"\s*(?:\+|or\s+(?:more|larger|bigger|longer)\b|and\s+up\b)", re.I)
+_FN_EXTRA_RX = re.compile(r"(?<![\w.])(\d+|one|two|three|four|five|six)[\s-]?(bays?|bed(?:room)?s?)\b", re.I)
+_FN_WORDNUM = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+_FN_UNIT_SAY = {"inch": "%g-inch", "kg": "%g kg", "lbs": "%g lb", "gb": "%g GB", "tb": "%g TB", "hours": "%g hours",
+                "minutes": "%g minutes", "days": "%g days", "nights": "%g nights", "weeks": "%g weeks",
+                "people": "%g people", "seats": "%g seats", "bay": "%g bays", "bedroom": "%g-bedroom"}
+
+
+def _fn_price_of(text):
+    """(value, per) of the one price a field states, or None: after "total" or "=" when there is one, else the first."""
+    t = str(text or "")
+    m = re.search(r"(?:total|=)[^$]{0,24}(\$\s?\d[\d,]*(?:\.\d+)?\s*k?)", t, re.I)
+    m = _FN_PRICE_RX.search(m.group(1) if m else t)
+    if not m:
+        return None
+    try:
+        v = float(m.group("n").replace(",", "")) * (1000 if m.group("k") else 1)
+    except ValueError:
+        return None
+    pw = re.search(r"mo(?:nth)?|night|year|yr|week|person", (m.group("per") or "").lower())
+    per = {"mo": "month", "yr": "year"}.get(pw.group(0) if pw else "", pw.group(0) if pw else "")
+    if not per:
+        pm = re.search(r"/\s*(mo|month|night|yr|year)\b|\ba\s+(month|night|year)\b|\bper\s+(month|night|year)\b", t, re.I)
+        per = {"mo": "month", "yr": "year"}.get((pm and next(g for g in pm.groups() if g) or "").lower(),
+                                                (pm and next(g for g in pm.groups() if g) or "").lower())
+    return v, per
+
+
+def _fn_nums_all(text, tails=False) -> list:
+    """(unit, value, op) in text: _fn_nums' units plus bays and bedrooms; op "max" when the words before say a
+    ceiling ("under 40 minutes"), else "eq". With tails, a fourth item: the words after it (" a week")."""
+    t = str(text or "")
+    out = []
+
+    def tail(end):
+        m = re.match(r"\s+(?:a|per)\s+(?:week|session|day|month|night)\b", t[end:end + 16], re.I)
+        return m.group(0) if m else ""
+    for m in _FN_NUM_RX.finditer(t):
+        got = _fn_nums(m.group(0))
+        if got and got[0][0] != "$":
+            before = t[max(0, m.start() - 16):m.start()]
+            op = ("max" if _FN_MAX_RX.search(before) else "min" if _FN_MIN_RX.search(before)
+                  or _FN_MIN_AFTER_RX.match(t[m.end():m.end() + 14]) else "eq")
+            u, v = got[0]
+            if u == "tb":
+                u, v = "gb", v * 1000         # one unit for storage: 1 TB meets "512GB"
+            out.append((u, v, op) + ((tail(m.end()),) if tails else ()))
+    for m in _FN_EXTRA_RX.finditer(t):
+        n = m.group(1).lower()
+        v = float(_FN_WORDNUM.get(n, n) if not n.isdigit() else n)
+        out.append(("bay" if m.group(2).lower().startswith("bay") else "bedroom", v, "eq") + (("",) if tails else ()))
+    return out
+
+
+def funnel_walls(goal, reqs, asked, picks) -> list:
+    """The person's walls, numbered for the writer and read by funnel_verify: a price ceiling (or floor), a number
+    with its unit (exact, or a ceiling), and each choice in their words. The requirements first, then the picks; a
+    later number on the same unit replaces an earlier one (they changed their mind). Pure."""
+    walls, seen = [], {}
+
+    def add(w, key=None):
+        if key and key in seen:
+            walls[seen[key]] = w
+            return
+        if key:
+            seen[key] = len(walls)
+        walls.append(w)
+
+    srcs = [("req", str(reqs or ""), "")] + [
+        ("pick", str(p), str(asked[i]) if i < len(asked or []) else "") for i, p in enumerate(picks or [])]
+    for kind, text, q in srcs:
+        for m in _FN_PRICE_RX.finditer(text):
+            try:
+                a = float(m.group("n").replace(",", "")) * (1000 if m.group("k") else 1)
+                b = float(m.group("n2").replace(",", "")) * (1000 if m.group("k2") else 1) if m.group("n2") else None
+            except ValueError:
+                continue
+            per = _fn_price_of(m.group(0))[1] if _fn_price_of(m.group(0)) else ""
+            floor = bool(m.group("pre") and _FN_FLOOR_RX.search(m.group("pre"))) and b is None
+            v = b if b is not None else a
+            say = ("$%s or more" if floor else "$%s or less") % format(int(v) if v == int(v) else v, ",")
+            add({"k": "price", "min" if floor else "max": v, "per": per,
+                 "say": "Price: %s%s (%s)" % (say, (" a " + per) if per else "", "their budget"
+                                               if kind == "req" else "they picked \"%s\"" % text[:60])},
+                "price-min" if floor else "price")
+        found = _fn_nums_all(text, True)
+        for unit, v, op, tail in found:
+            same = [x[1] for x in found if x[0] == unit]
+            if len(same) > 1:
+                if v != same[0]:
+                    continue               # "14-inch to 15-inch": one wall, the range
+                op, lo, v = "range", min(same), max(same)
+            if unit in ("minutes", "hours") and op == "eq" and kind == "req":
+                op = "max"                 # "45 minutes a session" is a time limit (FUNNEL_SUMMARY_SYS: a wall)
+            if unit == "gb" and op == "eq":
+                op = "min"                 # storage or memory: more is never a miss
+            say1 = lambda x: _FN_UNIT_SAY.get(unit, "%g " + unit) % x
+            word = ("%s to %s" % (say1(lo), say1(v)) if op == "range" else say1(v)) + tail
+            w = {"k": "num", "unit": unit, "v": v, "op": op,
+                 "say": "%s%s%s (%s)" % ("At most " if op == "max" else "At least " if op == "min" else "", word,
+                                         "", "they said so" if kind == "req" else "they picked \"%s\"" % text[:60])}
+            if op == "range":
+                w["lo"] = lo
+            add(w, "num-" + unit)
+        if kind == "pick":
+            add({"k": "pick", "q": q[:140], "a": text[:90],
+                 "say": "They chose \"%s\"%s" % (text[:90], (" when asked \"%s\"" % q[:120]) if q else "")})
+    if str(reqs or "").strip():
+        add({"k": "said", "say": "In their own words: \"%s\"" % str(reqs).strip()[:300]})
+    return walls
+
+
+# the families a choice rules out: what the person said (their requirements and picks), and what the pick may not be
+_FN_FAMILIES = (
+    ("mac", r"\bmac\s?os\b|\bmacbook\b|\bmacs?\b(?!\s*and\b)", r"\bwindows\b|chromebook|chrome\s?os|thinkpad|\bdell\b|\bxps\b|"
+     r"\bhp\b|lenovo|\basus\b|zenbook|\bacer\b|\bsurface\b|razer|\bmsi\b|galaxy book"),
+    ("windows", r"\bwindows\b", r"\bmac\s?book|\bmac\s?os\b|\bimac\b|chromebook"),
+    ("android", r"\bandroid\b", r"\biphone\b"),
+    ("ios", r"\biphone\b|\bios\b", r"\bandroid\b|\bpixel\b|\bgalaxy\b|oneplus|motorola"),
+    ("awd", r"\bawd\b|all[\s-]wheel|\b4wd\b|four[\s-]wheel", r"\bfwd\b|front[\s-]wheel[\s-]drive|\brwd\b|rear[\s-]wheel[\s-]drive"),
+)
+
+
+def _fn_families(walls) -> list:
+    said = " ".join(w.get("a", "") if w["k"] == "pick" else w["say"] for w in walls if w["k"] in ("pick", "said")).lower()
+    on = [f for f in _FN_FAMILIES if re.search(f[1], said, re.I)]
+    names = {f[0] for f in on}
+    # both of a pair ("Macs and a Windows PC"): neither rules anything out
+    return [f for f in on if not ({f[0], {"mac": "windows", "windows": "mac", "android": "ios", "ios": "android"}.get(f[0], "")}
+                                   <= names)]
+
+
+def _fn_norm(s) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", str(s or "").lower()))
+
+
+def funnel_verify(fn, walls) -> list:
+    """What in a structured verdict breaks the person's walls or itself: [(where, why)], where is "pick", "shape" or
+    an alternate's index ("alt0", "alt1"). Reads each thing's own name, specs and price, never the prose around it
+    (a verdict saying "your 14-inch preference" while naming a 13-inch is a miss). Pure."""
+    out = []
+    if not isinstance(fn, dict) or not isinstance(fn.get("pick"), dict) or not str(fn["pick"].get("name", "")).strip():
+        return [("shape", "there is no pick with a name")]
+    fams = _fn_families(walls)
+
+    def own(item):
+        problems = []
+        text = "%s %s" % (item.get("name", ""), item.get("specs", ""))
+        pr = _fn_price_of(item.get("price", ""))
+        for w in walls:
+            if w["k"] == "price":
+                if pr is None:
+                    if "max" in w and not re.search(r"\bfree\b|\$\s?0\b", str(item.get("price", "")), re.I):
+                        problems.append("it has no price, and you set one")
+                    continue
+                if w["per"] and pr[1] and w["per"] != pr[1]:
+                    continue
+                if "max" in w and pr[0] > w["max"] + 1e-6:
+                    problems.append("it costs $%s, over your $%s" % (format(int(pr[0]), ","), format(int(w["max"]), ",")))
+                if "min" in w and pr[0] < w["min"] - 1e-6:
+                    problems.append("it costs $%s, under your $%s floor" % (format(int(pr[0]), ","), format(int(w["min"]), ",")))
+            elif w["k"] == "num":
+                vals = [v for u, v, _ in _fn_nums_all(text) if u == w["unit"]]
+                if not vals:
+                    continue
+                tol = 0.3 if w["unit"] == "inch" else 1e-6
+                if w["op"] == "max" and min(vals) > w["v"] + tol:
+                    problems.append("it is %s, over your %s" % (_FN_UNIT_SAY.get(w["unit"], "%g") % min(vals),
+                                                                 _FN_UNIT_SAY.get(w["unit"], "%g") % w["v"]))
+                elif w["op"] == "min" and max(vals) < w["v"] - tol:
+                    problems.append("it is %s, under your %s" % (_FN_UNIT_SAY.get(w["unit"], "%g") % max(vals),
+                                                                  _FN_UNIT_SAY.get(w["unit"], "%g") % w["v"]))
+                elif w["op"] == "range" and not any(w["lo"] - tol <= v <= w["v"] + tol for v in vals):
+                    problems.append("it is %s, outside the %g to %g you chose" % (
+                        _FN_UNIT_SAY.get(w["unit"], "%g") % vals[0], w["lo"], w["v"]))
+                elif w["op"] == "eq" and not any(abs(v - w["v"]) <= tol for v in vals):
+                    problems.append("it is %s, not the %s you chose" % (_FN_UNIT_SAY.get(w["unit"], "%g") % vals[0],
+                                                                         _FN_UNIT_SAY.get(w["unit"], "%g") % w["v"]))
+        for name, _said, bad in fams:
+            hit = re.search(bad, text, re.I)
+            if hit:
+                problems.append({"mac": "you chose a Mac, and this isn't one",
+                                 "windows": "you chose Windows, and this doesn't run it",
+                                 "android": "you chose Android, and this isn't an Android phone",
+                                 "ios": "you chose an iPhone, and this isn't one",
+                                 "awd": "you chose all-wheel drive, and this doesn't have it"}[name])
+        return problems
+
+    pick = fn["pick"]
+    for p in own(pick):
+        out.append(("pick", p))
+    for n in fn.get("misses") or []:
+        try:
+            out.append(("pick", "it says itself it misses: %s" % walls[int(n) - 1]["say"]))
+        except (ValueError, TypeError, IndexError):
+            pass
+    pn = _fn_norm(pick.get("name"))
+    pp = _fn_price_of(pick.get("price", ""))
+    for i, a in enumerate(fn.get("alts") or []):
+        if not isinstance(a, dict) or not str(a.get("name", "")).strip():
+            continue
+        tag = "alt%d" % i
+        for p in own(a):
+            out.append((tag, p))
+        if _fn_norm(a.get("name")) == pn:
+            out.append((tag, "it is the pick again"))
+        ap = _fn_price_of(a.get("price", ""))
+        kind = str(a.get("kind", "")).lower()
+        if pp and ap and (not pp[1] or not ap[1] or pp[1] == ap[1]):
+            if kind.startswith("cheap") and ap[0] >= pp[0]:
+                out.append((tag, "the cheaper one costs no less than the pick"))
+            if kind.startswith("prem") and ap[0] <= pp[0]:
+                out.append((tag, "the premium one costs no more than the pick"))
+    for r in fn.get("why_not") or []:
+        if isinstance(r, dict) and pn and _fn_norm(r.get("name")) == pn:
+            out.append(("shape", "the pick is also under why not"))
+    return out
+
+
+def _wrote_parts(label, msgs) -> list:
+    """A model's whole reply, as parts (the rewrite on the model that wrote the pick)."""
+    parts = []
+    run_model(label, msgs, parts.append)
+    return parts
+
+
+def funnel_fix_note(problems) -> str:
+    """The one rewrite's instruction, from funnel_verify's findings."""
+    pick = [p for w, p in problems if w in ("pick", "shape")]
+    alts = [p for w, p in problems if w.startswith("alt")]
+    return ("Your recommendation breaks the person's choices: "
+            + "; ".join(["the pick: " + p for p in pick] + ["an alternate: " + p for p in alts])
+            + ". Write it again as the same STRICT JSON: a pick (and two alternates) that meet every choice exactly, "
+              "by their real specs and price. If nothing real meets every choice, keep the closest real one, list the "
+              "choice in misses and say so in note, in one plain sentence. Never mention this note.")
+
+
+def _fn_s(x, n) -> str:
+    return " ".join(str(x or "").split())[:n]
+
+
+def _fn_line(x, n) -> str:
+    """A sentence of the card starts as one ("the 5x telephoto provides..." was seen); names keep their case."""
+    t = _fn_s(x, n)
+    return t[:1].upper() + t[1:]
+
+
+def _fn_json_mend(t: str) -> str:
+    """A local model's JSON slips, mended (all seen in the runs): a trailing comma; a pick left open, so the rest of
+    the verdict sat inside it; the whole object closed early, before its last fields; a closer it never wrote.
+    Strings are skipped while counting."""
+    t = re.sub(r",(\s*[}\]])", r"\1", t)
+    out, stack, q, esc = [], [], False, False
+    for i, ch in enumerate(t):
+        if q:
+            out.append(ch)
+            esc, q = (not esc and ch == "\\"), (q if esc or ch != '"' else False)
+            continue
+        if ch == '"':
+            q = True
+        elif ch in "{[":
+            stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if ch not in stack:
+                continue                   # a stray closer
+            while stack[-1] != ch:
+                out.append(stack.pop())    # an inner one it forgot
+            if len(stack) == 1 and t[i + 1:].strip():
+                continue                   # the object closed early: more of it follows
+            stack.pop()
+        out.append(ch)
+    return "".join(out) + "".join(reversed(stack))
+
+
+def funnel_fn_parse(raw):
+    """The writer's JSON as a clean verdict, or None. Every field capped; why is two lines; at most two alternates,
+    three rivals."""
+    m = re.search(r"\{[\s\S]*\}", raw or "")
+    if not m:
+        return None
+    d = None
+    for t in (m.group(0), _fn_json_mend(m.group(0))):
+        try:
+            d = json.loads(t)
+            break
+        except Exception:
+            continue
+    if not isinstance(d, dict) or not isinstance(d.get("pick"), dict):
+        return None
+    p = d["pick"]
+    for k in ("misses", "why_not", "alts", "next", "src", "note"):
+        if k in p and k not in d:      # a field written inside the pick (the brace closed too late) is the verdict's
+            d[k] = p.pop(k)
+    why = p.get("why")
+    if isinstance(why, str):
+        why = [s for s in re.split(r"(?<=[.!?])\s+", why) if s.strip()]
+    why = [_fn_line(w, 180) for w in (why or []) if _fn_s(w, 180)][:2]
+    fn = {"pick": {"name": _fn_s(p.get("name"), 120), "price": _fn_s(p.get("price"), 60), "where": _fn_s(p.get("where"), 60),
+                   "specs": _fn_s(p.get("specs"), 180), "why": why},
+          "misses": [int(x) for x in (d.get("misses") or []) if isinstance(x, (int, float)) or str(x).isdigit()][:12],
+          "why_not": [{"name": _fn_s(r.get("name"), 80), "reason": _fn_line(r.get("reason"), 180)}
+                      for r in (d.get("why_not") or []) if isinstance(r, dict) and _fn_s(r.get("name"), 80)][:3],
+          "alts": [{"kind": _fn_s(a.get("kind"), 16) or ("Cheaper", "Premium")[min(i, 1)], "name": _fn_s(a.get("name"), 100),
+                    "price": _fn_s(a.get("price"), 60), "specs": _fn_s(a.get("specs"), 120), "why": _fn_line(a.get("why"), 160)}
+                   for i, a in enumerate(d.get("alts") or []) if isinstance(a, dict) and _fn_s(a.get("name"), 100)][:2],
+          "next": _fn_line(d.get("next"), 220), "note": _fn_line(d.get("note"), 240),
+          "src": [int(x) for x in (d.get("src") or []) if isinstance(x, (int, float)) or str(x).isdigit()][:6]}
+    return fn
+
+
+def funnel_fn_settle(fn, problems, research=None, walls=None) -> dict:
+    """The verdict as shown: an alternate that still breaks a wall is dropped; a pick that still misses says so in
+    plain words (its own note first); the sources it cited (or the first three) and the day they were checked."""
+    fn = dict(fn)
+    bad = {w for w, _ in problems if w.startswith("alt")}
+    pp = _fn_price_of(fn["pick"].get("price", ""))
+    keep = []
+    for i, a in enumerate(fn.get("alts") or []):
+        ap = _fn_price_of(a.get("price", ""))
+        if pp and ap and (not pp[1] or not ap[1] or pp[1] == ap[1]) and ap[0] != pp[0]:
+            a = dict(a, kind="Cheaper" if ap[0] < pp[0] else "Premium")      # the kind is the price's, not a word
+        why = [p for w, p in problems if w == "alt%d" % i and " one costs no " not in p]   # a kind is relabelled above
+        if not why:
+            keep.append(a)
+        elif all(" over your $" in p for p in why) and a["kind"] == "Premium":
+            # the step up costs more than they set: said, never offered as a fit
+            keep.append({"kind": "Premium", "name": "Nothing pricier fits", "price": "", "specs": "", "over": True,
+                         "why": "The next step up, %s, is %s." % (a["name"], a.get("price") or "over your budget")})
+    one, seen = [], set()
+    for a in keep:                     # one of each kind: a second "cheaper" is not the premium they were promised
+        if a["kind"] in seen and a["kind"] in ("Cheaper", "Premium"):
+            continue
+        seen.add(a["kind"])
+        one.append(a)
+    ceil = [w["max"] for w in (walls or []) if w["k"] == "price" and "max" in w]
+    if "Premium" not in seen and pp and ceil:
+        # no step up offered: the rival the pick beat on price, when it costs more than they set, says where it is
+        up = sorted((_fn_price_of(r.get("reason", ""))[0], r["name"]) for r in fn.get("why_not") or []
+                    if _fn_price_of(r.get("reason", "")) and _fn_price_of(r.get("reason", ""))[0] > min(ceil))
+        if up:
+            one.append({"kind": "Premium", "name": "Nothing pricier fits", "price": "", "specs": "", "over": True,
+                        "why": "The next step up, %s, is $%s." % (up[0][1], format(int(up[0][0]), ","))})
+    fn["alts"] = sorted(one, key=lambda a: {"Cheaper": 0, "Premium": 1}.get(a["kind"], 2))[:2]   # cheaper, then premium
+    miss = [p.replace("it says itself it misses: ", "it doesn't meet ") for w, p in problems if w == "pick"]
+    if fn.get("note") or miss:
+        fn["miss"] = fn.get("note") or ("Heads up: " + "; ".join(miss[:2]) + ".")
+    rows = (research or {}).get("rows") or []
+    use = [i for i in fn.get("src") or [] if 1 <= i <= len(rows)] or list(range(1, min(3, len(rows)) + 1))
+    fn["sources"] = [{"n": i, "host": rows[i - 1]["host"], "url": rows[i - 1]["url"], "title": rows[i - 1]["title"][:120]}
+                     for i in use[:4]]
+    fn["checked"] = (research or {}).get("at", "") if rows else ""
+    return fn
+
+
+def funnel_fn_md(fn) -> str:
+    """The verdict as the chat keeps it (and Classic shows it): plain markdown, the same facts as the card."""
+    p = fn["pick"]
+    head = "**%s**" % p["name"] + (" · %s" % p["price"] if p.get("price") else "") + (" at %s" % p["where"] if p.get("where") else "")
+    out = [head] + [w for w in p.get("why") or []]
+    if fn.get("miss"):
+        out += ["", fn["miss"]]
+    if fn.get("why_not"):
+        out += ["", "**Why not the others**"] + ["- **%s**: %s" % (r["name"], r["reason"]) for r in fn["why_not"]]
+    if fn.get("alts"):
+        out += [""] + ["**%s:** %s%s%s" % (a["kind"], a["name"], (" · " + a["price"]) if a.get("price") else "",
+                                           (". " + a["why"]) if a.get("why") else "") for a in fn["alts"]]
+    if fn.get("next"):
+        out += ["", "**Next:** " + fn["next"]]
+    if fn.get("sources"):
+        out += ["", "%s %s" % ("Prices checked %s:" % fn["checked"] if fn.get("checked") else "Sources:",
+                               " · ".join("[%s](%s)" % (s["host"], s["url"]) for s in fn["sources"]))]
+    elif not fn.get("checked"):
+        out += ["", "Prices from memory, not checked online. Check before you buy."]
+    return "\n".join(out).strip()
+
+
+# the research: what the web says now, before the pick is written
+_FN_LEAD_RX = re.compile(
+    r"^\s*(?:help\s+me\s+|i\s+(?:need|want)\s+to\s+|should\s+i\s+|let'?s\s+)?(?:choose|pick|find|buy|get|plan|select|"
+    r"decide\s+on|book|rent|choosing|picking|finding|buying)\s+(?:out\s+)?(?:a|an|the|my|our|some)?\s*"
+    r"(?:new|next|good|great|best)?\s*", re.I)
+
+
+def _fn_subject(goal) -> str:
+    s = _FN_LEAD_RX.sub("", str(goal or "")).strip(" ?.!")
+    return (s.split(",")[0].strip() or str(goal or "").strip())[:80]
+
+
+def funnel_queries(goal, reqs, asked, picks) -> list:
+    """Two searches: the best of the thing inside the requirements' walls (the same before and after the last pick,
+    so the one warmed while the person reads the last question is reused), and the thing with their choices."""
+    subj = _fn_subject(goal)
+    yr = time.strftime("%Y")
+    rw = funnel_walls(goal, reqs, [], [])
+    terms = []
+    for w in rw:
+        if w["k"] == "price" and "max" in w:
+            terms.append("under $%s" % format(int(w["max"]), ","))
+        elif w["k"] == "num":
+            terms.append(_FN_UNIT_SAY.get(w["unit"], "%g") % w["v"])
+    place = re.findall(r"\b(?:in|from|near)\s+([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)", str(reqs or ""))
+    q1 = " ".join(["best", subj] + terms[:3] + [p for p in place[:1] if p.lower() not in subj.lower()] + [yr])
+    short = [p for p in (picks or []) if len(str(p).split()) <= 4][-3:]
+    q2 = " ".join([subj] + [str(p) for p in short] + [yr, "price"])
+    return [" ".join(q1.split()), " ".join(q2.split())]
+
+
+def funnel_research(goal, reqs, asked, picks, say=True) -> dict:
+    """The searches side by side (snippets only, no page reads: fast, and nothing a page says reaches the model but
+    its listing), deduplicated, eight rows at most, with the day they were made."""
+    qs = funnel_queries(goal, reqs, asked, picks)
+    if say:
+        _fn_say("search", "Searching the web", "run", qs[0])
+    got = [[] for _ in qs]
+
+    def one(i, q):
+        try:
+            got[i] = search_results(q, 6) or []
+        except Exception:
+            got[i] = []
+    ts = [ctx_thread(target=one, args=(i, q), daemon=True) for i, q in enumerate(qs)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join(timeout=12)
+    rows, seen = [], set()
+    for r in [r for g in got for r in g]:
+        u = str(r.get("url") or "")
+        if not u or u in seen or not str(r.get("title") or "").strip():
+            continue
+        seen.add(u)
+        host = urllib.parse.urlparse(u).netloc.lower().removeprefix("www.")
+        rows.append({"title": _fn_s(r.get("title"), 140), "body": _fn_s(r.get("body"), 320), "url": u[:400], "host": host})
+    rows = rows[:8]
+    if say:
+        hosts = list(dict.fromkeys(r["host"] for r in rows))
+        _fn_say("search", "Searched the web" if rows else "The web didn't answer", "done" if rows else "err",
+                ("%d results from %s" % (len(rows), ", ".join(hosts[:3]))) if rows else "working from what the model knows")
+    return {"rows": rows, "queries": qs, "at": time.strftime("%b %-d, %Y")}
+
+
+def funnel_market(goal, reqs) -> list:
+    """The requirements' search as the stages see it: what the cache holds now (never a wait), and the search started
+    when it holds nothing, so the next stage has it."""
+    q = funnel_queries(goal, reqs, [], [])[0]
+    with _search_lock:
+        hit = _results_cache.get(q)
+    if hit and time.time() - hit[0] < _RESULTS_TTL:
+        return list(hit[1] or [])
+    ctx_thread(target=funnel_research_warm, args=(goal, reqs), daemon=True).start()
+    return []
+
+
+def funnel_warm(ctx, goal, reqs, cloud=True) -> str:
+    """Funnels' home is being typed into: the model the first stage will run on is loaded in the background (only
+    this computer's MLX model, only when no cloud model or server would take the stage), and the requirements'
+    search is made. The label being warmed, or ""."""
+    if goal and HAS_SEARCH and not _TENDER_RX.search(goal):
+        ctx_thread(target=funnel_research_warm, args=(goal, reqs), daemon=True).start()
+    try:
+        if cloud and (user_prefs(ctx).get("funnel_cloud", True) is not False) and cloud_allowed() \
+                and (work_ladder("work") or fast_cloud_ladder(utility=True)):
+            return ""
+        if server_funnel_pick(ctx, "normal"):
+            return ""
+    except Exception:
+        return ""
+    lbl = next((l for l in FUNNEL_VERDICT_LOCAL + ("Gemma 4 E2B",) if model_cached(l) and model_fits_memory(l)), "")
+    if not lbl or MODEL_ROUTES.get(lbl, (None,))[0] != "mlx" or not engine_must_load(lbl):
+        return ""
+
+    def go():
+        global _mlx_last_use
+        try:
+            with _engine_lock:
+                ensure_mlx_engine(lbl)
+                _mlx_last_use = time.time()
+        except Exception:
+            pass
+    ctx_thread(target=go, daemon=True).start()
+    return lbl
+
+
+def funnel_research_warm(goal, reqs) -> None:
+    """The requirements' search, while the person reads the last question: the verdict then finds it in the cache."""
+    try:
+        search_results(funnel_queries(goal, reqs, [], [])[0], 6)
+    except Exception:
+        pass
+
+
+def funnel_verdict_ask(goal, reqs, asked, picks, walls, research) -> str:
+    """The writer's instruction: the walls, numbered; what the web says, numbered; the shape, as strict JSON."""
+    wl = "\n".join("%d. %s" % (i + 1, w["say"]) for i, w in enumerate(walls)) or "(none stated)"
+    rows = (research or {}).get("rows") or []
+    if rows:
+        web = ("WHAT THE WEB SAYS (searched %s). Take names, prices and stores from these, cite them by number in src, "
+               "and never invent a price or a store they don't show:\n" % research["at"]
+               + "\n".join("[%d] %s: %s (%s)" % (i + 1, r["title"], r["body"], r["host"]) for i, r in enumerate(rows)))
+    else:
+        web = ("No web results came back, so work from what you know: name only things you are sure exist and are "
+               "current, put \"about\" before each price, and leave where empty.")
+    return (
+        "DECISION: %s\nTODAY: %s\n\n"
+        "THE PERSON'S CHOICES. Every one holds: the pick and both alternates meet ALL of them.\n%s\n\n%s\n\n"
+        "NAME the specific thing at the level they are choosing (a neighborhood when they choose a neighborhood, a "
+        "model and configuration when they choose a product, a named plan or place): one real, exact thing, never a "
+        "category and never a string copied from their answers. Never invent a street address, a listing, a model "
+        "number or a price the sources don't show.\n"
+        "Reply as STRICT JSON on ONE line (no indentation), nothing else:\n"
+        '{"pick":{"name":"the exact name","price":"one price, e.g. $1,449","where":"the store or source",'
+        '"specs":"the real facts that meet their choices (size, model, count)","why":["why it fits their choices, under 20 '
+        'words","the trade-off they accept, under 20 words"]},'
+        '"why_not":[{"name":"a real rival they might expect","reason":"one clause: the choice it fails"}],'
+        '"alts":[{"kind":"Cheaper","name":"...","price":"...","specs":"...","why":"what they give up"},'
+        '{"kind":"Premium","name":"...","price":"...","specs":"...","why":"what the extra buys"}],'
+        '"next":"the single most useful next step, a plain instruction","src":[1],"misses":[],"note":""}\n'
+        "Rules:\n"
+        "- misses lists the numbers of any choice the pick itself does not meet by its real specs; [] when it meets "
+        "all.\n"
+        "- A budget is a ceiling: the pick and BOTH alternates cost at most that, all in (a trip's flights and stay "
+        "together). Cheaper costs less than the pick; Premium costs more than the pick: the best one still inside "
+        "every choice, or when nothing pricier fits, the next real step up anyway with its true price (it is shown "
+        "as over the budget, never as a fit). "
+        "With no prices in play, give two honest alternatives with one-word kinds (Simpler, Bolder).\n"
+        "- If no real thing meets every choice, choose the closest real one, list the choice in misses and say so in "
+        "note in one plain sentence. Never claim a fit it doesn't have.\n"
+        "- Both alternates are required, each a different real thing from the pick.\n"
+        "- why_not: the two real rivals they would most expect, each with the choice it fails.\n"
+        "- The words a knowledgeable friend would use: plain and warm, no hype, no exclamation marks, never their "
+        "answers read back as a list, and never the words wall, binding, constraint or requirement.\n"
+        "- The name is the same everywhere it appears."
+        % (goal, time.strftime("%b %-d, %Y"), wl, web))
+
+
+# the local models a funnel's pick is written on first: the stages' own (funnel_stage), not the smallest
+FUNNEL_VERDICT_LOCAL = ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE")
+
+
+# the verdict voice's rules hold for every field of the structured pick (the prose voice alone made a local model
+# answer in prose, twice, and the pick fell back to words: seen in the runs)
+FUNNEL_JSON_TAIL = ("\n\nTHIS TIME YOUR REPLY IS THE STRICT JSON THE USER MESSAGE ASKS FOR, nothing before or after "
+                    "it. Every rule above holds for each field: the pick, its why, the alternates and the next step.")
+
+
+# a question about what the requirements already settle is not a question (the walkthrough: a budget asked after
+# "Budget up to $1,500", then a lower one picked and broken)
+_FN_SETTLED = (
+    (r"\bbudget\b|\bprice (?:range|point)\b|\bspend\b|\bafford\b|how much (?:do|would|can|will) you (?:want to |plan to |like to )?(?:spend|pay)",
+     r"\$\s?\d"),
+    (r"how (?:many|often)\b[^?]{0,30}\b(?:days?|times?|sessions?)\b|\bdays? (?:a|per) week\b|\bfrequency\b",
+     r"\b\d+\s*(?:days?|times?|x)\s*(?:a|per)\s*week\b"),
+    (r"how long\b[^?]{0,30}\bsession|\bsession length\b|\bminutes\b|\bduration of (?:each|a) (?:session|workout)\b",
+     r"\b\d+\s*(?:minutes?|mins?|hours?)\s*(?:a|per)\s*session\b"),
+    (r"how many (?:nights|days)|\btrip length\b|how long (?:is|will) (?:the|your) (?:trip|stay)", r"\bone-week\b|\b\d+\s*nights?\b|\ba week\b"),
+)
+
+
+def _fn_settled_ok(data, reqs, goal="") -> bool:
+    """False when a stage's question asks about something the requirements (or the goal) already settle."""
+    q = str((data or {}).get("q", "")).lower()
+    said = "%s %s" % (reqs or "", goal or "")
+    return not any(re.search(qa, q, re.I) and re.search(ra, said, re.I) for qa, ra in _FN_SETTLED)
+# ==== funnels-1 (6b650): end ====
+
+
 def _stage_ok(data, asked, opts) -> bool:
     """Is a generated stage actually a stage? (6b267, judged three
     cycles running: the local fallback writes malformed options
@@ -42122,7 +42794,7 @@ def _stage_ok(data, asked, opts) -> bool:
 
 
 def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
-                 asked=None, effort="normal", cloud=True):
+                 asked=None, effort="normal", cloud=True, market=None):
     """One stage: a question plus `opts` options, as structured data.
 
     `asked` is every question already put to the user. Without it the
@@ -42151,6 +42823,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         "settles. Rewording is repeating: texture asked once is "
         "texture asked, whatever the words. Each new question probes "
         "an AXIS no prior stage touched:\n%s\n\n"
+        "%s"
         "This is stage %d of %d.%s Write ONE short question (under 12 "
         "words) that MATERIALLY narrows this decision, then exactly %d "
         "options that follow from the choices so far.\n"
@@ -42159,11 +42832,27 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         "choices already imply. When the big choice is settled, "
         "narrow the practical side that matters most next: budget, "
         "size, timing, or where to get it.\n"
+        # 6b650 (the walkthrough: a budget asked after "Budget up to $1,500"; "Balanced workstation" and
+        # "Mid-range longevity" as options; storage asked of a laptop whose size was still open)
+        "Never ask about anything the REQUIREMENTS already settle: a "
+        "stated budget, place, schedule or size is settled. Ask first "
+        "what rules out the most candidates (the platform, the type, "
+        "the size, the area), and never about a detail that would not "
+        "change which one you recommend. Options are concrete values "
+        "a person would say ('14-inch', '16-inch'; 'macOS', "
+        "'Windows'), never abstractions ('Balanced workstation', "
+        "'Mid-range longevity'); each why names the real trade-off "
+        "in plain words.\n"
         "Reply as STRICT JSON, nothing else:\n"
         '{"q":"the question","options":[{"label":"short name",'
         '"why":"one clause on the tradeoff"}]}'
-        % (goal, reqs or "none stated", chosen, prior, stage, total,
-           final, opts))
+        % (goal, reqs or "none stated", chosen, prior,
+           # WHAT'S REAL (6b650): the requirements' search, made at stage 1, so an option is never something no
+           # real thing inside the requirements can be (a diesel SUV under $20,000, a touchscreen Mac)
+           ("WHAT'S ON THE MARKET NOW (a web search; offer only options something real here can satisfy inside the "
+            "requirements):\n" + "\n".join("- %s: %s" % (r.get("title", ""), str(r.get("body", ""))[:160])
+                                            for r in (market or [])[:5]) + "\n\n") if market else "",
+           stage, total, final, opts))
     label = next((l for l in ("Gemma 4 26B", "Gemma 4 12B", "Qwen 3.6 35B MoE",
                               "Gemma 4 E2B")
                   if model_cached(l) and model_fits_memory(l)), "")
@@ -42180,6 +42869,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # Mac. With the box unticked NO cloud model is asked here at all: not
     # the stage, not the retry.
     use_cloud = bool(cloud) and cloud_allowed()
+    _fn_say("ask", "Writing question %d of %d" % (stage, total))
     try:
         # a recovered server is used and a dead one skipped: asked again when
         # its last check is over a minute old, 5 s at most (6b339)
@@ -42220,14 +42910,21 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
         except Exception as exc:
             raw = ""      # a server that fails is skipped: this Mac next
             server_mark_down(bound_ctx(), srv["server"], str(exc))
-    if not raw and label:
+    for _try in (0, 1) if (not raw and label) else ():
+        # a local engine that fails or says nothing once (another copy swapping it, a respawn) gets one more
+        # try before the stock "what matters most?" stands in for a real question (6b650, seen in the runs)
         parts = []
         try:
+            _fn_load_say(label)
             run_model(label, msgs, parts.append)
             raw = strip_think("".join(parts))
             engine = "local:" + label
         except Exception:
             raw = ""
+        if raw.strip() or _try:
+            break
+        _fn_say("ask", "Trying again", "run", "the model didn't answer")
+        time.sleep(2)
     m = re.search(r"\{[\s\S]*\}", raw or "")
     data = {}
     if m:
@@ -42244,7 +42941,10 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
     # a malformed or re-asked one is no better (6b267): the gate
     # covers both, and a failure earns exactly one more walk up the
     # ladder before we accept defeat.
-    if ((not out or not _stage_ok(data, asked, opts))
+    _ok1 = bool(out) and _stage_ok(data, asked, opts) and _fn_settled_ok(data, reqs, goal)
+    if not _ok1:
+        _fn_say("ask", "Asking again", "run", "that question wasn't a good one")
+    if ((not out or not _ok1)
             and use_cloud):
         out = []
         for _conf in work_ladder("work"):
@@ -42256,7 +42956,7 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
                 d2 = json.loads(m2.group(0))
             except Exception:
                 continue
-            if not _stage_ok(d2, asked, opts):
+            if not _stage_ok(d2, asked, opts) or not _fn_settled_ok(d2, reqs, goal):
                 continue
             for o in (d2.get("options") or [])[:opts]:
                 if isinstance(o, dict) and o.get("label"):
@@ -42266,13 +42966,21 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
                 engine = str(_conf.get("model") or "cloud") + ":retry"
                 data = d2
                 break
-    elif (not out or not _stage_ok(data, asked, opts)) and \
-            engine.startswith("server:") and label:
+    elif (not out or not _ok1) and \
+            (engine.startswith("server:") or engine.startswith("local:")) and label:
         # no cloud rung (unticked, off or none) and the server's stage
-        # failed the gate: one more walk, onto this Mac (6b339)
+        # failed the gate: one more walk, onto this Mac (6b339); a stage
+        # this Mac wrote gets the same one more try, told why (6b650: a
+        # local-only funnel kept a budget question its requirements had
+        # answered, and a reworded repeat)
         parts = []
+        _rm = msgs if engine.startswith("server:") else msgs + [
+            {"role": "assistant", "content": raw or ""},
+            {"role": "user", "content": "That stage can't be used: it repeats an earlier question, asks what the "
+             "requirements already settle, or its options are malformed. Write a different question on a new axis, "
+             "as the same STRICT JSON."}]
         try:
-            run_model(label, msgs, parts.append)
+            run_model(label, _rm, parts.append)
             raw3 = strip_think("".join(parts))
         except Exception:
             raw3 = ""
@@ -42281,13 +42989,14 @@ def funnel_stage(goal, reqs, opts, stage, total, picks, want_img=False,
             d3 = json.loads(m3.group(0)) if m3 else {}
         except Exception:
             d3 = {}
-        if _stage_ok(d3, asked, opts):
+        if _stage_ok(d3, asked, opts) and _fn_settled_ok(d3, reqs, goal):
             out = [{"label": str(o["label"])[:90],
                     "why": str(o.get("why", ""))[:160]}
                    for o in (d3.get("options") or [])[:opts]
                    if isinstance(o, dict) and o.get("label")]
             if out:
                 engine, data = "local:" + label + ":retry", d3
+    _fn_say("ask", "Wrote question %d of %d" % (stage, total), "done")
     if want_img and out:
         # all of the stage's pictures at once, one each, never the same
         # one twice (6b340); a card left without one asks again itself
@@ -45173,6 +45882,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/api/home":
             # the Horizon home's status line (6b526): the day's cloud calls
             self._send_json(home_facts(self.ctx))
+        elif urllib.parse.urlparse(self.path).path == "/api/funnel/progress":
+            # what a funnel's wait is doing right now (6b650): the page asks while a stage or the pick is coming
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            self._send_json(fn_prog_get(q.get("run", [""])[0]))
         elif self.path.startswith("/api/remote/classify"):
             # read-only introspection of the safety classifier (6b249):
             # the UI uses it to preview a command's risk, and the gauntlet
@@ -46633,6 +47346,20 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             self._send_json({"img": funnel_images(
                 goal, [label], budget=12.0, exclude=ex)[0]})
             return
+        if self.path == "/api/funnel/warm":
+            # THE FIRST QUESTION WITHOUT THE LOAD (6b650): typing a goal on Funnels' home warms what the first stage
+            # will use while the person is still typing: this computer's model when no cloud model or server will
+            # take the stage (a cold 26B engine was 13-22 s of the first wait), and the requirements' search
+            n = int(self.headers.get("Content-Length", 0) or 0)
+            try:
+                d = json.loads(self.rfile.read(n)) if n else {}
+            except (ValueError, json.JSONDecodeError):
+                d = {}
+            d = d if isinstance(d, dict) else {}
+            goal = str(d.get("goal", "")).strip()[:300]
+            reqs = str(d.get("reqs", "")).strip()[:400]
+            self._send_json({"ok": True, "warming": funnel_warm(self.ctx, goal, reqs, d.get("cloud") is not False)})
+            return
         if self.path == "/api/funnel":
             n = int(self.headers.get("Content-Length", 0) or 0)
             try:
@@ -46672,6 +47399,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             use_cloud = (d.get("cloud") is not False and _saved_cloud
                          and cloud_allowed())
             stage = len(picks) + 1
+            fn_prog_bind(d.get("run"))       # this stage's progress, for the page's wait (6b650)
             # FUNNEL TURNS ARE SAVED HERE (0b 5.5, gap G4; 6b322): the goal
             # or the latest pick when the request arrives, the summary
             # when it's done; the page only ever saved them itself, and
@@ -46694,11 +47422,13 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 if _ft:
                     if reply.get("done") and reply.get("summary"):
                         # a late write: a funnel deleted or erased
-                        # meanwhile doesn't come back as a new chat
+                        # meanwhile doesn't come back as a new chat; a
+                        # structured pick keeps its card (6b650)
                         _late = chat_append_late(
                             _ft[0], _ft[1], _ft[2],
                             {"role": "assistant",
-                             "content": str(reply["summary"])}, _fbase)
+                             "content": str(reply["summary"]),
+                             **({"fn": reply["fn"]} if reply.get("fn") else {})}, _fbase)
                         if _late:
                             _ft[:] = _late
                     with _chats_lock:
@@ -46758,6 +47488,21 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                          "Under 160 words. No preamble."
                          % (goal, reqs or "none", "; ".join(picks),
                             "; ".join(asked) or "not recorded")}]
+                # THE PICK HAS A SHAPE AND WALLS (6b650): the walls numbered, the web searched (warmed during the
+                # last question), and the writer asked for a structured pick it is checked against below. A tender
+                # decision keeps the prose verdict above: a card with prices is the wrong voice for it.
+                _fstruct = not _TENDER_RX.search(goal)
+                _walls = funnel_walls(goal, reqs, asked, picks)
+                _research, _audit_said, _fn = None, "", None
+                _prose = list(msgs)
+                if _fstruct:
+                    if HAS_SEARCH:
+                        _research = funnel_research(goal, reqs, asked, picks)
+                    else:
+                        _fn_say("search", "No web search here", "err", "working from what the model knows")
+                    msgs = [{"role": "system", "content": msgs[0]["content"] + FUNNEL_JSON_TAIL},
+                            {"role": "user", "content": funnel_verdict_ask(goal, reqs, asked, picks, _walls, _research)}]
+                _fn_say("write", "Writing your pick")
                 out = ""
                 _eng = ""
                 _gen = None          # what wrote the verdict, for the pick check's one rewrite (beta 4)
@@ -46805,9 +47550,14 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                 and not slow_giant(l)
                                 and model_cached(l)
                                 and model_fits_memory(l)), "")
+                    # the model that wrote the stages writes the pick when it is a strong one (6b650): it is
+                    # already loaded, so no multi-GB swap (measured: 13-26 s), and the larger MoE the ladder
+                    # chose invented street addresses for a neighborhood
+                    lbl = next((l for l in FUNNEL_VERDICT_LOCAL if model_cached(l) and model_fits_memory(l)), lbl)
                     if lbl:
                         parts = []
                         try:
+                            _fn_load_say(lbl)
                             run_model(lbl, msgs, parts.append)
                             out = strip_think("".join(parts))
                             if out:
@@ -46885,7 +47635,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     # (or an audit with no verdict) leaves it alone
                     if _fix and not _fix.rstrip().endswith("OK"):
                         _m = re.search(r"VERDICT:\s*([\s\S]{40,})$", _fix)
-                        if _m:
+                        if _m and _fstruct:
+                            _audit_said = _m.group(1).strip()   # a structured pick is rewritten from it (6b650)
+                        elif _m:
                             out = _m.group(1).strip()
                 except Exception:
                     # an auditor that crashes forfeits its say; the
@@ -46899,7 +47651,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                 # contradicts gets one rewrite on the same model, kept only
                 # if it no longer contradicts
                 try:
-                    _pc = funnel_pick_conflicts(picks, out)
+                    _pc = funnel_pick_conflicts(picks, out) if not _fstruct else []
                     if out and _pc and _gen:
                         _fm = msgs + [{"role": "assistant", "content": out},
                                       {"role": "user", "content": funnel_pick_fix_note(_pc)}]
@@ -46916,10 +47668,64 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     raise
                 except Exception:
                     pass
+                # THE CHECK (6b650): the pick's own name, specs and price against every wall; a miss (or the
+                # audit's finding) gets one rewrite on the model that wrote it, the better of the two is kept, an
+                # alternate that still breaks a wall is dropped, and a pick that still misses says so in words.
+                _wrote = lambda _m2: ((cloud_text(_gen[1], _m2, timeout=120) or "") if _gen[0] == "cloud" else
+                                      strip_think("".join(_wrote_parts(_gen[1], _m2))))
+                try:
+                    if _fstruct and out:
+                        _fn_say("write", "Wrote your pick", "done")
+                        _fn_say("check", "Checking it against your choices", "run",
+                                "%d choice%s to meet" % (len(_walls), "" if len(_walls) == 1 else "s"))
+                        _fn = funnel_fn_parse(out)
+                        _probs = funnel_verify(_fn, _walls) if _fn else [("shape", "the reply was not the JSON asked for")]
+                        if _audit_said:
+                            _probs.append(("pick", "a second reading found it misses: " + _audit_said[:400]))
+                        if [p for w, p in _probs if w in ("pick", "shape")] and _gen:
+                            _fn_say("check", "Fixing the pick", "run", _probs[0][1])
+                            _nw = _wrote(msgs + [{"role": "assistant", "content": out},
+                                                 {"role": "user", "content": funnel_fix_note(_probs)}])
+                            _fn2 = funnel_fn_parse(_nw)
+                            _p2 = funnel_verify(_fn2, _walls) if _fn2 else None
+                            _bad = lambda ps: len([p for w, p in ps if w in ("pick", "shape")])
+                            if _fn2 and (_fn is None or _bad(_p2) <= _bad(_probs)):
+                                _fn, _probs = _fn2, _p2
+                        elif _probs and _gen:
+                            pass                 # only an alternate is off: it is dropped below, not rewritten
+                        if _fn:
+                            _fn = funnel_fn_settle(_fn, _probs, _research, _walls)
+                            out = funnel_fn_md(_fn)
+                            _fn_say("check", "Checked against your choices", "done",
+                                    "one doesn't fit, and it says so" if _fn.get("miss") else
+                                    "meets all %d" % len(_walls))
+                        elif _gen:
+                            # no JSON twice: the verdict in words, the way it was always written, and a clicked
+                            # number it contradicts gets the 6b640 rewrite there too
+                            _fn_say("check", "Writing it in words", "run")
+                            out = (_wrote(_prose) or "").strip()
+                            # (its first line is the pick: the same check as the card's, on that line alone)
+                            _pv = lambda t: [p for w, p in funnel_verify({"pick": {"name": (t or "").split("\n")[0],
+                                                                                   "price": ""}}, _walls)
+                                             if w == "pick" and "no price" not in p]
+                            _pc2 = _pv(out)
+                            if out and _pc2:
+                                _nw2 = (_wrote(_prose + [{"role": "assistant", "content": out},
+                                                         {"role": "user", "content": funnel_fix_note(
+                                                             [("pick", p) for p in _pc2]).replace(
+                                                             "as the same STRICT JSON", "in the same shape")}])
+                                        or "").strip()
+                                if _nw2 and not _pv(_nw2):
+                                    out = _nw2
+                except (StaleProfile, BrokenPipeError, ConnectionResetError):
+                    raise
+                except Exception:
+                    if _fn is None and out.lstrip().startswith("{"):
+                        out = ""
                 # NEVER hand the picks back as if they were an answer
                 # (6b260, per Patrick) — if no model can weigh in, say
                 # so honestly and point at the fix
-                _fsend({"done": True, "stage": total,
+                _fsend({"done": True, "stage": total, "fn": _fn,
                                  "total": total, "engine": _eng,
                                  "summary": out or (
                                      "I couldn't reach a model to weigh "
@@ -46930,9 +47736,12 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                                      "\u2192 Models (or a cloud key) and "
                                      "finish the funnel again.")})
                 return
+            # the requirements' search (6b650): started at the first stage, read by the next ones from the cache,
+            # and there again for the pick (refreshed at the last stage when it has gone stale)
+            _market = (funnel_market(goal, reqs) if HAS_SEARCH and not _TENDER_RX.search(goal) else [])
             st = funnel_stage(goal, reqs, opts, stage, total, picks,
                               want_img, asked, effort=effort,
-                              cloud=use_cloud)
+                              cloud=use_cloud, market=_market)
             _fsend({"done": False, "stage": stage,
                              "total": total, "q": st["q"],
                              "options": st["options"],
@@ -57646,6 +58455,65 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz .msg.ai.hz-fn.settled>.ftrail{--sxp:1}
 .hz.hz-calm .msg.ai.hz-fn>.ftrail{transition:none}
 @media (prefers-reduced-motion:reduce){.hz .msg.ai.hz-fn>.ftrail{transition:none}}
+/* ==== funnels-1 (6b650): the pick as a card, and the wait's steps ====
+   The pick: a graphite hero on the composer's 14 px corner (its name, the price and where, the facts that meet the
+   choices, why in two lines, "Why not the others" folded), the cheaper and premium alternates as two smaller flat
+   cards (radius 10), the next step and where the prices came from. Inter, hairlines, no shadow, glow, circle or rose.
+   The wait: the server's steps under its line, a 6 px square while one runs (its words in the silver sweep), a check
+   when done, a dash when it came back empty. */
+.hz .hz-stage.verdict>.body.fncard{padding:0;background:none;border:0;border-radius:0;font:400 14px/20px var(--hz-font-ui);color:var(--ln-ink2)}
+.hz .hz-stage.verdict>.fncard>.fn-k{margin:0 0 8px}
+.hz .hz-stage.verdict>.fncard .fn-hero{padding:20px 22px 18px;border-radius:14px;background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.14)}
+.hz .hz-stage.verdict>.fncard .fn-name{font:600 21px/27px var(--hz-font-ui);letter-spacing:-.02em;color:var(--ln-ink);text-wrap:balance;-webkit-font-smoothing:antialiased}
+.hz .hz-stage.verdict>.fncard .fn-meta{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px;margin:6px 0 0;font:400 13px/18px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.verdict>.fncard .fn-pr{font:600 15px/18px var(--hz-font-ui);color:var(--ln-ink);font-variant-numeric:tabular-nums}
+.hz .hz-stage.verdict>.fncard .fn-specs{margin:4px 0 0;font:400 12.5px/18px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.verdict>.fncard .fn-why{margin:12px 0 0;max-width:62ch;font:400 14.5px/21px var(--hz-font-ui);color:var(--ln-ink2)}
+.hz .hz-stage.verdict>.fncard .fn-why+.fn-why{margin-top:4px}
+.hz .hz-stage.verdict>.fncard .fn-miss{margin:12px 0 0;padding:8px 12px;border-radius:8px;border:var(--chat-hw) solid rgba(255,255,255,.2);font:500 13px/19px var(--hz-font-ui);color:var(--ln-ink)}
+.hz .hz-stage.verdict>.fncard .fn-not{margin:14px 0 0;padding:10px 0 0;border:0;border-top:var(--chat-hw) solid rgba(255,255,255,.08);border-radius:0;background:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none}   /* not the reasoning fold's box (.body details) */
+.hz .hz-stage.verdict>.fncard .fn-not>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:0;border:0;letter-spacing:-.005em;
+  font:500 13px/18px var(--hz-font-ui);color:var(--ln-ink2)}
+.hz .hz-stage.verdict>.fncard .fn-not[open]>summary{border:0;color:var(--ln-ink)}
+.hz .hz-stage.verdict>.fncard .fn-not>summary::-webkit-details-marker{display:none}
+.hz .hz-stage.verdict>.fncard .fn-not>summary::after{content:"";width:10px;height:10px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.6l3 3 3-3' fill='none' stroke='%23c5c6cd' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat;transition:transform .2s var(--ln-e)}
+.hz .hz-stage.verdict>.fncard .fn-not[open]>summary::after{transform:rotate(180deg)}
+.hz .hz-stage.verdict>.fncard .fn-not>summary:hover{color:var(--ln-ink)}
+.hz:not(.hz-kb) .hz-stage.verdict>.fncard .fn-not>summary:focus-visible{outline:0}
+.hz.hz-kb .hz-stage.verdict>.fncard .fn-not>summary:focus-visible{outline:1px solid var(--hz-ember);outline-offset:2px}
+.hz .hz-stage.verdict>.fncard .fn-not ul{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hz .hz-stage.verdict>.fncard .fn-not li{font:400 13px/19px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.verdict>.fncard .fn-not li b{font-weight:500;color:var(--ln-ink2);margin-right:6px}
+.hz .hz-stage.verdict>.fncard .fn-alts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0 0}
+.hz .hz-stage.verdict>.fncard .fn-alts.one{grid-template-columns:minmax(0,1fr)}
+.hz .hz-stage.verdict>.fncard .fn-alt{display:flex;flex-direction:column;gap:3px;min-width:0;padding:12px 14px;border-radius:10px;background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.1)}
+.hz .hz-stage.verdict>.fncard .fn-alt>.fn-k{margin:0 0 2px}
+.hz .hz-stage.verdict>.fncard .fn-alt>b{font:500 13.5px/19px var(--hz-font-ui);color:var(--ln-ink)}
+.hz .hz-stage.verdict>.fncard .fn-ap{font:600 13px/18px var(--hz-font-ui);color:var(--ln-ink2);font-variant-numeric:tabular-nums}
+.hz .hz-stage.verdict>.fncard .fn-aw{font:400 12.5px/18px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.verdict>.fncard .fn-next{display:flex;gap:10px;align-items:baseline;margin:14px 2px 0;font:400 14px/20px var(--hz-font-ui);color:var(--ln-ink2)}
+.hz .hz-stage.verdict>.fncard .fn-next>.fn-k{margin:0;flex:none}
+.hz .hz-stage.verdict>.fncard .fn-src{margin:8px 2px 0;font:400 12px/17px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.verdict>.fncard .fn-src a{color:var(--ln-ink2);text-decoration:none;border-bottom:var(--chat-hw) solid rgba(255,255,255,.2)}
+.hz .hz-stage.verdict>.fncard .fn-src a:hover{color:var(--ln-ink);border-color:rgba(255,255,255,.45)}
+@media (max-width:640px){.hz .hz-stage.verdict>.fncard .fn-alts{grid-template-columns:minmax(0,1fr)}.hz .hz-stage.verdict>.fncard .fn-hero{padding:16px 16px 14px}}
+.hz .hz-stage .fn-prog{margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px}
+.hz .hz-stage .fn-prog>div{display:flex;align-items:baseline;gap:8px;min-width:0;font:400 12.5px/18px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage .fn-prog>div::before{content:"";flex:none;align-self:center;box-sizing:border-box;width:10px;height:10px}
+.hz .hz-stage .fn-prog>div.run::before{width:6px;height:6px;margin:0 2px;border:var(--chat-hw) solid rgba(255,255,255,.6)}
+.hz .hz-stage .fn-prog>div.done::before{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath d='M2.4 6.4l2.4 2.3 4.8-5' fill='none' stroke='%23c5c6cd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px no-repeat}
+.hz .hz-stage .fn-prog>div.err::before{width:8px;height:1px;margin:0 1px;background:rgba(255,255,255,.45)}
+.hz .hz-stage .fn-prog>div>span{flex:none;color:var(--ln-ink2)}
+.hz .hz-stage .fn-prog>div.done>span{color:var(--ln-meta)}
+.hz .hz-stage .fn-prog>div.run>span{background:linear-gradient(100deg,#aab2c3 0%,#aab2c3 37%,#f2f4f9 49%,#aab2c3 61%,#aab2c3 100%);
+  background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:lnSweep 2.4s linear infinite}
+.hz .hz-stage .fn-prog>div>i{font-style:normal;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ln-meta)}
+.hz.hz-calm .hz-stage .fn-prog>div.run>span{animation:none;background:none;color:var(--ln-ink2)}
+.hz.hz-calm .hz-stage.verdict>.fncard .fn-not>summary::after{transition:none}
+@media (prefers-reduced-motion:reduce){.hz .hz-stage .fn-prog>div.run>span{animation:none!important;background:none;color:var(--ln-ink2)}
+  .hz .hz-stage.verdict>.fncard .fn-not>summary::after{transition:none}}
+/* ==== funnels-1 (6b650): end ==== */
 /* ---- BRING YOUR CHATS: over black, never navy (the governing rule) ------------------------------------------------- */
 .hz #imp-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none}
 .hz #imp-sheet{border-radius:14px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
@@ -65954,9 +66822,10 @@ async function fnStep(pick){
   const box=document.createElement("div");
   box.className="msg ai";
   box.innerHTML='<div class="who">Funnel</div><div class="body">'
-    +'<span class="statusline"><i class="cspin"></i> Stage '
-    +(fnState.picks.length+1)+'…</span></div>';
+    +'<span class="statusline"><i class="cspin"></i> '
+    +esc(fnWaitLabel(fnState.picks.length,fnState.stages))+'</span></div>';   // never "Stage 6…" after 5 of 5 (6b650, Classic too)
   if(!fnHzStage(box))inner.appendChild(box);autoScroll();   // Horizon: a stage on the funnel's hairline (6b622)
+  const fnPg=fnProgWatch(box,fnState.run);   // what the wait is doing, from the server (6b650)
   let d={};
   // the server saves this stage's turn (the goal, or the pick the page
   // just showed) and, at the end, the summary (0b 5.5, 6b322); the reply
@@ -65969,6 +66838,7 @@ async function fnStep(pick){
         cloud:fnCloudLoaded?fnCloudOn:undefined,
         after_len:fn,after_hash:chatHash(messages,fn)}))})).json();
   }catch(e){d={err:"Couldn\u2019t reach the model. Try again."};}
+  fnPg.stop();
   // adopted only while the page still has the chat: one deleted or
   // erased mid-stage stays gone (review of 6b322)
   const fc=chats.find(x=>x.id===fid);
@@ -66063,6 +66933,17 @@ async function fnStep(pick){
   });
   autoScroll();
 }
+// TYPING A GOAL WARMS THE FIRST QUESTION (6b650): a pause in the typing asks the server to load the model the first
+// stage will use (only this computer's, only when nothing else would answer) and to make the requirements' search
+var fnWarmT=0,fnWarmGoal="";
+$("#fn-goal").addEventListener("input",()=>{
+  clearTimeout(fnWarmT);
+  fnWarmT=setTimeout(()=>{
+    const g=$("#fn-goal").value.trim();if(g.length<6||g===fnWarmGoal)return;fnWarmGoal=g;
+    api("/api/funnel/warm",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({goal:g,reqs:($("#fn-reqs").value||"").trim(),cloud:fnCloudLoaded?fnCloudOn:undefined})}).catch(()=>{});
+  },1200);
+});
 $("#fn-go").addEventListener("click",()=>{
   const goal=$("#fn-goal").value.trim();
   if(!goal){$("#fn-goal").focus();return;}
@@ -66070,7 +66951,8 @@ $("#fn-go").addEventListener("click",()=>{
   fnState={goal:goal,reqs:$("#fn-reqs").value.trim(),
     opts:+$("#fn-opts").value,stages:+$("#fn-stages").value,
     images:$("#fn-type").value==="images",picks:[],asked:[],
-    effort:eff==="fast"?"fast":"normal"};
+    effort:eff==="fast"?"fast":"normal",
+    run:"fn"+Math.random().toString(36).slice(2,10)+Date.now().toString(36)};   // the wait's progress is read by it (6b650)
   curChat=newChatId();messages=[];inner.innerHTML="";
   addMsg("user","Funnel: "+goal);
   messages.push({role:"user",content:"Funnel: "+goal});
@@ -66156,9 +67038,72 @@ function fnHzDone(box,d){
   const c=box.closest(".hz-fn"),w=c&&c.querySelector(":scope>.who");if(w)w.textContent="Funnel · done";
   sxFnProg(box,1);(typeof sxLaneSoon==="function"&&sxLaneSoon());   // 6b625
   box.className="hz-stage verdict";box.setAttribute("role","listitem");
-  box.querySelector(".body").innerHTML='<span class="fn-k">The pick</span>'+renderMD(d.summary||"");
+  const card=fnCardHTML(d.fn);   // the pick as a hero, its why, the others and two alternates (6b650); words otherwise
+  const b=box.querySelector(".body");b.classList.toggle("fncard",!!card);
+  b.innerHTML='<span class="fn-k">The pick</span>'+(card||renderMD(d.summary||""));
   return true;
 }
+// ==== funnels-1 (6b650): begin ====
+// THE WAIT SAYS WHAT IT IS DOING (6b650, the walkthrough: "loading states that don't show progress"): while a stage or
+// the pick is coming, the page reads the server's steps for this funnel (/api/funnel/progress?run=) every 700 ms: the
+// question being written, a model loading and for how long, the web searched and what came back, the pick checked
+// against the person's choices and fixed when it missed. Horizon lists them under the wait's line; Classic's status
+// line says the newest.
+function fnProgRows(steps){
+  return (steps||[]).filter(x=>x&&x.say).map(x=>'<div role="listitem" class="'+(x.st==="done"?"done":x.st==="err"?"err":"run")+'"><span>'
+    +esc(x.say)+'</span>'+(x.d?'<i>'+esc(x.d)+'</i>':"")+'</div>').join("");
+}
+function fnProgWatch(box,run){
+  let on=!!run,last="";
+  const paint=steps=>{
+    const html=fnProgRows(steps);if(html===last||!box.isConnected)return;last=html;
+    const b=box.querySelector(".body");if(!b)return;
+    if(box.classList.contains("hz-stage")){
+      let ol=b.querySelector(":scope>.fn-prog");
+      if(!ol){ol=document.createElement("div");ol.className="fn-prog";ol.setAttribute("role","list");ol.setAttribute("aria-live","polite");b.appendChild(ol);}   // not an ol: the answer's list counters would number it
+      ol.innerHTML=html;
+    }else{
+      const sl=b.querySelector(".statusline"),x=(steps||[]).filter(y=>y&&y.say).pop();
+      if(sl&&x)sl.innerHTML='<i class="cspin"></i> '+esc(fnWaitLabel(fnState?fnState.picks.length:0,fnState?fnState.stages:0).replace(/…$/,""))
+        +' \u00b7 '+esc(x.say)+(x.d?' \u00b7 '+esc(x.d):"");
+    }
+  };
+  const tick=async()=>{
+    if(!on||!box.isConnected)return;
+    try{const r=await(await api("/api/funnel/progress?run="+encodeURIComponent(run))).json();if(on)paint(r.steps);}catch(e){}
+    if(on)setTimeout(tick,700);
+  };
+  if(on)setTimeout(tick,300);
+  return {stop(){on=false;}};
+}
+// THE PICK AS A CARD (6b650, per Patrick: "the funnels to be just as perfect"): the name, its price and where, the facts
+// that meet the person's choices, why in two lines, a plain line when it can't meet one, "Why not the others" folded,
+// then the cheaper and the premium alternates as two smaller cards, the next step and where the prices came from.
+// "" when the server sent no structured pick (a tender decision, an older chat): the words are drawn as before.
+function fnCardHTML(f){
+  const p=f&&f.pick;if(!p||!p.name)return "";
+  const href=u=>/^https?:\/\//i.test(u||"")?esc(u):"";
+  const meta=(p.price?'<b class="fn-pr">'+esc(p.price)+'</b>':"")+(p.where?'<span>'+(p.price?"at ":"")+esc(p.where)+'</span>':"");
+  const nots=(f.why_not||[]).filter(r=>r&&r.name);
+  const alts=(f.alts||[]).filter(a=>a&&a.name).slice(0,2);
+  const srcs=(f.sources||[]).filter(x=>x&&href(x.url));
+  return '<div class="fn-hero"><div class="fn-name">'+esc(p.name)+'</div>'
+    +(meta?'<div class="fn-meta">'+meta+'</div>':"")
+    +(p.specs?'<div class="fn-specs">'+esc(p.specs)+'</div>':"")
+    +(p.why||[]).slice(0,2).map(x=>'<div class="fn-why">'+esc(x)+'</div>').join("")
+    +(f.miss?'<div class="fn-miss">'+esc(f.miss)+'</div>':"")
+    +(nots.length?'<details class="fn-not"><summary>Why not the others</summary><ul>'
+      +nots.map(r=>'<li><b>'+esc(r.name)+'</b><span>'+esc(r.reason||"")+'</span></li>').join("")+'</ul></details>':"")
+    +'</div>'
+    +(alts.length?'<div class="fn-alts'+(alts.length===1?' one':'')+'">'+alts.map(a=>'<div class="fn-alt"><span class="fn-k">'+esc(a.kind||"")+'</span>'
+      +'<b>'+esc(a.name)+'</b>'+(a.price?'<span class="fn-ap">'+esc(a.price)+'</span>':"")
+      +(a.why?'<span class="fn-aw">'+esc(a.why)+'</span>':"")+'</div>').join("")+'</div>':"")
+    +(f.next?'<div class="fn-next"><span class="fn-k">Next</span><span>'+esc(f.next)+'</span></div>':"")
+    +(srcs.length?'<div class="fn-src">'+(f.checked?'Prices checked '+esc(f.checked):'Sources')+' \u00b7 '
+      +srcs.map(x=>'<a href="'+href(x.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(x.title||x.host||"")+'">'+esc(x.host||"")+'</a>').join(' \u00b7 ')+'</div>'
+      :'<div class="fn-src">Prices from memory, not checked online. Check before you buy.</div>');
+}
+// ==== funnels-1 (6b650): end ====
 // a reopened funnel (loadChat drew its turns as plain messages): its stages ("question → choice") and its verdict
 // gathered into the same flow, at rest; what follows the verdict (a follow-up chat) stays as drawn
 var FN_TURN_RX=/^([^\n]*?) → ([^\n]+)$/;
@@ -66174,6 +67119,7 @@ function fnHzRest(c){
     while(j<ms.length&&ms[j].role==="assistant"&&String(ms[j].content||"").length<=260&&FN_TURN_RX.test(ms[j].content||"")){
       const m=FN_TURN_RX.exec(ms[j].content);picks.push({q:m[1],l:m[2]});j++;}
     const sum=(j<ms.length&&ms[j].role==="assistant")?String(ms[j].content||""):"";
+    const card=sum?fnCardHTML(ms[j].fn):"";   // a structured pick reopens as its card (6b650)
     if(!picks.length&&!sum)continue;
     const box=document.createElement("div");box.className="msg ai hz-fn settled";
     const n=picks.length;
@@ -66182,7 +67128,7 @@ function fnHzRest(c){
       +'<div class="hz-stages" role="list">'+picks.map((p,k)=>'<div class="hz-stage done" role="listitem"><div class="body"><div class="fstage">'
         +'<div class="fpath">Stage '+(k+1)+(sum?" of "+n:"")+'</div>'+(p.q?'<div class="fsq">'+esc(p.q)+'</div>':"")
         +'<div class="fopts rest"><button type="button" class="fopt on" disabled tabindex="-1"><b>'+esc(p.l)+'</b></button></div></div></div></div>').join("")
-      +(sum?'<div class="hz-stage verdict" role="listitem"><div class="body"><span class="fn-k">The pick</span>'+renderMD(sum)+'</div></div>':"")
+      +(sum?'<div class="hz-stage verdict" role="listitem"><div class="body'+(card?' fncard':'')+'"><span class="fn-k">The pick</span>'+(card||renderMD(sum))+'</div></div>':"")
       +'</div>';
     if(sum)msgActions(box,"assistant",sum);
     const last=sum?j:j-1;

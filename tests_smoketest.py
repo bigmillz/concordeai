@@ -23508,7 +23508,9 @@ def _p2_funnel(src, servers, cloud_ok=True, local=("Gemma 4 26B",), gate_fail=Fa
               fast_cloud_ladder=lambda utility=False: [{"model": "haiku"}], work_ladder=lambda role: [{"model": "opus"}],
               strip_think=lambda x: x, re=re, json=json, funnel_sys_for=lambda g: "sys", _funnel_image=lambda q: "",
               model_cached=lambda l, p=None: l in local, model_fits_memory=lambda l: True,
-              _stage_ok=lambda data, asked, opts: bool(data.get("options")))
+              _stage_ok=lambda data, asked, opts: bool(data.get("options")),
+              # 6b650: the settled-question gate and the wait's steps, stood in
+              _fn_settled_ok=lambda data, reqs, goal="": True, _fn_say=lambda *a, **k: None, _fn_load_say=lambda label: None)
     exec(_p2_fn(src, "funnel_stage"), ns)
     ns["_dls"] = dls
     return ns, ctx, ents, calls
@@ -23597,7 +23599,7 @@ def _p2c_funnel(src):
         and ch.index("if use_cloud:\n                    for _conf in work_ladder") < ch.index("server_funnel_pick(self.ctx")
         < ch.index("lbl = next((l for l in MERGE_RANK")
         and "cloud_allowed()" not in ch.replace("and cloud_allowed())", "")
-        and '                              cloud=use_cloud)' in ch and '"total": total, "engine": _eng,' in ch)
+        and '                              cloud=use_cloud, market=_market)' in ch and '"total": total, "engine": _eng,' in ch)   # 6b650: the market rows ride along
     return all(got.values()), got
 
 
@@ -49329,6 +49331,271 @@ check("6b640 no test searches the real web: every copy starts with the stand-in 
       and not _w640_ok(_MILLENAI_SRC.replace('SEARCH_STUB = bool(DEV_HOME) and os.environ', 'SEARCH_STUB = True and os.environ', 1), _w640_me)
       and not _w640_ok(_MILLENAI_SRC.replace("def _net_probe():\n    if SEARCH_STUB:\n        return", "def _net_probe():\n    if False:\n        return", 1), _w640_me), "")
 # ==== 6b640 beta-4 integration: end ====
+# ==== 6b650 funnels: begin ====
+# FUNNELS, CORRECT AND CONFIDENT (6b650, per Patrick: "the funnels to be just as perfect"). The walkthrough picked a
+# 14-inch laptop and was handed a 13-inch one (the 6b640 check passed it: the verdict said "your 14-inch preference"
+# while naming the 13-inch), re-asked a budget the requirements had set, and showed nothing while it worked. The
+# person's choices are walls, read against the PICK ITSELF (its name, specs and price); the pick is a structured card
+# with two alternates; the wait says what it is doing. Every check here has mutants the same predicate must catch.
+import threading
+print("== funnels (6b650): the walls, the check on the pick itself, the card, the counter, the wait's steps ==")
+def _f650_ns(src):
+    ns_ = {"re": re, "json": json, "time": time, "threading": threading, "urllib": urllib}
+    exec(src[src.index("_FN_NUM_RX = re.compile"):src.index("def funnel_pick_conflicts")], ns_)
+    exec(src[src.index("# ==== funnels-1 (6b650): begin ===="):src.index("# ==== funnels-1 (6b650): end ====")], ns_)
+    return ns_
+def _f650_pure(src):
+    try:
+        n_ = _f650_ns(src)
+    except Exception as e_:
+        return {"err": str(e_)[:160]}
+    W, V, S, M = n_["funnel_walls"], n_["funnel_verify"], n_["funnel_fn_settle"], n_["funnel_fn_md"]
+    lap = W("Choose a new laptop", "Photo editing and travel. Budget up to $1,500.",
+            ["Which screen size?", "Which operating system?"], ["14-inch", "macOS"])
+    r = {"walls": [(w["k"], w.get("unit") or w.get("per", ""), w.get("v", w.get("max")), w.get("op", "")) for w in lap if w["k"] in ("price", "num")]}
+    r["min"] = [(w["unit"], w["v"], w["op"]) for w in W("Buy a TV", "", ["size?"], ["65 inches+"]) if w["k"] == "num"]
+    r["range"] = [(w["unit"], w.get("lo"), w["v"], w["op"]) for w in W("laptop", "", ["size?"], ["14-inch to 15-inch"]) if w["k"] == "num"]
+    r["time"] = [(w["unit"], w["v"], w["op"]) for w in W("gym plan", "3 days a week, 45 minutes a session, at home", [], []) if w["k"] == "num"]
+    r["rent"] = [(w["max"], w["per"]) for w in W("apartment", "A 1-bedroom, up to $3,000 a month.", [], []) if w["k"] == "price"]
+    # the walkthrough's own verdict: 14-inch chosen, a 13-inch named, "your 14-inch preference" in the words around it
+    air = {"pick": {"name": "MacBook Air 13-inch (M5)", "price": "$999", "specs": "13.6-inch, 16 GB",
+                    "why": ["While your 14-inch preference points to the Pro, the Air is the closest match.", "x"]}}
+    mbp = {"pick": {"name": "MacBook Pro 14-inch (M5, 16 GB, 512 GB)", "price": "$1,449", "where": "Best Buy", "specs": "14.2-inch XDR",
+                    "why": ["The best screen for photo work under your budget.", "You carry 3.4 lb instead of 2.7."]},
+           "why_not": [{"name": "MacBook Air 13-inch (M5)", "reason": "13.6-inch: smaller than the 14-inch you chose"}],
+           "alts": [{"kind": "Bolder", "name": "MacBook Pro 14-inch (M5 Pro)", "price": "$1,999", "specs": "14.2-inch"},
+                    {"kind": "Simpler", "name": "Refurbished MacBook Pro 14-inch (M4)", "price": "$1,359", "specs": "14.2-inch"}],
+           "next": "Order it at Best Buy.", "src": [1], "misses": []}
+    r["air"] = V(air, lap)
+    r["mbp"] = V(mbp, lap)
+    r["dell"] = V({"pick": {"name": "Dell XPS 14", "price": "$1,399", "specs": "14.5-inch OLED, Windows 11"}}, lap)
+    r["over"] = V({"pick": {"name": "MacBook Pro 14-inch (M5)", "price": "$1,599", "specs": "14.2-inch"}}, lap)
+    r["hours"] = V({"pick": {"name": "MacBook Air 13-inch (M5)", "price": "$999", "specs": "up to 14 hours of battery"}}, lap)
+    r["self"] = V({"pick": {"name": "MacBook Pro 14-inch", "price": "$1,449"}, "misses": [2]}, lap)
+    r["noname"] = V({"pick": {"name": ""}}, lap)
+    r["cheap"] = V({"pick": mbp["pick"], "alts": [{"kind": "Cheaper", "name": "MacBook Pro 14-inch (M5) open box", "price": "$1,499", "specs": "14.2-inch"}]}, lap)
+    rows = [{"title": "MacBook Pro 14-inch (M5) drops to $1,449", "url": "https://www.bestbuy.com/x", "host": "bestbuy.com", "body": ""}]
+    f_ = S(mbp, r["mbp"], {"rows": rows, "at": "Nov 11, 2026"})
+    r["alts"] = [(a["kind"], a["name"]) for a in f_["alts"]]
+    r["md"] = M(f_)
+    r["src"] = [(x["host"], x["url"]) for x in f_["sources"]] + [f_["checked"]]
+    # two "cheaper" ones and no step up: one cheaper, and the rival the pick beat on price says where the step up is
+    two = {"pick": mbp["pick"], "why_not": [{"name": "MacBook Pro 14-inch (M5 Pro)", "reason": "At $1,999 it is over your budget."}],
+           "alts": [{"kind": "Premium", "name": "Refurbished MacBook Pro 14-inch (M4)", "price": "$1,359", "specs": "14.2-inch"},
+                    {"kind": "Cheaper", "name": "Open-box MacBook Pro 14-inch (M4)", "price": "$1,299", "specs": "14.2-inch"}]}
+    r["rival"] = [(a["kind"], a["name"], a.get("why", "")) for a in S(two, V(two, lap), None, lap)["alts"]]
+    g_ = S({"pick": dict(air["pick"]), "alts": []}, r["air"], None)
+    r["miss"] = g_.get("miss", "")
+    r["mdmem"] = M(g_)
+    r["gate"] = [n_["_fn_settled_ok"]({"q": "What is your target budget for the hardware?"}, "Under $600 without drives."),
+                 n_["_fn_settled_ok"]({"q": "How many days a week can you train?"}, "3 days a week, 45 minutes a session"),
+                 n_["_fn_settled_ok"]({"q": "How many drive bays do you need?"}, "Under $600 without drives."),
+                 n_["_fn_settled_ok"]({"q": "What is your budget?"}, "")]
+    q0 = n_["funnel_queries"]("Choose a new laptop", "Budget up to $1,500.", ["a?"] * 4, ["14-inch", "macOS", "512GB", "Light"])
+    q1 = n_["funnel_queries"]("Choose a new laptop", "Budget up to $1,500.", ["a?"] * 5, ["14-inch", "macOS", "512GB", "Light", "Silver"])
+    r["q"] = [q0[0] == q1[0], q0[0], n_["funnel_queries"]("Choose a new laptop", "Budget up to $1,500.", [], [])[0] == q0[0]]
+    r["parse"] = [bool(n_["funnel_fn_parse"]('```json\n{"pick":{"name":"A","why":"One. Two."},"alts":[{"name":"B"},],}\n```')),
+                  n_["funnel_fn_parse"]("no json here"), (n_["funnel_fn_parse"]('{"pick":{"name":"A","why":"One. Two. Three."}}') or {}).get("pick", {}).get("why")]
+    # a pick left open (the rest of the verdict written inside it, seen in the runs) is mended; 1 TB meets "512GB"
+    mend = n_["funnel_fn_parse"]('{"pick":{"name":"Google Pixel 10","price":"$649","why":["a","b"],"misses":[],'
+                                 '"why_not":[{"name":"Galaxy S26","reason":"162 g {lighter}"}],"alts":[{"kind":"Cheaper","name":"Pixel 10a","price":"$499"}],"next":"Go.","note":""}')
+    r["mend"] = mend and [mend["pick"]["name"], [x["name"] for x in mend["why_not"]], [a["name"] for a in mend["alts"]], mend["next"]]
+    early = n_["funnel_fn_parse"]('{"pick":{"name":"MacBook Pro 14-inch (M5)","price":"$1,449","why":["a","b"],'
+                                  '"why_not":[{"name":"MacBook Air 15-inch","reason":"15-inch"}]},"alts":[{"kind":"Cheaper","name":"Refurbished M4","price":"$1,359"}]},'
+                                  '"next":"Order it.","src":[1],"misses":[],"note":""}')
+    r["early"] = early and [early["pick"]["name"], len(early["why_not"]), len(early["alts"]), early["next"]]
+    gbw = W("laptop", "", ["storage?"], ["512GB"])
+    r["gb"] = [V({"pick": {"name": "MacBook Pro 14 (M5 Pro)", "specs": "24 GB memory, 1 TB SSD"}}, gbw),
+               V({"pick": {"name": "MacBook Air 13 (M5)", "specs": "16 GB memory, 256 GB SSD"}}, gbw)]
+    return r
+def _f650_pure_ok(r):
+    return (not r.get("err")
+            and r["walls"] == [("price", "", 1500.0, ""), ("num", "inch", 14.0, "eq")]
+            and r["min"] == [("inch", 65.0, "min")] and r["range"] == [("inch", 14.0, 15.0, "range")]
+            and r["time"] == [("days", 3.0, "eq"), ("minutes", 45.0, "max")] and r["rent"] == [(3000.0, "month")]
+            and r["air"] == [("pick", "it is 13-inch, not the 14-inch you chose")]
+            and r["mbp"] == [("alt0", "it costs $1,999, over your $1,500")]
+            and ("pick", "you chose a Mac, and this isn't one") in r["dell"] and ("pick", "it is 14.5-inch, not the 14-inch you chose") in r["dell"]
+            and r["over"] == [("pick", "it costs $1,599, over your $1,500")]
+            and r["hours"] == [("pick", "it is 13-inch, not the 14-inch you chose")]
+            and len(r["self"]) == 1 and r["self"][0][1].startswith("it says itself it misses: 14-inch")
+            and r["noname"] == [("shape", "there is no pick with a name")]
+            and r["cheap"] == [("alt0", "the cheaper one costs no less than the pick")]
+            and r["alts"] == [("Cheaper", "Refurbished MacBook Pro 14-inch (M4)"), ("Premium", "Nothing pricier fits")]
+            and r["rival"] == [("Cheaper", "Refurbished MacBook Pro 14-inch (M4)", ""),
+                               ("Premium", "Nothing pricier fits", "The next step up, MacBook Pro 14-inch (M5 Pro), is $1,999.")]
+            and r["md"].startswith("**MacBook Pro 14-inch (M5, 16 GB, 512 GB)** · $1,449 at Best Buy\n")
+            and "**Why not the others**" in r["md"] and "**Cheaper:** Refurbished MacBook Pro 14-inch (M4) · $1,359" in r["md"]
+            and "**Premium:** Nothing pricier fits. The next step up, MacBook Pro 14-inch (M5 Pro), is $1,999." in r["md"]
+            and "**Next:** Order it at Best Buy." in r["md"] and "Prices checked Nov 11, 2026: [bestbuy.com](https://www.bestbuy.com/x)" in r["md"]
+            and r["src"] == [("bestbuy.com", "https://www.bestbuy.com/x"), "Nov 11, 2026"]
+            and r["miss"] == "Heads up: it is 13-inch, not the 14-inch you chose." and "Prices from memory, not checked online." in r["mdmem"]
+            and r["gate"] == [False, False, True, True]
+            and r["q"][0] and r["q"][2] and "under $1,500" in r["q"][1]
+            and r["parse"][0] and r["parse"][1] is None and r["parse"][2] == ["One.", "Two."]
+            and r["mend"] == ["Google Pixel 10", ["Galaxy S26"], ["Pixel 10a"], "Go."]
+            and r["early"] == ["MacBook Pro 14-inch (M5)", 1, 1, "Order it."]
+            and r["gb"] == [[], [("pick", "it is 256 GB, under your 512 GB")]])
+_f650_r = _f650_pure(_MILLENAI_SRC)
+_F650_MUT = [
+    ("the pick read through its words (the 6b640 gap)", 'text = "%s %s" % (item.get("name", ""), item.get("specs", ""))',
+     'text = "%s %s %s" % (item.get("name", ""), item.get("specs", ""), " ".join(item.get("why") or []))'),
+    ("a price ceiling ignored", 'if "max" in w and pr[0] > w["max"] + 1e-6:', 'if False:'),
+    ("the unit ignored", 'vals = [v for u, v, _ in _fn_nums_all(text) if u == w["unit"]]', 'vals = [v for u, v, _ in _fn_nums_all(text)]'),
+    ("the families off", "    for name, _said, bad in fams:", "    for name, _said, bad in []:"),
+    ("a range read as its top", 'op, lo, v = "range", min(same), max(same)', 'op, lo, v = "eq", min(same), max(same)'),
+    ("a 65-inch-plus read as exactly 65", 'or _FN_MIN_AFTER_RX.match(t[m.end():m.end() + 14]) else "eq")', 'else "eq")'),
+    ("an unclosed pick not mended", "    for t in (m.group(0), _fn_json_mend(m.group(0))):", "    for t in (m.group(0),):"),
+    ("the object closed early kept closed", "            if len(stack) == 1 and t[i + 1:].strip():\n                continue", "            if False:\n                continue"),
+    ("storage read as exact", '            if unit == "gb" and op == "eq":\n                op = "min"', '            if False:\n                op = "min"'),
+    ("the model's own misses ignored", '    for n in fn.get("misses") or []:', '    for n in []:'),
+    ("an alternate that breaks a wall kept", "        if not why:\n            keep.append(a)", "        if True:\n            keep.append(a)"),
+    ("the kinds left to the model's words", '            a = dict(a, kind="Cheaper" if ap[0] < pp[0] else "Premium")', '            pass'),
+    ("two of a kind kept", '        if a["kind"] in seen and a["kind"] in ("Cheaper", "Premium"):\n            continue', '        if False:\n            continue'),
+    ("a settled budget asked again", '    return not any(re.search(qa, q, re.I) and re.search(ra, said, re.I) for qa, ra in _FN_SETTLED)', '    return True'),
+    ("the warmed search not reused (the picks in the first query)", '    q1 = " ".join(["best", subj] + terms[:3]', '    q1 = " ".join(["best", subj] + [str(p) for p in (picks or [])] + terms[:3]'),
+]
+_f650_mr = [(n_, _f650_pure_ok(_f650_pure(_MILLENAI_SRC.replace(a_, b_, 1))) if a_ in _MILLENAI_SRC else "anchor missing")
+            for n_, a_, b_ in _F650_MUT]
+check("6b650 Funnels' walls and the check on the pick itself: a clicked 14-inch named as a 13-inch is caught however the words around it read; a price over the budget, a Windows laptop for a Mac, an alternate that isn't cheaper or breaks a wall, a range, a 65-inch-plus, a time limit, a monthly rent; the card's words; a settled budget not asked again; the warmed search reused; the mutants are caught",
+      _f650_pure_ok(_f650_r) and all(m_ is False for _, m_ in _f650_mr),
+      json.dumps({"r": _f650_r, "mutants": _f650_mr}, default=str)[:1500])
+# the wiring: the walls and the research go into the writer, the check reads its pick, a miss gets one rewrite on the
+# same model, the card is saved with the turn, the stages' model writes the pick, the search is warmed at the last
+# stage, a stage asking what the requirements settle is asked again, the progress endpoint, the fixture is dev-only
+def _f650_wire(src):
+    try:
+        return _f650_wire1(src)
+    except ValueError as e_:
+        return {"err": False, "why": str(e_)[:80]}
+def _f650_wire1(src):
+    h_ = src[src.index('        if self.path == "/api/funnel":'):]
+    h_ = h_[:h_.index('        if self.path == "/api/prefs":')]
+    st_ = src[src.index("def funnel_stage("):src.index("# ==== funnel images: begin ====")]
+    return {
+        "walls": "_walls = funnel_walls(goal, reqs, asked, picks)" in h_ and "funnel_verdict_ask(goal, reqs, asked, picks, _walls, _research)" in h_,
+        "research": "_research = funnel_research(goal, reqs, asked, picks)" in h_ and h_.index("funnel_research(goal") < h_.index("for _conf in work_ladder(\"work\"):\n                        out = cloud_text(_conf, msgs, timeout=120)"),
+        "check": "_probs = funnel_verify(_fn, _walls) if _fn else" in h_ and "funnel_fix_note(_probs)" in h_ and "if _fn2 and (_fn is None or _bad(_p2) <= _bad(_probs)):" in h_,
+        "settle": "_fn = funnel_fn_settle(_fn, _probs, _research, _walls)" in h_ and "out = funnel_fn_md(_fn)" in h_ and '"fn": _fn,' in h_,
+        "saved": '**({"fn": reply["fn"]} if reply.get("fn") else {})}, _fbase)' in h_,
+        "tender": "_fstruct = not _TENDER_RX.search(goal)" in h_ and "_pc = funnel_pick_conflicts(picks, out) if not _fstruct else []" in h_,
+        "local": "lbl = next((l for l in FUNNEL_VERDICT_LOCAL if model_cached(l) and model_fits_memory(l)), lbl)" in h_,
+        "warm": "_market = (funnel_market(goal, reqs) if HAS_SEARCH and not _TENDER_RX.search(goal) else [])" in h_
+                and "cloud=use_cloud, market=_market)" in h_ and 'if self.path == "/api/funnel/warm":' in src
+                and 'funnel_warm(self.ctx, goal, reqs, d.get("cloud") is not False)' in src
+                and "ctx_thread(target=funnel_research_warm, args=(goal, reqs), daemon=True).start()" in src,
+        "bind": 'fn_prog_bind(d.get("run"))' in h_ and h_.index('fn_prog_bind(d.get("run"))') < h_.index("if stage > total:"),
+        "gate": "_ok1 = bool(out) and _stage_ok(data, asked, opts) and _fn_settled_ok(data, reqs, goal)" in st_
+                and "if not _stage_ok(d2, asked, opts) or not _fn_settled_ok(d2, reqs, goal):" in st_
+                and "if _stage_ok(d3, asked, opts) and _fn_settled_ok(d3, reqs, goal):" in st_
+                and '(engine.startswith("server:") or engine.startswith("local:")) and label:' in st_,
+        "counter": "            stage = len(picks) + 1\n" in h_ and "            if stage > total:\n" in h_ and '_fsend({"done": True, "stage": total, "fn": _fn,' in h_,
+        "endpoint": 'elif urllib.parse.urlparse(self.path).path == "/api/funnel/progress":' in src,
+        "fixture": 'SEARCH_FIXTURE = os.environ.get("MILLENAI_SEARCH_FIXTURE", "").strip() if SEARCH_STUB else ""' in src
+                   and '"MILLENAI_SEARCH_FIXTURE",' in src,
+    }
+_f650_w = _f650_wire(_MILLENAI_SRC)
+_F650_WMUT = [
+    ("the check not wired", "_probs = funnel_verify(_fn, _walls) if _fn else", "_probs = [] if _fn else"),
+    ("no rewrite", "funnel_fix_note(_probs)", "''"),
+    ("the card not saved", '**({"fn": reply["fn"]} if reply.get("fn") else {})}, _fbase)', "}, _fbase)"),
+    ("a pick one stage early", "            if stage > total:\n", "            if stage >= total:\n"),
+    ("the settled-question gate off", "_ok1 = bool(out) and _stage_ok(data, asked, opts) and _fn_settled_ok(data, reqs, goal)", "_ok1 = bool(out) and _stage_ok(data, asked, opts)"),
+    ("the fixture outside a dev copy", 'SEARCH_FIXTURE = os.environ.get("MILLENAI_SEARCH_FIXTURE", "").strip() if SEARCH_STUB else ""', 'SEARCH_FIXTURE = os.environ.get("MILLENAI_SEARCH_FIXTURE", "").strip()'),
+]
+_f650_wm = [(n_, all(_f650_wire(_MILLENAI_SRC.replace(a_, b_, 1)).values()) if a_ in _MILLENAI_SRC else "anchor missing") for n_, a_, b_ in _F650_WMUT]
+check("6b650 Funnels' wiring: the walls and the web into the writer, the check on its pick and one rewrite on the same model, the card saved with the turn, the stages' model writes the pick, the search warmed at the last stage, a question the requirements settle asked again (a stage this Mac wrote too), the progress endpoint, the fixture only in a dev copy with the stand-in; the mutants are caught",
+      all(_f650_w.values()) and all(m_ is False for _, m_ in _f650_wm), json.dumps({"w": _f650_w, "mutants": _f650_wm})[:900])
+# THE COUNTER (6b650; 6b640 fixed Horizon's wait, Classic's status line still said "Stage 6…" after "5 of 5"): a whole
+# five-stage funnel's waits in order, Horizon's and Classic's lines from the same function; the stage label "Stage N of M"
+def _f650_count(src):
+    js_ = _jsfn(src, "function fnWaitLabel(picked,stages){") + r"""
+const out=[];for(let p=0;p<=5;p++)out.push(fnWaitLabel(p,5));out.push(fnWaitLabel(1,1));
+process.stdout.write(JSON.stringify(out));"""
+    try:
+        return _node_json(js_, "f650c.js")
+    except Exception as e_:
+        return [str(e_)[:120]]
+_F650_SEQ = ["Stage 1 of 5…", "Stage 2 of 5…", "Stage 3 of 5…", "Stage 4 of 5…", "Stage 5 of 5…", "Weighing your choices…", "Weighing your choices…"]
+def _f650_count_ok(src):
+    fs_ = _jsfn(src, "async function fnStep(pick){")
+    return (_f650_count(src) == _F650_SEQ
+            and "+esc(fnWaitLabel(fnState.picks.length,fnState.stages))+'</span></div>';" in fs_ and "' Stage '\n    +(fnState.picks.length+1)" not in fs_
+            and "esc(fnWaitLabel(fnState.picks.length,fnState.stages))" in src
+            and 'if(p)p.textContent="Stage "+d.stage+" of "+d.total;' in src)
+_f650_cm = [
+    ("Classic's old line", "+'<span class=\"statusline\"><i class=\"cspin\"></i> '\n    +esc(fnWaitLabel(fnState.picks.length,fnState.stages))+'</span></div>';",
+     "+'<span class=\"statusline\"><i class=\"cspin\"></i> Stage '\n    +(fnState.picks.length+1)+'…</span></div>';"),
+    ("a stage past the last", 'return m&&n>m?"Weighing your choices…":', 'return m&&n>m+1?"Weighing your choices…":'),
+]
+_f650_cmr = [(n_, _f650_count_ok(_MILLENAI_SRC.replace(a_, b_, 1)) if a_ in _MILLENAI_SRC else "anchor missing") for n_, a_, b_ in _f650_cm]
+check("6b650 Funnels' counter: a five-stage funnel waits on \"Stage 1 of 5…\" to \"Stage 5 of 5…\", then \"Weighing your choices…\", in Horizon and in Classic's status line; the mutants are caught",
+      _f650_count_ok(_MILLENAI_SRC) and all(m_ is False for _, m_ in _f650_cmr),
+      json.dumps({"seq": _f650_count(_MILLENAI_SRC), "mutants": _f650_cmr})[:600])
+# THE CARD AND THE WAIT'S STEPS, in node on the page's own functions: the hero, the fold, two alternates, the sources
+# (a javascript: link never drawn), "" without a structured pick; the steps' classes and words, escaped
+def _f650_card(src):
+    js_ = ("const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');\n"
+           + _jsfn(src, "function fnCardHTML(f){") + _jsfn(src, "function fnProgRows(steps){") + r"""
+const f={pick:{name:"MacBook Pro 14-inch (M5)",price:"$1,449",where:"Best Buy",specs:"14.2-inch",why:["One.","Two.","Three."]},
+  miss:"",why_not:[{name:"MacBook Air 13-inch",reason:"13.6-inch"}],
+  alts:[{kind:"Cheaper",name:"Refurbished M4",price:"$1,359",why:"older chip"},{kind:"Premium",name:"Nothing pricier fits",why:"The next step up is $1,999."},{kind:"X",name:"third"}],
+  next:"Order it.",checked:"Nov 11, 2026",sources:[{host:"bestbuy.com",url:"https://www.bestbuy.com/x",title:"t"},{host:"evil",url:"javascript:alert(1)"}]};
+const h=fnCardHTML(f),g=fnCardHTML(Object.assign({},f,{sources:[],checked:""}));
+const cnt=(s,x)=>s.split(x).length-1;
+process.stdout.write(JSON.stringify({hero:cnt(h,'class="fn-hero"'),name:h.includes('<div class="fn-name">MacBook Pro 14-inch (M5)</div>'),
+  meta:h.includes('<b class="fn-pr">$1,449</b><span>at Best Buy</span>'),why:cnt(h,'class="fn-why"'),fold:h.includes('<details class="fn-not"><summary>Why not the others</summary>'),
+  alts:cnt(h,'class="fn-alt"'),src:h.includes('Prices checked Nov 11, 2026 · <a href="https://www.bestbuy.com/x" target="_blank" rel="noopener noreferrer"'),
+  js:h.includes("javascript:"),mem:g.includes("Prices from memory, not checked online."),none:fnCardHTML(null)===""&&fnCardHTML({pick:{name:""}})==="",
+  next:h.includes('<div class="fn-next"><span class="fn-k">Next</span><span>Order it.</span></div>'),
+  rows:fnProgRows([{k:"search",say:"Searching the web",st:"run",d:"best <b>"},{k:"x",say:"Done",st:"done"},{k:"y",say:"No",st:"err"},{k:"z",say:""}])}));""")
+    try:
+        return _node_json(js_, "f650card.js")
+    except Exception as e_:
+        return {"err": str(e_)[:160]}
+def _f650_card_ok(r):
+    return (r.get("hero") == 1 and r.get("name") and r.get("meta") and r.get("why") == 2 and r.get("fold") and r.get("alts") == 2
+            and r.get("src") and r.get("js") is False and r.get("mem") and r.get("none") and r.get("next")
+            and r.get("rows") == '<div role="listitem" class="run"><span>Searching the web</span><i>best &lt;b&gt;</i></div><div role="listitem" class="done"><span>Done</span></div><div role="listitem" class="err"><span>No</span></div>')
+_f650_cr = _f650_card(_MILLENAI_SRC)
+_f650_crm = [(n_, _f650_card_ok(_f650_card(_MILLENAI_SRC.replace(a_, b_, 1))) if a_ in _MILLENAI_SRC else "anchor missing") for n_, a_, b_ in [
+    ("any link drawn", 'const href=u=>/^https?:\\/\\//i.test(u||"")?esc(u):"";', 'const href=u=>esc(u||"x");'),
+    ("three alternates", "const alts=(f.alts||[]).filter(a=>a&&a.name).slice(0,2);", "const alts=(f.alts||[]).filter(a=>a&&a.name);"),
+    ("the steps unescaped", "+esc(x.say)+'</span>'+(x.d?'<i>'+esc(x.d)+'</i>':\"\")", "+x.say+'</span>'+(x.d?'<i>'+x.d+'</i>':\"\")")]]
+# the css: Horizon's, the hero on the 14 px corner, the alternates two across (one under 640), no shadow, glow, blur,
+# circle or rose, the sweep stopped in Calm and reduced motion; the page wires the card, the reopened card and the watch
+def _f650_css_ok(src):
+    a_ = src.index("/* ==== funnels-1 (6b650): the pick as a card"); b_ = src.index("/* ==== funnels-1 (6b650): end ==== */")
+    c_ = src[a_:b_]
+    rules = [l for l in c_.split("\n") if l.startswith(".") or l.startswith("@media")]
+    return (all(l.startswith(".hz") or l.startswith("@media") for l in rules)
+            and ".hz .hz-stage.verdict>.fncard .fn-hero{padding:20px 22px 18px;border-radius:14px;background:var(--chat-surface);" in c_
+            and ".hz .hz-stage.verdict>.fncard .fn-alts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));" in c_
+            and "@media (max-width:640px){.hz .hz-stage.verdict>.fncard .fn-alts{grid-template-columns:minmax(0,1fr)}" in c_
+            and ".hz .hz-stage.verdict>.fncard .fn-alt{display:flex;flex-direction:column;gap:3px;min-width:0;padding:12px 14px;border-radius:10px;" in c_
+            and not re.search(r"box-shadow:(?!none)|text-shadow|blur\(|border-radius:50%|999px|#e8|#f4|pink|rose|#ff",
+                              re.sub(r"/\*.*?\*/", "", c_, flags=re.S))
+            and ".hz.hz-calm .hz-stage .fn-prog>div.run>span{animation:none" in c_ and "@media (prefers-reduced-motion:reduce){.hz .hz-stage .fn-prog>div.run>span{animation:none!important" in c_
+            and "const card=fnCardHTML(d.fn);" in src and "const card=sum?fnCardHTML(ms[j].fn):\"\";" in src
+            and "const fnPg=fnProgWatch(box,fnState.run);" in src and "fnPg.stop();" in src
+            and 'run:"fn"+Math.random().toString(36).slice(2,10)+Date.now().toString(36)}' in src)
+_f650_cssm = [(n_, _f650_css_ok(_MILLENAI_SRC.replace(a_, b_, 1)) if a_ in _MILLENAI_SRC else "anchor missing") for n_, a_, b_ in [
+    ("a shadow on the hero", ".hz .hz-stage.verdict>.fncard .fn-hero{padding:20px 22px 18px;border-radius:14px;", ".hz .hz-stage.verdict>.fncard .fn-hero{padding:20px 22px 18px;border-radius:14px;box-shadow:0 8px 24px #000;"),
+    ("the watch never stopped", "  fnPg.stop();\n", "\n"),
+    ("the sweep in Calm", ".hz.hz-calm .hz-stage .fn-prog>div.run>span{animation:none", ".hz.hz-calm .hz-stage .fn-prog>div.run>span{animation:lnSweep 2.4s")]]
+check("6b650 Funnels' card and wait, on the page's own functions: the pick as a hero (name, price and where, two lines of why), \"Why not the others\" folded, two alternates, the next step, where the prices came from and when (never a javascript: link), the steps escaped; Horizon-only css, the 14 px hero, no shadow, glow, circle or rose, Calm and reduced motion still; the mutants are caught",
+      _f650_card_ok(_f650_cr) and all(m_ is False for _, m_ in _f650_crm) and _f650_css_ok(_MILLENAI_SRC) and all(m_ is False for _, m_ in _f650_cssm),
+      json.dumps({"card": _f650_cr, "m": _f650_crm, "css": _f650_css_ok(_MILLENAI_SRC), "cm": _f650_cssm})[:900])
+# live, on this run's copy: the progress door is the API's (no token, no answer), an unknown run has no steps, and a
+# run id that isn't one is refused quietly
+_f650_p0 = req("/api/funnel/progress?run=fnabcdef123", token=False)[0]
+_f650_p1 = req("/api/funnel/progress?run=fnabcdef123")
+_f650_p2 = req("/api/funnel/progress?run=../../x")
+check("6b650 Funnels' progress over the wire: refused without the API token, empty for a run it never saw, quiet on a run id that isn't one",
+      _f650_p0 in (401, 403) and _f650_p1[0] == 200 and json.loads(_f650_p1[2]) == {"steps": []}
+      and _f650_p2[0] == 200 and json.loads(_f650_p2[2]) == {"steps": []},
+      "%r" % [_f650_p0, _f650_p1[:1], _f650_p1[2][:80], _f650_p2[:1]])
+# ==== 6b650 funnels: end ====
 
 # ==== 6b626 answers: begin ====
 # USABLE ANSWERS (6b626, per Patrick: "it has to be usable"). The beta-4 walkthrough: "How do I hard-boil an egg?"
