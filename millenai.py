@@ -38861,14 +38861,23 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         step(sid, label, "run", {"read": "reading", "write": "changes",
                                  "danger": "irreversible"}[risk]
              + (" · %d steps" % len(cmds) if batch else ""))
-        need_ok = (autonomy == "manual"
-                   or (autonomy == "auto" and risk != "read")
-                   or risk == "danger")
+        # A DANGER COMMAND IS NEVER ONE TAP AMONG OTHERS (6b625, per
+        # Patrick): in a batch, each irreversible command gets an approval
+        # of its own, asked just before it runs (below); the batch's one
+        # card covers the rest, priced at the riskiest of THEM, and is asked
+        # only when they need it. A single command is as it was.
+        own = batch and "danger" in risks
+        rest = [c for c, r in zip(cmds, risks) if r != "danger"] if own else cmds
+        rrisk = (risk if not own else "write" if "write" in risks
+                 else "read")
+        need_ok = bool(rest) and (autonomy == "manual"
+                                  or (autonomy == "auto" and rrisk != "read")
+                                  or rrisk == "danger")
         if need_ok:
             step(sid, label, "wait", "Waiting for you")
-            # the approval card shows every command in the batch, so one
-            # tap is never a blind yes
-            _ok = await_approval("\n".join(cmds), risk)
+            # the approval card shows every command it covers, so one tap
+            # is never a blind yes
+            _ok = await_approval("\n".join(rest), rrisk)
             if _ok == "expired":
                 step(sid, label, "skip", "No answer. Nothing ran.")
                 emit("Paused after 10 minutes with no answer. Nothing ran. Say **keep going** to continue.")
@@ -38883,8 +38892,23 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         # a single command flagged long runs detached + polled (6b251),
         # so a 30-minute compile doesn't hit the per-command timeout
         want_long = bool(act.get("long")) and not batch
-        results, ran, failed = [], 0, False
+        results, ran, failed, said_no = [], 0, False, None
         for n, c in enumerate(cmds, 1):
+            if own and risks[n - 1] == "danger":
+                # its own card, under its own line of the batch (6b625)
+                csid = "%s_%d" % (sid, n)
+                step(csid, c, "wait", "Waiting for you")
+                _cok = await_approval(c, "danger")
+                if _cok is not True:
+                    # "expired" is a word, so it is TRUTHY: a no-answer is
+                    # a no, and nothing after it runs
+                    said_no = "expired" if _cok == "expired" else "declined"
+                    step(csid, c, "skip", "No answer. Nothing ran."
+                         if said_no == "expired" else "Skipped")
+                    results.append("Command: %s\n(%s: not run; nothing after it ran)"
+                                   % (c, "no answer" if said_no == "expired"
+                                      else "the user DECLINED it"))
+                    break
             status("running: " + c[:60])
             if want_long:
                 status("Long job. Running detached.")
@@ -38904,8 +38928,15 @@ def run_remote_agent(messages, conf, autonomy, emit, status, step,
         step(sid, label, "done",
              ("%d of %d ran" % (ran, len(cmds)) if batch
               else ("exit 0" if not failed else "failed")))
+        if said_no == "expired":
+            emit("Paused after 10 minutes with no answer. %d of %d ran. Say **keep going** to continue."
+                 % (ran, len(cmds)))
+            return
         convo.append({"role": "assistant", "content": text})
-        convo.append({"role": "user", "content": "\n\n".join(results)})
+        convo.append({"role": "user", "content": "\n\n".join(results)
+                      + ("\n\nThe user DECLINED that command. Do not run it. "
+                         "Choose a different approach or ask why."
+                         if said_no else "")})
     emit("Reached the %d-command limit for one run. Say continue to go on." % REMOTE_CAP)
 
 
@@ -42588,6 +42619,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     .replace("__IMP_DEMO__", json.dumps(_hook_arg("imp-demo")))
                     .replace("__JUST_UPDATED__", json.dumps(_JUST_UPDATED[0]))
                     .replace("__APP_VER_SPEC__", spec_version())
+                    .replace("__APP_BUILD__", str(APP_BUILD))
                     .replace("__APP_VER__", short_version()
                              + (" \u00b7 test build" if os.environ.get(
                                  "MILLENAI_TESTBUILD") else "")))
@@ -54734,6 +54766,350 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
   .hz .hz-fn .hz-stage .fopt{transition:none}
   .hz .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:none}}
 /* ==== the Code lane and Funnels (6b622): end ==== */
+/* ==== THE POLISH (6b625, per Patrick: "I want this UI to be perfect"): begin ==== */
+/* The web demo's look on what the app already has (beta/DESIGN.md "Settings", ddfdf72; "THE GOVERNING RULE"):
+   Claude-sharp chrome, one type system, flat near-black surfaces on one-device-pixel hairlines, no glow and no shine.
+   Settings keeps its rail and panes (every id, every handler) and wears the demo's dialog; Inter (the system's sans
+   until the file is bundled) for the UI and the reading, mono only for code; the palette's tags in words; a level
+   meter while dictating; the PDF chip in plain words; the Code lane's drawn icons, host chip and sheet, neutral keys
+   and an ember outline for danger; Funnels' goal form as the lane's home; the import sheet over black. Horizon only:
+   every rule is under .hz (or an id only Horizon draws), so Classic is untouched. One easing family, (.2,.7,.2,1). */
+.hz{--sx-e:cubic-bezier(.2,.7,.2,1);--sx-hl:var(--chat-hw,1px);--sx-ink:#f4f5fa;--sx-ink2:rgba(255,255,255,.78);--sx-meta:rgba(255,255,255,.55);
+  --sx-lab:rgba(255,255,255,.5);--sx-s0:#0e0e10;--sx-s1:#141416;--sx-s2:#1a1a1d;--sx-s3:#1f1f22;--sx-s4:#2a2a2f;
+  --sans:var(--hz-font-ui)}   /* ONE TYPE SYSTEM: what was Space Grotesk by default is Inter; the greeting keeps its face by name */
+.hz body{font-family:var(--hz-font-ui)}
+/* ---- SETTINGS: the demo's dialog ---------------------------------------------------------------------------------- */
+@keyframes sxFade{from{opacity:0}to{opacity:1}}
+@keyframes sxRise{from{transform:translateY(6px)}to{transform:none}}
+.hz #about-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none;--sl-mono:var(--hz-font-ui);--mono:var(--hz-font-ui);
+  --sl-ui:var(--hz-font-ui);--sans:var(--hz-font-ui);--helv:var(--hz-font-ui);--disp:var(--hz-font-ui);--sl-ink:var(--sx-ink);--sl-ink2:var(--sx-ink2);--sl-ink3:var(--sx-meta);
+  --sl-hair:rgba(255,255,255,.08);--sl-hair2:rgba(255,255,255,.14);--sl-line:rgba(255,255,255,.22);--sl-glass:var(--sx-s2);--sl-spec:transparent;
+  --text:var(--sx-ink);--dim:var(--sx-ink2);--faint:var(--sx-meta);--line:rgba(255,255,255,.14);--line-soft:rgba(255,255,255,.08)}
+.hz #about-veil:not([hidden]){animation:sxFade .18s var(--sx-e) both}
+@keyframes sxFadeOut{from{opacity:1}to{opacity:0}}
+@keyframes sxSink{from{transform:none}to{transform:translateY(6px)}}
+.hz #about-veil.sx-out{animation:sxFadeOut .18s var(--sx-e) both;pointer-events:none}
+.hz #about-veil #about-card{width:min(672px,calc(100vw - 32px));height:min(640px,calc(100vh - 32px));grid-template-columns:184px minmax(0,1fr);
+  background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+  font:450 13px/1.4 var(--hz-font-ui);color:var(--sx-ink2);animation:sxRise .2s var(--sx-e) both}
+.hz #about-veil.sx-out #about-card{animation:sxSink .18s var(--sx-e) both}
+/* the rail: "Settings" in 11 px caps at 50 %, rows 13 px and 30 high, the machine's facts at its foot */
+.hz #about-veil #set-rail{display:flex;flex-direction:column;gap:0;padding:16px 8px;background:none;border-right:var(--sx-hl) solid rgba(255,255,255,.08);overflow-y:auto}
+.hz #about-veil #set-brand{display:none}
+.hz #about-veil .sx-slab{display:block;order:0;margin:0 10px 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}
+html:not(.hz) .sx-slab{display:none}
+.hz #about-veil #set-nav{order:1;display:flex;flex-direction:column;gap:2px}
+.hz #about-veil #set-spec{order:2;margin:auto 0 0;padding:12px 10px 0;border:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08);
+  font:450 11px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;font-variant-numeric:tabular-nums}
+.hz #about-veil #set-spec>div{padding:0;gap:8px}
+.hz #about-veil #set-spec dt{color:var(--sx-meta)}
+.hz #about-veil #set-spec dt::first-letter{text-transform:uppercase}
+.hz #about-veil #set-spec dd{color:var(--sx-ink2)}
+.hz #about-veil .snav{height:30px;flex:none;padding:0 10px;border:0;border-radius:8px;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);
+  letter-spacing:0;text-align:left;white-space:nowrap;transition:background .15s var(--sx-e),color .15s var(--sx-e)}
+.hz #about-veil .snav:hover{background:var(--sx-s2);color:var(--sx-ink)}
+.hz #about-veil .snav.on{background:var(--sx-s3);color:var(--sx-ink);font-weight:450}
+.hz #about-veil .snav.on::after{display:none}
+.hz #about-veil .snav-kid{padding-left:28px}
+.hz #about-veil .snav-chev{width:5px;height:5px;margin:0 3px 0 1px}
+.hz:not(.hz-kb) #about-veil .snav:focus-visible{box-shadow:none}
+.hz.hz-kb #about-veil .snav:focus-visible{outline:1px solid var(--hz-ember);outline-offset:-1px;box-shadow:none}
+/* the pane: its heading 15/600, the body scrolls above a slim foot */
+.hz #about-veil #set-main{display:grid;grid-template-rows:minmax(0,1fr) auto;overflow:hidden;min-height:0}
+.hz #about-veil #about-body{overflow-y:auto;min-height:0;padding:24px 24px 32px;scrollbar-width:thin}
+.hz #about-veil #about-foot{display:flex;align-items:center;padding:10px 24px;border-top:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil #about-site{font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);text-decoration:none}
+.hz #about-veil #about-site:hover{color:var(--sx-ink)}
+.hz #about-veil .spane{animation:none}
+.hz #about-veil .set-h{margin:0 0 16px;font:600 15px/24px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-ink);opacity:1}
+.hz #about-veil .tdesc{margin:-8px 0 16px;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .tdesc b{color:var(--sx-ink2);font-weight:500}
+/* About: the version and its build, what's new for this version, then the rows */
+.hz #about-veil #up-version{margin:0;font:600 17px/24px var(--hz-font-ui);letter-spacing:-.005em;color:var(--sx-ink);text-align:left}
+.hz #about-veil #sx-build,.hz #about-veil #up-reldate{margin:2px 0 0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);font-variant-numeric:tabular-nums;text-align:left}
+html:not(.hz) #sx-build{display:none}
+.hz #about-veil #up-notes{margin:16px 0 0;padding:14px 16px;max-height:200px;border-radius:10px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s0);
+  font:450 13px/1.55 var(--hz-font-ui);color:var(--sx-ink2);box-shadow:none}
+.hz #about-veil #up-notes>p:first-child>b{display:block;margin:0 0 8px;font:600 13px/20px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-ink)}
+.hz #about-veil #up-notes b{color:var(--sx-ink);font-weight:600}
+.hz #about-veil #about-check{width:auto;align-self:flex-start;margin:16px 0 16px}
+/* rows: 48 high on hairlines, the label 13/500, its note 12 at 55 % */
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row{min-height:48px;padding:8px 0;margin:0;
+  border-top:var(--sx-hl) solid rgba(255,255,255,.08);font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span{
+  font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #sugg-note,.hz #about-veil #autoclean-note{margin:-8px 0 0;padding:0 0 12px;
+  font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+/* the controls: segmented on #1a1a1d with the choice on #2a2a2f; squared switches; 28 px buttons; 32 px inputs on #0e0e10 */
+.hz #about-veil .sl-seg{height:30px;padding:2px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s2);box-shadow:none}
+.hz #about-veil .sl-seg button{min-width:0;height:24px;padding:0 10px;border-radius:6px;font:450 12px/1 var(--hz-font-ui);letter-spacing:0;color:rgba(255,255,255,.7);
+  transition:color .15s var(--sx-e)}
+.hz #about-veil .sl-seg button:hover,.hz #about-veil .sl-seg button[aria-checked="true"]{color:var(--sx-ink)}
+.hz #about-veil .sl-hi{top:2px;bottom:2px;left:2px;width:calc((100% - 4px) / var(--n,3));border-radius:6px;background:var(--sx-s4);box-shadow:none;transition:transform .18s var(--sx-e)}
+.hz #about-veil .sl-menu{height:28px;padding:0 8px 0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s2);box-shadow:none;
+  font:450 12px/1 var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .sl-menu:hover,.hz #about-veil .sl-menu[aria-expanded="true"]{background:#222226;border-color:rgba(255,255,255,.22)}
+.hz #sl-pop{border-radius:10px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:0 12px 32px rgba(0,0,0,.5);-webkit-backdrop-filter:none;backdrop-filter:none}
+.hz #sl-pop button{height:30px;border-radius:6px;font:450 13px/1 var(--hz-font-ui);color:var(--sx-ink2)}
+.hz #sl-pop button:hover,.hz #sl-pop button:focus-visible{background:var(--sx-s2);color:var(--sx-ink)}
+.hz #sl-pop button[aria-selected="true"]{background:var(--sx-s3);color:var(--sx-ink);font-weight:450}
+.hz #sl-pop button[aria-selected="true"]::after{display:none}
+.hz #sl-pop .sl-pop-h{padding:8px 10px 4px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:var(--sx-lab)}
+.hz #about-veil .switch{width:32px;height:18px;border-radius:5px;background:var(--sx-s2);box-shadow:inset 0 0 0 var(--sx-hl) rgba(255,255,255,.22);transition:background .18s var(--sx-e)}
+.hz #about-veil .switch::after{top:3px;left:3px;width:12px;height:12px;border-radius:3px;background:#8d919b;box-shadow:none;transition:transform .18s var(--sx-e),background .18s var(--sx-e)}
+.hz #about-veil .toggle-row.on .switch{background:#d9dde6;box-shadow:inset 0 0 0 var(--sx-hl) #d9dde6}
+.hz #about-veil .toggle-row.on .switch::after{transform:translateX(14px);background:var(--sx-s1)}
+.hz #about-veil .about-btn,.hz #about-veil .bm-btn{height:28px;padding:0 12px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.2);background:var(--sx-s2);box-shadow:none;
+  color:var(--sx-ink);font:500 12px/1 var(--hz-font-ui);transition:background .15s var(--sx-e)}
+.hz #about-veil .about-btn.slim,.hz #about-veil .bm-btn{height:28px;padding:0 12px;font-size:12px}
+.hz #about-veil .about-btn:hover,.hz #about-veil .bm-btn:hover{background:#222226;border-color:rgba(255,255,255,.26);color:var(--sx-ink)}
+.hz #about-veil .about-btn:active,.hz #about-veil .bm-btn:active{transform:none;background:#26262a}
+.hz #about-veil .about-btn.primary{padding:0 14px;background:var(--sx-s2);border-color:rgba(255,255,255,.2)}
+.hz #about-veil .about-btn.danger{color:#f0566c;border-color:rgba(232,65,90,.45);background:transparent}
+.hz #about-veil .about-btn.quiet{height:28px;border:0;background:none;color:var(--sx-meta)}
+.hz:not(.hz-kb) #about-veil .about-btn:focus-visible,.hz:not(.hz-kb) #about-veil .bm-btn:focus-visible,.hz:not(.hz-kb) #about-veil .sl-seg button:focus-visible,
+.hz:not(.hz-kb) #about-veil .sl-menu:focus-visible,.hz:not(.hz-kb) #about-veil .toggle-row:focus-visible .switch{box-shadow:none}
+.hz #about-veil input[type=text],.hz #about-veil input[type=password],.hz #about-veil input[type=search],.hz #about-veil input[type=number],.hz #about-veil input:not([type]){
+  height:32px;min-height:32px;padding:0 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);color:var(--sx-ink);font:450 13px/1 var(--hz-font-ui)}
+.hz #about-veil textarea{min-height:72px;padding:8px 10px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);color:var(--sx-ink);font:450 13px/1.45 var(--hz-font-ui);resize:none}
+.hz #about-veil input::placeholder,.hz #about-veil textarea::placeholder{color:rgba(255,255,255,.4)}
+.hz #about-veil input:focus,.hz #about-veil textarea:focus{outline:1px solid var(--hz-ember);outline-offset:-1px;border-color:rgba(255,255,255,.14)}
+.hz #about-veil .ctlrow>input,.hz #about-veil .ctlrow>.about-btn.slim{height:32px}
+/* the cards (Usage, Cloud, Servers, Manage, the plans): flat, a hairline, radius 10 */
+.hz #about-veil .us-card,.hz #about-veil #cloudkey-box,.hz #about-veil #srv-add,.hz #about-veil .srv-card,.hz #about-veil #manage-box,.hz #about-veil .plan-card,
+.hz #about-veil .mu,.hz #about-veil #acct-card,.hz #about-veil .set-card{border-radius:10px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s0);box-shadow:none}
+.hz #about-veil .set-card.on{border-color:rgba(255,255,255,.3);background:var(--sx-s2)}
+/* every label in words: sentence case Inter, never mono caps */
+.hz #about-veil .us-k,.hz #about-veil .srv-h,.hz #about-veil #cloudkey-head,.hz #about-veil .ros-gh,.hz #about-veil .bm-e,.hz #about-veil #mg-stats dt,.hz #about-veil #len-head,
+.hz #about-veil .kn-h,.hz #about-veil .bm-h{font:500 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-meta)}
+.hz #about-veil #mg-stats dt::first-letter{text-transform:uppercase}
+.hz #about-veil #len-head b{font:500 13px/16px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil .us-v,.hz #about-veil .bm-v{font:600 20px/28px var(--hz-font-ui);letter-spacing:-.01em;color:var(--sx-ink);font-variant-numeric:tabular-nums}
+.hz #about-veil .us-title{font:600 15px/24px var(--hz-font-ui);color:var(--sx-ink)}
+.hz #about-veil #us-svg text{font-family:var(--hz-font-ui);font-size:11px;fill:var(--sx-meta)}
+/* Usage: one silver chart (the three series as three greys), not three hues */
+.hz #about-veil #us-svg rect[fill="#e6b422"]{fill:#e6e8ee}
+.hz #about-veil #us-svg rect[fill="#22c08a"]{fill:#9ea3ae}
+.hz #about-veil #us-svg rect[fill="#4d8dff"]{fill:#5e636e}
+.hz #about-veil #us-svg line{stroke:rgba(255,255,255,.08)}
+.hz #about-veil .us-leg i:nth-child(1),.hz #about-veil .us-leg span:nth-child(1) i{background:#e6e8ee!important}
+.hz #about-veil .us-leg span:nth-child(2) i{background:#9ea3ae!important}
+.hz #about-veil .us-leg span:nth-child(3) i{background:#5e636e!important}
+/* Models: two-line rows (the name; its size and what it is for), a silver dot, Remove as a small key while managing */
+.hz #about-veil #roster{font:450 13px/1.4 var(--hz-font-ui);margin:0 0 8px;max-height:none;overflow:visible}
+.hz #about-veil .ros-gh{margin:16px 0 4px}
+.hz #about-veil .ros-gh:first-child{margin-top:0}
+.hz #about-veil .ros-row{display:grid;grid-template-columns:14px minmax(0,auto) minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:8px;row-gap:2px;
+  align-items:center;min-height:52px;padding:8px 0;border-bottom:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #about-veil .ros-row .rs{grid-column:1;grid-row:1/3;width:6px;height:6px;border-radius:2px;background:#d9dde6;font-size:0;color:transparent;overflow:hidden;align-self:center}
+.hz #about-veil .ros-row .rs.rno{background:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.hz #about-veil .ros-row .rn{grid-column:2/4;grid-row:1;font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz #about-veil .ros-row .rg{grid-column:2;grid-row:2;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);font-variant-numeric:tabular-nums}
+.hz #about-veil .ros-row .rg:not(:empty)::after{content:"\00a0\00b7";margin-right:-4px}
+.hz #about-veil .ros-row .rd{grid-column:3;grid-row:2;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil .ros-row .rd.rerr{color:#f0566c}
+.hz #about-veil .ros-row .rrm,.hz #about-veil .ros-row .rin,.hz #about-veil .ros-row .rgo{grid-column:4;grid-row:1/3;align-self:center;margin:0}
+.hz #about-veil .ros-row .rrm,.hz #about-veil .ros-row .rin{display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.2);
+  background:var(--sx-s2);color:var(--sx-ink);font:500 12px/1 var(--hz-font-ui);white-space:nowrap;cursor:pointer}
+.hz #about-veil .ros-row .rrm::first-letter,.hz #about-veil .ros-row .rin::first-letter,.hz #about-veil .ros-row .rgo::first-letter{text-transform:uppercase}
+.hz #about-veil .ros-row .rrm:hover{color:#f0566c;border-color:rgba(232,65,90,.45);background:var(--sx-s2)}
+.hz #about-veil .ros-row .rin:hover{background:#222226;color:var(--sx-ink)}
+.hz #about-veil .ros-row .rgo{display:inline-block;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);font-variant-numeric:tabular-nums}
+.hz #about-veil #roster:not(.managing) .rrm{display:none}
+/* Personal suggestions: Horizon's home shows none (6b555), so it asks for none; the switch is Classic's */
+.hz #about-veil #sugg-toggle,.hz #about-veil #sugg-note{display:none}
+/* a phone: the dialog is the screen; the rail runs along the top */
+@media (max-width:640px){
+  .hz #about-veil{align-items:stretch;padding:0}
+  .hz #about-veil #about-card{width:100vw;height:100%;max-width:none;max-height:none;border:0;border-radius:0;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr)}
+  .hz #about-veil #set-rail{flex-direction:row;padding:12px;border-right:0;border-bottom:var(--sx-hl) solid rgba(255,255,255,.08);overflow:auto hidden;scrollbar-width:none}
+  .hz #about-veil .sx-slab,.hz #about-veil #set-spec{display:none}
+  .hz #about-veil #set-nav{flex-direction:row;gap:2px;width:max-content}
+  .hz #about-veil #snav-models-kids:not([hidden]){display:contents}
+  .hz #about-veil .snav{width:auto;padding:0 10px}
+  .hz #about-veil .snav-kid{padding-left:10px}
+  .hz #about-veil #about-body{padding:20px 16px 32px}
+  .hz #about-veil #about-foot{padding:10px 16px}
+  .hz #about-veil .sl-seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+}
+@media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card,.hz #about-veil.sx-out,.hz #about-veil.sx-out #about-card{animation:none}}
+/* ---- ONE TYPE SYSTEM: Inter for the UI and the reading, mono for code only ---------------------------------------- */
+.hz .msg.ai .body th{font:600 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--hz-ink-2)}
+.hz .msg.ai .body ol>li::before{font-family:var(--hz-font-ui);font-variant-numeric:tabular-nums}
+.hz .msg.ai .body sup.cite{font-family:var(--hz-font-ui)}
+.hz .liveline .lstats,.hz .behind .bt,.hz .behind .bfacts,.hz .behind .spine .nums,.hz .behind .mrow .mono,.hz .howsrc .sd,.hz .pcard .ph,
+.hz .srcchip.know .kn-when,.hz .docchip .dcm,.hz .docchip2 .mono,.hz #p-know .kn-nums b,.hz .srcchip .n{font-family:var(--hz-font-ui);font-variant-numeric:tabular-nums}
+/* ---- THE PALETTE (⌘K): flat, its tags in words ------------------------------------------------------------------- */
+.hz #palette{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none}
+.hz #palette .pbox{background:var(--sx-s1);border:var(--sx-hl) solid rgba(255,255,255,.1);border-radius:14px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+  font-family:var(--hz-font-ui);animation:sxRise .2s var(--sx-e) both}
+.hz #pq{font:450 15px/1.4 var(--hz-font-ui);color:var(--sx-ink)}
+.hz #pq::placeholder{color:rgba(255,255,255,.4)}
+.hz .pitem{height:36px;padding:0 10px;gap:10px;border-radius:8px;font:450 13px/1 var(--hz-font-ui);color:var(--sx-ink2)}
+.hz .pitem.sel,.hz .pitem:hover{background:var(--sx-s3);color:var(--sx-ink)}
+.hz .pitem .pk{flex:none;min-width:56px;box-sizing:border-box;padding:0;border:0;background:none;font:450 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-meta)}
+.hz .pitem .psub{font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #palette .pfoot{display:flex;gap:16px;padding:10px 16px;border-top:var(--sx-hl) solid rgba(255,255,255,.08);font:450 12px/16px var(--hz-font-ui);letter-spacing:0;
+  text-transform:none;color:var(--sx-meta)}
+.hz #palette .pempty{font:450 13px/1 var(--hz-font-ui);color:var(--sx-meta)}
+@media (prefers-reduced-motion:reduce){.hz #palette .pbox{animation:none}}
+/* ---- DICTATION: a live level while listening (flat silver bars), and never the ember send key ------------------------ */
+.hz #mic .sx-lvl{display:none;flex:none;width:40px;height:16px}
+.hz #mic.rec{width:84px;gap:6px;justify-content:center;transition:width .2s var(--sx-e)}
+.hz #mic.rec .sx-lvl{display:block}
+.hz #composer.hastext:has(#mic.rec) #send:not(:disabled):not(.stop),.hz #composer.hastext.sx-dict #send:not(:disabled):not(.stop){background:transparent;color:var(--hz-ink);
+  box-shadow:inset 0 0 0 1px var(--hz-line)}
+@media (prefers-reduced-motion:reduce){.hz #mic.rec{transition:none}}
+/* ---- THE PDF CHIP: plain words and one action, flat --------------------------------------------------------------- */
+.hz .docchip.sx-pdf{display:inline-flex;align-items:center;gap:10px;height:auto;min-height:36px;max-width:min(560px,100%);padding:6px 6px 6px 10px;border-radius:10px;
+  border:var(--sx-hl) solid rgba(255,255,255,.12);background:#151517;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
+.hz .docchip.sx-pdf.dbad{border-color:rgba(255,255,255,.12)}
+.hz .docchip.sx-pdf>svg{flex:none;width:16px;height:16px;color:var(--sx-meta)}
+.hz .docchip.sx-pdf .sx-pn{flex:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500}
+.hz .docchip.sx-pdf .sx-pw{min-width:0;flex:1 1 auto;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta);font-style:normal}
+.hz .docchip.sx-pdf .sx-pa{flex:none;height:24px;padding:0 10px;border-radius:6px;border:var(--sx-hl) solid rgba(255,255,255,.2);background:var(--sx-s2);color:var(--sx-ink);
+  font:500 12px/1 var(--hz-font-ui);cursor:pointer;position:static;width:auto;top:auto;right:auto}
+.hz .docchip.sx-pdf .sx-pa:hover{background:#222226}
+.hz .docchip.sx-pdf b{display:none}
+/* ---- THE CODE LANE: drawn icons, the host chip and its sheet, neutral keys, an ember outline for danger ------------- */
+.hz #code-wrap .agent .ico svg,.hz .sx-ico{width:16px;height:16px;flex:none;stroke-width:1.5;color:var(--sx-ink2)}
+.hz #code-wrap .agent .ico{display:inline-flex;align-items:center;justify-content:center;width:16px;font-size:0}
+.hz #code-wrap .agent.on .ico svg{color:var(--sx-ink)}
+.hz #code-wrap #remote-bar{display:none!important}   /* the connection lives in the host sheet (Horizon) */
+#sx-host{display:none}
+.hz #sx-host:not([hidden]){display:inline-flex;align-items:center;gap:6px;order:5;margin-left:auto;height:36px;max-width:200px;padding:0 10px;box-sizing:border-box;
+  border-radius:8px;border:var(--sx-hl) solid var(--hz-hair-2);background:transparent;color:var(--hz-ink-2);font:450 13px/1 var(--hz-font-ui);cursor:pointer;
+  transition:background .15s var(--sx-e),color .15s var(--sx-e)}
+.hz #sx-host:hover{background:rgba(255,255,255,.05);color:var(--hz-ink)}
+.hz #sx-host span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hz #sx-host .sx-hd{width:6px;height:6px;flex:none;border-radius:2px;background:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
+.hz #sx-host.set .sx-hd{background:#d9dde6;box-shadow:none}
+.hz #crow:has(#sx-host:not([hidden])) #mic{margin-left:0}
+.hz #main:not(:has(#hero)) #sx-host:not([hidden]){order:2;margin-left:auto;height:32px}
+/* the Code lane's Run key: neutral silver with words in it, never the ember and never a hue */
+.hz.hz-sx-code #composer.hastext #send:not(:disabled):not(.stop){background:#e9ebf0;color:#141416;box-shadow:none}
+.hz.hz-sx-code #composer.hastext #send:not(:disabled):not(.stop):hover{background:#fff;color:#141416}
+.hz:not(.hz-kb) #sx-host:focus-visible{outline:0}
+.hz.hz-kb #sx-host:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+#sx-host-veil{position:fixed;inset:0;z-index:62;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);animation:sxFade .18s cubic-bezier(.2,.7,.2,1) both}
+#sx-host-veil[hidden]{display:none}
+#sx-host-sheet{position:relative;width:min(480px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow-y:auto;box-sizing:border-box;padding:24px;border-radius:14px;
+  background:#141416;border:var(--chat-hw,1px) solid rgba(255,255,255,.1);color:rgba(255,255,255,.78);font:450 13px/1.4 var(--hz-font-ui);
+  animation:sxRise .2s cubic-bezier(.2,.7,.2,1) both;-webkit-font-smoothing:antialiased}
+#sx-host-sheet h2{margin:0 0 4px;font:600 15px/24px var(--hz-font-ui);color:#f4f5fa}
+#sx-host-sheet .sx-sub{margin:0 0 16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55)}
+#sx-host-sheet .sx-x{position:absolute;top:12px;right:12px;width:28px;height:28px;border:0;border-radius:8px;background:none;color:rgba(255,255,255,.55);
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+#sx-host-sheet .sx-x:hover{background:#1f1f22;color:#f4f5fa}
+#sx-host-sheet #remote-bar{display:flex!important;flex-direction:column;gap:8px;padding:0;margin:0;border:0;border-radius:0;background:none;box-shadow:none}
+#sx-host-sheet #remote-bar .set-h{margin:8px 0 0;font:500 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:rgba(255,255,255,.6)}
+#sx-host-sheet #remote-bar .set-h:first-child{margin-top:0}
+#sx-host-sheet #autonomy-seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;border-radius:8px;background:#1a1a1d;border:var(--chat-hw,1px) solid rgba(255,255,255,.08)}
+#sx-host-sheet .autoseg{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-height:0;padding:8px 10px;border:0;border-radius:6px;background:none;box-shadow:none;
+  color:rgba(255,255,255,.7);text-align:left;cursor:pointer;font:450 12px/16px var(--hz-font-ui)}
+#sx-host-sheet .autoseg .ai{display:inline-flex;font-size:0;margin:0 0 2px}
+#sx-host-sheet .autoseg .ai svg{width:14px;height:14px;stroke-width:1.5}
+#sx-host-sheet .autoseg b{font:500 13px/18px var(--hz-font-ui);color:#f4f5fa}
+#sx-host-sheet .autoseg .ad{font:450 11px/15px var(--hz-font-ui);color:rgba(255,255,255,.55)}
+#sx-host-sheet .autoseg.on{background:#2a2a2f;border:0;box-shadow:none}
+#sx-host-sheet .autoseg:hover{color:#f4f5fa}
+#sx-host-sheet #remote-row{display:grid;grid-template-columns:minmax(0,1fr) 96px 64px;gap:8px}
+#sx-host-sheet #remote-bar input{height:32px;width:100%;box-sizing:border-box;padding:0 10px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.14);background:#0e0e10;
+  color:#f4f5fa;font:450 13px/1 var(--hz-font-mono);box-shadow:none}
+#sx-host-sheet #remote-bar input::placeholder{color:rgba(255,255,255,.4);font-family:var(--hz-font-ui)}
+#sx-host-sheet #remote-bar input:focus{outline:1px solid var(--hz-ember);outline-offset:-1px;border-color:rgba(255,255,255,.14)}
+#sx-host-sheet #remote-foot{display:flex;gap:8px;margin-top:8px}
+#sx-host-sheet .about-btn{width:auto;height:28px;padding:0 12px;border-radius:8px;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);background:#1a1a1d;box-shadow:none;
+  color:#f4f5fa;font:500 12px/1 var(--hz-font-ui);cursor:pointer}
+#sx-host-sheet .about-btn:hover{background:#222226}
+#sx-host-sheet .about-btn[hidden]{display:none}
+#sx-host-sheet #rm-note{min-height:16px;font:450 12px/16px var(--hz-font-ui);color:rgba(255,255,255,.55);overflow-wrap:anywhere}
+@media (prefers-reduced-motion:reduce){#sx-host-veil,#sx-host-sheet{animation:none}}
+/* the keys: no light blue anywhere; danger is an ember outline, its own card per command */
+.hz .apbtn.ok{background:transparent;color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.34)}
+.hz .apcard .aprisk.read{color:var(--hz-ink-2);background:rgba(255,255,255,.06)}
+.hz .apbtn:focus-visible,.hz .fopt:focus-visible{box-shadow:inset 0 0 0 1px var(--hz-ember)}
+.hz:not(.hz-kb) .apbtn:focus-visible,.hz:not(.hz-kb) .fopt:focus-visible{box-shadow:none}
+.hz .msg .apcard.hz-ap.danger:not(.decided){border-color:rgba(232,65,90,.6)}
+.hz .msg .apcard.hz-ap.danger:not(.decided) .apbtn.ok{color:var(--hz-ink);border-color:rgba(232,65,90,.6)}
+.hz .msg .apcard.hz-ap.danger:not(.decided) .apbtn.ok:hover{background:rgba(232,65,90,.08);border-color:var(--hz-ember)}
+.hz .hz-subruns>.hz-apli{margin:4px 0 2px}
+/* the lane's home line: what the lane does, under the greeting */
+#sx-lanehome{display:none}
+.hz #hero #sx-lanehome:not([hidden]){display:block;margin:12px auto 0;max-width:560px;text-align:center;font:450 15px/22px var(--hz-font-ui);color:var(--sx-meta);
+  animation:sxFade .4s var(--sx-e) both}
+@media (prefers-reduced-motion:reduce){.hz #hero #sx-lanehome{animation:none}}
+/* ---- FUNNELS: the goal form is the lane's home, in the main column; the trail's stage hairline ---------------------- */
+.hz #sx-fnhome{display:none}
+.hz #sx-fnhome.on{display:block;width:min(640px,100%);margin:0 auto;box-sizing:border-box}
+.hz.hz-sx-fn #composer,.hz.hz-sx-fn #hz-cglow{display:none!important}
+.hz #sx-fnhome #funnel-wrap{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 12px;padding:20px;border-radius:14px;
+  background:#141416;border:var(--sx-hl) solid rgba(255,255,255,.1);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+  font:450 13px/1.4 var(--hz-font-ui);color:var(--sx-ink2);text-align:left;animation:sxRise .3s var(--sx-e) both}
+.hz #sx-fnhome #funnel-wrap>*{margin:0}
+.hz #sx-fnhome .fq{display:flex;flex-direction:column;align-items:stretch;gap:6px;font:500 12px/16px var(--hz-font-ui);letter-spacing:0;text-transform:none;color:var(--sx-meta);text-align:left}
+.hz #sidebar #funnel-wrap{display:none!important}   /* Horizon: the form is the lane's home, not a sidebar panel */
+.hz #sx-fnhome #funnel-wrap>label.fq,.hz #sx-fnhome #funnel-wrap>textarea{grid-column:1/-1}
+.hz #sx-fnhome #funnel-wrap>label.fq:nth-of-type(1){margin-bottom:-6px}
+.hz #sx-fnhome #funnel-wrap>label.fq:nth-of-type(2){margin-bottom:-6px}
+.hz #sx-fnhome .fgrid{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.hz #sx-fnhome textarea,.hz #sx-fnhome input,.hz #sx-fnhome select{width:100%;box-sizing:border-box;height:32px;padding:0 10px;border-radius:8px;
+  border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);color:var(--sx-ink);font:450 13px/1 var(--hz-font-ui);box-shadow:none}
+.hz #sx-fnhome textarea{height:auto;min-height:52px;padding:8px 10px;line-height:1.45;resize:none}
+.hz #sx-fnhome #fn-goal{font-size:15px;min-height:56px}
+.hz #sx-fnhome textarea::placeholder,.hz #sx-fnhome input::placeholder{color:rgba(255,255,255,.4)}
+.hz #sx-fnhome textarea:focus,.hz #sx-fnhome input:focus,.hz #sx-fnhome select:focus{outline:1px solid var(--hz-ember);outline-offset:-1px}
+.hz #sx-fnhome .sl-sel{width:100%}
+.hz #sx-fnhome .sl-menu{width:100%;height:32px;border-radius:8px;border:var(--sx-hl) solid rgba(255,255,255,.14);background:var(--sx-s0);box-shadow:none;font:450 13px/1 var(--hz-font-ui)}
+.hz #sx-fnhome #funnel-wrap>div.fq{grid-column:1;align-self:end;flex-direction:row;align-items:center;gap:6px;height:32px}
+.hz #sx-fnhome #funnel-wrap>div.fq .hint{display:none}
+.hz #sx-fnhome #fn-effort{grid-column:2/4;justify-self:start;display:inline-grid;grid-auto-flow:column;gap:2px;padding:2px;height:32px;box-sizing:border-box;border-radius:8px;
+  background:var(--sx-s2);border:var(--sx-hl) solid rgba(255,255,255,.08)}
+.hz #sx-fnhome #fn-effort label{display:flex;margin:0}
+.hz #sx-fnhome #fn-effort input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.hz #sx-fnhome #fn-effort span{display:flex;align-items:center;height:26px;padding:0 12px;border-radius:6px;background:none;box-shadow:none;border:0;
+  font:450 12px/1 var(--hz-font-ui);color:rgba(255,255,255,.7);cursor:pointer}
+.hz #sx-fnhome #fn-effort input:checked+span{background:var(--sx-s4);color:var(--sx-ink)}
+.hz #sx-fnhome #fn-cloud-row{grid-column:1/3;align-self:center;display:flex;align-items:center;gap:8px;font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink2);cursor:pointer}
+.hz #sx-fnhome #fn-cloud-row input{width:16px;height:16px;min-height:0;margin:0;padding:0;accent-color:#d9dde6}
+.hz #sx-fnhome #fn-cloud-row.off{opacity:1;color:var(--sx-meta)}
+.hz #sx-fnhome #fn-cloud-row.off input{opacity:.45}
+.hz #sx-fnhome #fn-go{grid-column:3;justify-self:end;width:auto;height:32px;padding:0 16px;border-radius:8px;border:0;background:var(--sx-ink);color:var(--sx-s1);
+  font:600 13px/1 var(--hz-font-ui);box-shadow:none;cursor:pointer;transition:background .15s var(--sx-e)}
+.hz #sx-fnhome #fn-go:hover{background:#fff}
+.hz #sx-fnhome #fn-go:active{background:#dfe2e8}
+.hz:not(.hz-kb) #sx-fnhome #fn-go:focus-visible{outline:0}
+.hz.hz-kb #sx-fnhome #fn-go:focus-visible{outline:1px solid var(--hz-ember);outline-offset:2px}
+@media (max-width:640px){.hz #sx-fnhome #funnel-wrap,.hz #sx-fnhome .fgrid{grid-template-columns:minmax(0,1fr)}
+  .hz #sx-fnhome .fgrid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .hz #sx-fnhome #funnel-wrap>div.fq,.hz #sx-fnhome #fn-effort,.hz #sx-fnhome #fn-cloud-row,.hz #sx-fnhome #fn-go{grid-column:1}}
+@media (prefers-reduced-motion:reduce){.hz #sx-fnhome #funnel-wrap{animation:none}}
+.hz.hz-calm #sx-fnhome #funnel-wrap{animation:none}
+/* a funnel under way: no "Funnel" byline over the trail, and the stage N of M hairline under it */
+.hz .msg.ai.hz-fn>.who{display:none}
+@property --sxp{syntax:"<number>";inherits:true;initial-value:0}
+.hz .msg.ai.hz-fn>.ftrail{transition:--sxp .52s var(--sx-e)}
+.hz .msg.ai.hz-fn>.ftrail::after{content:"";flex:0 0 100%;order:9;height:1px;margin:4px 0 0;
+  background:linear-gradient(90deg,#d9dde6 0,#d9dde6 calc(var(--sxp,0) * 100%),rgba(255,255,255,.1) calc(var(--sxp,0) * 100%))}
+.hz .msg.ai.hz-fn.settled>.ftrail{--sxp:1}
+.hz.hz-calm .msg.ai.hz-fn>.ftrail{transition:none}
+@media (prefers-reduced-motion:reduce){.hz .msg.ai.hz-fn>.ftrail{transition:none}}
+/* ---- BRING YOUR CHATS: over black, never navy (the governing rule) ------------------------------------------------- */
+.hz #imp-veil{background:rgba(0,0,0,.55);-webkit-backdrop-filter:none;backdrop-filter:none}
+.hz #imp-sheet{border-radius:14px;border:var(--sx-hl) solid rgba(255,255,255,.1);background:var(--sx-s1);box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.hz #imp-sheet .imp-sky{display:none}
+.hz #imp-sheet .imp-title{font-family:var(--hz-font-ui);font-weight:600;letter-spacing:-.01em}
+.hz .imp-card{border-radius:10px;border:var(--sx-hl) solid rgba(255,255,255,.08);background:var(--sx-s0)}
+.hz #imp-veil .imp-tile{padding:16px 18px;border-radius:10px;background:var(--sx-s0)!important;border:var(--sx-hl) solid rgba(255,255,255,.1)!important;box-shadow:none!important}
+.hz #imp-veil .imp-tile:hover{background:var(--sx-s2)!important;border-color:rgba(255,255,255,.2)!important}
+.hz .imp-tile svg,.hz .imp-drop svg{color:var(--sx-ink2)}
+.hz .imp-steps li.done i{background:#d9dde6;opacity:.55}
+.hz .imp-drop.over{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.04)}
+.hz #imp-veil .imp-btn.primary,.hz #imp-ask #imp-ask-go{background:var(--sx-ink)!important;color:var(--sx-s1)}
+.hz .imp-sw button[aria-checked="true"]{background:#d9dde6!important}
+.hz #imp-veil button:focus-visible,.hz #imp-veil [tabindex]:focus-visible,.hz #imp-veil input:focus-visible,.hz #imp-ask button:focus-visible{box-shadow:0 0 0 1px var(--hz-ember)}
+.hz:not(.hz-kb) #imp-veil button:focus-visible,.hz:not(.hz-kb) #imp-veil [tabindex]:focus-visible{box-shadow:none}
+/* ==== THE POLISH (6b625): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -55184,9 +55560,11 @@ __CODE_ROWS__
            autocomplete="off" spellcheck="false">
     <div id="presults"></div>
     <div class="pfoot"><span>&uarr;&darr; move</span>
-      <span>\u21a9 open</span><span>esc close</span></div>
+      <span>&#8617; open</span><span>esc close</span></div>
   </div>
 </div>
+<!-- the Code lane's server connection (6b625): the Remote agent's fields move in here while it is open -->
+<div id="sx-host-veil" hidden><div id="sx-host-sheet" role="dialog" aria-modal="true" aria-labelledby="sx-host-h"><button type="button" class="sx-x" aria-label="Close"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8"/></svg></button><h2 id="sx-host-h">Your server</h2><p class="sx-sub">Key-only SSH. How much runs before it asks you is up to you.</p></div></div>
 <!-- ==== bring your chats (6b529): the sheet begin ==== -->
 <div id="imp-ask" role="alertdialog" aria-labelledby="imp-ask-t" hidden><span id="imp-ask-t"></span>
   <button type="button" id="imp-ask-go">Import</button><button type="button" id="imp-ask-no">Cancel</button></div>
@@ -55247,6 +55625,8 @@ __CODE_ROWS__
     <div id="bm-busy" hidden></div>
     <!-- Horizon (6b526): the glow under the glass, placed by hzGlowFit -->
     <div id="hz-cglow" hidden></div>
+    <!-- the Funnels lane's home (6b625): the goal form moves here, where the composer sits -->
+    <div id="sx-fnhome"></div>
     <div id="composer">
 
       <input type="file" id="fpick" multiple hidden
@@ -55272,6 +55652,7 @@ __CODE_ROWS__
           <path d="M21.4 11.05 12.2 20.2a5.5 5.5 0 0 1-7.78-7.78l9.2-9.19a3.67 3.67 0 0 1 5.18 5.18l-9.2 9.2a1.83 1.83 0 0 1-2.6-2.6l8.5-8.48"/>
         </svg>
       </button>
+      <button type="button" id="sx-host" hidden title="Server connection"><i class="sx-hd" aria-hidden="true"></i><span>Connect a server</span></button>
       <button class="cbtn" id="mic" title="Dictate">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -55377,6 +55758,7 @@ __CODE_ROWS__
          still finds it. The rail head is a proper spec list rather than a
          dot-separated run that wrapped mid-word. -->
     <nav id="set-rail">
+      <p class="sx-slab" id="sx-set-title">Settings</p>
       <div id="set-brand">
         <svg id="set-wing" viewBox="2 2.3 19.6 16.4" aria-hidden="true"><defs><linearGradient id="swg" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#787e89"/><stop offset=".55" stop-color="#b7bcc6"/><stop offset="1" stop-color="#f4f5f8"/></linearGradient></defs><g stroke="url(#swg)" stroke-width="2.4" stroke-linecap="round"><line x1="3.2" y1="17.5" x2="20.4" y2="3.5"/><line x1="7.5" y1="17.5" x2="20.4" y2="7"/><line x1="11.8" y1="17.5" x2="20.4" y2="10.5"/><line x1="16.1" y1="17.5" x2="20.4" y2="14"/><line x1="19.3" y1="17.5" x2="20.4" y2="16.6"/></g></svg><b>Concorde<b>AI</b></b>
       </div>
@@ -55418,6 +55800,7 @@ __CODE_ROWS__
     <section class="spane on" id="p-about">
       <div class="set-h">About</div>
       <div id="up-version">__APP_VER__</div>
+      <div id="sx-build">Build __APP_BUILD__</div>
       <div id="up-reldate"></div>
       <div id="up-notes" hidden></div>
       <button class="about-btn" id="about-check">Check now</button>
@@ -57112,6 +57495,7 @@ function modeShow(which){
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
   if(globalThis.hzReady)hzLanePaint();   // Horizon's lanes (6b526)
+  sxLaneSoon();                          // the lane's placeholder, home line, host chip, funnel form (6b625)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -57155,6 +57539,7 @@ function setAgent(name,guess){
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
   if(typeof remoteRefresh==="function")remoteRefresh();
+  sxLaneSoon();                          // 6b625
 }
 
 /* -------------------------------------------------- task library (6b250) */
@@ -57292,6 +57677,7 @@ async function remoteRefresh(){
         :"Key-only SSH. On a new server, install your key first: "+keyCopyCmd("user","host");
     }
   }catch(e){}
+  sxLaneSoon();                        // the host chip says the saved host (6b625)
 }
 // the key-install command for this computer (6b317): Windows has no
 // ssh-copy-id, so a PC gets the PowerShell line that does the same
@@ -59971,7 +60357,8 @@ function paintChips(){
   w.innerHTML=pendingImages.map((d,i)=>
     '<span class="imgchip"><img src="'+d+'">'+
     '<b data-k="i" data-i="'+i+'" title="Remove">×</b></span>').join("")
-   +pendingDocs.map((d,i)=>d.busy||d.err
+   +pendingDocs.map((d,i)=>(d.busy||d.err)&&isHz()?docChipHz(d,i)   // plain words and one action, flat (6b625)
+    :d.busy||d.err
     // a PDF still being read, or one that can't be (6b546): never sent
     ?'<span class="docchip dloc dpdf'+(d.err?' dbad dperr':' dpbusy')+'" title="'+esc(d.name+(d.err?"\n"+d.err:""))+'">📄 '
       +'<span class="dcn">'+esc(d.name)+'</span>'
@@ -61524,6 +61911,7 @@ addEventListener("resize",()=>{
   if(b&&!b.hidden)suggFitWords(b);
 });
 function suggLoad(){
+  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)
   if(suggFlight)return;
   suggAsked=Date.now();suggFlight=true;
   api("/api/suggest").then(r=>r.json()).then(d=>{
@@ -61685,6 +62073,7 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
   if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
+  sxLaneSoon();                               // the lane's home (6b625)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -62396,6 +62785,7 @@ function fnHzReady(box,d){
   if(!box.classList.contains("hz-stage"))return;
   box.classList.remove("wait");
   const p=box.querySelector(".fpath");if(p)p.textContent="Stage "+d.stage+" of "+d.total;
+  sxFnProg(box,(d.stage-1)/Math.max(1,d.total));sxLaneSoon();   // stage N of M on the trail; "Or type your own answer" (6b625)
 }
 // a pick (a card, or words typed in the box): the stage is done, its choice flies into the trail
 function fnHzPick(box,d,label){
@@ -62406,6 +62796,7 @@ function fnHzPick(box,d,label){
     on.querySelector("b").textContent=label;ops.appendChild(on);btns.push(on);}
   btns.forEach(el=>{el.disabled=true;el.tabIndex=-1;el.classList.toggle("on",el===on);el.classList.toggle("off",el!==on);});
   box.classList.remove("cur");box.classList.add("done");
+  sxFnProg(box,(+d.stage||0)/Math.max(1,+d.total||1));   // 6b625
   const tr=c&&c.querySelector(":scope>.ftrail");
   if(tr){const chip=document.createElement("span");chip.className="ftc";chip.setAttribute("role","listitem");chip.textContent=label;tr.appendChild(chip);
     if(on&&fnHzMotion()&&chip.animate){const a=on.getBoundingClientRect(),b=chip.getBoundingClientRect();
@@ -62417,6 +62808,7 @@ function fnHzPick(box,d,label){
 function fnHzDone(box,d){
   if(!box.classList.contains("hz-stage"))return false;
   const c=box.closest(".hz-fn"),w=c&&c.querySelector(":scope>.who");if(w)w.textContent="Funnel · done";
+  sxFnProg(box,1);sxLaneSoon();   // 6b625
   box.className="hz-stage verdict";box.setAttribute("role","listitem");
   box.querySelector(".body").innerHTML='<span class="fn-k">The pick</span>'+renderMD(d.summary||"");
   return true;
@@ -62526,7 +62918,7 @@ function palSearch(q){
   const out=[];
   if(!s){
     chats.slice(0,8).forEach(c=>out.push(
-      {k:"chat",t:c.title||"chat",sub:"",run:()=>loadChat(c.id)}));
+      {k:palKind(c),t:c.title||"chat",sub:"",run:()=>loadChat(c.id)}));
     palActions().forEach(a=>out.push(a));
     return out;
   }
@@ -62535,7 +62927,7 @@ function palSearch(q){
   chats.forEach(c=>{
     const title=(c.title||"chat");
     if(title.toLowerCase().includes(s)){
-      out.push({k:"chat",t:title,sub:"",run:()=>loadChat(c.id)});return;
+      out.push({k:palKind(c),t:title,sub:"",run:()=>loadChat(c.id)});return;
     }
     // fall through to message text — "that Bushwick thing" lives in the
     // body, not the title
@@ -62556,7 +62948,7 @@ function palPaint(){
   }
   presults.innerHTML=palItems.map((it,i)=>
     '<div class="pitem'+(i===palSel?" sel":"")+'" data-i="'+i+'">'
-    +'<span class="pk">'+esc(it.k)+'</span>'
+    +'<span class="pk">'+esc(isHz()?palLabel(it.k):it.k)+'</span>'
     +'<span class="pt">'+esc(it.t)+'</span>'
     +(it.sub?'<span class="psub">'+esc(it.sub)+'</span>':"")+'</div>').join("");
   presults.querySelectorAll(".pitem").forEach(el=>{
@@ -62611,6 +63003,7 @@ document.addEventListener("keydown",e=>{
     if(!palette.hidden){palClose();return;}
     if(srvAllClose()){e.preventDefault();return;}
     if(engMenuEsc()){e.preventDefault();return;}
+    if(typeof sxHostEsc==="function"&&sxHostEsc()){e.preventDefault();return;}   // the host sheet (6b625)
     if(generating&&abortCtl){e.preventDefault();abortCtl.abort();return;}
     // close whatever modal is open, outermost last
     if(srvSheetAt){srvSheetClose();e.preventDefault();return;}
@@ -63604,6 +63997,7 @@ function pcm16(f,srIn){
 }
 function micChunk(e){
   if(!micCap)return;                   // the warm window records nothing
+  if(typeof dictMeter==="function")dictMeter(e.inputBuffer.getChannelData(0));   // the live level (6b625)
   const b=pcm16(e.inputBuffer.getChannelData(0),micCtx.sampleRate);
   dictQ.push(b);dictSecs+=b.length/16000;
   if(!recHeard){recHeard=true;dictTrace("chunk");recPaint();}
@@ -63617,6 +64011,7 @@ function dictLit(on){
   micBtn.classList.toggle("rec",on);
   if(on)input.placeholder="Listening…";
   else input.classList.remove("dictating");
+  if(!on&&typeof dictMeterOff==="function")dictMeterOff();
 }
 // everything queued, as one body; the queue is left empty
 function dictJoin(){
@@ -66174,7 +66569,8 @@ function uChart(d,W){
 function paintUsage(d,err){
   const T=(d&&d.totals)||{},dash="\u2014";
   $("#us-req").textContent=d?uInt(T.requests):dash;
-  $("#us-ans").textContent=d?uInt(T.answers)+(T.answers===1?" answer":" answers"):"";
+  $("#us-ans").textContent=d?uInt(T.answers)+" "+sxPl(T.answers,"answer"):"";
+  {const rk=$("#us-req").parentNode.querySelector(".us-k");if(rk)rk.textContent=d&&+T.requests===1?"Request":"Requests";}   // plural rules (6b625)
   $("#us-in").textContent=d?uTok(T.input):dash;
   $("#us-cached").textContent=d&&T.cached?uTok(T.cached)+" cached":"";
   $("#us-out").textContent=d?uTok(T.output):dash;
@@ -67754,14 +68150,14 @@ async function paintUpdatesPane(){
     else if(r.auto===false)
       $("#up-reldate").textContent="Automatic checks are off. Use Check now.";
     else if(r.published)
-      $("#up-reldate").textContent="Released on "
+      $("#up-reldate").textContent=(!r.latest||r.latest===r.current||r.tag==="nightly"?"Released on ":r.latest+" released on ")   // another release's date says whose (6b625)
         +new Date(r.published).toLocaleDateString("en-US",
           {month:"long",day:"numeric",year:"numeric"});
     const nb=$("#up-notes");
     if(r.notes){
       nb.hidden=false;
       nb.innerHTML='<p><b>What’s new'
-        +(r.available&&r.tag!=="nightly"?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);   // a nightly's notes are the last release's (6b551)
+        +(r.tag!=="nightly"&&r.latest&&(r.available||r.latest!==r.current)?" in "+esc(r.latest):"")+"</b></p>"+notesHTML(r.notes);   // never another version's notes as this one's (6b625)   // a nightly's notes are the last release's (6b551)
     }else nb.hidden=true;
   }catch(e){}
 }
@@ -70995,6 +71391,178 @@ $("#imp-ask-go").addEventListener("click",()=>impAskClose(true));
 $("#imp-ask-no").addEventListener("click",()=>impAskClose(false));
 $("#imp-ask").addEventListener("keydown",e=>{if(e.key==="Escape"){e.preventDefault();e.stopPropagation();impAskClose(false);}});
 /* ==== bring your chats (6b529): script end ==== */
+// ==== polish-js (6b625): begin ====
+// THE POLISH (6b625, per Patrick: "I want this UI to be perfect"). The page's own pieces, dressed and steered in Horizon
+// (Classic draws what it drew): Settings opens and closes as the demo's dialog (180 ms fade, 6 px rise, focus kept
+// inside and given back, arrow keys on the rail); the palette names a chat's lane; a level meter while dictating; the
+// PDF chip in plain words with one action; the Code lane's drawn icons, host chip and sheet, its own placeholder and a
+// line saying what the lane does; Funnels' goal form as the lane's home and the stage hairline. Every name is var or a
+// function declaration, so nothing here can throw in a temporal dead zone when a chat opens early.
+function sxHz(){return document.documentElement.classList.contains("hz");}
+function sxMotion(){return !(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches);}
+// plural rules, in words: "1 request", "0 answers", "2 commands"
+var SX_PR=(typeof Intl!=="undefined"&&Intl.PluralRules)?new Intl.PluralRules("en-US"):null;
+function sxPl(n,one,many){n=+n||0;const k=SX_PR?SX_PR.select(n):(n===1?"one":"other");return k==="one"?one:(many||one+"s");}
+// ---- SETTINGS: the demo's dialog ----------------------------------------------------------------------------------
+var sxSetPrev=null;
+function sxSetFocusables(){const c=$("#about-card");if(!c)return [];
+  return [...c.querySelectorAll('button,a[href],input,select,textarea,[tabindex]')].filter(x=>x.tabIndex>=0&&!x.disabled&&x.offsetParent!==null&&!x.closest("[hidden]"));}
+function sxSetWire(){
+  const v=$("#about-veil");if(!v||v._sx)return;v._sx=true;
+  const D=Object.getOwnPropertyDescriptor(HTMLElement.prototype,"hidden");if(!D||!D.set)return;
+  let want=v.hasAttribute("hidden"),t=0;
+  Object.defineProperty(v,"hidden",{configurable:true,get(){return want;},set(x){
+    x=!!x;if(x===want)return;want=x;clearTimeout(t);v.classList.remove("sx-out");
+    if(!x){sxSetPrev=document.activeElement;D.set.call(v,false);
+      if(sxHz())setTimeout(()=>{if(want)return;const r=v.querySelector(".snav.on:not(.snav-grp)")||v.querySelector(".snav");if(r&&!v.contains(document.activeElement))r.focus({preventScroll:true});},0);
+      return;}
+    const back=sxSetPrev;sxSetPrev=null;
+    if(sxHz()&&sxMotion()){v.classList.add("sx-out");t=setTimeout(()=>{v.classList.remove("sx-out");if(want)D.set.call(v,true);},180);}
+    else D.set.call(v,true);
+    if(back&&back.isConnected&&back!==document.body&&typeof back.focus==="function")try{back.focus({preventScroll:true});}catch(e){}
+  }});
+  v.addEventListener("keydown",e=>{
+    if(!sxHz()||want)return;
+    if(e.key==="Tab"){const f=sxSetFocusables();if(!f.length)return;const i=f.indexOf(document.activeElement);
+      if(e.shiftKey&&i<=0){e.preventDefault();f[f.length-1].focus();}else if(!e.shiftKey&&(i===f.length-1||i<0)){e.preventDefault();f[0].focus();}return;}
+    const r=e.target&&e.target.closest&&e.target.closest("#set-nav .snav");
+    if(r&&/^Arrow(Up|Down|Left|Right)$/.test(e.key)){e.preventDefault();
+      const rs=[...v.querySelectorAll("#set-nav .snav")].filter(x=>x.offsetParent!==null),i=rs.indexOf(r),fw=/Down|Right/.test(e.key);
+      const n=rs[(i+(fw?1:rs.length-1))%rs.length];if(!n)return;n.focus();if(n.dataset.pane)n.click();}
+  });
+}
+// About's version line: the build, from APP_BUILD (served), under the version from APP_VERSION and the beta number
+// ---- THE PALETTE: a chat's lane, in words -------------------------------------------------------------------------
+var SX_PK={chat:"Chat",code:"Code",funnel:"Funnel",msg:"Message",new:"New",go:"Open",set:"Setting",tier:"Mode"};
+function palKind(c){const l=(c&&c.lane)||"ai";return l==="code"?"code":l==="funnel"?"funnel":"chat";}
+function palLabel(k){return SX_PK[k]||String(k||"");}
+// ---- DICTATION: the level, from the samples the dictation already reads (no new permission) -------------------------
+var sxLv=null,sxLvAt=0;
+function dictMeter(f){
+  if(!sxHz()||!f)return;const mic=$("#mic");if(!mic||!mic.classList.contains("rec"))return;
+  let cv=mic.querySelector("canvas.sx-lvl");
+  if(!cv){cv=document.createElement("canvas");cv.className="sx-lvl";cv.setAttribute("aria-hidden","true");cv.width=80;cv.height=32;mic.appendChild(cv);}
+  let s=0;for(let i=0;i<f.length;i++)s+=f[i]*f[i];const rms=Math.sqrt(s/Math.max(1,f.length));
+  const lv=Math.min(1,Math.pow(Math.min(1,rms*7),.6));
+  if(!sxLv)sxLv=new Array(14).fill(0);sxLv.push(lv);sxLv.shift();sxLvAt=performance.now();
+  sxLvDraw(cv);
+}
+function sxLvDraw(cv){
+  const g=cv.getContext&&cv.getContext("2d");if(!g||!sxLv)return;
+  const W=cv.width,H=cv.height,n=sxLv.length,bw=3,step=W/n;g.clearRect(0,0,W,H);
+  for(let i=0;i<n;i++){const h=Math.max(3,Math.round(sxLv[i]*(H-4)));g.fillStyle="rgba(233,236,242,"+(.45+.55*(i+1)/n).toFixed(2)+")";
+    g.fillRect(Math.round(i*step+(step-bw)/2),Math.round((H-h)/2),bw,h);}
+}
+function dictMeterOff(){sxLv=null;const cv=document.querySelector("#mic canvas.sx-lvl");if(cv&&cv.getContext)cv.getContext("2d").clearRect(0,0,cv.width,cv.height);}
+// ---- THE PDF CHIP: plain words, one action ------------------------------------------------------------------------
+var SX_PDF_WORDS={"PDF needs an update on this computer.":"This computer can’t read PDFs yet."};
+var SX_FILE_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
+function docChipHz(d,i){
+  const w=d.err?(SX_PDF_WORDS[d.err]||d.err):"Reading…";
+  return '<span class="docchip dloc dpdf sx-pdf'+(d.err?' dbad dperr':' dpbusy')+'" title="'+esc(d.name+(d.err?"\n"+d.err:""))+'">'+SX_FILE_SVG
+    +'<span class="sx-pn dcn">'+esc(d.name)+'</span><i class="sx-pw dcm">'+esc(w)+'</i>'
+    +'<button type="button" class="sx-pa" data-k="d" data-i="'+i+'">Remove</button></span>';
+}
+// ---- THE CODE LANE: drawn icons, its placeholder, the line under the greeting, the host chip and its sheet -----------
+var SX_ICO={
+  Coding:'<path d="M8.5 7.5 4 12l4.5 4.5"/><path d="M15.5 7.5 20 12l-4.5 4.5"/><path d="M13.5 5.5l-3 13"/>',
+  Workspace:'<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+  Remote:'<rect x="4" y="4.5" width="16" height="6" rx="1.5"/><rect x="4" y="13.5" width="16" height="6" rx="1.5"/><path d="M7.5 7.5h.01M7.5 16.5h.01"/>',
+  manual:'<rect x="5.5" y="10.5" width="13" height="9" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
+  auto:'<path d="M8 5.5v13l10-6.5z"/>',
+  full:'<path d="M4.5 6v12l7-6z"/><path d="M12.5 6v12l7-6z"/>'};
+function sxIco(k){return '<svg class="sx-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(SX_ICO[k]||"")+'</svg>';}
+function sxIconsPaint(){
+  if(!sxHz())return;
+  $$("#code-wrap .agent").forEach(el=>{const i=el.querySelector(".ico"),k=el.dataset.agent;if(i&&SX_ICO[k]&&!i.querySelector("svg")){i.dataset.emoji=i.textContent;i.innerHTML=sxIco(k);}});
+  $$("#autonomy-seg .autoseg").forEach(el=>{const i=el.querySelector(".ai"),k=el.dataset.a;if(i&&SX_ICO[k]&&!i.querySelector("svg")){i.dataset.emoji=i.textContent;i.innerHTML=sxIco(k);}});
+}
+var SX_PH={chat:"Ask anything",Coding:"Describe the code you need",Workspace:"Ask about your project folder",Remote:"What should happen on the server?",
+  funnel:"What are you deciding?",answer:"Or type your own answer"};
+var SX_PHS=new Set(Object.values(SX_PH));
+function sxPh(){
+  if(typeof uiMode==="undefined")return SX_PH.chat;
+  if(uiMode==="code")return SX_PH[typeof agent!=="undefined"&&SX_PH[agent]?agent:"Coding"];
+  if(uiMode==="funnel")return typeof fnState!=="undefined"&&fnState?SX_PH.answer:SX_PH.funnel;
+  return SX_PH.chat;
+}
+function sxPhWire(){
+  const i=$("#input");if(!i||i._sxPh)return;i._sxPh=true;
+  const D=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"placeholder");if(!D||!D.set)return;
+  Object.defineProperty(i,"placeholder",{configurable:true,get(){return D.get.call(i);},set(x){D.set.call(i,(x==="Ask anything"&&sxHz())?sxPh():x);}});
+}
+function sxPhPaint(){const i=$("#input");if(!i)return;const cur=i.getAttribute("placeholder")||"";if(SX_PHS.has(cur)||!cur)i.placeholder="Ask anything";}
+var SX_LANE={Coding:"Write, fix and explain code with a model on your machines.",Workspace:"Work inside a project folder on this computer.",
+  Remote:"Run tasks on your server over SSH. Every change waits for your OK."};
+function sxLaneLine(){
+  const h=$("#hero");if(!h)return;let p=h.querySelector("#sx-lanehome");
+  const txt=sxHz()&&uiMode==="code"?SX_LANE[typeof agent!=="undefined"&&SX_LANE[agent]?agent:"Coding"]:"";
+  if(!txt){if(p)p.hidden=true;return;}
+  if(!p){p=document.createElement("p");p.id="sx-lanehome";h.appendChild(p);}
+  if(p.textContent!==txt)p.textContent=txt;p.hidden=false;
+}
+// the host chip in the composer row (Remote only) and the sheet with the same fields, the same wire
+async function sxHostPaint(){
+  const b=$("#sx-host");if(!b)return;
+  const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="code"&&typeof agent!=="undefined"&&agent==="Remote";
+  b.hidden=!on;if(!on)return;
+  const h=($("#rm-host")||{}).value||"",u=($("#rm-user")||{}).value||"";
+  b.classList.toggle("set",!!h.trim());
+  b.querySelector("span").textContent=h.trim()?(u.trim()&&u.trim()!=="root"?u.trim()+"@":"")+h.trim():"Connect a server";
+  b.title=h.trim()?"Server connection":"Set up the server connection";
+}
+function sxHostOpen(){
+  const v=$("#sx-host-veil"),s=$("#sx-host-sheet"),bar=$("#remote-bar");if(!v||!s||!bar)return;
+  v._prev=document.activeElement;v._home=bar.parentNode;v._next=bar.nextSibling;
+  s.appendChild(bar);bar.hidden=false;sxIconsPaint();v.hidden=false;
+  setTimeout(()=>{const f=$("#rm-host");if(f&&!v.hidden)f.focus({preventScroll:true});},0);
+}
+function sxHostClose(){
+  const v=$("#sx-host-veil"),bar=$("#remote-bar");if(!v||v.hidden)return;
+  v.hidden=true;if(bar&&v._home){v._home.insertBefore(bar,v._next&&v._next.parentNode===v._home?v._next:null);}
+  sxHostPaint();const p=v._prev;v._prev=null;if(p&&p.isConnected&&p.focus)try{p.focus({preventScroll:true});}catch(e){}
+}
+function sxHostWire(){
+  const b=$("#sx-host"),v=$("#sx-host-veil");if(!b||!v||b._sx)return;b._sx=true;
+  b.addEventListener("click",sxHostOpen);
+  v.addEventListener("pointerdown",e=>{if(e.target===v)sxHostClose();});
+  v.querySelector(".sx-x").addEventListener("click",sxHostClose);
+  v.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();sxHostClose();return;}
+    if(e.key==="Tab"){const f=[...v.querySelectorAll("button,input")].filter(x=>!x.disabled&&x.offsetParent!==null);if(!f.length)return;
+      const i=f.indexOf(document.activeElement);if(e.shiftKey&&i<=0){e.preventDefault();f[f.length-1].focus();}else if(!e.shiftKey&&i===f.length-1){e.preventDefault();f[0].focus();}}});
+  ["#rm-host","#rm-user"].forEach(s=>{const x=$(s);if(x)x.addEventListener("input",sxHostPaint);});
+}
+// ---- FUNNELS: the goal form is the lane's home (the main column, where the composer sits), the sidebar's otherwise ---
+function sxFnHome(){
+  const root=document.documentElement,f=$("#funnel-wrap"),home=$("#sx-fnhome");if(!f||!home)return;
+  const on=sxHz()&&typeof uiMode!=="undefined"&&uiMode==="funnel"&&!!$("#hero");
+  if(on&&f.parentNode!==home){f._sxHome=f._sxHome||{p:f.parentNode,n:f.nextSibling};home.appendChild(f);}
+  else if(!on&&f.parentNode===home&&f._sxHome){f._sxHome.p.insertBefore(f,f._sxHome.n&&f._sxHome.n.parentNode===f._sxHome.p?f._sxHome.n:null);}
+  home.classList.toggle("on",on);root.classList.toggle("hz-sx-fn",on);
+}
+// stage N of M as a thin silver hairline under the trail of choices
+function sxFnProg(box,p){
+  const c=box&&box.closest&&box.closest(".hz-fn"),t=c&&c.querySelector(":scope>.ftrail");if(!t)return;
+  t.style.setProperty("--sxp",String(Math.max(0,Math.min(1,+p||0))));
+}
+// ---- everything that follows the lane: one call from modeShow, setAgent, resetHero and the chat's children ----------
+function sxLanePaint(){
+  if(!document.body)return;
+  sxIconsPaint();sxPhPaint();sxLaneLine();sxHostPaint();sxFnHome();
+  document.documentElement.classList.toggle("hz-sx-code",sxHz()&&typeof uiMode!=="undefined"&&uiMode==="code");
+}
+// deferred a tick, as modeShow's own repaint is: a hook can run during boot, before the chat's state is declared
+function sxLaneSoon(){setTimeout(()=>{try{sxLanePaint();}catch(e){}},0);}
+function sxHostEsc(){const v=document.getElementById("sx-host-veil");if(!v||v.hidden)return false;sxHostClose();return true;}
+function sxBoot(){
+  sxSetWire();sxPhWire();sxHostWire();sxLanePaint();
+  const ci=$("#chat-inner");
+  if(ci&&window.MutationObserver&&!ci._sx){ci._sx=true;let q=false;
+    new MutationObserver(()=>{if(q)return;q=true;setTimeout(()=>{q=false;sxLanePaint();},0);}).observe(ci,{childList:true});}
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",sxBoot);else setTimeout(sxBoot,0);
+// ==== polish-js (6b625): end ====
 </script>
 </body>
 </html>
