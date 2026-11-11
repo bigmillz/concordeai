@@ -21154,3 +21154,97 @@ layout check fails on a79ae7c already (6b590's `.chat-sr` rule is unscoped and i
   frame says "No answer. Nothing ran."; the card's line says Expired at once.
 - Checked in an offscreen WKWebView, not in the shipped window (its 72 px header moves the sticky trail to 72, set
   by `html.tl`, not seen live).
+
+## 6b623 — beta-4-md: markdown as models write it (7.0 beta 4, per Patrick)
+
+Per Patrick, on the app at Ultra: "I want this UI to be perfect." The daily audit's P0 was the answer text itself:
+nested lists came out as raw "- " lines run together, numbering restarted after a code card or a paragraph and "10."
+became "2", h4 to h6, `- [ ]` tasks, `~~strike~~`, `[^1]` footnotes, `_italic_` inside bold and a list inside a
+quote all showed raw, a bare URL was not a link and pushed the column sideways (848 px of scroll in a 748 px chat at
+760), and `$…$` math showed raw.
+
+**What changed (renderMD, one function, still self-contained so the gauntlet's node harnesses lift it whole).** The
+text is still escaped first and the tokens (download and video boxes, the annotate card, code cards, think blocks) are
+still stashed the moment it is. The regex chain after that (setext, rules, quotes, three list rules, the paragraph
+splitter) is now `blocks()`, a line parser: a heading (# to ######), a rule, a quote (its lines lose their `>` and are
+parsed again, so it holds lists, paragraphs and code), a list, display math, a footnote's note, a table, a token on its
+own line, else a paragraph (lines joined by `<br>`, as before; a `===`/`---` under a line makes it a heading). Lists
+are a nesting stack: an item takes every line indented past its marker (2, 3 or 4 spaces or a tab nest, as models
+write them, not only CommonMark's exact content column), lazy lines that carry on its paragraph, and blank lines
+followed by more of it, then parses its lines again, so lists nest to any depth, bullets and numbers mixed, with code
+and quotes inside. A blank line between items or between an item's blocks makes the list loose (`<p>` items),
+otherwise tight. A numbered list starts at its first number (`<ol start>`, so "3." after a paragraph or a code card
+carries on), "1. 1. 1." counts 1, 2, 3, and a jump the source makes (2 then 10) is kept (`value`). Each number is also
+`data-n`: Horizon draws its numbers from a CSS counter that can't see `start` or `value`, so they now read
+`attr(data-n)`. A fenced block with only spaces or `>` marks before it on its line loses that margin and stays in its
+item or quote as a placeholder on that line; one at column 0 is stashed as 6b528 does (so a list it cuts carries on
+after it). The inline rules (`inl`) now run per leaf and hold each finished piece aside (`keep`) so a later rule can't
+reach into it: code spans, math, backslash escapes, pictures and links, autolinks, footnote refs, citations, then
+strike and emphasis. Emphasis nests (`**bold _it_ bold**`, `***both***`, `*em **strong** em*`); a `*` or `_` never
+opens inside a word or next to a space (snake_case, `2 * 3`, `__init__` stay as written; `__two words__` is bold).
+Autolinks: `<https://…>` and a bare http(s) URL, escaped text that stops at a space, a quote or any entity but
+`&amp;` so it can't leave its attribute, trailing punctuation and an unmatched `)` left as prose, `_blank noopener`;
+no other scheme. Footnotes: `[^x]` is a small superscript numbered by first use (`sup.fnref`, never `sup.cite`: the
+`[1]` citations are untouched and still open the sources row), the `[^x]:` notes listed at the end of the answer under
+a hairline; a ref shows its note on hover and brings it into view on a click (delegated; no ids, they would repeat
+across answers). Tables keep 6b425's builder (its pinned lines untouched) and gain the inline rules per cell, `:-:`
+and `-:` alignment (`ta-c`, `ta-r`), `\|` and a `|` inside `code` as a pipe, and work inside list items and quotes.
+`hzMdClose` also closes an open `~~` mid-stream, so struck words don't flash their tildes.
+
+MATH, AS CODE FOR NOW. No KaTeX (downloads are not approved). `$…$`, `$$…$$` and `\(…\)` inline become
+`<code class="math">`; `$$` / `\[` on their own lines a `.mathblock` code card. Money is never math: the opening `$`
+sits against its first character, the closing `$` against its last and before no letter or digit, and a span starting
+with a digit needs a math sign in it ("$5 and $10", "$5-$10", "I paid $5 and 3$ more", "$HOME and $PATH" stay text).
+**TODO (KaTeX):** once a download is approved, vendor KaTeX's JS, CSS and fonts into the app (no CDN: the CSP and the
+offline promise), render `code.math` / `.mathblock code` after the landing only (never per streamed chunk; a
+placeholder of the same height while streaming, so the landing doesn't move), `throwOnError:false`, `trust:false`,
+`maxExpand` capped, and keep this code look as the fallback.
+
+**Style.** Horizon, in the reading's own terms (15/1.6 Inter, hairlines, the 8 px grid; a scoped, flat block before
+HORIZON end): lists 24 px a level, nested bullets solid and fainter (no rings), numbers mono 12 tabular right-aligned
+in a 20 px gutter; a loose item's paragraphs 8 apart; h4 15/600, h5 and h6 13/600 quieter; task boxes drawn 14 px in a
+hairline, the done one filled silver with a dark tick (never an emoji), in the bullet's gutter; strike at 58 % ink;
+footnote refs in the reading font (citations are mono), the notes 13/1.55 at 66 % under a hairline; math as code; a
+long URL or word wraps (`overflow-wrap:anywhere` on links, `break-word` on the body). Classic gets the same pieces in
+its own type next to its `.body` rules.
+
+**Measured** (one long stand-in answer: headings, a three-level list, numbers 1-4 with a code card inside item 3, a
+paragraph, then 5 and 10, tasks, an aligned table, a quote with a list, a footnote, inline and display math, money, a
+long URL; streamed through the real page by a stand-in `/api/chat`):
+- Chromium, before → after: the chat scrolled sideways at 760 (848 vs 748) and 390 (848 vs 378) → none at 1440, 760
+  and 390; nothing inside the answer past its column; layout shift in the 1.8 s around the landing 0 → 0, the body's
+  top and height at the landing unmoved; raw markers in the landed text → none.
+- WKWebView, before → after: at 760 the chat scrolled sideways (848 vs 760) → none; at 1440 and 760 the same
+  structure as Chromium (nested lists, start 5, numbers 1,2,3,4,5,10, three tasks, the card in its item, the footnote,
+  math), the landing unmoved, no errors.
+- The task box is hit (`elementFromPoint`) in both engines and both looks.
+- Every whole-word prefix of the answer through `renderMD(hzMdClose(…))`: 348 renders, no throw, no raw marker
+  (before: 290 of 348 showed one). renderMD on a 21 k-character answer: 1.35 ms (0.35 before), in node.
+
+**Tests:** `== markdown as models write it … (6b623) ==`: a golden corpus of 53 inputs (the audit's twelve plus the
+shapes above) through the page's own renderMD in node, compared exactly (a code card and a download box by language
+and code; their markup is pinned in their own blocks), with every streamed prefix of the long answer and a safety
+predicate (no on* attribute, no javascript:, every link http(s) `_blank noopener`); eleven renderer mutants (the list
+stack flattened, start= dropped, numbers as written, an autolink past an entity, `<…>` of any scheme, currency to
+math, `_` inside words, a quote with no blocks, every list loose, footnotes raw, a fence breaking its item) each
+caught; the css (scoped, flat, the data-n numbers, the wrap, Classic's pieces, the footnote click; three mutants);
+live in headless Chromium at 760 and 390 (6b580's harness) with two mutants served in place of the page (the wrap
+rules gone, a style that moves at the landing). Proven on a trimmed copy on 9981-9983: 33/33 (one run at load average
+57 had its first live run never land, as 6b580's own first run did beside it; both pass at normal load). The existing
+renderMD checks (annotate, the XSS harness, pipe tables, citations, 6b528's fenced cards) re-run unchanged: 7/7, no
+pin moved. 6b580, 6b590 and the sky blocks the same way: pass, except 6b580's layout check, which fails at f9148e1
+already (6b590's unscoped `:root .chat-sr` with `clip-path:inset(50%)` sits inside its slice).
+
+**Copy, new (for Patrick's approval):** a task box's label "Done" / "Not done"; a footnote ref's tooltip "Note N",
+then the note's own text; the footnotes list's label "Notes".
+
+**Left / worth knowing.**
+- Reference-style links (`[text][1]` with `[1]: url`) are not supported; a bare `[1]` stays a citation chip, as
+  before (also after a word: `arr[1]` outside code is still a chip).
+- Raw HTML is never rendered (`<kbd>` shows as text), by design.
+- Mid-stream, an unclosed `$x` or `_x` shows its marker until the closer arrives (hzMdClose closes fences, inline
+  code, bold and now strike); a list turning loose when a blank line and the next item arrive re-spaces the items
+  above it (mid-stream only; the landing doesn't move).
+- Classic's code cards show the line gutter and the "lines" key unstyled (6b528's styles are Horizon-only); seen while
+  checking Classic, not touched here.
+- Tables don't stretch to the column in Horizon (as before).
