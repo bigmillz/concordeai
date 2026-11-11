@@ -68700,8 +68700,9 @@ function chatEditOpen(div){
     if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();chatEditSave(div);}
   });
   ta.focus({preventScroll:true});ta.setSelectionRange(ta.value.length,ta.value.length);
-  const r=div.getBoundingClientRect(),sr=scroller.getBoundingClientRect(),room=sr.bottom-(scroller.style.getPropertyValue("--cwh")?parseFloat(scroller.style.getPropertyValue("--cwh")):0);
-  if(r.top<sr.top)chatScrollBy(r.top-sr.top-16);else if(r.bottom>room)chatScrollBy(Math.min(r.bottom-room+16,r.top-sr.top-16));
+  // in view, clear of the header above it and the composer below
+  const r=div.getBoundingClientRect(),top=chatTopEdge(),room=scroller.getBoundingClientRect().bottom-(parseFloat(scroller.style.getPropertyValue("--cwh"))||0);
+  if(r.top<top)chatScrollBy(r.top-top);else if(r.bottom>room)chatScrollBy(Math.min(r.bottom-room+16,r.top-top));
   return true;
 }
 function chatEditClose(div,refocus){
@@ -68803,15 +68804,16 @@ function chatPaste(e){
   paintChips();docMeasure();
 }
 // SCROLL ANCHORING THAT WEBKIT LACKS: while the reader is up the page, the first message in view keeps its place when
-// something above it changes size (a picture, a fold opened, a code card); at the end, the end is kept
-var chatAnc=null,chatAncRaf=0;
+// something above it changes size (a picture, a fold opened, a code card); at the end, the end is kept. The place is
+// read once the scrolling rests (100 ms), never on every frame of it, and only used while the view is where it was read
+var chatAnc=null,chatAncT=0;
 function chatAnchorNote(){
-  chatAncRaf=0;
+  clearTimeout(chatAncT);chatAncT=0;
   if(chatPinned){chatAnc=null;return;}
   const top=scroller.getBoundingClientRect().top,ks=inner.children;
   let lo=0,hi=ks.length-1,el=null;
   while(lo<=hi){const mid=(lo+hi)>>1,r=ks[mid].getBoundingClientRect();if(r.bottom>top+1){el=ks[mid];hi=mid-1;}else lo=mid+1;}
-  chatAnc=el?{el:el,top:el.getBoundingClientRect().top}:null;
+  chatAnc=el?{el:el,top:el.getBoundingClientRect().top,st:scroller.scrollTop}:null;
 }
 // a scroll the app makes: at once (never the smooth glide), the reader's place unpinned, and the anchor read again so the
 // next size change keeps this place and not the one before it
@@ -68820,10 +68822,16 @@ function chatScrollBy(d,keepPin){
   scroller.style.scrollBehavior="auto";scroller.scrollTop+=d;scroller.style.scrollBehavior="";
   chatLastTop=scroller.scrollTop;chatAnchorNote();
 }
+// the first line of the chat a reader can see: under the header (it floats over the chat) and 16 px more
+function chatTopEdge(){
+  const h=$("#hz-top"),sr=scroller.getBoundingClientRect();
+  return Math.max(sr.top,h?h.getBoundingClientRect().bottom:0)+16;
+}
 function chatAnchorKeep(){
   if(chatBulk)return;
   if(chatPinned){if(!generating&&!document.querySelector("#hero"))chatToBottom(false);return;}
-  if(!chatAnc||!chatAnc.el.isConnected)return;
+  // read while the reader was elsewhere (still scrolling, or the place never read): read it now, move nothing
+  if(!chatAnc||!chatAnc.el.isConnected||Math.abs(scroller.scrollTop-chatAnc.st)>1){chatAnchorNote();return;}
   const d=chatAnc.el.getBoundingClientRect().top-chatAnc.top;
   if(Math.abs(d)>=1)chatScrollBy(d,true);
 }
@@ -68834,8 +68842,8 @@ function chatInit(){
     const more=t.closest(".umore");
     if(more){const b=more.previousElementSibling;if(!b)return;const open=!b.classList.contains("open");
       chatPinned=false;b.classList.toggle("open",open);more.textContent=open?"Show less":"Show more";more.setAttribute("aria-expanded",String(open));
-      if(!open){const r=more.closest(".msg").getBoundingClientRect(),sr=scroller.getBoundingClientRect();
-        if(r.top<sr.top)chatScrollBy(r.top-sr.top-16);}
+      if(!open){const r=more.closest(".msg").getBoundingClientRect(),top=chatTopEdge();
+        if(r.top<top)chatScrollBy(r.top-top);}
       chatAnchorNote();return;}
     const x=t.closest(".uedit-x");if(x){chatEditClose(x.closest(".msg"),true);return;}
     const ok=t.closest(".uedit-ok");if(ok){chatEditSave(ok.closest(".msg"));return;}
@@ -68849,7 +68857,7 @@ function chatInit(){
   addEventListener("dragenter",e=>{if(hasFiles(e)&&comp){dn++;comp.classList.add("drop");}});
   addEventListener("dragleave",e=>{if(hasFiles(e)&&comp&&--dn<=0){dn=0;comp.classList.remove("drop");}});
   addEventListener("drop",()=>{dn=0;if(comp)comp.classList.remove("drop");});
-  scroller.addEventListener("scroll",()=>{if(!chatAncRaf)chatAncRaf=requestAnimationFrame(chatAnchorNote);},{passive:true});
+  scroller.addEventListener("scroll",()=>{clearTimeout(chatAncT);chatAncT=setTimeout(chatAnchorNote,100);},{passive:true});
   if(window.ResizeObserver)new ResizeObserver(chatAnchorKeep).observe(inner);
   if(window.ResizeObserver&&comp)new ResizeObserver(chatJumpPlace).observe(comp);
   addEventListener("resize",chatJumpPlace);chatJumpPlace();
