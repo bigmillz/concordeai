@@ -48414,7 +48414,7 @@ def _px_set_ok(r, phone=False):
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
             and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona", "know-path"]
-            and (r.get("you") or {}).get("labels") == ["What should we call you?", "Anything to keep in mind?"]
+            and (r.get("you") or {}).get("labels") == ["Name", "Keep in mind"]
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
@@ -50156,7 +50156,8 @@ def _c626_all(src):
         pl3, said3, _a3, _s3, st3 = _pl626(g, web=False, offline=True)
         out["offline: the lookup says so, stops (no pin asked for), and the step says it couldn't check"] = (
             pl3.offline and ("read", "Couldn\u2019t check what\u2019s open", "done", "") in said3
-            and st3["geo_asked"] == ["eiffel tower"] and st3["geo"] is None)
+            and st3["geo_asked"] == ["eiffel tower"] and st3["geo"] is None
+            and "check" not in (getattr(pl3, "t", None) or {"check": 0}))   # (beta 4) it stops before the check stage: no live call needed to tell
     except Exception as e_:
         out["the lookups: %r" % (e_,)] = False
     # ---- the turn a place question becomes (lifted out of the handler word for word)
@@ -50469,6 +50470,42 @@ for _mn, _ma, _mb in _C650_MUT:
     if all(_e650_ok(_e650_run(_ms), _ms).values()):
         _c650_caught.append((_mn, "not caught"))
 check("6b651's rules each break a check when broken (%d mutants)" % len(_C650_MUT), not _c650_caught, "%r" % _c650_caught)
+# THE TWO SEARCH HOOKS TOGETHER (beta 5): answers-1's search-fixture file (6b651) answers what it holds; a query it
+# doesn't hold falls through to funnels-1's recorded rows (6b650, MILLENAI_SEARCH_FIXTURE under the stand-in); one
+# neither holds finds nothing. In process, on the two blocks lifted from the source; the mutant drops the fall-through.
+def _fx5_run(src):
+    import tempfile as _tf5
+    d_ = _tf5.mkdtemp(prefix="fx5-", dir=_SMOKE_TMP)
+    fa, ff = os.path.join(d_, "answers.json"), os.path.join(d_, "funnels.json")
+    json.dump({"queries": [{"match": ["knicks"], "rows": [{"title": "Knicks 101-99", "href": "http://127.0.0.1:9/k", "body": "b", "date": ""}]}]},
+              open(fa, "w"))
+    json.dump([{"keys": ["laptop"], "hits": [{"title": "Best laptops", "href": "http://127.0.0.1:9/l", "body": "b", "date": ""}]}],
+              open(ff, "w"))
+    a = src.index("_FIXTURE_ROWS = []\n"); b = src.index("class _StubDDGS:")
+    c = src.index("def _fx_load():"); e = src.index("# ==== 6b651 search fixture: end ====")
+    ns = {"re": re, "json": json, "os": os, "SEARCH_FIXTURE": ff, "_hook_arg": lambda k: fa if k == "search-fixture" else ""}
+    exec(src[a:b], ns)
+    blk = src[c:e]
+    blk = blk[:blk.index("if _FX is not None:")]
+    exec(blk, ns)
+    D = ns["_FixtureDDGS"]()
+    return {"answers": [r.get("title") for r in D.text("knicks score last night")],
+            "funnels": [r.get("title") for r in D.text("best laptop for travel")],
+            "funnels_news": [r.get("title") for r in D.news("laptop deals")],
+            "none": D.text("what is a lighthouse for")}
+
+
+def _fx5_ok(r):
+    return (r.get("answers") == ["Knicks 101-99"] and r.get("funnels") == ["Best laptops"]
+            and r.get("funnels_news") == ["Best laptops"] and r.get("none") == [])
+
+
+_fx5_r = _fx5_run(_MILLENAI_SRC)
+_fx5_m = _MILLENAI_SRC.replace("        return (_fx_rows(query) or _fixture_hits(query, max_results))[:max_results]",
+                               "        return (_fx_rows(query))[:max_results]", 1)
+check("beta 5 the two search hooks together: answers-1's fixture file answers what it holds, a query it doesn't hold "
+      "falls through to funnels-1's recorded rows, one neither holds finds nothing; the mutant (no fall-through) is caught",
+      _fx5_ok(_fx5_r) and _fx5_m != _MILLENAI_SRC and not _fx5_ok(_fx5_run(_fx5_m)), "%r" % (_fx5_r,))
 # ==== 6b651 everyday: end ====
 # ==== 6b627 robust: begin ====
 print("== usable when things go wrong: Stop only in the answering chat, a cut answer says so, a damaged model falls through with Download again, a load and a long silence said, offline said plainly (6b627) ==")

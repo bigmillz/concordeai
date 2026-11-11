@@ -77224,8 +77224,8 @@ function sxSetSimplify(){
   if(pp){const h=pp.querySelector(".set-h");if(h)h.textContent="You";
     pp.querySelectorAll(":scope>.tdesc").forEach(gone);
     const nm=g("#user-name"),ps=g("#persona");
-    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should we call you?"));}
-    if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
+    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","Name"));}
+    if(ps){ps.placeholder="Short, direct answers";ps.before(sxLabel("persona","Keep in mind"));}   // Pat approved "fewer words" for beta 5
     const sh=g("#know-share"),rx=g("#know-reindex"),line=n=>{const l=n&&n.closest("label");if(l){n.classList.add("sx-sw");l.classList.add("sx-line");}return l;};
     if(pk){pk.classList.remove("spane");pk.classList.add("sx-know");pk.querySelectorAll(":scope>.set-h,:scope>.tdesc,:scope>.kn-hint").forEach(gone);
       const kl=line(g("#know-chats")),sp=kl&&kl.querySelector("span");if(sp)sp.textContent="Use my chats";
@@ -78004,11 +78004,13 @@ class _FixtureDDGS:
     def __init__(self, *a, **kw):
         pass
 
+    # (beta 5) a query the fixture file doesn't hold falls through to funnels-1's recorded rows (6b650,
+    # MILLENAI_SEARCH_FIXTURE under the stand-in) before it finds nothing, so neither hook shadows the other
     def text(self, query, max_results=10, **kw):
-        return _fx_rows(query)[:max_results]
+        return (_fx_rows(query) or _fixture_hits(query, max_results))[:max_results]
 
     def news(self, query, max_results=10, **kw):
-        return _fx_rows(query, "news")[:max_results]
+        return (_fx_rows(query, "news") or _fixture_hits(query, max_results))[:max_results]
 
     def images(self, query, max_results=10, **kw):
         return []
