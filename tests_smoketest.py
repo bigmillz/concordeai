@@ -22432,7 +22432,7 @@ def _soc_page(src):
         # only a server that is gone sends it back to Fast; one that is off stays
         "kept": o["kept"] == [],
         "fast": o["gone"] == ["setTier:Fast"] and o["goneTier"] == "Fast",
-        "fast with an agent": o["goneAgent"] == ['pref:{"tier":"Fast"}', "paint"],
+        "fast with an agent": o["goneAgent"] == ["paint"],   # (beta 4) this window only: the saved pick is kept
         "early": o["early"] == [],
         "refresh": o["refresh"] == [["paint"], ["Fast"], "Lab · x:8b"],
         "chip paints": '  $("#chip-model").textContent=tierLabel();' in src,
@@ -48615,6 +48615,27 @@ check("6b640 the composer's corners and Ultra's lit edge are pinned (14 px round
       _c640_ok(_hz_css, _MILLENAI_SRC)
       and not _c640_ok(_hz_css.replace("border-radius:var(--hz-r-composer);padding:1.5px;", "border-radius:var(--hz-r-composer);padding:1px;"), _MILLENAI_SRC)
       and not _c640_ok(_hz_css, _MILLENAI_SRC.replace(":root{--hz-r-composer:14px;", ":root{--hz-r-composer:12px;")), "")
+# A SAVED SERVER PICK SURVIVES A START (6b640, from the lead in the C++ preview: a new bundle's first load put "Fast"
+# over prefs.json's "srv:<id>"): the fall back to Fast is the window's own (setTier quiet, no prefSet), and a server
+# list that can't be read decides nothing. Mutants: the old saving fall back, the unguarded list.
+def _s640_ok(src):
+    g_ = _jsfn(src, "function srvModeGone(){"); l_ = _jsfn(src, "async function loadServers(refresh){")
+    return ('else setTier("Fast",true);' in g_ and "prefSet(" not in g_ and 'if(agent){tier="Fast";paintModels();}' in g_
+            and "if(!d||!Array.isArray(d.servers))return;" in l_ and l_.index("if(!d||!Array.isArray(d.servers))return;") < l_.index("srvLoaded=true;"))
+check("6b640 a saved server pick survives a start: Fast stands in for this window only when its server isn't listed, and an unreadable list decides nothing; the mutants are caught",
+      _s640_ok(_MILLENAI_SRC)
+      and not _s640_ok(_MILLENAI_SRC.replace('  else setTier("Fast",true);\n}', '  else setTier("Fast");\n}', 1))
+      and not _s640_ok(_MILLENAI_SRC.replace('if(agent){tier="Fast";paintModels();}', 'if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}', 1))
+      and not _s640_ok(_MILLENAI_SRC.replace("    if(!d||!Array.isArray(d.servers))return;   // an unreadable list decides nothing about a saved pick (beta 4)\n", "", 1)), "")
+# NO STRINGS FROM THE TOP (6b640, from the lead in the C++ preview at Ultra: "long lines hanging down from the
+# window's top like strings"): the hanging stars draw no thread from the window's edge, only short links between two
+# of them on screen. Mutant: the thread back.
+def _t640_ok(js):
+    d_ = js[js.index("function drawChand(nowT,t){"):]
+    d_ = d_[:d_.index("chand.now=P.map(")]
+    return "pfx.line(p.x,0," not in d_ and "chand.links.forEach(" in d_ and "pfx.star(x,y," in d_
+check("6b640 Ultra's hanging stars draw no line from the window's top edge (only short links between stars on screen); the mutant is caught",
+      _t640_ok(_hz_js) and not _t640_ok(_hz_js.replace("      if(p.mid){pfx.star(", "      pfx.line(p.x,0,x,y,.5,ICE,.05*fade,.16*fade);\n      if(p.mid){pfx.star(", 1)), "")
 # ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====

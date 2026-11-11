@@ -68236,6 +68236,7 @@ function paintServers(){
 async function loadServers(refresh){
   try{
     const d=await(await api("/api/servers"+(refresh?"?refresh=1":""))).json();
+    if(!d||!Array.isArray(d.servers))return;   // an unreadable list decides nothing about a saved pick (beta 4)
     srvList=Array.isArray(d.servers)?d.servers:[];
     srvLan=!!d.lan;
     srvLoaded=true;
@@ -68839,8 +68840,10 @@ function srvSyncOff(){
 // the servers are known, and never because the server is merely off
 function srvModeGone(){
   if(!srvLoaded||!isSrvMode(tier)||srvModeOf(tier))return;
-  if(agent){tier="Fast";prefSet({tier:"Fast"});paintModels();}
-  else setTier("Fast");
+  // (beta 4: a new bundle's first load put "Fast" over a saved "srv:<id>") the fall back is this window's only: the
+  // saved pick stays in prefs.json, so the server is the pick again once it is listed; a pick the person makes saves
+  if(agent){tier="Fast";paintModels();}
+  else setTier("Fast",true);
 }
 // the servers changed: greyed rows, the chip's model, a vanished server
 function srvModesRefresh(){
@@ -72277,7 +72280,9 @@ function hzSkyBoot(){
   function drawChand(nowT,t){if(!chand)return;const fade=chandOff?Math.max(0,1-(nowT-chandOff)/600):1;if(chandOff&&fade<=0){chand=null;chandOff=0;return;}
     const P=chand.P.map(p=>chandStar(p,nowT,t));
     chand.P.forEach((p,i)=>{const [x,y,e,th]=P[i];if(e<=.01)return;const tw_=.72+.28*Math.sin(t*(1.1+p.w)+p.tw);
-      pfx.line(p.x,0,x,y,.5,ICE,.05*fade,.16*fade);
+      // (beta 4, from the lead in the C++ preview: "long lines hanging down from the window's top like strings") no
+      // thread from the top edge any more: the stars sway where they hang, and only the short links between two of
+      // them on screen are drawn, so no line ever runs off the window
       if(p.mid){pfx.star(p.x+(x-p.x)*p.mid,y*p.mid,2.2,ICE,.55*tw_*fade,0);}
       pfx.star(x,y,p.s*(p.hero?1:.9),p.col,(p.hero?1:.85)*tw_*fade,th*2);});
     chand.links.forEach(([i,j])=>{const a=P[i],b=P[j];if(Math.min(a[2],b[2])<.9)return;pfx.line(a[0],a[1],b[0],b[1],.6,ICE,.12*fade,.12*fade);});
