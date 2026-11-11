@@ -21313,3 +21313,33 @@ leaves the knob. Not measured: 120 Hz (both engines cap at 60 here), WKWebView i
   ms through the arrival, at rest and through a slow drag Low → Ultra → Low; WKWebView on screen p95 18 ms (arrival and
   rest). A comment swallowed a statement during the edit (the arrival's field never built); caught by the live check's
   field count before commit.
+
+**The C++ Preview, in WKWebView** (per Patrick, ~07:00: "we definitely need to get ultra mode super sexy in the C++
+version ... it's just looking kind of lacking").
+- **Why it looked lacking:** the installed `/Applications/ConcordeAI C++ Preview.app` bundles the beta-2 page
+  (`Resources/millenai.py`: APP_BUILD 279, APP_BETA 2, dated 01:41): none of beta 3 or beta 4 (0 hits for 6b555,
+  6b580, 6b621, 6b622, 6b640). c2452f5's page does carry this work. It needs a rebuild from the current page; reported
+  to the lead. His installed copy and data were not touched (a copy of that page was run as a dev copy for the comparison).
+- **The GPU sky in WKWebView:** it does start, in a WKWebView configured like the C++ shell (drawsBackground off, the
+  near-60 fps preference off as the shell's `allow_full_frame_rate`, media without a gesture): renderer "Apple GPU",
+  358 sky frames in the 3 s arrival at 120 Hz (the screen reports 120). It can no longer fail silently: a shader that
+  won't compile or link now logs its compile/link log (`[sky] the GPU sky could not start ...`, kept in `hzS.gpuErr`;
+  `hzProgram` now carries the link log too); the sky counts its frames (`S.draws`, in `state()` with the renderer); a dev
+  copy shows a badge with `?hz=gpu=1` ("GPU sky on · 120 fps · Apple GPU" or why it is off). The shaders' `pow(x, 2.)` of
+  values that go negative (the matrix's sweeps, the surge) are written as squares: GLSL ES leaves `pow` undefined for a
+  negative base, and Metal can make it NaN.
+- **A bug the WKWebView run found:** a comment of mine had swallowed `const [x0,y0,x1,y1]=...` in `buildSign`, so every
+  star sign at Ultra threw (`Can't find variable: x0`, 930 times in one run) and broke the frame's later star drawing.
+  Fixed; the live check's no-page-error clause covers it.
+- **Frame pacing at 120 Hz** (WKWebView on screen, the shell's flag, no snapshots during the measurement): the arrival rAF
+  p50 8 ms / p95 11 / max 32; Ultra at rest p95 9; the demo the same. (Snapshots taken during the arrival had added a
+  280 ms frame: a measurement artefact, not the page.) The burst's GPU canvas is now made 4 s after load rather than at
+  the first Ultra.
+- **Pushed again:** at Ultra the curtain is lifted .14 whatever the mode (Fast's Ultra was the dimmest: neon .48 against
+  the demo's .60 in Thinking), stands 1.3× taller and folds 1.35× deeper, its tips running deeper into violet; a star
+  sign every 9–14 s, every other one above the box; four small four-point glints on the lit rim's corners twinkling out
+  of step (5.5–7.5 s). The rim and corners themselves unchanged.
+- Side by side (the C++ Preview's page today, this branch in WKWebView and in Chromium, the demo in WKWebView and in
+  Chromium; home, the landing at 0.5 / 1.4 / 2.6 s, Ultra at rest): this branch is at least as rich as the demo in both
+  engines; the C++ Preview's beta-2 page is the blue, full-height-rain one.
+- Mirrored into the demo's `beta/index.html` (not pushed).

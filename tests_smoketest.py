@@ -39240,7 +39240,7 @@ check("horizon: the night is one GPU canvas over the app's own aerial (same-orig
       and "gl.uniform1f(pS.U.foot,hasVid&&hzS.clip?hzS.clip.foot*S.footMul:0);" in _hz_js
       and 'powerPreference:"high-performance"' in _hz_js and "gap=hzS.gen&&hzS.genLocal?1000/15:0;" in _hz_js   # (6b542 on beta-1) no gap below Full any more
       and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
-      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.45,.58,.66][Math.max(0,Math.min(4,m))]+Math.min(e,3)*.035;S.setNeon();};" in _hz_js   # the preview's level (6b555): Ultra lifts by its own light
+      and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.45,.58,.66][Math.max(0,Math.min(4,m))]+Math.min(e,3)*.035+Math.max(0,e-3)*.14;S.setNeon();};" in _hz_js   # (6b621) Ultra lifts the curtain .14 more   # the preview's level (6b555): Ultra lifts by its own light
       and "S.setBusy=function(on){S.boostTo=on?1.7:1;busyOn=on;S.busy=on;S.setNeon();};" in _hz_js
       and "neon=neonBase*(1+.56*ultraE*amp_+.45*surge*amp_);" in _hz_js
       and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
@@ -44979,12 +44979,12 @@ def _sl549_aurora(js):
     palette and fringe, the canvas curtains, the wash's blooms) is a blue-to-violet hue (200 to 285 deg) or near-white
     (chroma under .2): no rose, gold, mint or teal"""
     pals = re.findall(r'vec3 pal\(float t\)\{vec3 a=vec3\(([^)]*)\),b=vec3\(([^)]*)\),c=vec3\(([^)]*)\),d=vec3\(([^)]*)\);', js)   # the neon's curtain and the greeting's trace
-    fr = re.search(r'vec3 c=mix\(vec3\(([^)]*)\),vec3\(([^)]*)\),smoothstep\(0\.,\.3,d\)\);c=mix\(c,pal\(', js)   # (6b621) the demo's order: the edge-to-tip pair, then the palette's touch
+    fr = re.search(r'vec3 c=mix\(vec3\(([^)]*)\),mix\(vec3\(([^)]*)\),vec3\(([^)]*)\),\.6\*min\(cool,1\.\)\),smoothstep\(0\.,\.3,d\)\);c=mix\(c,pal\(', js)   # (6b621) the edge-to-tip pair (the tips deeper violet at Ultra), then the palette's touch
     cur = re.findall(r'hzDrawAuroraLayer\(\w+,\{w:\d+,h:\d+,rgb:"(\d+),(\d+),(\d+)"', js)
     wash = re.findall(r'bloom\([.\d]+,[.\d]+,[.\d]+,[.\d]+,"(\d+),(\d+),(\d+)",', js)
     if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 4:
         return False
-    cols = [tuple(float(v) for v in g_.split(",")) for g_ in [x_ for p_ in pals for x_ in p_] + [fr.group(1), fr.group(2)]]
+    cols = [tuple(float(v) for v in g_.split(",")) for g_ in [x_ for p_ in pals for x_ in p_] + [fr.group(1), fr.group(2), fr.group(3)]]
     cols += [tuple(int(v) / 255 for v in c_) for c_ in cur + wash]
     for c_ in cols:
         h_, ch_ = _sl549_hue(c_)
@@ -45098,7 +45098,7 @@ check("6b552 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       # the aurora blue-violet only (6b552): its rose back, its mint fringe back, the wash's rose back
       and not _sl549(_hz_css, _hz_js.replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)"), page)
       and not _sl549(_hz_css, _hz_js.replace(_jsfn(_hz_js, "async function hzTraceIn(el,opts){"), _jsfn(_hz_js, "async function hzTraceIn(el,opts){").replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)")), page)   # the greeting's trace alone back to rose
-      and not _sl549(_hz_css, _hz_js.replace("vec3 c=mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d));", "vec3 c=mix(vec3(.5,.94,.84),vec3(.7,.6,1.),smoothstep(0.,.3,d));"), page)   # a mint lower edge (6b555: the preview's blue edge)
+      and not _sl549(_hz_css, _hz_js.replace("vec3 c=mix(vec3(.62,.78,1.),mix(vec3(.7,.6,1.),", "vec3 c=mix(vec3(.5,.94,.84),mix(vec3(.7,.6,1.),"), page)   # a mint lower edge (6b555: the preview's blue edge)
       and not _sl549(_hz_css, _hz_js.replace('rgb:"186,176,255",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
       and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"150,118,255",.4);', 'bloom(.72,.30,.38,.32,"255,118,178",.4);'), page)
       # THE KNOB STAYS THE KNOB (6b553, per Patrick: "one star that sits there spinning just looks tacky"): the star back in the
@@ -45468,12 +45468,12 @@ def _b3_sky(js, css, pg):
             # the dot matrix: 11 px pitch, 1.8 px dots, about 4 % white; linear sweeps (horizontal or diagonal, never
             # radial) at 180 px/s every 3.4-4.6 s (Balanced 5.2-6.8); half in Balanced; never in Calm
             and '"vec2 gg=(qq-mrect.xy)/11.,cell=floor(gg),fo=(fract(gg)-.5)*11.;float led=1.-smoothstep(.65,1.15,max(abs(fo.x),abs(fo.y)));"' in sky
-            and '"float lw=.04+.31*mw0.w*exp(-pow((dot(cc,mw0.xy)-mw0.z)/52.,2.))' in sky and "length(cc" not in sky
+            and '"float lw=.04+.31*mw0.w*exp(-sq((dot(cc,mw0.xy)-mw0.z)/52.))' in sky and "exp(-pow(" not in sky   # (6b621) squares written out: pow() of a negative base is undefined in GLSL ES and "length(cc" not in sky
             and "if(live)w.s+=dt*180;" in sky and 'MX.next=nowT+(skyMode==="full"?3400+Math.random()*1200:6000+Math.random()*2000)*(Math.random()<.25?.4:1);' in sky   # Balanced 6-8 s (6b621, the demo's)
             and 'lvm=skyMode==="full"?1:.5;' in sky
             # the star signs: every 20-30 s (the first 9-15 s after arriving), 4-6 stars joined by their minimum spanning
             # tree, 420 ms a line, held 2 s, dissolving over 1.2 s; lines and points, no art
-            and "nextSign=nowT+14000+Math.random()*6000;" in sky and "nextSign=n+1800+Math.random()*800;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
+            and "nextSign=nowT+9000+Math.random()*5000;" in sky and "nextSign=n+1800+Math.random()*800;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
             and "const P=pts.slice(0,4+Math.floor(Math.random()*3)),inT=[0],edges=[];" in sky and "per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;" in sky
             # meteor showers: every 60-90 s in Full (110-130 s in Balanced), 3-5 from one radiant
             and 'nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);' in sky and "n=landing?5+Math.floor(Math.random()*4):3+Math.floor(Math.random()*3);landing=false;" in sky
@@ -45487,8 +45487,8 @@ check("6b555 the sky: the near-black ground with the hour in the footage's grade
       and not _b3_sky(_hz_js.replace('const still=hzS.reduced||skyMode==="calm",k=', 'const still=hzS.reduced,k='), _hz_css, page)              # the aurora moving in Calm
       and not _b3_sky(_hz_js, _hz_css.replace("@keyframes hzSway{from{transform:translateX(-48px)}to{transform:translateX(48px)}}", "@keyframes hzSway{from{transform:translateX(-48px) skewX(-12deg)}to{transform:translateX(48px) skewX(-18deg)}}"), page)   # slanted rays
       and not _b3_sky(_hz_js, _hz_css.replace("margin-left:-900px;transform:none;", "margin-left:-900px;transform:rotate(-3deg);"), page)        # a tilted curtain
-      and not _b3_sky(_hz_js.replace("exp(-pow((dot(cc,mw0.xy)-mw0.z)/52.,2.))", "exp(-pow((length(cc-mw0.xy)-mw0.z)/52.,2.))"), _hz_css, page)   # a radial sweep (a ring)
-      and not _b3_sky(_hz_js.replace("nextSign=nowT+14000+Math.random()*6000;", "nextSign=nowT+2000+Math.random()*1000;"), _hz_css, page)      # star signs every 2 s
+      and not _b3_sky(_hz_js.replace("exp(-sq((dot(cc,mw0.xy)-mw0.z)/52.))", "exp(-sq((length(cc-mw0.xy)-mw0.z)/52.))"), _hz_css, page)   # a radial sweep (a ring)
+      and not _b3_sky(_hz_js.replace("nextSign=nowT+9000+Math.random()*5000;", "nextSign=nowT+2000+Math.random()*1000;"), _hz_css, page)      # star signs every 2 s
       and not _b3_sky(_hz_js.replace("if(on&&fxLive()&&!sign&&nowT>nextSign)", "if(on&&!sign&&nowT>nextSign)"), _hz_css, page), "")            # star signs while hidden
 # ONCE PER ARRIVAL, WITH ITS HANG: hzIgnite and hzUltraFire run in node over a sequence: an arrival fires once, 140 ms
 # after the held breath; a return within 1.5 s is quiet; leaving inside the 140 ms fires nothing; Calm never fires
@@ -46778,7 +46778,7 @@ def _u621_aur(js):
             # ripples running sideways through the rays (about 35 px/s, the mean kept, richer at Ultra), each ray's height
             # breathing on its own (about 14 s), and every 20-40 s a section that brightens and lifts (2 s in, 1.5 s held,
             # 2.5 s out); all on the continuous clock, so still in Calm and reduced motion
-            and '"float rp=fa*(1.+.4*min(cool,1.)),sgv=sga*exp(-pow((uv.x-sgx)/.12,2.));"' in aur
+            and '"float rp=fa*(1.+.4*min(cool,1.)),sgv=sga*exp(-sq((uv.x-sgx)/.12));"' in aur and "pow((" not in aur
             and "*(1.+.35*rp*(2.67*pow(.5+.5*sin(xn*9.-ft*.35+fk*1.7),2.)-1.))*(1.+.6*sgv);" in aur
             and "hb*mix(1.,.7+.6*nz(vec2(xn*(9.+fk*3.5),ft*.07+fk*7.)),fa)*(1.+.3*sgv)" in aur
             and "AW.sgN-=d;if(AW.sgN<=0&&AW.sgU<0){AW.sgU=0;AW.sgX=AW.cx+(arnd()-.5)*.36;AW.sgN=20+arnd()*20;}" in sky
@@ -46787,6 +46787,15 @@ def _u621_aur(js):
             # its rays in the band above the greeting (1.35 x the falloff at rest), the footage's blue excess cut
             and "(1.+.45*rich)*mix(.55,1.,min(cool,1.))" in aur and "*(1.35-.35*min(cool,1.))/" in aur
             and '"earth.b-=max(earth.b-.5*(earth.r+earth.g),0.)*dbl;"' in sky and "gl.uniform1f(pS.U.dbl,.65-.3*(lift()?ultraE:0));" in sky
+            # WKWEBVIEW (per Patrick on the C++ Preview: "kind of lacking"): the GPU sky never fails silently (the shader's
+            # compile or link log on the console and in hzS.gpuErr), proves it runs (S.draws, a dev-only badge), and no
+            # pow() of a possibly negative base anywhere in it (undefined in GLSL ES; squares written out)
+            and 'console.error("[sky] the GPU sky could not start (a shader would not compile or link):",hzS.gpuErr);' in sky
+            and 'throw new Error("link: "+(gl.getProgramInfoLog(p)||"no log"));' in js
+            and "S.draws=(S.draws||0)+1;" in sky and 'if(hzS.debug&&hzS.debug.gpu==="1")hzGpuBadge();' in sky
+            and "pow((" not in sky                                                                   # (the one pow left squares a value in 0..1)
+            # Ultra pushed again: the curtain taller and lifted whatever the mode, its tips deeper violet
+            and "+Math.max(0,e-3)*.14;S.setNeon();};" in sky and "mix(vec3(.7,.6,1.),vec3(.6,.46,1.),.6*min(cool,1.))" in aur
             and '"float o=spl*.1,env=' in aur                                                        # the lobes +-10 %: one curtain widening, no gap
             and "cl=mix(" not in aur and "/(1.+lk/.06)" not in aur and "gm" not in aur              # no crest cap, no knee
             and "gb=grt.z>grt.x?1.-smoothstep(gh,gh+.22,abs(uv.y-gc)):0." in aur and '"col*=1.-.3*gb;"' in aur   # the greeting's band, full width
@@ -46799,7 +46808,8 @@ def _u621_aur(js):
             # changes along the curtain, the folds deeper and their phase pushed, all riding the swell; a little at rest;
             # only while Ultra lifts the sky (never Calm or reduced motion); a lean, not a spin
             and '+"x+=tws*(p.y-.62)*sin(p.x*2.6-tph*.7+fk*1.9);"' in aur
-            and "const aTw=[1+ATW_AMP*surgeNow,twDir*ATW_PH*surgeNow,lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0];" in sky
+            and "const aTw=[(1+ATW_AMP*surgeNow)*(1+.35*(lift()?ultraE:0)),twDir*ATW_PH*surgeNow,lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0];" in sky   # at Ultra the folds deeper (x1.35)
+            and "gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow)*(1+.3*(lift()?ultraE:0)));" in sky   # and the curtain taller (x1.3)
             and bool(re.search(r"const ATW_AMP=\.6,ATW_PH=\.25,ATW_SH=\.35,ATW_REST=\.28;", sky))
             and "gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);" in sky)
 check("6b621 the aurora's shader: the travelling fold wave, the pulse and the sliding rays on the continuous clock; the living rays (ripples, breathing heights, a surge now and then); silver at rest; no dent (no crest cap, no knee: a soft full-width band at the greeting's height, the Ultra lift withheld in it); the lobes +-10 %; the wavy edge kept; the dev hooks; the mutants are caught",
@@ -46813,7 +46823,10 @@ check("6b621 the aurora's shader: the travelling fold wave, the pulse and the sl
       and not _u621_aur(_hz_js.replace("AW.sga=(u<2?ss5(u/2):u<3.5?1:", "AW.sga=(u<.1?1:u<3.5?1:"))                                     # a surge that flashes on
       and not _u621_aur(_hz_js.replace("    if(still)AW.sga=0;", ""))                                                                    # a surge in Calm
       and not _u621_aur(_hz_js.replace("(1.+.45*rich)*mix(.55,1.,min(cool,1.))", "(1.+.45*rich)"))                                     # the blue back at rest
-      and not _u621_aur(_hz_js.replace("sin(xn*9.-ft*.35+fk*1.7)", "sin(xn*9.-ft*3.5+fk*1.7)")), "")                                   # ripples ten times faster                          # a spin, not a lean                           # the rays parked
+      and not _u621_aur(_hz_js.replace("sin(xn*9.-ft*.35+fk*1.7)", "sin(xn*9.-ft*3.5+fk*1.7)"))
+      and not _u621_aur(_hz_js.replace('  catch(e){hzS.gpuErr=String(e&&e.message||e);console.error("[sky] the GPU sky could not start (a shader would not compile or link):",hzS.gpuErr);', '  catch(e){'))   # a silent fallback again
+      and not _u621_aur(_hz_js.replace("exp(-sq((uv.x-sgx)/.12))", "exp(-pow((uv.x-sgx)/.12,2.))"))                                     # pow() of a negative base again
+      and not _u621_aur(_hz_js.replace('if(hzS.debug&&hzS.debug.gpu==="1")hzGpuBadge();', "hzGpuBadge();")), "")                          # the badge outside a dev copy                                   # ripples ten times faster                          # a spin, not a lean                           # the rays parked
 # THE WORKING VIEWS' SKY (THE GOVERNING RULE): the field in a conversation is the short light version (pure, in node):
 # half the stars, centred over the composer's top edge (.18-.82 of the band, the grid's half pitch either way), each
 # living 2-4 s; the home's live on
@@ -46876,7 +46889,7 @@ def _u621_css(css, js, pg):
     spawn = _jsfn(js, "function hzMoteSpawn(){")
     return (".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit{opacity:1;--hz-urev:360deg;transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}" in nc
             and "transition:--hz-urev .9s var(--hz-ease-in-out),opacity .1s linear .9s}" in nc                       # drains back the way it came
-            and "{animation:hzURimTurn 6s linear infinite}" in nc and nc.count("infinite") == 2                       # two loops: the rim's turn at Ultra, the fill's shimmer only while the slider is held
+            and "{animation:hzURimTurn 6s linear infinite}" in nc and nc.count("infinite") == 3                       # three loops: the corners' glints, the rim's turn at Ultra, the fill's shimmer only while the slider is held
             and ".hz:not(.hz-calm) .hz-sl.dragging .hz-sl-led::after{opacity:.6;animation:hzMarquee 1.6s cubic-bezier(.45,0,.25,1) infinite;" in nc   # held only, never at rest
             and ".hz #composer>.hz-ulit>b{position:absolute;inset:0;filter:blur(3px);" in nc and "#composer>.hz-ulit>b{opacity:.75;" in nc
             and ".hz.hz-ignite:not(.hz-calm) #composer>.hz-ulit>i.h{animation:hzUHead 1.4s linear both}" in nc
@@ -46895,6 +46908,8 @@ def _u621_css(css, js, pg):
             and "@media (prefers-reduced-motion:reduce){" in nc and ".hz .hz-sl-rays,.hz #hz-motes{display:none}}" in nc
             and ".hz #hz-aurw{filter:saturate(.55)}" in nc and ".hz #hz-wash{filter:saturate(.25)}" in nc and ".hz.hz-ultra:not(.hz-calm) #hz-aurw{filter:none}" in nc   # silver at rest
             and ".hz #hz-sky{background:#050506}" in nc
+            and "@keyframes hzUCorner{0%,100%{opacity:.35;transform:scale(.8)}50%{opacity:.95;transform:scale(1.05)}}" in nc   # the corners' glints: a twinkle, never a turn
+            and ".hz.hz-ultra:not(.hz-calm) #composer>.hz-ulit>em{animation:hzUCorner 6.5s ease-in-out 1.2s infinite}" in nc
             and "mask-image:radial-gradient(ellipse 52% 32% at 50% 30%,#000 30%,rgba(0,0,0,0) 100%);" in css                            # the rays in the band above the greeting
             and "box-shadow:0 24px 70px rgba(150,154,166,.14),0 2px 30px rgba(200,204,214,.08);" in css                                 # the composer's glow silver at rest, its ice at Ultra
             and _arr553_colours_ok(nc) and _arr553_shapes_ok(nc) and _knob_plain553(css, js))
@@ -46987,9 +47002,9 @@ def _u621_push_ok(r):
     sk = [s.get("sk") or {} for s in S]
     tw = [x.get("atw") or [1, 0, 0] for x in sk]
     peak = max((t for t in tw), key=lambda t: t[2], default=[1, 0, 0])
-    return (bool(sk) and peak[0] >= 1.3 and abs(peak[1]) >= .15 and .3 <= peak[2] <= .5      # the twist in the swell: folds deeper, a lean of ~24 deg, a phase push
+    return (bool(sk) and peak[0] >= 1.6 and abs(peak[1]) >= .15 and .3 <= peak[2] <= .5      # the twist in the swell: folds deeper, a lean of ~24 deg, a phase push
             and max(x.get("births", 0) for x in sk) >= 9 and any(x.get("shower", 0) > 0 for x in sk)   # stars born in the hang, a shower on landing
-            and rs.get("deep") == 90 and .05 <= (rs.get("atw") or [0, 0, 0])[2] <= .14 and abs((rs.get("atw") or [1, 1, 0])[0] - 1) < .05)   # the resting twist, and the deeper layer
+            and rs.get("deep") == 90 and .05 <= (rs.get("atw") or [0, 0, 0])[2] <= .14 and abs((rs.get("atw") or [1, 1, 0])[0] - 1.35) < .05)   # at rest the folds settle to Ultra's deeper 1.35   # the resting twist, and the deeper layer
 def _u621_conv_ok(r):
     c, st = r.get("conv") or {}, r.get("rest") or {}
     box, fs = c.get("box") or [0, 0, 1, 1], c.get("fspan") or [0, 9e9]
@@ -47007,7 +47022,7 @@ check("6b621 live (headless Chromium, the copy's page, Full at 1440): the curtai
 check("6b621 live, the landing pushed (per Patrick: \"More twist ... More stars, more pretty, more fantastic\"): in the swell the curtains fold deeper (x1.3 at least) and twist (a lean of about 24 deg, changing sign along them, and a phase push), stars are born in the hang (six or more), a meteor shower crosses, and resting Ultra keeps a gentle twist (about 6 deg) and the deeper star layer (30)",
       _u621_push_ok(_u621_l), json.dumps({k: _u621_l.get(k) for k in ("restSk",)})[:600] + json.dumps([s_.get("sk") for s_ in (_u621_l.get("arr") or [])])[:900])
 _u621_lm = [
-    ("no twist (the old landing)", [["const aTw=[1+ATW_AMP*surgeNow,", "const aTw=[1+0*surgeNow,"], ["gl.uniform1f(pA.U.tws,aTw[2]);", "gl.uniform1f(pA.U.tws,0.);"]], _u621_push_ok),
+    ("no twist (the old landing)", [["const aTw=[(1+ATW_AMP*surgeNow)*", "const aTw=[(1+0*surgeNow)*"], ["gl.uniform1f(pA.U.tws,aTw[2]);", "gl.uniform1f(pA.U.tws,0.);"]], _u621_push_ok),
     ("the aurora biased (the old left lean)", [[".5+.11*Math.sin(2*Math.PI*wt/140", ".64+.11*Math.sin(2*Math.PI*wt/140"]], _u621_aur_ok),
     ("the rim at once (no line of light)", [["transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}", "transition:none}"]], _u621_arr_ok),
     ("the rim's turning discs unclipped (the page wider than the window)", [["border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;overflow:hidden;", "border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;"]], _u621_conv_ok),
