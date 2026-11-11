@@ -48700,6 +48700,99 @@ def _t640_ok(js):
     return "pfx.line(p.x,0," not in d_ and "chand.links.forEach(" in d_ and "pfx.star(x,y," in d_
 check("6b640 Ultra's hanging stars draw no line from the window's top edge (only short links between stars on screen); the mutant is caught",
       _t640_ok(_hz_js) and not _t640_ok(_hz_js.replace("      if(p.mid){pfx.star(", "      pfx.line(p.x,0,x,y,.5,ICE,.05*fade,.16*fade);\n      if(p.mid){pfx.star(", 1)), "")
+# THE FIND BAR UNDER THE HEADER (6b640, per Patrick: "ahem": at 1377 x 868 with a chat open the bar sat on the lanes
+# and the mode chip): live in headless Chromium, a conversation, the bar closed until Cmd/Ctrl+F (findOpen), then at
+# 1440, 1377, 1100 and 760 its box meets none of the header's controls and each control's centre still hits the
+# control; Esc closes it. The 6b555 header harness's page driver, with this flow. Mutant: findPlace never called.
+_F640_FLOW = r'''  await size(1440);
+  let ready = false;
+  for (let tries = 0; tries < 2 && !ready; tries++) { await send("Page.navigate", { url: base + "/" });
+    for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#hz-top")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro`); } }
+  if (!ready) { out.errs.push("page not ready"); return done(); }
+  await sleep(600);
+  await ev(`(()=>{const i=document.querySelector("#input");i.value="Find me in this chat";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`);
+  await sleep(2500);
+  out.closedAtStart = await ev(`document.querySelector("#findbar").hidden`);
+  await ev(`findOpen()`); await sleep(300);
+  for (const w of [1440, 1377, 1100, 760]) { await size(w); await sleep(350);
+    out.cases.push(Object.assign({ w }, await ev(`(()=>{
+      const V=s=>{const e=document.querySelector(s);if(!e)return null;const c=getComputedStyle(e),r=e.getBoundingClientRect();
+        return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?{s,e,l:r.left,t:r.top,r:r.right,b:r.bottom}:null;};
+      const C=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-lanemenu","#hz-effort-slot","#hz-pick","#hz-machines","#hz-update","#hz-settings"].map(V).filter(Boolean);
+      const f=V("#findbar");if(!f)return {shown:false};
+      const hit=(a,b)=>a.l<b.r-.5&&b.l<a.r-.5&&a.t<b.b-.5&&b.t<a.b-.5;
+      const over=C.filter(c=>hit(c,f)).map(c=>c.s);
+      const blocked=C.filter(c=>{const x=(c.l+c.r)/2,y=(c.t+c.b)/2,h=document.elementFromPoint(x,y);return !(h&&(h===c.e||c.e.contains(h)));}).map(c=>c.s);
+      const hb=document.querySelector("#hz-top").getBoundingClientRect().bottom;
+      return {shown:true,over,blocked,gap:Math.round(f.t-hb),inside:f.r<=innerWidth+.5&&f.l>=-.5};})()`))); }
+  await ev(`document.querySelector("#find-q").dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))`); await sleep(300);
+  out.escClosed = await ev(`document.querySelector("#findbar").hidden`);
+  done();
+});
+'''
+_F640_JS = _B3_HDR[:_B3_HDR.index("  for (const tl of [false, true]) {")] + _F640_FLOW + _B3_HDR[_B3_HDR.index('ch.on("exit"'):]
+def _f640_run(mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="f640-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "find.js"), "w").write(_F640_JS)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "find.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation)); args.append(os.path.join(d_, "mut.json"))
+    try:
+        return json.loads(subprocess.run(args, capture_output=True, text=True, timeout=200).stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _f640_ok(r):
+    c_ = r.get("cases") or []
+    return (not r.get("err") and not r.get("errs") and r.get("closedAtStart") is True and r.get("escClosed") is True and len(c_) == 4
+            and all(x.get("shown") and not x["over"] and not x["blocked"] and 4 <= x["gap"] <= 16 and x["inside"] for x in c_))
+_f640_r = _f640_run()
+_f640_m = _f640_run([["  fb.hidden=false;findPlace();\n", "  fb.hidden=false;\n"]])
+check("6b640 find in this chat docks under the header: closed until asked, then at 1440, 1377, 1100 and 760 it meets none of the header's controls (each still hit at its centre), 4-16 px under the header; Esc closes it; the mutant (the bar left on the header) is caught",
+      _f640_ok(_f640_r) and _f640_m.get("mutated", 0) >= 1 and not _f640_ok(_f640_m),
+      json.dumps({"ok": _f640_r, "mut": {k: _f640_m.get(k) for k in ("cases", "errs", "mutated")}})[:900])
+
+# A QUESTION WITH NO ANSWER SAYS SO (6b640, from the lead in the C++ preview: an open chat showed a question and nothing
+# under it): redrawOpen and loadChat end with noAnswerPaint, which adds one quiet line with Try again when the chat's
+# last turn is the person's and no answer is on its way in it (funnels aside). Mutant: the call gone from loadChat.
+def _n640_ok(src):
+    f_ = _jsfn(src, "function noAnswerPaint(){")
+    return ("No answer came back for this question." in f_ and 'class="chat-err-go">Try again</button>' in f_
+            and 'messages[messages.length-1].role!=="user"' in f_ and "genChat===curChat" in f_ and 'lc.lane==="funnel"' in f_
+            and src.count("noAnswerPaint();") >= 2
+            and "  noAnswerPaint();                 // a question left with no answer says so (beta 4)\n  fnHzRest(c);" in src)
+check("6b640 a reopened chat whose last turn is an unanswered question shows one line with Try again, never a blank; the mutant is caught",
+      _n640_ok(_MILLENAI_SRC) and not _n640_ok(_MILLENAI_SRC.replace("  noAnswerPaint();                 // a question left with no answer says so (beta 4)\n  fnHzRest(c);", "  fnHzRest(c);", 1)), "")
+# SMALL TALK NEVER SEARCHES (6b640, per Patrick in the C++ preview: "What are we up to today?" came back as a news
+# digest; "and what?"): the person's day, plans and how things are going are "social" (answer_kind), never a web
+# question and never a follow-up carrying the last search's evidence, and the writer is told to keep it short and
+# human with one question back (SOCIAL_RULE); a fresh fact (the weather, the news, a race result, TV tonight, stocks)
+# still searches. Run on 6b626's own namespace. Mutant: the social line gone from answer_kind.
+_S640_SOCIAL = ["What are we up to today?", "what should I do today?", "how's it going?", "what's up?", "how are you?",
+                "what should we work on?", "any plans for tonight?", "what's on my plate today?", "hey, what are we doing today?",
+                "how's your day going?", "help me plan my day", "where were we?"]
+_S640_FRESH = ["what's the weather today?", "news today", "who won the F1 race yesterday?", "what's on tv tonight?",
+               "what are the stock prices today"]
+def _s640_run(src):
+    try:
+        g = _ns626(src)
+        K, NS, FU = g["answer_kind"], g["needs_search"], g["grounded_followup"]
+        return {"kind": {q: K(q) for q in _S640_SOCIAL}, "search": {q: NS(q) for q in _S640_SOCIAL + _S640_FRESH},
+                "fu": FU("What are we up to today?", "What is the capital of Australia?")}
+    except Exception as e_:
+        return {"err": repr(e_)[:300]}
+def _s640_ok(r, src):
+    return (not r.get("err") and all(v == "social" for v in r["kind"].values())
+            and not any(r["search"][q] for q in _S640_SOCIAL) and all(r["search"][q] for q in _S640_FRESH) and r["fu"] is False
+            and 'if messages and answer_kind(str(messages[-1].get("content") or "")) == "social":' in src
+            and "dated_system[\"content\"] += SOCIAL_RULE" in src and "never list news, prices or search results" in src)
+_s640_r = _s640_run(_MILLENAI_SRC)
+_s640_msrc = _MILLENAI_SRC.replace('        return "social"            # small talk, the person\'s own day (beta 4)\n', '        pass\n', 1)
+check("6b640 small talk never searches: \"What are we up to today?\" and ten like it are social (no web, no carried evidence, a short human answer with one question back); the weather, the news, a race result, TV tonight and stocks still search; the mutant is caught",
+      _s640_ok(_s640_r, _MILLENAI_SRC) and _s640_msrc != _MILLENAI_SRC and not _s640_ok(_s640_run(_s640_msrc), _s640_msrc),
+      json.dumps(_s640_r)[:900])
 # ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====

@@ -6318,6 +6318,30 @@ _AK_HOWTO_RX = re.compile(
     r"(?:give|tell)\s+me\s+(?:a\s+few\s+|some\s+|\w+\s+)?(?:tips|steps|ways|ideas)\b|"
     r"(?:any\s+)?tips\s+(?:for|on)\b|explain\s+how\b|walk\s+me\s+through\b|steps\s+to\b|"
     r"teach\s+me\s+(?:how\s+)?to\b)", re.I)
+# SMALL TALK AND THE PERSON'S OWN DAY (beta 4, per Patrick, from the C++ preview: "What are we up to today?" came
+# back as a search digest of CD rates, a phone update, airline points and Broadway, then "you did mention a thought
+# about breakfast"; "and what?"): a question to the assistant about the person, the two of you, plans or how
+# things are going is never a web question. A fresh fact (the weather, the news, a score, what's on) is not small
+# talk and still searches (_AK_SOCIAL_NOT_RX).
+_AK_SOCIAL_RX = re.compile(
+    r"^\W*(?:(?:so|ok|okay|hey|hi|hello|well|alright|morning|evening)[,!.\s]+)*(?:"
+    r"what(?:'s|’s|s|\s+is|\s+are)\s+(?:we|you|i)\s+(?:up\s+to|doing|working\s+on|going\s+to\s+do|gonna\s+do)\b|"
+    r"what\s+(?:are|were|should|shall|could|can|do|will)\s+(?:we|i)\s+(?:be\s+)?(?:up\s+to|do|doing|work\s+on|"
+    r"tackle|start\s+with|focus\s+on)\b|"
+    r"what\s+(?:should|shall|could|can)\s+(?:we|i)\s+(?:do|start)\b|"
+    r"what(?:'s|’s|s|\s+is)\s+(?:up|new|good|happening\s+with\s+you|on\s+(?:my|our|the)\s+(?:plate|list|agenda|mind))\b|"
+    r"(?:how(?:'s|’s|s|\s+is)\s+(?:it|everything|life|your\s+day)\s+going|how\s+(?:are|r)\s+(?:you|u|things)|"
+    r"how\s+have\s+you\s+been|how(?:'s|’s|s|\s+is)\s+(?:your|my)\s+(?:day|morning|evening|week))\b|"
+    r"(?:any|got\s+any)\s+(?:plans|ideas)\s+for\s+(?:today|tonight|the\s+day|the\s+weekend|this\s+weekend)\b|"
+    r"(?:where|what)\s+(?:were|was)\s+we\b|"
+    r"(?:i'?m|i\s+am)\s+(?:bored|tired|back|up|awake|here)\b|"
+    r"(?:help\s+me\s+)?plan\s+(?:my|our)\s+(?:day|morning|evening)\b|"
+    r"what\s+do\s+you\s+(?:want|think\s+we\s+should)\s+to?\s*do\b"
+    r")", re.I)
+_AK_SOCIAL_NOT_RX = re.compile(
+    r"\b(?:weather|forecast|rain|news|headlines?|score|scores|result|results|match|game|stocks?|market|price|"
+    r"traffic|open\s+now|showing|playing|on\s+tv|tv\s+tonight|events?|concerts?|election|f1|nba|nfl|"
+    r"premier\s+league|in\s+the\s+world)\b", re.I)
 # a how-to whose answer moves with the world: software and devices, money,
 # rules and paperwork, travel, anything named or dated
 _AK_WORLD_RX = re.compile(
@@ -6354,6 +6378,8 @@ def answer_kind(text: str) -> str:
         return "arith"
     if _AK_CHAT_RX.search(p):
         return "chat"
+    if _AK_SOCIAL_RX.match(p) and not _AK_SOCIAL_NOT_RX.search(p) and len(p.split()) <= 14:
+        return "social"            # small talk, the person's own day (beta 4)
     if _AK_HOWTO_RX.match(p):
         low = p.lower()
         if (not _AK_WORLD_RX.search(low) and not _sc_entities(p) and not re.search(r"\d", p)
@@ -6393,7 +6419,7 @@ def grounded_followup(text: str, prior_question: str = "") -> bool:
     the population?") or shares the earlier question's subject."""
     t = strip_greeting(str(text or "")).strip()
     t = _PREAMBLE_RX.sub("", t, count=1).strip() or t
-    if not t or answer_kind(t) in ("arith", "chat"):
+    if not t or answer_kind(t) in ("arith", "chat", "social"):   # small talk carries no evidence (beta 4)
         return False
     if _OTHER_AI_RX.search(t) or _FU_LEAD_RX.match(t):
         return True
@@ -7067,6 +7093,12 @@ def place_turn(query: str, snippets: str, matched: bool, placey: bool,
 # ---- the length dial never refuses what was asked for: "Write a long,
 # detailed 1500-word essay" came back "A 1500-word deep dive would likely
 # exceed technical length limits" (there is no such limit: 8,192 tokens)
+# SMALL TALK (beta 4, per Patrick: "What are we up to today?" got a news digest; "and what?")
+SOCIAL_RULE = ("\n\nTHIS TURN is small talk or a question about the person's own day or plans, not a question "
+               "about the world. Answer in one or two short, warm sentences. Say plainly what you actually know "
+               "(the date and time in the question; something from this chat or a remembered note only if it "
+               "clearly fits), never list news, prices or search results, never guess at their plans, and end "
+               "with one useful question back, offering two or three concrete things you could help with.")
 LENGTH_ASKED = (" The person's own words win over this setting: asked for a "
                 "length or a long piece (an essay, 1,500 words, a full guide), "
                 "write it in full. Never mention a length limit, a word cap or "
@@ -48548,6 +48580,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _lv = max(1, min(5, _lv))
         if _LEN.get(_lv):
             dated_system["content"] += "\n\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED
+        if messages and answer_kind(str(messages[-1].get("content") or "")) == "social":
+            dated_system["content"] += SOCIAL_RULE      # small talk: short, human, one question back (beta 4)
         if auto_web and messages:
             # THE CLOCK RIDES THE QUESTION (6b264): the system-prompt
             # binding lost to a Beijing-hosted model's own calendar
@@ -57593,6 +57627,13 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz.hz-kb .hz-row:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
 @media (prefers-reduced-motion:reduce){.hz .hz-row{transition:none}}
 /* ==== the recent chats (beta 4): end ==== */
+/* ==== find in this chat under the header (beta 4): the graphite bar, right-aligned over the transcript, never on the
+   header's controls (findPlace sets its top and right from the header and the composer) ==== */
+.hz #findbar{transform:none;width:min(380px,calc(100% - 32px));z-index:7;background:#151517;border:var(--chat-hw,1px) solid rgba(255,255,255,.1);
+  border-radius:10px;box-shadow:0 8px 24px -12px rgba(0,0,0,.7);padding:4px 4px 4px 12px;font-family:var(--hz-font-ui)}
+.hz #findbar input{font:450 13px/20px var(--hz-font-ui);letter-spacing:-.005em;color:var(--hz-ink)}
+.hz #findbar button{width:28px;height:28px;border-radius:8px;font-size:14px}
+/* ==== find (beta 4): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -64648,7 +64689,21 @@ function redrawOpen(){
   try{messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
     m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));}
   finally{chatBulk--;}
+  noAnswerPaint();                     // a question left with no answer says so (beta 4)
   if(chatPinned)chatToBottom(false);   // one pin for the whole repaint (6b590)
+}
+// A QUESTION WITH NO ANSWER SAYS SO (beta 4, from the lead in the C++ preview: an open chat showed the question and
+// nothing under it): a saved chat whose last turn is the person's, with no answer on its way in this chat, gets one
+// quiet line with Try again (6b590's kind error line; Try again asks it again), never a blank. Funnels are left alone.
+function noAnswerPaint(){
+  if(!messages.length||messages[messages.length-1].role!=="user")return;
+  if(generating&&typeof genChat!=="undefined"&&genChat===curChat)return;
+  const lc=chats.find(x=>x.id===curChat);if(lc&&lc.lane==="funnel")return;
+  if(inner.querySelector(":scope>.msg.ai.noans"))return;
+  const d=document.createElement("div");d.className="msg ai settled noans";
+  d.innerHTML='<div class="body"><div class="chat-err" role="status"><span class="chat-err-t">No answer came back for this question.</span>'
+    +'<button type="button" class="chat-err-go">Try again</button></div></div>';
+  inner.appendChild(d);
 }
 async function loadChatsFromDisk(){
   try{
@@ -65547,6 +65602,7 @@ function loadChat(id){
   chatBulk++;
   try{messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));}
   finally{chatBulk--;}
+  noAnswerPaint();                 // a question left with no answer says so (beta 4)
   fnHzRest(c);                     // Horizon: a funnel reopens as its flow, at rest (6b622)
   renderChats();
   markSeen();
@@ -67510,9 +67566,23 @@ function findWatch(){
     findWait=setTimeout(findLater,250);
   });
 }
+// THE BAR UNDER THE HEADER (beta 4, per Patrick: "ahem", the find bar sat on the header's lanes and mode chip at
+// 1377 wide): in Horizon it docks 8 px under the header's real bottom, right-aligned over the transcript (its right
+// edge the composer's, which sits under the reading column), measured whenever it opens and on a resize
+function findPlace(){
+  if(!document.documentElement.classList.contains("hz")||fb.hidden){fb.style.top=fb.style.right=fb.style.left="";return;}
+  const host=fb.offsetParent||fb.parentElement;if(!host)return;
+  const m=host.getBoundingClientRect(),hd=document.querySelector("#hz-top"),cp=document.querySelector("#composer");
+  const hb=hd&&hd.getClientRects().length?hd.getBoundingClientRect().bottom:m.top+64;
+  const cr=cp&&cp.getClientRects().length?cp.getBoundingClientRect():null;
+  fb.style.top=Math.round(Math.max(0,hb-m.top)+8)+"px";
+  fb.style.left="auto";
+  fb.style.right=Math.round(Math.max(12,cr?m.right-cr.right:16))+"px";
+}
+addEventListener("resize",()=>{if(!fb.hidden)findPlace();});
 function findOpen(){
   const again=!fb.hidden;
-  fb.hidden=false;
+  fb.hidden=false;findPlace();
   fq.focus();fq.select();
   if(again)return;
   findWatch();
@@ -67523,7 +67593,7 @@ function findOpen(){
 // saved turn the server matched). The jump is instant and unpins the view,
 // so the open's own glide to the end does not carry it away
 function findOpenAt(q,mi){
-  fb.hidden=false;fq.value=q;
+  fb.hidden=false;fq.value=q;findPlace();
   findWatch();
   findRun(false);
   const el=[...inner.children].filter(x=>x.classList.contains("msg"))[mi];
