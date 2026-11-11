@@ -46440,7 +46440,7 @@ def _b3_hdr_static(css, js, pg):
             and _B624_LOOP in fit and "top.classList.remove(...HZ_HD);" in fit
             and 'if(top.getBoundingClientRect().width<HZ_LANES_MENU&&!$("#hero"))top.classList.add("hz-hd5");' in fit
             and 'var HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7","hz-hd8"],HZ_LANES_MENU=940;' in js
-            and ".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}" in css
+            and ".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}" in pg   # 6b624's rule sits after the Horizon slice: read from the served page
             and "if(tl&&b.left<88&&b.top<56)l=true;" in js and "tv.width<Math.min(96,t.scrollWidth))l=true;" in js
             and 'ro.observe(e);' in js and "  hzHeaderFit();\n}" in js
             # the gear and the badge: a 32 px glass key with its shortcut; the pill mirrors the app's own check, no new call
