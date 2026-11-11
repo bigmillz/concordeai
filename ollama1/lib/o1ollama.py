@@ -136,8 +136,8 @@ def _per_layer(v, n_layer):
     return [int(v)] * n_layer
 
 
-# THE CACHE AS LLAMA.CPP ALLOCATES IT (6b660, per Patrick): the estimate used
-# to count every layer at the full context, so on his 16 GB card the gateway
+# THE CACHE AS LLAMA.CPP ALLOCATES IT (6b660, per the owner): the estimate used
+# to count every layer at the full context, so on a 16 GB card (the owner's server) the gateway
 # refused gemma4:12b past ~11k (16k "needs" 18.3 GiB; it really holds 9.6 GB)
 # and gpt-oss:20b past ~31k (64k really fits in 14.3 GB). llama.cpp (Ollama
 # 0.40 runs llama-server) keeps far less:
@@ -161,9 +161,9 @@ SWA_PATTERN_BY_ARCH = {"gpt-oss": 2, "gemma2": 2, "gemma3": 6, "cohere2": 4}
 def _swa_layers(g, arch, n_layer):
     """[bool] per layer: True for a sliding-window layer; None when the model has a
     window but the kit can't tell which layers use it (then all count in full)."""
-    pat = g("attention.sliding_window_pattern")
-    if isinstance(pat, list) and pat:
-        vals = [bool(x) for x in pat[:n_layer]]
+    layout = g("attention.sliding_window_pattern")
+    if isinstance(layout, list) and layout:
+        vals = [bool(x) for x in layout[:n_layer]]
         return vals + [vals[-1]] * (n_layer - len(vals))
     n = SWA_PATTERN_BY_ARCH.get(arch)
     if not n:
