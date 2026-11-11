@@ -59,7 +59,7 @@ def _port_open(port):
         return so.connect_ex(("127.0.0.1", port)) == 0
 
 
-_NO_WEB = os.path.join(_SMOKE_TMP, "no-web.json")     # the empty stand-in web every copy searches (6b650)
+_NO_WEB = os.path.join(_SMOKE_TMP, "no-web.json")     # the empty stand-in web every copy searches (6b651)
 with open(_NO_WEB, "w") as _fh_nw:
     json.dump({"queries": [], "pages": {}}, _fh_nw)
 
@@ -80,7 +80,7 @@ class Instance:
         self.env.update(MILLENAI_DEV="1", MILLENAI_HOME=self.home,
                         MILLENAI_NOWINDOW="1", MILLENAI_PORT=str(port))
         self.env.update(env or {})
-        # NO REAL SEARCH ENGINE FROM A GAUNTLET COPY (6b650, per Patrick via the lead: the test traffic got this
+        # NO REAL SEARCH ENGINE FROM A GAUNTLET COPY (6b651, per Patrick via the lead: the test traffic got this
         # Mac's connection bot-flagged). Every copy that isn't already behind a test proxy answers its searches
         # from an empty stand-in web (the search-fixture hook): nothing found, nothing sent.
         if not any(k.lower() in ("https_proxy", "http_proxy") for k in self.env):
@@ -38969,7 +38969,7 @@ _exec_names(_g18, {"_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "
                    # (6b626) needs_search asks answer_kind first: a sum, the chat itself, a plain how-to
                    "answer_kind", "_ak_arith", "_AK_LEAD_RX", "_AK_TAIL_RX", "_AK_NUM", "_AK_OP", "_AK_EXPR_RX",
                    "_AK_OPS_RX", "_AK_CHAT_RX", "_AK_HOWTO_RX", "_AK_WORLD_RX",
-                   # (6b640) the person's own day; (6b650) how they feel, a bite to eat, a unit conversion
+                   # (6b640) the person's own day; (6b651) how they feel, a bite to eat, a unit conversion
                    "_AK_SOCIAL_RX", "_AK_SOCIAL_NOT_RX", "_ak_personal", "_AK_FEEL_RX", "_AK_FOOD_RX", "_AK_CUISINE",
                    "_AK_UNIT", "_AK_CONVERT_RX", "_REL_WORDS", "place_anchor", "_PA_RX", "_PA_STOP_RX", "_PA_NOT",
                    "_PA_LANDMARK", "_PLACE_FILLER"})
@@ -49302,7 +49302,7 @@ def _s640_run(src):
 def _s640_ok(r, src):
     return (not r.get("err") and all(v == "social" for v in r["kind"].values())
             and not any(r["search"][q] for q in _S640_SOCIAL) and all(r["search"][q] for q in _S640_FRESH) and r["fu"] is False
-            and '_kind = answer_kind(str(messages[-1].get("content") or "")) if messages else ""\n        if _kind == "social":' in src   # (6b650 re-pin)
+            and '_kind = answer_kind(str(messages[-1].get("content") or "")) if messages else ""\n        if _kind == "social":' in src   # (6b651 re-pin)
             and "dated_system[\"content\"] += SOCIAL_RULE" in src and "never list news, prices or search results" in src)
 _s640_r = _s640_run(_MILLENAI_SRC)
 _s640_msrc = _MILLENAI_SRC.replace('        return "social"            # small talk, the person\'s own day (beta 4)\n', '        pass\n', 1)
@@ -49566,7 +49566,7 @@ def _c626_all(src):
         and "so is 'I didn't find' about anything you can answer yourself" in gt
         and "does not cover part of the question" in gt and "'The provided data'" in gt and "are banned" in gt
         and "never mention the search, a cutoff or your training data" not in gn
-        and "Never mention your training data or a cutoff" in gn and "found nothing usable" in gn   # (6b650 re-pin)
+        and "Never mention your training data or a cutoff" in gn and "found nothing usable" in gn   # (6b651 re-pin)
         and "say nothing about the search" in gn and "live results didn't come through" in gn
         and "without remarking on the evidence" in g["GROUND_FOLLOWUP"])
     # ---- the post-pass: a sentence narrating what the search returned
@@ -49619,7 +49619,7 @@ def _c626_all(src):
         and "        if query and not _offline:\n" in h)
     out["the handler: a question about the chat or a sum is written once (a reviser sees only the question), and the "
         "length line carries the asked-for rule"] = (
-        h.count('answer_kind(prompt) not in ("chat", "arith", "social", "personal")') == 3   # (6b650: and the server's Fast)
+        h.count('answer_kind(prompt) not in ("chat", "arith", "social", "personal")') == 3   # (6b651: and the server's Fast)
         and 'dated_system["content"] += "\\n\\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED' in h
         and 'txt = title_text(_tb.get("texts") or [str(_tb.get("text", ""))])' in h)
     return out
@@ -49646,7 +49646,7 @@ _C626_MUT = [
     ("needs_search asks nothing first", "    if answer_kind(p):\n        return False         # sums, the chat itself",
      "    if False:\n        return False         # sums, the chat itself"),
     ("a world how-to answered from memory", "        if (not _AK_WORLD_RX.search(low) and not [e for e in _sc_entities(p) if e not in _AK_CUISINE]",
-     "        if (not [e for e in _sc_entities(p) if e not in _AK_CUISINE]"),     # (6b650 re-pin: a cuisine is no name)
+     "        if (not [e for e in _sc_entities(p) if e not in _AK_CUISINE]"),     # (6b651 re-pin: a cuisine is no name)
     ("the chat itself searched", "    if _AK_CHAT_RX.search(p):\n        return \"chat\"", "    if False:\n        return \"chat\""),
     ("'what's' read as 'what'", "r\"(?:(?:what's|what\u2019s|whats|what)(?:", "r\"(?:(?:what|whats|what's|what\u2019s)(?:"),
     ("every turn a follow-up (the bleed)", "    return bool(prior_question and _fu_stems(new) & _fu_stems(followup_new_terms(prior_question)))",
@@ -49681,7 +49681,7 @@ _C626_MUT = [
     ("a greeting names the chat", "        if t and turn_triage(t) != \"chat\":\n            return t", "        if t:\n            return t"),
     ("the length line without the asked-for rule", '"\\n\\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED', '"\\n\\nLENGTH: " + _LEN[_lv]'),
     ("the chat question rewritten blind",
-     "                          and answer_kind(prompt) not in (\"chat\", \"arith\", \"social\", \"personal\")   # (6b650) no reviser\n", ""),
+     "                          and answer_kind(prompt) not in (\"chat\", \"arith\", \"social\", \"personal\")   # (6b651) no reviser\n", ""),
 ]
 _c626_caught = []
 for _mn, _ma, _mb in _C626_MUT:
@@ -49693,8 +49693,8 @@ for _mn, _ma, _mb in _C626_MUT:
         _c626_caught.append((_mn, "not caught"))
 check("6b626's rules each break a check when broken (%d mutants)" % len(_C626_MUT), not _c626_caught, "%r" % _c626_caught)
 # ==== 6b626 answers: end ====
-# ==== 6b650 everyday: begin ====
-# EVERYDAY ANSWERS (6b650, per Patrick: "I'm asking it, what's for breakfast, and saying, I'm tired, and it's giving me
+# ==== 6b651 everyday: begin ====
+# EVERYDAY ANSWERS (6b651, per Patrick: "I'm asking it, what's for breakfast, and saying, I'm tired, and it's giving me
 # a bunch of crap"; "What if I'm run down?" got cortisol, the autonomic nervous system, a header and NSDR, "not a very
 # inviting answer"; "What's for breakfast?" opened "Since I can't see your kitchen ... I'll assume" and called eggs
 # "the standard high-utility choice", "kind of rubbish"). How the person feels and an everyday bite are "personal"
@@ -49703,7 +49703,7 @@ check("6b626's rules each break a check when broken (%d mutants)" % len(_C626_MU
 # about 40-120 words whatever the effort). A unit conversion is a sum; "say that shorter" and "which one did you
 # suggest first?" are about the chat; a cuisine is not a name to look up ("French toast"); the kitchen's clock ("how
 # long do I boil an egg") is a how-to. A place, a fresh fact or a named thing still searches. Run on 6b626's namespace.
-print("== everyday: how they feel, a bite to eat, a conversion, the chat itself, answered like a friend (6b650) ==")
+print("== everyday: how they feel, a bite to eat, a conversion, the chat itself, answered like a friend (6b651) ==")
 _E650_PERSONAL = ["I'm tired", "what's for breakfast? I'm tired", "What's for breakfast?", "What if I'm run down?",
                   "ugh, Monday", "I'm so stressed about work right now", "can't sleep", "feeling kind of down today",
                   "I have a headache, any ideas?", "I'm bored", "what should I eat for dinner?",
@@ -49776,19 +49776,19 @@ def _e650_ok(r, src):
 
 
 for _n650, _o650 in _e650_ok(_e650_run(_MILLENAI_SRC), _MILLENAI_SRC).items():
-    check("6b650 everyday — " + _n650, _o650, "")
+    check("6b651 everyday — " + _n650, _o650, "")
 # live, on the copy (Cloud Only, no keys: no model runs; a personal turn never searches)
 _l650 = {}
 for _q650 in ("what's for breakfast? I'm tired", "What if I'm run down?"):
     _s650, _hd650, _b650 = req("/api/chat", "POST", {"messages": [{"role": "user", "content": _q650}], "tier": "Cloud Only"},
                                cookie=K, timeout=60)
     _l650[_q650] = (_s650, {k.lower(): v for k, v in _hd650.items()}.get("x-web-search"))
-check("6b650 live: \"what's for breakfast? I'm tired\" and \"What if I'm run down?\" are answered without the web",
+check("6b651 live: \"what's for breakfast? I'm tired\" and \"What if I'm run down?\" are answered without the web",
       all(v == (200, "0") for v in _l650.values()), "%r" % _l650)
 _ns650p = {}
 _exec_names(_ns650p, {"CLAUDE_PRICES", "PRICES_BY_PROVIDER", "price_for", "call_cost"})
 _pr650 = _ns650p["price_for"]("claude", "claude-haiku-5-5")
-check("6b650 Haiku 5.5 is priced as Haiku 5.5 ($0.10 / $0.50 per million), not at Fable's price as an unknown model",
+check("6b651 Haiku 5.5 is priced as Haiku 5.5 ($0.10 / $0.50 per million), not at Fable's price as an unknown model",
       _pr650[1] is True and abs(_ns650p["call_cost"]("claude", {"m": "claude-haiku-5-5", "o": 1_000_000})[0] - 0.5) < 1e-9,
       repr(_pr650))
 _C650_MUT = [
@@ -49809,10 +49809,10 @@ _C650_MUT = [
     ("a personal turn to the whole council", '        if _triage == "full" and answer_kind(prompt) in ("social", "personal"):\n            _triage = "short"',
      '        if False:\n            _triage = "short"'),
     ("the writer never told", '        elif _kind == "personal":\n            dated_system["content"] += PERSONAL_RULE', '        elif False:\n            pass'),
-    ("the reviser on a personal turn", '                          and answer_kind(prompt) not in ("chat", "arith", "social", "personal")   # (6b650) no reviser\n',
+    ("the reviser on a personal turn", '                          and answer_kind(prompt) not in ("chat", "arith", "social", "personal")   # (6b651) no reviser\n',
      '                          and answer_kind(prompt) not in ("chat", "arith")\n'),
     ("an old chat cited for 'I'm tired'", '            if _kn_want == 1 and answer_kind(prompt) in ("social", "personal", "arith"):\n                _kn_want = 0\n', ""),
-    ("the assumption opener kept", "    m = _ANS_ASSUME_RX.match(t)            # (6b650)", "    m = None            # (6b650)"),
+    ("the assumption opener kept", "    m = _ANS_ASSUME_RX.match(t)            # (6b651)", "    m = None            # (6b651)"),
     ("'down today' borrows the weather", '                    and answer_kind(p2) not in ("arith", "chat", "social", "personal")):\n',
      '                    and True):\n'),
     ("effort buys words", "more effort means more care, not more words", "more effort means more depth"),
@@ -49825,8 +49825,8 @@ for _mn, _ma, _mb in _C650_MUT:
         continue
     if all(_e650_ok(_e650_run(_ms), _ms).values()):
         _c650_caught.append((_mn, "not caught"))
-check("6b650's rules each break a check when broken (%d mutants)" % len(_C650_MUT), not _c650_caught, "%r" % _c650_caught)
-# ==== 6b650 everyday: end ====
+check("6b651's rules each break a check when broken (%d mutants)" % len(_C650_MUT), not _c650_caught, "%r" % _c650_caught)
+# ==== 6b651 everyday: end ====
 # ==== 6b627 robust: begin ====
 print("== usable when things go wrong: Stop only in the answering chat, a cut answer says so, a damaged model falls through with Download again, a load and a long silence said, offline said plainly (6b627) ==")
 # USABLE WHEN THINGS GO WRONG (6b627, per Patrick: "it has to be usable"; a usability walkthrough of beta 4). Three

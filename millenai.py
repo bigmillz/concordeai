@@ -1249,7 +1249,7 @@ SYSTEM_PROMPT = {
         "clarifying questions — when a request is broad, make a reasonable "
         "assumption, name it in one clause, and deliver the substance "
         "anyway. Name an assumption only when it changes the answer, and "
-        # (6b650) "Since I can't see your kitchen ... I'll assume" opened a breakfast answer
+        # (6b651) "Since I can't see your kitchen ... I'll assume" opened a breakfast answer
         "never as an opener about what you can't see or know ('Since I "
         "can't see your kitchen, I'll assume…'): just start helping. "
         "CALIBRATE depth to the ask, the way the best assistants do: a "
@@ -6298,13 +6298,13 @@ _AK_TAIL_RX = re.compile(
     r"(?:in|as)\s+(?:a\s+)?(?:decimal|fraction|percent(?:age)?))\b)\s*$", re.I)
 _AK_NUM = r"\d[\d,]*(?:\.\d+)?%?|\.\d+%?"
 _AK_OP = (r"[-+*/x×÷^−()=]|plus|minus|times|multiplied\s+by|divided\s+by|over|"
-          r"to\s+the\s+power\s+of|to\s+the(?=\s+\d+(?:st|nd|rd|th)\b)|(?<=\d)(?:st|nd|rd|th)(?:\s+power)?\b|"  # 2 to the 10th (6b650)
+          r"to\s+the\s+power\s+of|to\s+the(?=\s+\d+(?:st|nd|rd|th)\b)|(?<=\d)(?:st|nd|rd|th)(?:\s+power)?\b|"  # 2 to the 10th (6b651)
           r"squared|cubed|percent\s+of|(?:the\s+)?(?:sum|product)\s+of|add|"
           r"of|mod|modulo|(?:the\s+)?(?:square|cube)\s+root\s+of|sqrt|and")
 _AK_EXPR_RX = re.compile(r"(?:\s*(?:%s|%s))+\s*" % (_AK_NUM, _AK_OP), re.I)
 _AK_OPS_RX = re.compile(r"[-+*/x×÷^−]|\b(?:plus|minus|times|multiplied|divided|over|power|to\s+the|"
                         r"squared|cubed|percent|of|add|mod|modulo|root|sqrt)\b", re.I)
-# A UNIT CONVERSION IS A SUM (6b650): "how many minutes in 3.5 hours", "30 Celsius in Fahrenheit", "how many
+# A UNIT CONVERSION IS A SUM (6b651): "how many minutes in 3.5 hours", "30 Celsius in Fahrenheit", "how many
 # ounces in a cup" searched the web and came back with citations for a fixed ratio. Currencies are not here.
 _AK_UNIT = (r"(?:minutes?|mins?|seconds?|secs?|hours?|hrs?|days?|weeks?|months?|years?|ounces?|oz|fl\.?\s*oz|cups?|"
             r"tablespoons?|tbsps?|teaspoons?|tsps?|grams?|g|kilos?|kilograms?|kg|pounds?|lbs?|stones?|inch(?:es)?|in\.|"
@@ -6330,7 +6330,7 @@ _AK_CHAT_RX = re.compile(
     r"^\W*(?:summari[sz]e|recap|repeat|quote|shorten|simplify)\b.{0,30}\b(?:this|our|that|your)\s+"
     r"(?:chat|conversation|thread|discussion|answer|reply|last\s+answer)\b|"
     r"^\W*(?:say|repeat)\s+(?:that|it)\s+again\b|"
-    # (6b650) a rewrite of the last answer, or what it said: "can you say that shorter?", "which one did you suggest
+    # (6b651) a rewrite of the last answer, or what it said: "can you say that shorter?", "which one did you suggest
     # first?" searched the web
     r"^\W*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:say|put|make|write|explain|give)\s+(?:that|it|this)\s+"
     r"(?:again\s+)?(?:shorter|simpler|more\s+simply|in\s+(?:fewer|plain(?:er)?|simple(?:r)?)\s+words|"
@@ -6343,7 +6343,7 @@ _AK_HOWTO_RX = re.compile(
     r"how\s+(?:do|can|should|would|could|might)\s+(?:i|you|we|one|someone|people)\b|how\s+to\b|"
     r"how\s+(?:does|do)\s+(?:a|an|the)\b[^?]{0,40}\bwork\b|"
     r"how\s+long\s+(?:do|should|does|to|would)\s+(?:i|you|we|it\s+take\s+to)?\s*(?:boil|cook|bake|roast|grill|fry|"
-    r"steam|microwave|poach|rest|soak|marinate|steep|brew|simmer|toast|thaw|defrost)\b|"   # the kitchen's clock (6b650)
+    r"steam|microwave|poach|rest|soak|marinate|steep|brew|simmer|toast|thaw|defrost)\b|"   # the kitchen's clock (6b651)
     r"what(?:'s|’s|s|\s+is)\s+the\s+(?:best|easiest|right|proper|fastest|quickest)\s+way\s+to\b|"
     r"(?:give|tell)\s+me\s+(?:a\s+few\s+|some\s+|\w+\s+)?(?:tips|steps|ways|ideas)\b|"
     r"(?:any\s+)?tips\s+(?:for|on)\b|explain\s+how\b|walk\s+me\s+through\b|steps\s+to\b|"
@@ -6372,7 +6372,7 @@ _AK_SOCIAL_NOT_RX = re.compile(
     r"\b(?:weather|forecast|rain|news|headlines?|score|scores|result|results|match|game|stocks?|market|price|"
     r"traffic|open\s+now|showing|playing|on\s+tv|tv\s+tonight|events?|concerts?|election|f1|nba|nfl|"
     r"premier\s+league|in\s+the\s+world)\b", re.I)
-# HOW THE PERSON FEELS, AND WHAT THEY'LL EAT (6b650, per Patrick: "I'm asking it, what's for breakfast, and saying,
+# HOW THE PERSON FEELS, AND WHAT THEY'LL EAT (6b651, per Patrick: "I'm asking it, what's for breakfast, and saying,
 # I'm tired, and it's giving me a bunch of crap"; "What if I'm run down?" came back as a clinical lecture on
 # cortisol, the autonomic nervous system and NSDR: "it's great, but it's not a very inviting answer"). A message
 # that says how the person feels (tired, run down, stressed, can't sleep, a headache, "ugh, Monday") or asks for an
@@ -6432,7 +6432,7 @@ def _ak_arith(p: str) -> bool:
 
 
 def _ak_personal(p: str) -> bool:
-    """How the person feels, or an everyday bite (6b650): short, about them, and nothing the web would know
+    """How the person feels, or an everyday bite (6b651): short, about them, and nothing the web would know
     better: no place, venue, fresh fact, figure or named thing (a cuisine is not one)."""
     if len(p.split()) > 30 or not (_AK_FEEL_RX.search(p) or _AK_FOOD_RX.search(p)):
         return False
@@ -6461,7 +6461,7 @@ def answer_kind(text: str) -> str:
     if _AK_CHAT_RX.search(p):
         return "chat"
     if _ak_personal(p):
-        return "personal"          # how they feel, what they'll eat (6b650)
+        return "personal"          # how they feel, what they'll eat (6b651)
     if _AK_SOCIAL_RX.match(p) and not _AK_SOCIAL_NOT_RX.search(p) and len(p.split()) <= 14:
         return "social"            # small talk, the person's own day (beta 4)
     if _AK_HOWTO_RX.match(p):
@@ -6504,7 +6504,7 @@ def grounded_followup(text: str, prior_question: str = "") -> bool:
     the population?") or shares the earlier question's subject."""
     t = strip_greeting(str(text or "")).strip()
     t = _PREAMBLE_RX.sub("", t, count=1).strip() or t
-    if not t or answer_kind(t) in ("arith", "chat", "social", "personal"):   # small talk carries no evidence (beta 4, 6b650)
+    if not t or answer_kind(t) in ("arith", "chat", "social", "personal"):   # small talk carries no evidence (beta 4, 6b651)
         return False
     if _OTHER_AI_RX.search(t) or _FU_LEAD_RX.match(t):
         return True
@@ -7111,7 +7111,7 @@ def place_turn(query: str, snippets: str, matched: bool, placey: bool,
             "answer. Commit — name the current releases "
             "or events the data names, each with a few "
             "honest words on what it is and who it's for. "
-            # (6b650) with no listings, 2024's films came back as "this weekend, November 14, 2026"
+            # (6b651) with no listings, 2024's films came back as "this weekend, November 14, 2026"
             "When the data names none, say so in ONE plain "
             "sentence (\"I couldn't get this week's listings "
             "just now.\"), then name recent ones you know "
@@ -7188,7 +7188,7 @@ SOCIAL_RULE = ("\n\nTHIS TURN is small talk or a question about the person's own
                "(the date and time in the question; something from this chat or a remembered note only if it "
                "clearly fits), never list news, prices or search results, never guess at their plans, and end "
                "with one useful question back, offering two or three concrete things you could help with.")
-# HOW THEY FEEL, A BITE TO EAT (6b650, per Patrick: "What if I'm run down?" got cortisol, the autonomic nervous
+# HOW THEY FEEL, A BITE TO EAT (6b651, per Patrick: "What if I'm run down?" got cortisol, the autonomic nervous
 # system, a header and NSDR, "not a very inviting answer"; "What's for breakfast?" got "Since I can't see your
 # kitchen ... I'll assume you're looking for a reliable, high-protein breakfast ... the standard high-utility
 # choice", "kind of rubbish ... Claude still looks so much cleaner"). A friend's answer, the same at every effort.
@@ -26978,7 +26978,7 @@ GROUND_RULES = (
     "- Never describe your own data access: 'the evidence', 'the sources "
     "above', 'the snippets', 'I can't pull live data' are banned. Speak as "
     "yourself ('I found', 'as of June 2026').\n")
-# (6b650, per Patrick via the lead) NO RESULTS, SAID HONESTLY: with the engines refusing this connection, "who won the
+# (6b651, per Patrick via the lead) NO RESULTS, SAID HONESTLY: with the engines refusing this connection, "who won the
 # Knicks game last night?" came back "I don't have access to live sports scores ... check ESPN", the news "check
 # Google News", and the week's films were 2024's presented as this weekend's. A stable question is still answered
 # with nothing said about the search; a current one gets ONE plain line that live results didn't come through, then
@@ -27882,7 +27882,7 @@ CLAUDE_PRICES = {
     "claude-sonnet-4-6": (3.0, 15.0, 0.30, 3.75),
     "claude-sonnet-4-5": (3.0, 15.0, 0.30, 3.75),
     "claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25),
-    # (6b650) Haiku 5.5, the quick ladder's first Claude rung, had no entry, so its calls were counted at Fable
+    # (6b651) Haiku 5.5, the quick ladder's first Claude rung, had no entry, so its calls were counted at Fable
     # 5.1's price (100x). $0.10 / $0.50 per the claude-api skill's table (2026-10-06), prompts up to 100K tokens;
     # cache read and write assumed at the usual 0.1x and 1.25x of input (not checked)
     "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),
@@ -38979,7 +38979,7 @@ def _ans_asked(question: str) -> str:
     return q[i + 8:] if i >= 0 else q
 
 
-# AN OPENER ABOUT WHAT IT CAN'T SEE (6b650, per Patrick): "What's for breakfast?" began "Since I can't see your kitchen
+# AN OPENER ABOUT WHAT IT CAN'T SEE (6b651, per Patrick): "What's for breakfast?" began "Since I can't see your kitchen
 # or know your specific dietary preferences, I'll assume you're looking for a reliable, high-protein breakfast that
 # fits a busy morning schedule." The first sentence goes when it is only that and the answer goes on after it.
 _ANS_ASSUME_RX = re.compile(
@@ -39022,7 +39022,7 @@ def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
     if m:
         t = t[m.end():]
         notes.append("heading dropped")
-    m = _ANS_ASSUME_RX.match(t)            # (6b650) "Since I can't see your kitchen..., I'll assume..."
+    m = _ANS_ASSUME_RX.match(t)            # (6b651) "Since I can't see your kitchen..., I'll assume..."
     if m and len(t[m.end():].strip()) >= 40:
         t = t[m.end():]
         t = t[:1].upper() + t[1:]
@@ -47997,7 +47997,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # Deep keep their own runs.
         _triage = turn_triage(prompt)
         if _triage == "full" and answer_kind(prompt) in ("social", "personal"):
-            _triage = "short"     # how they feel, a bite to eat: one seat, one pass, no council (6b650)
+            _triage = "short"     # how they feel, a bite to eat: one seat, one pass, no council (6b651)
         _plain_turn = (not images and not req_json.get("docs")
                        and not str(req_json.get("agent") or ""))
         _brief_turn = bool(
@@ -48411,7 +48411,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             # previous entity and searches WITH it
             p2 = strip_greeting(prompt)
             p2 = _PREAMBLE_RX.sub("", p2, count=1).strip() or p2
-            # (6b650) never small talk, a feeling, a sum or the chat itself: "feeling kind of down today" after the
+            # (6b651) never small talk, a feeling, a sum or the chat itself: "feeling kind of down today" after the
             # weather took "today" for a follow-up and searched "brooklyn feeling down today"
             if (p2 and len(p2.split()) <= 10 and _FOLLOWUP_RX.search(p2)
                     and answer_kind(p2) not in ("arith", "chat", "social", "personal")):
@@ -48855,7 +48855,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         if _kind == "social":
             dated_system["content"] += SOCIAL_RULE      # small talk: short, human, one question back (beta 4)
         elif _kind == "personal":
-            dated_system["content"] += PERSONAL_RULE    # how they feel, a bite to eat: a friend's answer (6b650)
+            dated_system["content"] += PERSONAL_RULE    # how they feel, a bite to eat: a friend's answer (6b651)
         if auto_web and messages:
             # THE CLOCK RIDES THE QUESTION (6b264): the system-prompt
             # binding lost to a Beijing-hosted model's own calendar
@@ -49596,7 +49596,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     or AGENTS.get(agent_name, {}).get("workspace")
                     or str(req_json.get("lane") or "") == "code"):
                 _kn_want = know_wants(prompt)
-            # (6b650) "I'm tired" is a cue only by its "I'm": small talk and how the person feels look through their
+            # (6b651) "I'm tired" is a cue only by its "I'm": small talk and how the person feels look through their
             # chats only when they ask for them ("remind me", "what did I…"), never for an old breakfast to cite
             if _kn_want == 1 and answer_kind(prompt) in ("social", "personal", "arith"):
                 _kn_want = 0
@@ -49827,7 +49827,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     polish=(_so_revise if (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                                            and (not query or bookish)
                                            and _is_substantive(prompt)
-                                           and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b650)
+                                           and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b651)
                                 else None))
                 if _so_res == "server":
                     _single_polish()      # the post-pass (6b560)
@@ -49942,7 +49942,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             and not images and (not query or bookish)
                             and not _links
                             and _is_substantive(prompt)
-                            and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b626, 6b650)
+                            and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b626, 6b651)
 
                     def _revise(_d):
                         _sq = (ground_clip(full_messages[-1]["content"], 10000)
@@ -49977,7 +49977,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and _is_substantive(prompt)
                           # (6b626) a reviser shown only the question can't see the
                           # chat: "what did I say first" came back as itself
-                          and answer_kind(prompt) not in ("chat", "arith", "social", "personal")   # (6b650) no reviser
+                          and answer_kind(prompt) not in ("chat", "arith", "social", "personal")   # (6b651) no reviser
                           and not slow_giant(lbl))
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
@@ -76481,8 +76481,8 @@ def _retire_contribute():
 
 
 
-# ==== 6b650 search fixture: begin ====
-# NO TEST TRAFFIC TO A REAL SEARCH ENGINE (6b650, per Patrick via the lead: the benches and gauntlets run from this
+# ==== 6b651 search fixture: begin ====
+# NO TEST TRAFFIC TO A REAL SEARCH ENGINE (6b651, per Patrick via the lead: the benches and gauntlets run from this
 # Mac got its connection bot-flagged; DuckDuckGo answered 202 "anomaly" and Brave 429, and every search came back
 # empty). A dev copy with the `search-fixture=<file.json>` hook answers every search from that file and never from the
 # network: the engines (ddgs text, news, images), the page reader (a fixture's pages, else nothing), the official
@@ -76546,7 +76546,7 @@ if _FX is not None:
 
     def _official_get(url, timeout=6.0, data=None):          # noqa: F811
         raise OSError("no network under the search fixture")
-# ==== 6b650 search fixture: end ====
+# ==== 6b651 search fixture: end ====
 
 if __name__ == "__main__":
     # NO PAGE OUTSIDE THE APP WINDOW (6b320): a launch that can't draw

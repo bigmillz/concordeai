@@ -34,7 +34,7 @@ import run_bench as rb  # noqa: E402
 import scorecard as sc  # noqa: E402
 
 SET = os.path.join(HERE, "everyday.json")
-FIXTURE = os.path.join(HERE, "everyday_search.json")    # the stand-in web: no real search engine, ever (6b650)
+FIXTURE = os.path.join(HERE, "everyday_search.json")    # the stand-in web: no real search engine, ever (6b651)
 REFS = os.path.join(HERE, "everyday_refs.json")         # reference answers written by Claude Fable 5.1 (the bar)
 OUT = os.path.join(HERE, "everyday")
 CONFIGS = {
@@ -183,10 +183,10 @@ def cmd_run(args):
     lock.acquire()
     home = os.path.expanduser("~/Library/Application Support/MillenAI-everyday-%d" % args.port)
     copy = rb.DevCopy(args.repo, args.python, home, args.port, os.path.join(run_dir, "devcopy.log"))
-    # NEVER A REAL SEARCH ENGINE (6b650, per Patrick via the lead: the test traffic got this Mac's connection
+    # NEVER A REAL SEARCH ENGINE (6b651, per Patrick via the lead: the test traffic got this Mac's connection
     # bot-flagged): the copy must know the search-fixture hook, and gets it
     with open(os.path.join(args.repo, "millenai.py"), encoding="utf-8") as fh:
-        if "# ==== 6b650 search fixture: begin ====" not in fh.read():
+        if "# ==== 6b651 search fixture: begin ====" not in fh.read():
             sys.exit("refusing: %s/millenai.py has no search-fixture hook (it would search the real web)" % args.repo)
     rb.SEARCH.update(real_web=False, fixture=FIXTURE)     # run_bench's DevCopy adds the hook (and refuses without it)
     if os.path.exists(os.path.join(home, "servers.json")):

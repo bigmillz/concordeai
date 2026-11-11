@@ -22634,7 +22634,9 @@ takes 300 ms of the fake device's own time, and the pre-roll keeps what is said 
 once the words land (as for typed text, 6b542's rule); during listening and finishing it stays silver. The Python-app
 bundle (`build_macos_app.sh`) still carries no helper (6b543).
 
-## 6b650 — answers-1: everyday answers like a friend's: how you feel and a bite to eat never search, effort buys care not length, no assumption openers, honest no-results, a stand-in web for every test (7.0 beta 5, per Patrick)
+## 6b651 — answers-1: everyday answers like a friend's: how you feel and a bite to eat never search, effort buys care not length, no assumption openers, honest no-results, a stand-in web for every test (7.0 beta 5, per Patrick)
+
+*(Renumbered from 6b650 at the beta-5 merge: funnels-1 had taken 6b650. Every tag in the code, the checks and tools/answer_eval moved with it.)*
 
 Patrick: "I'm asking it, what's for breakfast, and saying, I'm tired, and it's giving me a bunch of crap." Then, in
 the C++ Preview (Ollama1 · gemma4:12b, Ultra), after the breakfast answer, "What if I'm run down?" came back as a
@@ -22687,7 +22689,7 @@ Small talk was already right (6b640).
 traffic: html.duckduckgo.com answered 202 with its "anomaly" page, search.brave.com 429, ddgs "No results found" from
 both (bing and yandex still answered; SEARCH_ENGINES unchanged, Patrick's call). Every baseline search logged
 `hits=0`. The dev-only hook `search-fixture=<file.json>` answers ddgs text/news/images from a file, reads only the
-file's pages, never asks the official feeds and treats the connection as up (`# ==== 6b650 search fixture ====`).
+file's pages, never asks the official feeds and treats the connection as up (`# ==== 6b651 search fixture ====`).
 Every gauntlet copy not behind a test proxy gets an empty one (`_NO_WEB`); run_bench.py, scorecard.py and
 everyday.py use one by default (`no_web.json`, or `--search-fixture`), the real engines only with `--real-web`, and
 refuse a checkout without the hook. The release step's scorecard history was made with the real web.
@@ -22709,7 +22711,7 @@ the judge against Fable's answers) waits for the machine: beta 4's release run g
 `everyday.py run --label base-fast --config fast --repo <beta-4 + the fixture block>` and `--label after1-fast`
 on this branch, the same with `--config g12-ultra --only …`, then `judge` and `show base-fast after1-fast`.
 
-**Checks.** A 6b650 block (the kinds on Patrick's prompts and their controls, the handler's wiring, the rules' words,
+**Checks.** A 6b651 block (the kinds on Patrick's prompts and their controls, the handler's wiring, the rules' words,
 the post-pass on the breakfast opener, Haiku 5.5's price, one live ask on the copy) and 16 mutants. Re-pinned at the
 same strength: 6b626's needs-search count (three paths now), its world-how-to and chat-rewritten mutants, its
 GROUND_NONE pin, 6b640's SOCIAL_RULE line. quality-2's namespace gains the names answer_kind now reads (it lacked

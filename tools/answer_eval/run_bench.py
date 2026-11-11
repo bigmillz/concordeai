@@ -53,13 +53,13 @@ DEFAULT_PY = os.path.join(REAL_APP_DIR, "venv", "bin", "python3")
 DEFAULT_LOCK_DIR = ("/private/tmp/claude-501/-Users-patrickmiller-My-Drive-Projects-Concorde-ConcordeAI/"
                     "b2cba696-73a2-4ea8-b3e7-2d49db11356a/scratchpad")
 FORBIDDEN_PORTS = {8889, 9901, 9902, 9903}
-# NO REAL SEARCH ENGINE BY DEFAULT (6b650, per Patrick via the lead: the bench and gauntlet traffic got this Mac's
+# NO REAL SEARCH ENGINE BY DEFAULT (6b651, per Patrick via the lead: the bench and gauntlet traffic got this Mac's
 # connection bot-flagged; DuckDuckGo answered 202 "anomaly" and Brave 429). Every copy started here searches a
 # stand-in web (the app's dev-only `search-fixture` hook): no_web.json (nothing found) unless --search-fixture names
 # a file of recorded results; the real engines only with --real-web, said at the start of the run.
 NO_WEB = os.path.join(HERE, "no_web.json")
 SEARCH = {"real_web": False, "fixture": NO_WEB}
-_FIXTURE_MARK = "# ==== 6b650 search fixture: begin ===="
+_FIXTURE_MARK = "# ==== 6b651 search fixture: begin ===="
 
 CONFIGS = {
     "local-fast": {"where": "local", "tier": "Fast", "lock": "engines.lock"},
@@ -203,7 +203,7 @@ class DevCopy:
             with open(os.path.join(self.repo, "millenai.py"), encoding="utf-8") as fh:
                 if _FIXTURE_MARK not in fh.read():
                     sys.exit("refusing: %s/millenai.py has no search-fixture hook, so its copy would search the real "
-                             "engines; pass --real-web to allow that (6b650)" % self.repo)
+                             "engines; pass --real-web to allow that (6b651)" % self.repo)
             hooks = [h for h in env.get("MILLENAI_TEST_HOOKS", "").split(",") if h and not h.startswith("search-fixture=")]
             env["MILLENAI_TEST_HOOKS"] = ",".join(hooks + ["search-fixture=" + os.path.abspath(SEARCH["fixture"])])
         os.makedirs(self.home, mode=0o700, exist_ok=True)
@@ -414,7 +414,7 @@ def chat(copy, body, max_wait, idle):
 
 def add_search_args(ap):
     ap.add_argument("--search-fixture", default=NO_WEB,
-                    help="the stand-in web the copy searches (default: no_web.json, nothing found) (6b650)")
+                    help="the stand-in web the copy searches (default: no_web.json, nothing found) (6b651)")
     ap.add_argument("--real-web", action="store_true",
                     help="search the real engines (DuckDuckGo, Brave): rate-limit risk for this connection")
 
