@@ -55332,6 +55332,18 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #about-veil #p-usage>.us-head:first-child .us-ico{display:none}
 .hz #about-veil #p-usage>.us-head:first-child .us-title{font:500 20px/28px var(--hz-font-ui);letter-spacing:-.01em;color:#fff}
 .hz #about-veil #ck-models{font:450 12px/18px var(--hz-font-ui);color:rgba(255,255,255,.6)}
+/* FEWER WORDS (6b625): the news in four words, a model's name and size, the studio and Usage without their paragraphs */
+.hz #about-veil #sx-ver-row #up-reldate{display:none}
+.hz #about-veil #sx-news{display:block;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil #sx-news:empty{display:none}
+.hz #about-veil .ros-row .rd:not(.rerr){display:none}
+.hz #about-veil .ros-row .rg{grid-column:3;justify-self:end}
+.hz #about-veil #studio-row .stdesc,.hz #about-veil #studio-row .stlegend,.hz #about-veil #studio-row .sttier i{display:none}
+.hz #about-veil #studio-row .stnotch span{text-transform:none;letter-spacing:0}
+.hz #about-veil #autoclean-toggle .ac-txt{display:flex;flex-direction:column;gap:2px;overflow:visible;white-space:normal}
+.hz #about-veil #autoclean-toggle .ac-txt>span{display:block;font-size:13px;line-height:18px}
+.hz #about-veil #autoclean-toggle #autoclean-note{margin:0;padding:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
+.hz #about-veil #us-fresh,.hz #about-veil #bm-note,.hz #about-veil #bm-desc:not(.sx-cost){display:none}
 @media (max-width:640px){.hz #about-veil #set-rail{padding:12px 52px 12px 12px;background:none}.hz #about-veil #sx-x{top:12px;right:10px}}
 /* ==== THE POLISH (6b625): end ==== */
 /* ============================================================ HORIZON end */
@@ -71816,13 +71828,15 @@ function sxSetSimplify(){
   if(pp){const h=pp.querySelector(".set-h");if(h)h.textContent="You";
     pp.querySelectorAll(":scope>.tdesc").forEach(gone);
     const nm=g("#user-name"),ps=g("#persona");
-    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should Concorde call you?"));}
-    if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
+    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","Name"));}
+    if(ps){ps.placeholder="Short, direct answers";ps.before(sxLabel("persona","Keep in mind"));}
     const sh=g("#know-share"),rx=g("#know-reindex"),line=n=>{const l=n&&n.closest("label");if(l){n.classList.add("sx-sw");l.classList.add("sx-line");}return l;};
     if(pk){pk.classList.remove("spane");pk.classList.add("sx-know");pk.querySelectorAll(":scope>.set-h,:scope>.tdesc,:scope>.kn-hint").forEach(gone);
-      const kl=line(g("#know-chats")),sp=kl&&kl.querySelector("span");if(sp)sp.textContent="Use my chats in answers";
+      const kl=line(g("#know-chats")),sp=kl&&kl.querySelector("span");if(sp)sp.textContent="Use my chats";
       const sv=g("#persona-save");(sv||ps||pp.lastElementChild).after(pk);}
-    const shl=line(sh);
+    const shl=line(sh),shs=shl&&shl.querySelector("span");if(shs){shl.title=shs.textContent.trim();shs.textContent="Share with cloud";}
+    const kp0=g("#know-path");if(kp0)kp0.placeholder="Folder, like ~/Documents";
+    const io=g("#imp-settings-open");if(io)io.textContent="Import chats";
     sxAdv(pp,[g("#len-row"),shl,g("#know-line"),g("#know-nums"),rx&&rx.parentNode,g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),
       g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
   if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(gone);
@@ -71852,6 +71866,12 @@ function sxAboutLine(v){
   const mem=t("#spec-mem"),bits=["ConcordeAI "+t("#about-ver"),t("#spec-chip"),mem&&mem!=="—"?mem:""].filter(Boolean);
   const s=bits.join(" · ");if(l.textContent!==s)l.textContent=s;
 }
+// the version's news, short: "7.0 beta 3 is available", "7.0 beta 3 is out", "Automatic checks are off"; else nothing
+function sxNews(t){let m;t=String(t||"").trim();
+  if((m=/^(.+?) is available$/.exec(t)))return m[1]+" is available";
+  if(/^Automatic checks are off/.test(t))return "Automatic checks are off";
+  if((m=/^(.+?) released on /.exec(t)))return m[1]+" is out";
+  return "";}
 function sxSetPanes(v,g){
   const body=g("#about-body"),ab=g("#p-about"),nav=g("#set-nav");if(!body||!ab||!nav||g("#sx-p-general"))return;
   const gen=sxPane("sx-p-general","General"),look=sxPane("sx-p-look","Appearance");
@@ -71863,7 +71883,8 @@ function sxSetPanes(v,g){
   const rd=g("#up-reldate");
   const vr=sxRow(ver?"Version "+ver:"Version",rd,ctl);vr.id="sx-ver-row";
   // the date line shows only when it has news (an update is ready, another release is out, or checks are off)
-  if(rd&&window.MutationObserver){const f=()=>rd.classList.toggle("sx-news",/available|checks are off| released on/.test(rd.textContent));f();new MutationObserver(f).observe(rd,{childList:true,characterData:true,subtree:true});}
+  const nw=document.createElement("span");nw.id="sx-news";if(rd)rd.after(nw);
+  if(rd&&window.MutationObserver){const f=()=>{const t=nw.textContent=sxNews(rd.textContent);rd.classList.toggle("sx-news",!!t);};f();new MutationObserver(f).observe(rd,{childList:true,characterData:true,subtree:true});}
   [vr,g("#up-notes"),g("#beta-row"),g("#autochk-toggle"),g("#micwarm-toggle")].forEach(n=>{if(n)gen.appendChild(n);});
   [g("#micwarm-note"),g("#fx-level-note")].forEach(n=>{if(n)n.classList.add("sx-gone");});
   [g("#look-row"),g("#fx-level-row")].forEach(n=>{if(n)look.appendChild(n);});
@@ -71932,6 +71953,19 @@ function sxNight(v,g){
   const kc=g("#know-chats"),kp=g("#know-path");
   sxGroup([kc&&kc.closest("label"),g("#know-folders"),kp&&kp.closest(".ctlrow")],"","sx-g-know");
   v.querySelectorAll(".sx-advc").forEach(c=>c.classList.add("sx-group"));
+  sxTerse(v,g);
+}
+// FEWER WORDS (6b625, per Patrick: "cleaner. looks too wordy."): Local's two headings one word each, a model's purpose
+// on hover (its row's title) instead of beside it; the benchmark's paragraph only when it warns of cost
+var SX_GH={"On this computer":"Installed","Not downloaded":"Available"};
+function sxRosterTerse(r){
+  r.querySelectorAll(":scope>.ros-gh").forEach(h=>{const t=SX_GH[h.textContent.trim()];if(t)h.textContent=t;});
+  r.querySelectorAll(":scope>.ros-row").forEach(w=>{const d=w.querySelector(".rd:not(.rerr)"),t=d&&d.textContent.trim();if(t)w.title=t;});
+}
+function sxTerse(v,g){
+  const r=g("#roster");if(r&&window.MutationObserver){sxRosterTerse(r);new MutationObserver(()=>sxRosterTerse(r)).observe(r,{childList:true});}
+  const nl=g("#nolimits-row span");if(nl){nl.parentNode.title=nl.textContent.trim();nl.textContent="No limits: may crash this computer";}
+  const bd=g("#bm-desc");if(bd&&window.MutationObserver){const f=()=>bd.classList.toggle("sx-cost",/cost money/i.test(bd.textContent));f();new MutationObserver(f).observe(bd,{childList:true,characterData:true,subtree:true});}
 }
 // where Settings opens: General (the old About pane's first purpose, updates)
 function sxSetFirst(){return sxSimple&&$("#sx-p-general")?"sx-p-general":"p-about";}
@@ -71977,7 +72011,7 @@ function sxSrvCard(s){
   if(open){
     const r=s.relay||{},links=[...$$("#p-servers .srv-link")];
     h+='<div class="sx-srv-adv">'
-      +(s.paired?'<p class="sx-grey">Answers in Fast, Thinking, Pro and Code. Code agents may send a folder you choose to this server.</p>':"")
+      +(s.paired?'<p class="sx-grey">Used by Fast, Thinking, Pro and Code. Code may send it chosen folders.</p>':"")
       +'<div class="sx-btns"><button class="about-btn slim" data-a="test">Test</button>'
       +(s.paired&&!srvPairOpen[s.id]?'<button class="about-btn slim" data-a="repair">Pair again</button>':"")
       +(srvTokOpen[s.id]?"":'<button class="about-btn slim" data-a="tok">Change token</button>')+'</div>'
