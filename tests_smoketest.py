@@ -48269,11 +48269,16 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
   // sub-card, the roster one line a model, the pane padding 24
   await ev(`(()=>{settingsPane("p-models");return 1;})()`);   // the roster loads on the visit: wait for its rows
   await until(`[...document.querySelectorAll("#about-veil .ros-row")].some(e=>e.offsetParent!==null)`, 8000);
-  out.tight = await ev(`(()=>{const v=document.querySelector("#about-veil"),o={long:[],rosH:0,cards:[],rows:[]};
+  out.tight = await ev(`(()=>{const v=document.querySelector("#about-veil"),o={long:[],rosH:0,cards:[],rows:[],wordy:[]};
     settingsPane("sx-p-general");const n=v.querySelector("#up-notes"),w=v.querySelector("#sx-whatsnew");
     if(n.hidden||!n.textContent.trim()){n.innerHTML="<p><b>What is new</b></p><p>Stand-in notes.</p>";n.hidden=false;}
     o.ver=Math.round(v.querySelector("#sx-ver-row b").getBoundingClientRect().height);o.wn=[getComputedStyle(n).display];w.click();o.wn.push(getComputedStyle(n).display,w.getAttribute("aria-expanded"));w.click();o.wn.push(getComputedStyle(n).display);
     for(const id of ["sx-p-general","sx-p-look","p-models","p-cloud","p-servers","p-usage","p-persona","p-about"]){settingsPane(id);const p=v.querySelector("#"+id);
+      p.querySelectorAll(".toggle-row>span:not(.ac-txt),.ac-txt>span:first-child,#beta-row>span,#look-row>span,#fx-level-row>span,label.sx-line>span,.sx-lab,.sx-srow>span:not(.sx-sleep),.sx-glab,.ros-gh").forEach(e=>{if(e.offsetParent!==null&&e.textContent.trim().split(/ +/).length>3)o.wordy.push(id+": "+e.textContent.trim().slice(0,40));});
+      p.querySelectorAll(".sx-sub2").forEach(e=>{if(e.offsetParent!==null&&e.textContent.trim().split(/ +/).length>5)o.wordy.push(id+" sub: "+e.textContent.trim().slice(0,40));});
+      if(id==="p-models"){const rs=[...p.querySelectorAll(".ros-row")].filter(e=>e.offsetParent!==null);o.rd=rs.filter(e=>{const d=e.querySelector(".rd:not(.rerr)");return d&&d.offsetParent!==null;}).length;o.tips=rs.filter(e=>e.title).length;
+        o.gh=[...p.querySelectorAll(".ros-gh")].filter(e=>e.offsetParent!==null).map(e=>e.textContent.trim());}
+      if(id==="p-usage")o.prose=["#us-fresh","#bm-note"].map(s=>{const e=p.querySelector(s);return e?getComputedStyle(e).display:"none";}).concat([(()=>{const e=p.querySelector("#bm-desc");return e&&!e.classList.contains("sx-cost")?getComputedStyle(e).display:"none";})()]);
       p.querySelectorAll(".tdesc,.kn-hint,.sx-cline,#fx-level-note,#micwarm-note,#sugg-note,#know-privacy,#turbo-note").forEach(e=>{if(e.offsetParent!==null&&!e.closest(".sx-advc")){const t=e.textContent.replace(/Details$/,"").trim();if(t.split(/ +/).length>6)o.long.push(id+": "+t.slice(0,48));}});
       if(id==="p-models")o.rosH=Math.max(0,...[...p.querySelectorAll(".ros-row")].filter(e=>e.offsetParent!==null).map(e=>Math.round(e.getBoundingClientRect().height)));
       p.querySelectorAll(".us-card:not(.us-chart),.plan-card,.set-card,#acct-card").forEach(e=>{if(e.offsetParent!==null&&getComputedStyle(e).borderTopWidth!=="0px")o.cards.push(id+" boxed "+(e.id||e.className));});
@@ -48362,7 +48367,8 @@ def _px_live(width, mode="full", mutation=None):
     except Exception as e_:
         return {"err": repr(e_)}
 def _px_tight_ok(t):
-    return (t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
+    return (t.get("wordy") == [] and t.get("rd") == 0 and (t.get("tips") or 0) > 0 and (t.get("gh") or [""])[0] == "Installed"
+            and t.get("prose") == ["none", "none", "none"] and t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
             and t.get("rows") == [40] and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
             and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px"
             and _px_night_ok(t.get("night") or {}))
@@ -48415,7 +48421,7 @@ def _px_full_ok(r):
             and f1.get("parent") != "sx-fnhome" and f1.get("shown") is False and f1.get("composer") != "none" and f1.get("ph") == "Or type your own answer"
             and "33.3333%" in (f2.get("bar") or "") and f2.get("who") == "none")
 _px_w = _px_live(1440); _px_p = _px_live(390, "settings")
-check("6b625 live (headless Chromium, the copy's page, stand-in streams): Settings in the night edition (a 720 sheet sized to its content, the sky behind blurred, a rail of line icons and 28 px rows, a quiet x that closes it, no footer, General's Updates and Microphone groups under one grey line, the page behind stepped back while open and back after) and tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, 672 x 640 on #141416 at radius 14 over 55 % black, a 184 rail with \"SETTINGS\" its only caps, rows 30 high, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
+check("6b625 live (headless Chromium, the copy's page, stand-in streams): fewer words (row labels and group labels at most three words, a pane's line at most five, Local's models by name and size with their purpose on hover under \"Installed\" and \"Available\", Usage with no paragraph, You's \"Name\" and \"Keep in mind\"); Settings in the night edition (a 720 sheet sized to its content, the sky behind blurred, a rail of line icons and 28 px rows, a quiet x that closes it, no footer, General's Updates and Microphone groups under one grey line, the page behind stepped back while open and back after) and tight (five sections: General, Appearance, Models with Local, Cloud, Servers and Usage under it, You, About; General the version with What's new behind its link and Check now, the channel, automatic checks and the microphone; Appearance Look and Effects; You the two optional fields and your chats and folders; About one quiet line and the site; every row one line and 40 high, no helper sentence over six words, no boxed sub-card, the roster one line a model, 24 px padding) and in one language; one switch, one segmented size, neutral notes, the title left; You two optional fields, what to call you and anything to keep in mind, no place, job or units; the account, update channel, look and the rest under one Advanced per pane); the header keeps the status dot, a clean line gear (Settings, ⌘,) and no light/dark button, and ⌘, opens Settings; Settings by the gear fades in (180 ms) and rises, no caps, no mono; focus on the rail, the arrow moves panes, Tab stays inside, Esc fades it out and gives focus back; on a phone the dialog is the screen and the rail a row; no /api/suggest on load; the palette's Code chat and its arrow; the dictation level with no ember send; the host chip, its sheet with the same eight fields, Esc; a danger command's own ember card under its line, Approve not light blue; Funnels' form as the home in place of the composer, back out once it starts, the stage hairline at 1 of 3 and \"Or type your own answer\"",
       _px_full_ok(_px_w) and _px_set_ok(_px_p, phone=True), json.dumps({"w": _px_w, "p": _px_p})[:2500])
 _px_mw = [
     ("the hidden suggestions call back", [['  if(document.documentElement.classList.contains("hz"))return;   // Horizon shows no chips (6b555): no hidden model call (6b625)\n', ""]]),
@@ -48427,12 +48433,14 @@ _px_mw = [
     ("Settings not simplified (every switch on About's first screen, Account its own section)", [["sxHostWire();sxLanePaint();sxSetSimplify();", "sxHostWire();sxLanePaint();"]]),
     ("About left as four things at once (no General, Appearance or Voice)", [["  sxSetPanes(v,g);\n", ""]]),
     ("⌘, opens nothing in the page", [['  addEventListener("keydown",sxComma,true);\n', ""]]),
-    ("the job-shaped prompt back in You", [["ps.placeholder=\"Short answers, and say what you're unsure of.\";", ""]]),
+    ("the job-shaped prompt back in You", [["ps.placeholder=\"Short, direct answers\";", ""]]),
+    ("the models' purposes back beside them", [[".hz #about-veil .ros-row .rd:not(.rerr){display:none}", ""]]),
+    ("You's long labels back", [['nm.before(sxLabel("user-name","Name"))', 'nm.before(sxLabel("user-name","What should Concorde call you?"))']]),
     ("rows 48 high again", [[".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}", ".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:48px;padding:8px 0}"]]),
     ("What's new back on General's face", [[".hz #about-veil #sx-p-general:not(.sx-notes)>#up-notes{display:none}", ""]]),
     ("Your stuff its own section again", [["gone(g('.snav[data-pane=\"p-know\"]'));", ""]]),
     ("Usage outside Models", [['if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}', ""]]),
-    ("the roster two lines a model", [[".hz #about-veil .ros-row .rd{grid-column:3;grid-row:1;", ".hz #about-veil .ros-row .rd{grid-column:2/4;grid-row:2;"]]),
+    ("the roster two lines a model", [[".hz #about-veil .ros-row .rg{grid-column:3;justify-self:end}", ".hz #about-veil .ros-row .rg{grid-column:2;grid-row:2}"]]),
     ("a long helper sentence back under Cloud", [['p.textContent="While on, prompts leave your machines. ";', 'p.textContent="Optional. While on, cloud models answer and your prompts leave your machines. ";']]),
     ("the Close footer back", [[".hz #about-veil #about-foot{display:none}", ".hz #about-veil #about-foot{display:flex}"]]),
     ("no quiet x on the sheet", [["if(card)card.appendChild(x);", ""]]),
@@ -48524,6 +48532,60 @@ _px_g7m = [("the debug spec served outside a dev copy", "    if not dev:\n      
 _px_g7r = [(d_, _px_gpu_ok(_MILLENAI_SRC.replace(a_, b_, 1)) if a_ in _MILLENAI_SRC else "anchor missing") for d_, a_, b_ in _px_g7m]
 check("6b625 the GPU badge (\"GPU sky on · 119 fps · Apple GPU\") is a dev copy's only: outside one hz_debug_spec answers None for /?hz=gpu=1 and the test hooks are empty, so the page's HZ_DEBUG is null, and every hzGpuBadge() call is behind hzS.debug.gpu; the live page (no debug spec) has no badge; four mutants caught",
       _px_g7 is True and all(r_ is not True for _, r_ in _px_g7r), "%r %r" % (_px_g7, _px_g7r))
+# (8) fewer words (Patrick: "cleaner. looks too wordy."): the version's news, short; the page's own line (Classic's too)
+# is untouched. sxNews in node, on the four lines paintUpdatesPane writes
+_PX_NEWS_IN = ["7.0 beta 3 is available", "Automatic checks are off. Use Check now.", "7.0 beta 3 released on November 11, 2026",
+               "Released on November 10, 2026", ""]
+_PX_NEWS_WANT = ["7.0 beta 3 is available", "Automatic checks are off", "7.0 beta 3 is out", "", ""]
+def _px_news(pg):
+    try:
+        js_ = pg[pg.index("// ==== polish-js (6b625): begin ===="):pg.index("// ==== polish-js (6b625): end ====")]
+        return _node_json(_jsfn(js_, "function sxNews(t){") + "\nprocess.stdout.write(JSON.stringify(%s.map(sxNews)));" % json.dumps(_PX_NEWS_IN), "news625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_px_n8 = _px_news(page)
+_px_n8m = [("another release's whole sentence", 'return m[1]+" is out";', "return t;"),
+           ("checks off with its instruction", 'return "Automatic checks are off";', "return t;"),
+           ("this version's own date shown", '  return "";}\nfunction sxSetPanes', '  return t;}\nfunction sxSetPanes')]
+_px_n8r = [(d_, _px_news(page.replace(a_, b_, 1)) == _PX_NEWS_WANT if a_ in page else "anchor missing") for d_, a_, b_ in _px_n8m]
+check("6b625 fewer words: the version's news in four words or fewer (\"7.0 beta 3 is available\", \"7.0 beta 3 is out\", \"Automatic checks are off\"), this version's own date not at all; three mutants caught",
+      _px_n8 == _PX_NEWS_WANT and all(r_ is False for _, r_ in _px_n8r), "%r %r" % (_px_n8, _px_n8r))
+# (9) Manage's image and video tiers in the current palette (Patrick, via the coordinator: "green and amber from the old
+# design"): silver where a tier runs well, the ice accent on the chosen one, amber only for the real caution (fits when
+# the computer is clear), graphite when too big; no green or red in Horizon; each tier's tooltip says what its colour
+# means (the legend went with the fewer words). The css from the source; sxTierTips in node on stand-in notches.
+def _px_tiers_css_ok(css):
+    r_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules = [l for l in r_.split("\n") if "#studio-row" in l]
+    return (".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}" in r_
+            and ".hz #about-veil #studio-row .stnotch.amber i{background:#c9a15e}" in r_
+            and ".hz #about-veil #studio-row .stnotch.red i{background:rgba(255,255,255,.14)}" in r_
+            and ".hz #about-veil #studio-row .stnotch.sel.green i{background:#a9c6fb}" in r_
+            and ".hz #about-veil #studio-row .sttier u{color:#c9a15e}" in r_
+            and not any(re.search(r"#4fae6a|#c9584c|#d9a95a|#e8415a|#f0566c|pink|rose", l, re.I) for l in rules))
+_PX_TIPS = r"""
+const mk=(c,t)=>{const a={title:t};return {classList:{contains:x=>x===c},getAttribute:k=>a[k],setAttribute:(k,v)=>{a[k]=v;},a};};
+const ns=[mk("green","Quick · 4.6 GB"),mk("amber","Accurate · 9 GB"),mk("red","Finest · 40 GB")];
+const r={querySelectorAll:()=>ns};sxTierTips(r);sxTierTips(r);
+process.stdout.write(JSON.stringify(ns.map(n=>n.a.title)));
+"""
+_PX_TIPS_WANT = ["Quick · 4.6 GB · Runs well", "Accurate · 9 GB · Fits when the Mac is clear", "Finest · 40 GB · Too big"]
+def _px_tips(pg):
+    try:
+        js_ = pg[pg.index("// ==== polish-js (6b625): begin ===="):pg.index("// ==== polish-js (6b625): end ====")]
+        return _node_json(_px_line(js_, "var SX_FIT=") + _jsfn(js_, "function sxTierTips(r){") + _PX_TIPS, "tips625.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+_px_t9 = _px_tips(page)
+_px_t9c = [("the green back", ".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}", ".hz #about-veil #studio-row .stnotch.green i{background:#4fae6a}"),
+           ("a too-big tier red", ".hz #about-veil #studio-row .stnotch.red i{background:rgba(255,255,255,.14)}", ".hz #about-veil #studio-row .stnotch.red i{background:#c9584c}"),
+           ("amber on every tier", ".hz #about-veil #studio-row .stnotch.green i{background:#c9ced8}", ".hz #about-veil #studio-row .stnotch.green i{background:#c9a15e}")]
+_px_t9cr = [(d_, _px_tiers_css_ok(_px_css.replace(a_, b_, 1)) if a_ in _px_css else "anchor missing") for d_, a_, b_ in _px_t9c]
+_px_t9m = [("no meaning in the tooltip", 'if(w&&t.indexOf(w)<0)n.setAttribute("title",t+" \\u00b7 "+w);', "")]
+_px_t9mr = [(d_, _px_tips(page.replace(a_, b_, 1)) == _PX_TIPS_WANT if a_ in page else "anchor missing") for d_, a_, b_ in _px_t9m]
+check("6b625 Manage's image and video tiers in the current palette: silver where a tier runs well, ice on the chosen one, amber only for \"fits when the Mac is clear\", graphite when too big, no green or red; each tier's tooltip says what its colour means, once; four mutants caught",
+      _px_tiers_css_ok(_px_css) and _px_t9 == _PX_TIPS_WANT and all(r_ is False for _, r_ in _px_t9cr + _px_t9mr),
+      "%r %r %r" % (_px_t9, _px_t9cr, _px_t9mr))
 # ==== 6b625 the polish: end ====
 # ==== 6b621 ultra at full strength: begin ====
 # ULTRA AT FULL STRENGTH, THE AURORA FLUID AND CENTRED, THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have

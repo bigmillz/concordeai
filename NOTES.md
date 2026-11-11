@@ -22050,6 +22050,61 @@ left showing).
 "Microphone" (all three approved by Pat); "SETTINGS" eyebrow → removed; "Close" button → a × (its label "Close", tooltip
 "Close (Esc)").
 
+**Fewer words (per Patrick on the night edition, 2026-11-11: "cleaner. looks too wordy."; for beta 5).** Rules: a
+pane's line five words or none, group labels one word, row labels one to three, helper text only where a choice is
+unclear and six words at most. Horizon only, in the page (Classic and the page's own strings untouched, so no other
+block's pin moves):
+- General: the version's news line in four words (`sxNews`, from the page's own line): "7.0 beta 3 is available",
+  "7.0 beta 3 is out", "Automatic checks are off"; this version's own date not at all.
+- Local: the two headings "Installed" and "Available"; each model its name and size, its purpose on hover (the row's
+  title), a failure's reason still shown; Manage's studio cards without their paragraph, the colour legend and the
+  italic note (each tier keeps its tooltip and the red "more memory than this computer has"); the No limits box says
+  "No limits: may crash this computer" (the old sentence on hover).
+- Usage: no "Updated …" line, no benchmark method notes, no benchmark paragraph unless it warns of cost (the cloud
+  benchmark's "may cost money" stays).
+- You: labels "Name" and "Keep in mind", placeholder "Short, direct answers", "Use my chats", the folder box "Folder,
+  like ~/Documents", "Share with cloud" (the full sentence on hover), "Import chats".
+- Servers: Advanced's two sentences in two short ones. The pane's line, Pat's approved "Drafts leave your machines
+  only when a cloud model combines them." (10 words), is kept as approved; a shorter one is offered below.
+
+**Tests (fewer words):** the live check walks every pane: no visible row or group label over three words, no pane line
+over five, Local's purposes hidden with each row's tooltip set and the headings "Installed"/"Available", Usage's
+three paragraphs hidden, You's labels "Name" and "Keep in mind"; two more live mutants (the purposes back beside the
+models, You's long labels back). `sxNews` in node on paintUpdatesPane's four lines, three mutants.
+
+**Copy, fewer words (old → new, for Patrick's approval):**
+- General, under the version: "7.0 beta 3 released on November 11, 2026" → "7.0 beta 3 is out"; "Automatic checks are
+  off. Use Check now." → "Automatic checks are off"; "Released on <date>" (this version) → not shown.
+- Local: "On this computer" → "Installed"; "Not downloaded" → "Available"; each model's purpose ("instant drafts, the
+  simplest questions", "quick everyday answers", …) → on hover; Manage: "Pictures from a description, on this
+  computer" / "Short video from a description, on this computer" → removed; the italic tier notes ("four steps, about
+  half a minute a picture", …) → removed; "Green: runs well / Amber: fits when the Mac is clear / Red: too big" →
+  removed; "No limits. Everything includes models bigger than memory; they can crash this computer." → "No limits: may
+  crash this computer"; tier names "QUICK / ACCURATE / FINEST" → "Quick / Accurate / Finest".
+- Usage: "Updated 11 Nov at 10:27" → removed; "Reads 1,000 tokens and writes 256 on each installed model. About a minute
+  each. Chat pauses while it runs." → removed (the cloud one, which says it may cost money, kept); "10 models installed
+  here: about 10 minutes." and the method notes → removed.
+- You: "What should Concorde call you?" → "Name"; "Anything to keep in mind?" → "Keep in mind"; "Short answers, and say
+  what you're unsure of." → "Short, direct answers"; "Use my chats in answers" → "Use my chats"; "A folder to include,
+  like ~/Documents" → "Folder, like ~/Documents"; "Let cloud models read my stuff too" → "Share with cloud"; "Bring your
+  chats from another app" → "Import chats".
+- Servers, Advanced: "Answers in Fast, Thinking, Pro and Code. Code agents may send a folder you choose to this
+  server." → "Used by Fast, Thinking, Pro and Code. Code may send it chosen folders."
+- Kept as approved: "Updates and the microphone.", "Updates", "Microphone", "While on, prompts leave your machines." +
+  "Details", "Models show when it's awake.", and Servers' "Drafts leave your machines only when a cloud model combines
+  them." (offered shorter: "Drafts leave only for cloud merging." — Pat to choose).
+
+**Manage's tiers in the current palette (per Patrick via the coordinator, for beta 5: "green and amber from the old
+design").** Horizon only; Classic's studio keeps its colours. A tier that runs well is a silver bar (#c9ced8), the
+chosen one ice (#a9c6fb); amber (#c9a15e, muted) only where it is a real caution, "fits when the Mac is clear"; a tier
+too big for this computer is graphite (14 % white), never red; the "More memory than this computer has" line amber, not
+rose. Bars 3 px with 2 px corners. With the legend gone (fewer words), each tier's tooltip says what its colour means
+("Quick · 4.6 GB · Runs well", "… · Fits when the Mac is clear", "… · Too big"), added once per paint by
+`sxTierTips` on the studio row. Checked in WKWebView at 1440 and 760 (computed: chosen rgb(169,198,251), others
+rgb(201,206,216), cautions rgb(201,161,94)). **Tests:** the css pinned with no green, red, rose or pink in any
+#studio-row rule, sxTierTips in node on stand-in notches (twice, so once only); four mutants (the green back, a too-big
+tier red, amber on every tier, no meaning in the tooltip). No new copy (the three meanings are the old legend's).
+
 **Left / worth knowing.**
 - Dark/Light/Auto: the app has one (dark) theme; the control waits for a real light theme.
 - A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
