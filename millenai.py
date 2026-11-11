@@ -54964,6 +54964,113 @@ html.tl:not(.tl-fs).hz #main:has(#hero) #hz-brand,html.tl:not(.tl-fs).hz #main:h
 html.tl:not(.tl-fs).hz #main:has(#hero) #hz-right{justify-content:flex-end}
 html.tl:not(.tl-fs).hz #main:has(#hero) #hz-top>.hz-sp{flex:0 0 0}
 html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-right{padding-left:72px}
+/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): begin ====
+   Per Patrick, beta 4 ("I want this UI to be perfect"), from the audit of the chat page: at 900 and 760 with the
+   sidebar open the lanes took their own row and sat on the answer; the composer was not under the reading column
+   between 1000 and 1100 px with the sidebar shut (140 px off) or at 900 with it open (22 px); the sidebar's rows had no
+   menu and no keyboard. The demo's header (DESIGN.md "The header (beta 3)") in the app: one row in three columns,
+   minmax(0,1fr) auto minmax(0,1fr), so the lanes sit at the header's exact centre whatever the title; hzHeaderFit lays
+   it out from the header's real width (the sidebar open or shut, its real width): the title goes first, then the
+   wordmark becomes the mark, then the lanes go compact; under 940 px of header room (HZ_LANES_MENU) the lanes fold
+   into a compact menu (hz-hd5, no longer their own row). The working views carry an opaque #0f0f11 band under the
+   header with a 16 px fade below it (the home keeps its sky). These rules come last, so they win by order over the
+   older header rules the gauntlet still pins. */
+.hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}
+.hz #main:not(:has(#hero)) #hz-top{height:64px;padding:0 24px}
+.hz #hz-top>.hz-sp{display:none}
+.hz #hz-brand{grid-column:1;grid-row:1;justify-self:start;max-width:100%;gap:12px}
+.hz #hz-lanes,.hz #hz-lanemenu{grid-column:2;grid-row:1}
+.hz #hz-right{grid-column:3;grid-row:1;justify-self:end;min-width:0;gap:12px}
+html.tl:not(.tl-fs).hz #main:has(#hero) #hz-right,html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-right{padding-left:0}
+/* the Mac shell's light zone: where the header reserves it on the left it reserves the same on the right, so the centre
+   column stays the window's centre */
+html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
+html.tl:not(.tl-fs).hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-right:96px}
+/* the band: opaque under the header in the working views, a short fade below it; nothing reads through the header */
+.hz #main:not(:has(#hero)) #hz-top::before{content:"";position:absolute;left:0;right:0;top:0;bottom:-16px;z-index:-1;pointer-events:none;
+  background:linear-gradient(180deg,#0f0f11 0,#0f0f11 calc(100% - 16px),rgba(15,15,17,0))}
+.hz #main:not(:has(#hero)) #chat-scroll.scrolled{-webkit-mask-image:none;mask-image:none}
+/* the conversation starts 32 px below the header (64 + 32), the lanes never under it */
+.hz #main:not(:has(#hero)) #chat-inner,.hz #main:has(#hz-top.hz-hd5):not(:has(#hero)) #chat-inner{padding-top:96px}
+html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz #main:has(#hz-top.hz-hd5):not(:has(#hero)) #chat-inner{padding-top:104px}
+.hz.hz-flow .msg.ai>aside.behind{top:104px}
+/* the menu, the wordmark and the title (13 px at 450 after a one-device-pixel hairline) */
+.hz #hz-sb{width:36px;height:36px;border-radius:8px}
+.hz #hz-title{font:450 13px/1.2 var(--hz-font-ui);letter-spacing:-.005em;color:var(--hz-ink-2);padding-left:16px;margin-left:0}
+.hz #hz-title::before{width:var(--chat-hw,1px);height:16px;margin-top:-8px;background:rgba(255,255,255,.22)}
+/* the lanes: a flat segmented control (track #1a1a1d, selected #26262a, no glow, no blur), 13 px at 450 */
+.hz #hz-lanes{background:#1a1a1d;border:var(--chat-hw,1px) solid rgba(255,255,255,.08);-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:none}
+.hz #hz-lanes .hz-seg-hi,.hz #hz-lanes[data-m=funnel] .hz-seg-hi{background:#26262a;box-shadow:none;transition:transform .32s cubic-bezier(.2,.7,.2,1)}
+.hz #hz-lanes button{font-size:13px;font-weight:450}
+.hz #hz-top.hz-hd3 #hz-lanes button{min-width:0;padding:0 10px;font-size:13px}
+/* the lanes folded (hz-hd5): one compact key at the centre that names the lane; its menu holds all three */
+.hz #hz-lanemenu{display:none;align-items:center;gap:6px;height:32px;box-sizing:border-box;padding:0 10px 0 12px;margin:0;border-radius:6px;
+  border:var(--chat-hw,1px) solid rgba(255,255,255,.08);background:#1a1a1d;color:var(--hz-ink);font:450 13px/1 var(--hz-font-ui);letter-spacing:.005em;
+  cursor:pointer;white-space:nowrap;transition:background .15s cubic-bezier(.2,.7,.2,1)}
+.hz #hz-lanemenu:hover{background:#202024}
+.hz #hz-lanemenu:active{transform:translateY(1px) scale(.985);transition-duration:80ms}
+.hz #hz-lanemenu svg{width:12px;height:12px;flex:none;color:var(--hz-ink-3);transition:transform .2s cubic-bezier(.2,.7,.2,1)}
+.hz #hz-top.hz-hd5 #hz-lanemenu{display:inline-flex}
+.hz #hz-top.hz-lmo #hz-lanemenu svg{transform:rotate(180deg)}
+.hz #hz-top.hz-hd5 #hz-lanes{display:none;position:absolute;left:50%;top:calc(100% - 8px);transform:translateX(-50%);z-index:6;height:auto;width:176px;
+  grid-template-columns:none;flex-direction:column;gap:2px;padding:4px;border-radius:10px;background:#151517;border:var(--chat-hw,1px) solid rgba(255,255,255,.1)}
+.hz #hz-top.hz-hd5.hz-lmo #hz-lanes{display:flex}
+.hz #hz-top.hz-hd5 #hz-lanes{grid-column:auto;grid-row:auto}   /* placed against the header's box, not the centre column's */
+.hz #hz-top.hz-hd5 #hz-lanes .hz-seg-hi{display:none}
+.hz #hz-top.hz-hd5 #hz-lanes button{min-width:0;width:100%;height:32px;padding:0 10px;justify-content:flex-start;border-radius:6px;font-size:13px;color:var(--hz-ink-2)}
+.hz #hz-top.hz-hd5 #hz-lanes button:hover{background:#1f1f22;color:var(--hz-ink)}
+.hz #hz-top.hz-hd5 #hz-lanes button[aria-selected=true]{background:#26262a;color:var(--hz-ink)}
+.hz #hz-top.hz-hd5 #hz-lanes .hz-fstar{display:inline-block}
+/* a phone (hz-hd8, the last step): the key leaves the exact centre and follows the left group; the right group keeps the rest */
+.hz #hz-top.hz-hd8{grid-template-columns:auto auto minmax(0,1fr);column-gap:12px;padding-left:16px;padding-right:16px}
+/* the right group: the status dot, the update pill (24 px, a hairline) and the gear (32 px, flat, a hairline, radius 8) */
+.hz #hz-settings{background:rgba(255,255,255,.04);box-shadow:none;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);box-sizing:border-box}
+.hz #hz-settings:hover{background:rgba(255,255,255,.08);box-shadow:none;border-color:rgba(255,255,255,.32)}
+.hz #hz-settings svg{width:16px;height:16px}
+.hz #hz-update{height:24px;box-sizing:border-box;padding:0 10px;border-radius:6px;border:var(--chat-hw,1px) solid rgba(255,255,255,.2);background:transparent;font:450 12px/1 var(--hz-font-ui)}
+/* ---- THE COLUMN (6b624): the composer under the reading column at every width. hzColFit measures the column in the
+   same pass that sets hz-flow and writes --hz-read-w, --hz-gutter and --hz-marg-w, so this one rule places the composer
+   (the narrower windows' own margin rules are overruled by order); under 860 px the column is centred, 640 at most */
+.hz #main:not(:has(#hero)) #composer{max-width:var(--hz-read-w);margin:0 auto 0 calc(50% - (var(--hz-read-w) + var(--hz-gutter) + var(--hz-marg-w))/2)}
+@media (max-width:860px){.hz #main:not(:has(#hero)) #chat-inner{max-width:calc(640px + 2 * var(--hz-col-side,24px))}}
+/* ---- THE SIDEBAR'S ROWS (6b624): flat (13 px, 30 high, hover #1a1a1d, the chosen #1f1f22, radius 8); a ⋯ key per
+   row and the same menu on a right-click (Pin, Rename, Delete), F2 renames, the arrows, Home and End move along the
+   list; the rename field fills the row; the unread dot sits at the row's end, clear of the title */
+.hz #sidebar .chat-item{min-height:30px;border-radius:8px;font-size:13px;position:relative}
+.hz #sidebar .chat-item:not(.has-snip){height:30px}
+.hz #sidebar .chat-item:hover{background:#1a1a1d}
+.hz #sidebar .chat-item.active{background:#1f1f22}
+.hz #sidebar .chat-item .cx{display:none!important}
+.hz #sidebar .chat-item .cpin{display:none;pointer-events:none}
+.hz #sidebar .chat-item.pinned .cpin{display:flex;width:16px;background:none}
+.hz .chat-item .cmore{display:none;flex:none;width:24px;height:24px;margin:0 -4px 0 0;padding:0;border:0;border-radius:6px;background:transparent;color:var(--hz-ink-3);
+  align-items:center;justify-content:center;cursor:pointer}
+.hz .chat-item .cmore svg{width:16px;height:16px}
+.hz .chat-item .cmore:hover,.hz .chat-item .cmore[aria-expanded=true]{background:rgba(255,255,255,.08);color:var(--hz-ink)}
+.hz .chat-item:hover .cmore,.hz .chat-item:focus-within .cmore,.hz .chat-item.sb-menu-on .cmore{display:flex}
+.hz .chat-item:hover .cpin,.hz .chat-item:focus-within .cpin,.hz .chat-item.sb-menu-on .cpin{display:none!important}
+.hz .chat-item .cdot{left:auto;right:10px;width:6px;height:6px;margin-top:-3px;background:var(--hz-ink);box-shadow:none}
+.hz .chat-item.unread{padding-right:24px}
+.hz .chat-item:hover .cdot,.hz .chat-item:focus-within .cdot,.hz .chat-item.sb-menu-on .cdot{display:none}
+.hz .chat-item:has(.crename) .cpin,.hz .chat-item:has(.crename) .cmore,.hz .chat-item:has(.crename) .cdot,.hz .chat-item:has(.crename) .csrc{display:none!important}
+.hz .chat-item .crename{flex:1 1 auto;width:100%;min-width:0;height:24px;box-sizing:border-box;margin:0 -4px;padding:0 6px;border-radius:6px;border:0;
+  background:#0f0f11;box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);color:var(--hz-ink);font:450 13px/24px var(--hz-font-ui);outline:0}
+#sb-menu{position:fixed;z-index:70;min-width:168px;padding:4px;border-radius:10px;background:#151517;border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;gap:2px;box-sizing:border-box}
+#sb-menu[hidden]{display:none}
+#sb-menu button{display:flex;align-items:center;gap:10px;height:30px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#d6d7dc;
+  font:450 13px/1 var(--hz-font-ui,system-ui);text-align:left;cursor:pointer}
+#sb-menu button svg{width:14px;height:14px;flex:none;color:rgba(255,255,255,.55)}
+#sb-menu button:hover,#sb-menu button:focus{background:#1f1f22;color:#f4f4f6;outline:0}
+#sb-menu button.danger:hover,#sb-menu button.danger:focus{color:#ff8a7a}
+@media (min-resolution:2dppx){#sb-menu{border-width:.5px}}
+/* ---- ONE FOCUS RING (6b624): the 1 px ember hairline, from the keyboard only, on every key in the header, the sidebar
+   and the menus; a click never leaves one */
+.hz:not(.hz-kb) #hz-top button:focus-visible,.hz:not(.hz-kb) #sidebar button:focus-visible,.hz:not(.hz-kb) #sidebar .chat-item:focus-visible,.hz:not(.hz-kb) #sb-menu button:focus-visible{outline:0;box-shadow:none}
+.hz.hz-kb #hz-top button:focus-visible,.hz.hz-kb #sidebar button:focus-visible,.hz.hz-kb #sidebar .chat-item:focus-visible,.hz.hz-kb #sb-menu button:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+/* the question's flight to its row (Full): no glow, the row's own ink; the title takes over as it lands */
+.hz-ghost{text-shadow:none;color:#e6e7eb}
+.hz #chat-list .chat-item .ct{transition:opacity .12s cubic-bezier(.2,.7,.2,1)}
+/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): end ==== */
 </style>
 </head>
 <body>
@@ -55149,6 +55256,8 @@ __CODE_ROWS__
       <span id="hz-title"></span>
     </div>
     <span class="hz-sp" data-tauri-drag-region></span>
+    <!-- the lanes folded (6b624): under 940 px of header room one compact key names the lane and opens the three -->
+    <button id="hz-lanemenu" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="hz-lanes" aria-label="Lane: Chat"><span class="hz-lmt">Chat</span><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5"/></svg></button>
     <nav id="hz-lanes" role="tablist" aria-label="Lane" data-m="ai"><i class="hz-seg-hi" aria-hidden="true"></i>
       <button type="button" role="tab" data-m="ai" aria-selected="true">Chat</button>
       <button type="button" role="tab" data-m="code" aria-selected="false" tabindex="-1">Code</button>
@@ -58235,7 +58344,26 @@ inner.addEventListener("click",e=>{
 // else the proof line under the answer. Set once per resize, never during a run's paint, so the reading never moves.
 const HZ_FLOW_MIN=1000;
 function hzFlowFit(){const s=$("#chat-scroll");if(!s)return;const on=s.clientWidth>=HZ_FLOW_MIN;
-  if(document.documentElement.classList.contains("hz-flow")!==on)document.documentElement.classList.toggle("hz-flow",on);}
+  if(document.documentElement.classList.contains("hz-flow")!==on)document.documentElement.classList.toggle("hz-flow",on);
+  hzColFit();}
+// THE COLUMN (6b624, per Patrick: "I want this UI to be perfect"; the audit found the composer 140 px off the reading
+// column at 1000-1100 with the sidebar shut and 22 px at 900 with it open): the same pass that sets hz-flow measures the
+// reading column (the chat's content box; 640 at most, less the flow's 40 + 240 while it shows) and writes
+// --hz-read-w, --hz-gutter and --hz-marg-w so the composer's one rule, calc(50% - (read + gutter + marg) / 2) in its own
+// box, lands on the column's left edge at its width: the composer's column is always the reading column. Written only
+// when a value changes (a style write on the root restyles the page).
+function hzColFit(){
+  const root=document.documentElement,inner=$("#chat-inner"),c=$("#composer"),p=c&&c.parentElement;if(!inner||!p)return;
+  const ir=inner.getBoundingClientRect(),ics=getComputedStyle(inner),pr=p.getBoundingClientRect(),pcs=getComputedStyle(p);
+  const il=ir.left+(parseFloat(ics.paddingLeft)||0),iw=ir.width-(parseFloat(ics.paddingLeft)||0)-(parseFloat(ics.paddingRight)||0);
+  const pl=pr.left+(parseFloat(pcs.paddingLeft)||0),pw=pr.width-(parseFloat(pcs.paddingLeft)||0)-(parseFloat(pcs.paddingRight)||0);
+  if(!(iw>0&&pw>0))return;
+  const flow=root.classList.contains("hz-flow"),g=flow?40:0,side=flow?240:0;
+  const read=Math.max(0,Math.min(640,Math.floor(iw-g-side)));
+  const marg=Math.round((pw-2*(il-pl)-read-g)*100)/100;   // what puts calc(50% - (read+g+marg)/2) on the column's left edge
+  const set=(k,v)=>{if(root.style.getPropertyValue(k)!==v)root.style.setProperty(k,v);};
+  set("--hz-read-w",read+"px");set("--hz-gutter",g+"px");set("--hz-marg-w",marg+"px");
+}
 // THE PROOF LINE (6b580, per Patrick: "let's start working on getting that right panel cleaned up and, coming from a
 // marketing aspect, a little more exciting and not just a ton of information. Or completely remove it even."). The
 // "Behind this answer" column is gone; under each finished answer one quiet line of silver hairline chips says where
@@ -58334,6 +58462,19 @@ function proofPaint(div,o){
 function proofToggle(line){
   const b=line.querySelector(".pf-open"),card=b&&document.getElementById(b.getAttribute("aria-controls"));if(!card)return;
   const open=card.hidden;card.hidden=!open;b.setAttribute("aria-expanded",open?"true":"false");line.classList.toggle("open",open);
+  if(open)proofReveal(card);
+}
+// THE CARD IN VIEW (6b624, per Patrick: "I want this UI to be perfect"; the audit: Details opened its card behind the
+// composer): once open, the chat scrolls just enough for the card's foot to clear the composer by 16 px, never so far
+// that its top goes under the header. Its rise is a transform, so the layout box is read (offsetHeight), not the ink.
+function proofReveal(card){
+  const comp=$("#composer"),top=$("#hz-top");if(!comp||!card.isConnected)return;
+  const r=card.getBoundingClientRect(),c=comp.getBoundingClientRect(),h=top?top.getBoundingClientRect().bottom:0;
+  const foot=r.top+card.offsetHeight;
+  let d=Math.ceil(foot-(c.top-16));if(d<=0)return;
+  d=Math.min(d,Math.max(0,Math.floor(r.top-(h+16))));if(d<=0)return;
+  const smooth=typeof hzMotionOK==="function"&&hzMotionOK()&&!document.hidden;
+  scroller.scrollBy({top:d,behavior:smooth?"smooth":"auto"});
 }
 inner.addEventListener("click",e=>{
   const line=e.target.closest&&e.target.closest(".hz-proof");
@@ -60243,8 +60384,11 @@ function chatToBottom(smooth){
 }
 function chatJumpPaint(){
   const b=$("#jumpdown");
-  if(b)b.hidden=!((generating||chatUnseen)&&!chatPinned&&chatGap()>CHAT_SLACK);
+  if(b)b.hidden=!(((generating||chatUnseen)&&!chatPinned&&chatGap()>CHAT_SLACK)||chatFar());
 }
+// THE JUMP KEY, FAR UP THE PAGE (6b624, per Patrick: "I want this UI to be perfect"): the key also shows whenever the
+// reader is about a screen or more above the end of a conversation, answer or no answer (6b590's fade and place)
+function chatFar(){return !chatPinned&&!$("#hero")&&scroller.clientHeight>0&&chatGap()>scroller.clientHeight*.9;}
 function autoScroll(smooth){
   chatMoved();                      // a drag that hasn't fired its event yet
   if(chatPinned){if(smooth==="ease")chatEase();else chatToBottom(smooth);}
@@ -61952,6 +62096,7 @@ function renderChats(flip){
       :uiMode==="funnel"?"No Funnels":"No chats")+'</div>';
   else if(anyEst)html+='<div class="cfoot">~ estimated from length</div>';
   el.innerHTML=html;
+  sbRowsWire(el);   // the ⋯ key on each row, its menu, F2 and the arrows (6b624)
   if(flip&&!hzStill()){
     el.querySelectorAll(".chat-item").forEach(it=>{
       const was=before[it.dataset.id];if(was==null)return;
@@ -62077,6 +62222,81 @@ async function undoDelete(){
   await syncChat(back);
   if(st.wasCur)loadChat(back);
 }
+// ==== THE SIDEBAR'S ROWS (6b624): begin ====
+// Per Patrick ("I want this UI to be perfect"); the audit: a row's only actions were a hover pin and a ×, both spans a
+// keyboard could not reach, and rename was a double-click. Now each row has a real ⋯ key (a button, named for its chat)
+// and the same small menu opens on a right-click or the menu key / Shift+F10: Pin (Unpin), Rename, Delete, each a
+// button that runs the action the row already had (the pin's own handler, startRename, deleteChat with its Undo). F2
+// renames the focused row; the arrows, Home and End move along the rows, Enter opens one. The menu: arrows, Home, End,
+// Enter, Esc (back to the row); a click outside or a scroll closes it.
+var SB_DOTS='<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="3.5" cy="8" r="1.25"/><circle cx="8" cy="8" r="1.25"/><circle cx="12.5" cy="8" r="1.25"/></svg>';
+var SB_ICONS={pin:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2.5h4M6.5 2.5v4L4.5 9h7l-2-2.5v-4M8 9v4.5"/></svg>',
+  ren:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg>',
+  del:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5"/></svg>'};
+var sbMenuFor=null;
+function sbRowsWire(el){
+  if(!isHz())return;
+  el.querySelectorAll(".chat-item").forEach(it=>{
+    if(it.querySelector(".cmore"))return;
+    const b=document.createElement("button");b.type="button";b.className="cmore";b.tabIndex=-1;
+    b.setAttribute("aria-haspopup","menu");b.setAttribute("aria-expanded","false");
+    const t=(it.querySelector(".ct")||{}).textContent||"chat";b.setAttribute("aria-label","More for "+t);b.title="More";
+    b.innerHTML=SB_DOTS;it.appendChild(b);});
+  if(el._sb624)return;el._sb624=true;
+  el.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest(".cmore");if(!b||!el.contains(b))return;
+    e.stopPropagation();e.preventDefault();const it=b.closest(".chat-item");
+    if(sbMenuFor===it.dataset.id){sbMenuClose(false);return;}
+    const r=b.getBoundingClientRect();sbMenuOpen(it,r.right,r.bottom+4,true,e.detail===0);},true);
+  el.addEventListener("contextmenu",e=>{const it=e.target.closest&&e.target.closest(".chat-item");if(!it||it.querySelector(".crename"))return;
+    e.preventDefault();sbMenuOpen(it,e.clientX,e.clientY,false);});
+  el.addEventListener("keydown",e=>{
+    const it=e.target.closest&&e.target.closest(".chat-item");if(!it||e.target!==it)return;
+    if(e.key==="F2"){e.preventDefault();startRename(it,it.dataset.id);return;}
+    if(e.key==="ContextMenu"||(e.key==="F10"&&e.shiftKey)){e.preventDefault();const r=it.getBoundingClientRect();sbMenuOpen(it,r.right-8,r.bottom,true,true);return;}
+    const rows=[...el.querySelectorAll(".chat-item")].filter(x=>x.offsetParent!==null),i=rows.indexOf(it);
+    const j=e.key==="ArrowDown"?Math.min(rows.length-1,i+1):e.key==="ArrowUp"?Math.max(0,i-1):e.key==="Home"?0:e.key==="End"?rows.length-1:-1;
+    if(j<0||i<0)return;e.preventDefault();rows[j].focus();rows[j].scrollIntoView({block:"nearest"});});
+}
+function sbMenuEl(){
+  let m=document.getElementById("sb-menu");if(m)return m;
+  m=document.createElement("div");m.id="sb-menu";m.setAttribute("role","menu");m.tabIndex=-1;m.hidden=true;document.body.appendChild(m);
+  m.addEventListener("keydown",e=>{const items=[...m.querySelectorAll("[role=menuitem]")],i=items.indexOf(document.activeElement);
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();sbMenuClose(true);return;}
+    if(e.key==="Tab"){e.preventDefault();sbMenuClose(true);return;}
+    const j=e.key==="ArrowDown"?(i+1)%items.length:e.key==="ArrowUp"?(i+items.length-1)%items.length:e.key==="Home"?0:e.key==="End"?items.length-1:-1;
+    if(j>=0){e.preventDefault();items[j].focus();}});
+  m.addEventListener("click",e=>{const b=e.target.closest&&e.target.closest("[role=menuitem]");if(!b)return;
+    const id=sbMenuFor,act=b.dataset.act;sbMenuClose(false);
+    const it=document.querySelector('#chat-list .chat-item[data-id="'+String(id).replace(/["\\]/g,"")+'"]');if(!it)return;
+    if(act==="pin"){const p=it.querySelector(".cpin");if(p)p.click();}
+    else if(act==="ren")startRename(it,id);
+    else if(act==="del")deleteChat(id);});
+  document.addEventListener("pointerdown",e=>{if(!m.hidden&&!m.contains(e.target)&&!(e.target.closest&&e.target.closest(".cmore")))sbMenuClose(false);},true);
+  addEventListener("resize",()=>sbMenuClose(false));
+  const cl=$("#chat-list");if(cl)cl.addEventListener("scroll",()=>sbMenuClose(false),{passive:true});
+  return m;
+}
+function sbMenuOpen(it,x,y,fromKey,kb){
+  const id=it.dataset.id,c=chats.find(z=>z.id===id);if(!c)return;
+  sbMenuClose(false);
+  const m=sbMenuEl();sbMenuFor=id;it.classList.add("sb-menu-on");
+  const k=it.querySelector(".cmore");if(k)k.setAttribute("aria-expanded","true");
+  m.setAttribute("aria-label",c.title||"chat");
+  m.innerHTML='<button type="button" role="menuitem" data-act="pin" tabindex="-1">'+SB_ICONS.pin+(c.pin?"Unpin":"Pin")+'</button>'
+    +'<button type="button" role="menuitem" data-act="ren" tabindex="-1">'+SB_ICONS.ren+'Rename</button>'
+    +'<button type="button" role="menuitem" data-act="del" class="danger" tabindex="-1">'+SB_ICONS.del+'Delete</button>';
+  m.hidden=false;
+  const r=m.getBoundingClientRect(),X=fromKey?x-r.width:x,Y=y+r.height>innerHeight-8?Math.max(8,y-r.height-(fromKey?36:0)):y;
+  m.style.left=Math.max(8,Math.min(innerWidth-r.width-8,Math.round(X)))+"px";m.style.top=Math.round(Y)+"px";
+  if(kb){const f=m.querySelector("[role=menuitem]");if(f)f.focus();}else m.focus();
+}
+function sbMenuClose(back){
+  const m=document.getElementById("sb-menu");if(!m||m.hidden){sbMenuFor=null;return;}
+  m.hidden=true;const id=sbMenuFor;sbMenuFor=null;
+  document.querySelectorAll("#chat-list .sb-menu-on").forEach(r=>{r.classList.remove("sb-menu-on");const k=r.querySelector(".cmore");if(k)k.setAttribute("aria-expanded","false");});
+  if(back&&id){const it=document.querySelector('#chat-list .chat-item[data-id="'+String(id).replace(/["\\]/g,"")+'"]');if(it)it.focus();}
+}
+// ==== THE SIDEBAR'S ROWS (6b624): end ====
 function loadChat(id){
   if(id===curChat)return;
   // viewing writes nothing (0b L4, 6b322): switching used to save the
@@ -62646,7 +62866,9 @@ document.addEventListener("keydown",e=>{
 /* ----------------------------------------------------------- new chat */
 $("#newchat").addEventListener("click",()=>{
   pendingEdit=null;                 // a new chat drops an edit that was waiting (6b343)
-  if(generating&&abortCtl)abortCtl.abort();
+  // an answer on its way is NOT stopped (6b624, per Patrick: "I want this UI to be perfect"): it finishes in the
+  // background and lands in its own chat, saved whole, with the unread dot on its row until it is opened; the same path
+  // as switching chats (send() owns its chat, myChat/myMessages, and paints only while that chat is on screen)
   chatTrunc=null;
   chatPlaceSave();chatUnseen=false;   // where the chat being left was read to (6b590)
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
@@ -69282,6 +69504,7 @@ function hzStats(gpu,mem){if(!hzReady)return;hzS.gpu=(typeof gpu==="number")?gpu
 function hzLanePaint(){
   $$("#hz-lanes [role=tab]").forEach(b=>{const on=b.dataset.m===uiMode;b.setAttribute("aria-selected",on?"true":"false");b.tabIndex=on?0:-1;});
   const nav=$("#hz-lanes");if(nav&&nav.dataset.m!==uiMode)nav.dataset.m=uiMode;
+  hzLaneMenuPaint();   // the folded lanes' key names the lane (6b624)
 }
 // KEYBOARD-ONLY FOCUS (6b555): the ember hairline shows after a Tab, an arrow, Home, End or a Page key (html.hz-kb)
 // and any pointer press clears it, so a click never leaves a ring behind (WKWebView can call a clicked control
@@ -69291,27 +69514,75 @@ function hzKbWire(){
   addEventListener("keydown",e=>{if(/^(Tab|Arrow|Home$|End$|Page)/.test(e.key))root.classList.add("hz-kb");},true);
   addEventListener("pointerdown",()=>root.classList.remove("hz-kb"),true);
 }
-// THE HEADER, ONE ROW (6b555): the least compaction at which nothing in the header overlaps, spills past its edge or
-// sits in the Mac shell's traffic-light zone; recomputed from level 0 each time, so it never oscillates. The title is
-// kept only while it can show at least 96 px of itself.
-const HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7"];
-function hzHeaderOK(top){
-  const tr=top.getBoundingClientRect(),cs=getComputedStyle(top),padR=parseFloat(cs.paddingRight)||0,tl=document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs");
+// THE HEADER, ONE ROW IN THREE COLUMNS (6b555; 6b624, per Patrick: "I want this UI to be perfect"; the audit: at 900
+// and 760 with the sidebar open the lanes took their own row and sat on the answer). The demo's grid,
+// minmax(0,1fr) auto minmax(0,1fr): the lanes at the header's exact centre, the left group (the menu, the wordmark, the
+// title) in the left column, the right group (the mode, the effort, the dot, the pill, the gear) in the right. Laid out
+// from the header's REAL width, whatever the sidebar is doing: under 940 px of it the lanes fold into a compact menu
+// (hz-hd5); then, only for the side that does not fit, the least compaction at which nothing overlaps, spills past its
+// column or sits in the Mac shell's traffic-light zone, in the beta-3 order: 1 the title goes (kept only while it can
+// show 96 px of itself, or all of a shorter one), 2 the wordmark becomes the mark, 3 the lanes go compact, 4 the right
+// group compact (the pill a mark on the gear), 5 the lanes as the menu, 6 the effort at its phone width and the
+// machines out, 7 the effort's word out, 8 (a phone) the lanes' key leaves the exact centre for the left group's side. Recomputed from nothing each time, so it never oscillates.
+var HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7","hz-hd8"],HZ_LANES_MENU=940;
+var HZ_HD_SIDE={"hz-hd1":"l","hz-hd2":"l","hz-hd3":"lr","hz-hd4":"r","hz-hd5":"lr","hz-hd6":"r","hz-hd7":"r","hz-hd8":"lr"};
+function hzHeaderSides(top){
   const vis=e=>{if(!e)return null;const r=e.getBoundingClientRect(),c=getComputedStyle(e);return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?r:null;};
-  const lanesOwn=getComputedStyle($("#hz-lanes")||top).position!=="absolute";
-  const B=[vis($("#hz-sb")),vis($("#hz-mark")),vis($("#hz-title")),lanesOwn?vis($("#hz-lanes")):null,vis($("#hz-right"))].filter(Boolean);
-  for(const r of B){if(r.right>tr.right-padR+.5||r.left<tr.left-.5)return false;if(tl&&r.left<88&&r.top<56)return false;}
-  for(let i=0;i<B.length;i++)for(let j=i+1;j<B.length;j++){const a=B[i],b=B[j];if(a.left<b.right-.5&&b.left<a.right-.5)return false;}
-  const t=vis($("#hz-title"));if(t&&$("#hz-title").textContent.trim()&&t.width<96)return false;
-  const m=$("#hz-mark"),mr=vis(m);if(mr&&m.scrollWidth>Math.ceil(mr.width)+1)return false;
-  const br=$("#hz-brand");if(br&&br.scrollWidth>br.clientWidth+1)return false;   // nothing in the left group clipped away
-  return true;
+  const tr=top.getBoundingClientRect(),cs=getComputedStyle(top),L0=tr.left+(parseFloat(cs.paddingLeft)||0),R0=tr.right-(parseFloat(cs.paddingRight)||0);
+  const gap=parseFloat(cs.columnGap)||0,tl=document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs");
+  const mid=vis(top.classList.contains("hz-hd5")?$("#hz-lanemenu"):$("#hz-lanes"));
+  const cl=mid?mid.left-gap:(L0+R0)/2,cr=mid?mid.right+gap:(L0+R0)/2;
+  let l=!!(mid&&(mid.left<L0-.5||mid.right>R0+.5)),r=l;
+  for(const q of ["#hz-sb","#hz-mark","#hz-title"]){const b=vis($(q));if(!b)continue;
+    if(b.left<L0-.5||b.right>cl+.5)l=true;if(tl&&b.left<88&&b.top<56)l=true;}
+  const br=$("#hz-brand");if(br&&br.scrollWidth>br.clientWidth+1)l=true;   // nothing in the left group clipped away
+  const m=$("#hz-mark"),mr=vis(m);if(mr&&m.scrollWidth>Math.ceil(mr.width)+1)l=true;
+  const t=$("#hz-title"),tv=vis(t);if(tv&&t.textContent.trim()&&tv.width<Math.min(96,t.scrollWidth))l=true;
+  const rg=$("#hz-right");if(rg)for(const e of rg.children){const b=vis(e);if(!b)continue;if(b.left<cr-.5||b.right>R0+.5)r=true;}
+  return {l,r};
 }
+function hzHeaderOK(top){const f=hzHeaderSides(top);return !f.l&&!f.r;}
 function hzHeaderFit(){
   const top=$("#hz-top");if(!top||!document.documentElement.classList.contains("hz")||hzS.hdFit)return;
   hzS.hdFit=true;
-  try{top.classList.remove(...HZ_HD);for(let k=0;k<HZ_HD.length&&!hzHeaderOK(top);k++)top.classList.add(HZ_HD[k]);}
+  try{top.classList.remove(...HZ_HD);
+    if(top.getBoundingClientRect().width<HZ_LANES_MENU)top.classList.add("hz-hd5");
+    for(const k of HZ_HD){const f=hzHeaderSides(top);if(!f.l&&!f.r)break;
+      if(!top.classList.contains(k)&&((f.l&&HZ_HD_SIDE[k].includes("l"))||(f.r&&HZ_HD_SIDE[k].includes("r"))))top.classList.add(k);}
+    if(!top.classList.contains("hz-hd5"))hzLaneMenuOpen(false);}
   finally{hzS.hdFit=false;}
+}
+// THE LANES AS A MENU (6b624): under 940 px of header room one compact key names the lane ("Chat", "Code", "Funnels")
+// and opens the lanes as a short list under it; a pick, Esc, a click elsewhere or the focus leaving closes it. The list
+// is the lanes' own tabs, so a pick goes through switchLane as ever. ArrowDown on the key opens it at the current lane;
+// the arrows move, Enter picks, Esc comes back to the key.
+function hzLaneMenuPaint(){
+  const k=$("#hz-lanemenu");if(!k)return;const tab=$("#hz-lanes [role=tab][aria-selected=true]")||$("#hz-lanes [role=tab]");
+  const name=tab?tab.textContent.trim():"Chat",lbl=k.querySelector(".hz-lmt");
+  if(lbl&&lbl.textContent!==name)lbl.textContent=name;k.setAttribute("aria-label","Lane: "+name);
+}
+function hzLaneMenuOpen(on,focusTab){
+  const top=$("#hz-top"),k=$("#hz-lanemenu");if(!top||!k)return;
+  on=!!on&&top.classList.contains("hz-hd5");
+  const nav=$("#hz-lanes");if(nav)nav.style.left=on?Math.round(k.offsetLeft+k.offsetWidth/2)+"px":"";   // under its key, wherever the key sits
+  top.classList.toggle("hz-lmo",on);k.setAttribute("aria-expanded",on?"true":"false");
+  if(on&&focusTab){const t=$("#hz-lanes [role=tab][aria-selected=true]")||$("#hz-lanes [role=tab]");if(t)t.focus();}
+}
+function hzLaneMenuWire(){
+  const k=$("#hz-lanemenu"),nav=$("#hz-lanes"),top=$("#hz-top");if(!k||!nav||!top)return;
+  k.addEventListener("click",()=>hzLaneMenuOpen(!top.classList.contains("hz-lmo")));
+  k.addEventListener("keydown",e=>{if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();hzLaneMenuOpen(true,true);}});
+  nav.addEventListener("click",e=>{if(top.classList.contains("hz-lmo")&&e.target.closest("[role=tab]")){hzLaneMenuOpen(false);k.focus();}});
+  nav.addEventListener("keydown",e=>{
+    if(!top.classList.contains("hz-lmo"))return;
+    const tabs=[...nav.querySelectorAll("[role=tab]")],i=tabs.indexOf(document.activeElement);
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();hzLaneMenuOpen(false);k.focus();return;}
+    if(e.key==="Tab"){hzLaneMenuOpen(false);return;}
+    const j=e.key==="ArrowDown"?(i+1)%tabs.length:e.key==="ArrowUp"?(i+tabs.length-1)%tabs.length:-1;
+    if(j>=0){e.preventDefault();e.stopImmediatePropagation();tabs[j].focus();}
+  },true);
+  document.addEventListener("pointerdown",e=>{if(top.classList.contains("hz-lmo")&&!k.contains(e.target)&&!nav.contains(e.target))hzLaneMenuOpen(false);},true);
+  hzLaneMenuPaint();
 }
 // THE UPDATE BADGE (6b555): no new network call; it mirrors the app's own check (#update-flag, set by checkUpdate and
 // About's Check now) and the install (the update dialog's key going busy). Its click opens Settings > About with the
@@ -69804,18 +70075,35 @@ function hzArc(from,chatId){
   const a=from.inp||from.comp;
   if(!hzMotionOK()||!a||!document.body.animate){land();return;}
   let tgt=null;
-  if(open){const rr=row.getBoundingClientRect();tgt={x:rr.left+10,y:rr.top+rr.height/2};}
+  // THE GHOST LANDS ON THE TITLE (6b624; the audit's zoom-sb-ghost: the flying question landed 10 px into the row at
+  // its full length, so it ran past the sidebar and sat over the row's own title, doubled): it lands on the title's own
+  // box at the title's size, clipped to the title's width, while the row's title is held back until the hand-off
+  const ct=open?row.querySelector(".ct"):null;
+  if(ct){const cr=ct.getBoundingClientRect(),fs=parseFloat(getComputedStyle(ct).fontSize)||13;tgt={x:cr.left,y:cr.top+cr.height/2,k:fs/17,w:cr.width};}
+  else if(open){const rr=row.getBoundingClientRect();tgt={x:rr.left+10,y:rr.top+rr.height/2};}
   else if(btn){const br=btn.getBoundingClientRect();if(br.width)tgt={x:br.left+br.width/2-4,y:br.top+br.height/2};}
   if(!tgt)return;
   const g=document.createElement("div");g.className="hz-ghost";g.setAttribute("aria-hidden","true");
-  g.textContent=text.length>46?text.slice(0,44)+"…":text;document.body.appendChild(g);
+  g.textContent=text.length>46?text.slice(0,44)+"…":text;
+  if(tgt.w){g.style.maxWidth=Math.ceil(tgt.w/tgt.k)+"px";g.style.overflow="hidden";g.style.textOverflow="ellipsis";hzArcHold(chatId,true);}
+  document.body.appendChild(g);
   g.style.left=(a.left+2).toFixed(0)+"px";g.style.top=(a.top+2).toFixed(0)+"px";
-  const gr=g.getBoundingClientRect(),dx=tgt.x-gr.left,dy=tgt.y-(gr.top+gr.height/2),k=open?13.5/17:.2;
+  const gr=g.getBoundingClientRect(),dx=tgt.x-gr.left,dy=tgt.y-(gr.top+gr.height/2),k=tgt.k||(open?13.5/17:.2);
+  if(tgt.w){const held=()=>hzArcHold(chatId,false);setTimeout(held,700);setTimeout(held,1400);}   // the title back as the ghost fades out
   g.animate([{transform:"translate(0,0) scale(1)",opacity:1},
     {transform:"translate("+(dx*.42).toFixed(1)+"px,"+(dy*.42-46).toFixed(1)+"px) scale(.96)",opacity:1,offset:.42},
     {transform:"translate("+(dx*.92).toFixed(1)+"px,"+(dy*.97).toFixed(1)+"px) scale("+(k*1.02).toFixed(3)+")",opacity:.9,offset:.86},
     {transform:"translate("+dx.toFixed(1)+"px,"+dy.toFixed(1)+"px) scale("+k.toFixed(3)+")",opacity:0}],
-    {duration:820,easing:"cubic-bezier(.3,.7,.2,1)",fill:"forwards"}).onfinish=()=>{g.remove();land();};
+    {duration:820,easing:"cubic-bezier(.3,.7,.2,1)",fill:"forwards"}).onfinish=()=>{g.remove();hzArcHold(chatId,false);land();};
+}
+// the row's own title held back while the ghost flies to it (6b624): a rule by the chat's id, so it holds through the
+// list's repaints; dropped as the ghost fades out
+function hzArcHold(id,on){
+  let st=document.getElementById("hz-arc-hold");
+  if(!on){if(st)st.textContent="";return;}
+  if(!st){st=document.createElement("style");st.id="hz-arc-hold";document.head.appendChild(st);}
+  const q=String(id||"").replace(/["\\]/g,"");
+  st.textContent='#chat-list .chat-item[data-id="'+q+'"] .ct{opacity:0}';
 }
 // the answering chat's row: a live die in the working machine's colour, the title
 // shimmering, until the answer lands (kept through the list's own repaints)
@@ -70035,7 +70323,7 @@ function hzInit(){
   // the header refits whenever it, its groups or the page under it change size (a window resize, the sidebar, the
   // conversation's title, the mode and effort moving in)
   if(typeof ResizeObserver==="function"){const ro=new ResizeObserver(()=>hzHeaderFit());["#hz-top","#hz-right","#hz-title","#chat-inner"].forEach(q=>{const e=$(q);if(e)ro.observe(e);});}
-  hzFlowFit();if(typeof ResizeObserver==="function"&&$("#chat-scroll"))new ResizeObserver(()=>hzFlowFit()).observe($("#chat-scroll"));   // the flow's column or the proof line (6b580)
+  hzFlowFit();if(typeof ResizeObserver==="function"&&$("#chat-scroll")){const fro=new ResizeObserver(()=>hzFlowFit());fro.observe($("#chat-scroll"));if($("#chat-inner"))fro.observe($("#chat-inner"));}   // the flow's column or the proof line (6b580)
   addEventListener("resize",()=>{hzHeaderFit();setTimeout(hzHeaderFit,120);});   // and once more after the window settles
   hzUpdateWire();
   try{if(localStorage.getItem("millen.sbhide")==="1")root.classList.add("sbhide");}catch(e){}
@@ -70045,6 +70333,7 @@ function hzInit(){
     const j=e.key==="ArrowRight"?(i+1)%tabs.length:e.key==="ArrowLeft"?(i+tabs.length-1)%tabs.length:e.key==="Home"?0:e.key==="End"?tabs.length-1:-1;
     if(j<0)return;e.preventDefault();tabs[j].focus();tabs[j].click();});
   hzKbWire();
+  hzLaneMenuWire();   // the lanes as a menu under 940 px of header room (6b624)
   const mach=$("#hz-machines");if(mach)mach.addEventListener("click",e=>{if(e.target.closest(".hz-rig,.hz-mdot")&&typeof settingsPane==="function"){$("#settings-btn").click();settingsPane("p-servers");}});
   const gear=$("#hz-settings");if(gear)gear.addEventListener("click",()=>$("#settings-btn").click());
   const sel=$("#look-sel");
