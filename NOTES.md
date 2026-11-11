@@ -21056,6 +21056,39 @@ this branch touches, not re-run on beta-3 to confirm it predates this.
   saying which clock, so it is left as the kit sends it.
 - This computer's clock decides while the server is asleep; a wrong clock here moves the hours.
 
+## 6b620 — beta-4: the integration (7.0 beta 4, per Patrick)
+
+Patrick, at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important that the chat
+page and also obviously the code page and all that looks really dialed in ... I want this UI to be perfect." Later
+(2026-11-11): "it has to be usable": usability first for betas 4 and 5; the Ultra push lands, no other new effects.
+
+**What is in.** Branch `beta-4` from beta-3 (c5d44c5, then its final head fbe9275 with the two gauntlet fixes):
+beta-4-panel (6b580), beta-4-chat (6b590), quality-4 (6b560), quiet-hours (6b600, a9081b6 then 5765264),
+beta-4-lanes (6b622), beta-4-md (6b623), beta-4-layout (6b624), beta-4-polish (6b625), beta-4-ultra (6b621) and
+first-run-1 (6b630). The last five came from a daily-use audit of the chat and Code pages (scratchpad
+`audit/daily/`): renderMD, the Code run log, the header at narrow widths, the composer under the column (its P0s),
+and its P1s; and from the web demo's d84e057, b509fe9, fa8385e and ddfdf72.
+
+**How the merges were resolved.**
+- 6b580 and 6b590 both wrote the question's bubble: 6b590's box, keys row and rhythm win (the keys sit in the flow
+  under the bubble; 6b580's absolute keys row went); 6b580 keeps only `border:0;width:fit-content`.
+- One face token: `--hz-font-chat` is `var(--hz-font-ui)` (Inter, else the system's sans).
+- The eased follow (6b580's `chatEase`) stands beside 6b590's `chatPin` (which knows `chatBulk` and `chatUnseen`).
+- 6b590's two rules that read as unscoped or round in 6b580's layout check: the screen-reader line is `:root
+  .chat-sr` (a page-wide utility, Classic too) and the jump key centres by `left:50%;margin-left:-16px`.
+- `hzBalance` keeps Funnels' home (6b625) and the empty state's line (6b630).
+- The merge interleaved 6b625's and 6b621's gauntlet blocks (their node scripts share lines); 6b621's block was put
+  back whole after 6b625's. NOTES are in number order: 6b560 between 6b555 and 6b570, 6b621 before 6b622.
+
+**Quiet hours and Settings (per Patrick, via the coordinator).** "Wake up server" keeps working at night: a deliberate
+click wins. "Test relay" is treated the same way (the coordinator's default, not Patrick's decision). Both go through
+`server_wake_test`, which never consulted the quiet hours; a check with a mutant now holds that.
+
+**Inter.** TODO: bundle Inter's official woff2 as `fonts/InterVariable.woff2` once Patrick approves the download;
+`HZ_FONT_FILES` already lists it and the tokens fall back to the system's sans until then.
+
+**Verified.** GAUNTLET_LINE
+
 ## 6b621 — beta-4-ultra: the sky, the aurora and Ultra at full strength, matched to the demo (7.0 beta 4, per Patrick)
 
 Per Patrick, on the app at Ultra: "I don't think we have enough VFX going on right now. But also, it's very important
