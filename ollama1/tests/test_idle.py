@@ -592,7 +592,8 @@ class TestTick(unittest.TestCase):
         for k, v in (("at", int(NOW)), ("supported", True), ("wake", ["02:00:5e:10:00:01"]), ("enabled", True),
                      ("minutes", 30)):
             self.assertEqual(d_[k], v, k)            # enabled/minutes: the server panel reads them
-        self.assertEqual(set(d_), {"at", "supported", "wake", "enabled", "minutes", "sleep_ok", "reason", "idle_s"})
+        self.assertEqual(set(d_), {"at", "supported", "wake", "enabled", "minutes", "sleep_ok", "reason", "idle_s",
+                                   "count_minutes", "night"})
         self.assertEqual(o1idle.published_wake(), ["02:00:5e:10:00:01"])
 
     def published(self):

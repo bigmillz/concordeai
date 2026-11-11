@@ -214,6 +214,8 @@ def clean_idle(st, now):
             "supported": st.get("supported") if isinstance(st.get("supported"), bool) else None,
             "sleep_ok": st.get("sleep_ok") if isinstance(st.get("sleep_ok"), bool) else None,
             "reason": _txt(st.get("reason"), 160), "idle_s": _num(st.get("idle_s")),
+            # quiet hours (6b601): the minutes this tick counted, and whether that was the night's
+            "count_minutes": _num(st.get("count_minutes", st.get("minutes"))), "night": st.get("night") is True,
             "wake_cards": len(st["wake"]) if isinstance(st.get("wake"), list) else 0}
 
 
@@ -1457,7 +1459,7 @@ function sleepSummary(i){if(!i)return ['Unknown','warn','no word from the idle s
  if(i.enabled===false)return ['Off','dim','auto sleep is off'];
  if(i.sleep_ok===true)return ['Now','warn','going to sleep now'];
  const reason=String(i.reason||'').trim();
- if(reason.startsWith('idle ')&&i.minutes&&isNum(i.idle_s)){const left=i.minutes*60-i.idle_s-age;
+ if(reason.startsWith('idle ')&&(i.count_minutes||i.minutes)&&isNum(i.idle_s)){const left=(i.count_minutes||i.minutes)*60-i.idle_s-age;
   if(left<=0)return ['Very soon','warn','sleeping very soon'];return ['in '+mmss(left),left<300?'warn':'','after '+i.minutes+' min idle'];}
  return ['Awake','warn',reason?reason.charAt(0).toUpperCase()+reason.slice(1):'awake'];}
 

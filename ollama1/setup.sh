@@ -441,7 +441,7 @@ print_plan() {
    $(state 'ufw status | grep -q "Status: active"')  9. Firewall: nothing in except SSH from $HOME_LAN; bridged LAN traffic untouched
    $(state '[ -f /etc/ssh/sshd_config.d/10-ollama1.conf ]') 10. SSH: passwords off, only $ADMIN_USER with a key, no root (after you confirm your key)
    $(state '[ -L /opt/ollama/current ]') 11. Ollama (+ROCm for AMD) from GitHub, checksums verified; GPU only; local only
-   $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 04:00 when needed; weekly Ollama update
+   $(state '[ -f /etc/apt/apt.conf.d/52ollama1-unattended-upgrades ]') 12. Automatic security updates (+ cloudflared), reboot at 15:00 when needed; weekly Ollama update
    $(state 'systemctl is-active ollama1-dash') 13. Services: gateway, admin panel, web terminal, dashboard on the screen (big console font), timers
    $(state 'systemctl is-enabled ollama1-gpu-tune') 14. $(gpu_tune_plan)
    $(state 'systemctl is-active ollama1-fan')     $(fans_plan "$FANS")
@@ -1049,8 +1049,27 @@ step "Automatic updates"
 install -m 0644 "$KIT/config/52ollama1-unattended-upgrades" /etc/apt/apt.conf.d/52ollama1-unattended-upgrades
 install -m 0644 "$KIT/config/20auto-upgrades" /etc/apt/apt.conf.d/20auto-upgrades
 run systemctl enable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer
-[ "$(apt-config dump | awk -F'"' '/^Unattended-Upgrade::Automatic-Reboot-Time /{print $2}')" = "04:00" ] || die "unattended-upgrades did not pick up the reboot time"
-ok "security updates + cloudflared daily; reboot at 04:00 ($TIMEZONE) when one needs it"
+[ "$(apt-config dump | awk -F'"' '/^Unattended-Upgrade::Automatic-Reboot-Time /{print $2}')" = "15:00" ] || die "unattended-upgrades did not pick up the reboot time"
+ok "security updates + cloudflared daily; reboot at 15:00 ($TIMEZONE) when one needs it"
+# Quiet hours (6b601): the hand-made ollama1-cpu-perf.service (2026-10-03: the processor at full performance after
+# every boot and wake) is retired. It raised idle heat, and with it the fans' CPU trigger, for almost no speed (the
+# card's memory sets the pace of an answer). A copy is kept; the default setting comes back only under the
+# drivers where "powersave" is the normal, boosting setting (amd-pstate-epp, intel_pstate).
+if [ -f /etc/systemd/system/ollama1-cpu-perf.service ]; then
+  install -d -m 0755 /var/backups/ollama1
+  cp -p /etc/systemd/system/ollama1-cpu-perf.service /var/backups/ollama1/ollama1-cpu-perf.service.bak
+  systemctl disable ollama1-cpu-perf.service >/dev/null 2>&1 || true
+  rm -f /etc/systemd/system/ollama1-cpu-perf.service
+  systemctl daemon-reload
+  case "$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_driver 2>/dev/null)" in
+    amd-pstate-epp|intel_pstate)
+      for p in /sys/devices/system/cpu/cpu*/cpufreq; do
+        echo powersave > "$p/scaling_governor" 2>/dev/null || true
+        echo balance_performance > "$p/energy_performance_preference" 2>/dev/null || true
+      done ;;
+  esac
+  ok "ollama1-cpu-perf retired: the processor is on its normal setting (a copy: /var/backups/ollama1/ollama1-cpu-perf.service.bak)"
+fi
 run systemctl enable --now ollama1-update-ollama.timer
 ok "Ollama: weekly, $(systemctl show -P NextElapseUSecRealtime ollama1-update-ollama.timer)"
 

@@ -20230,3 +20230,46 @@ over the wire; the race did not reproduce on a quiet machine before the fix eith
 computer's own Pro seats follow its free memory (`model_fits_memory`), which other work on the machine moved between
 the check's `/api/tiers` snapshot and the Pro run minutes later (Qwen 3.6 35B MoE admitted at the run, not at the
 snapshot). The check now takes the snapshot just before the Pro run and still holds the line-up to it exactly.
+
+## 6b601 — the server kit's quiet hours: sleep sooner, fans capped, lights off, the cooler back under control (per Patrick)
+
+Patrick's family: the server is "on and loud all night". Measured (read-only, 2026-11-10): auto sleep was on (the
+admin panel, 2026-11-08 18:54) and worked, deep sleep resumed 7 of 7 times; the loud hours were 02:18–07:24
+Florida on 11-10, Patrick's late chats plus two helpers' dev copies on his real pairing (now forbidden: memory
+`helpers-never-use-real-server`), each resetting the 30-minute clock, fans to the working level 45–60 times an
+hour. At idle: a header at 100% (4354 rpm, learned `always100`), and the Corsair H115i Platinum uncontrolled:
+OpenRGB (pid 2001) held its hidraw node, so every liquidctl call timed out and even the safe curve failed. A
+hand-made `ollama1-cpu-perf.service` (2026-10-03) forced full performance after every wake.
+
+Patrick approved (relayed by the coordinating session): quiet the cooler and fans, lights off at night, the 04:00
+reboot to the afternoon, 10–15 min sleep at night, a night quiet mode in the kit, and the app's quiet-hours branch
+(6b600). Branch `kit-quiet` from main. **Not installed**: the server change needs Patrick's direct OK
+(the permission check refused remote writes on a relayed approval).
+
+- `lib/o1quiet.py` (new, stdlib): the window (23:00–08:00 local, wraps midnight, start == end never), the
+  settings file `/etc/ollama1/quiet.json` (optional; each key checked alone; re-read on change), `view()` for
+  the app, and the night values: sleep 12 min, keep_alive 120 s, fans 35%, lights off.
+- `o1idle`: the tick counts `o1quiet.sleep_minutes()` (only the timing value; `decide()` and the suspend are
+  untouched). `idle.json` keeps `minutes` as the saved setting and adds `count_minutes` and `night`; the panel's and
+  the admin page's "Sleeps in" use `count_minutes`.
+- `o1fan`: at night the working level is capped (never under `WORK_MIN_PCT`), and the day's level becomes the
+  heavy level, so `heavy_guard` (a temperature within 12 C of its limit) raises it at once; `hot` stays 100%.
+  `night` in the status. A failing or odd cap is the day.
+- `o1leds`: the lights are `OFF` during quiet hours (`dark` in the status). `leave_hydro_to_liquidctl()` turns
+  OpenRGB's "Corsair Hydro ..." detectors off in its own `OpenRGB.json` before it starts, when liquidctl is
+  installed; a failure there never keeps OpenRGB from starting.
+- `o1aio`: the cooler's own lights through liquidctl, off at night and white after (only if darkened here);
+  failures retried after 300 s, never counted toward FAILS_MAX.
+- Gateway: forwarded chat/generate/embed get `keep_alive: "120s"` at night (by day the client's keep_alive is
+  still dropped); `/v1/sleep-config` and `/v1/whoami` carry `quiet`; `/v1/models/apply` with downloads is 409
+  `quiet_hours` at night (removals go).
+- Afternoon timings: unattended-upgrades' reboot 15:00, the Ollama update Sunday 15:30.
+- setup.sh and `tools/install-quiet.sh` (new) retire `ollama1-cpu-perf.service` with a copy, resetting the
+  governor only under amd-pstate-epp/intel_pstate. install-quiet.sh installs only the kit's programs and those two
+  files, refuses while serving, backs up everything it replaces, restarts six services (never Ollama, the tunnel,
+  SSH, the firewall), rolls back by itself if one doesn't come back, and has `--uninstall`.
+- Tests: `tests/test_quiet.py` (36: window, file, idle, fans, lights, hand-off, cooler lights, gateway, timings,
+  the installer on a fake root with a fake systemctl: install, rollback, uninstall); four older tests updated for
+  the new fields; 26 `quiet:` mutants in `tests/mutate.py`, all killed. Full kit suite: 2378 tests, two timing tests (test_fancal.TestQueryLoad, test_quickburn abort, untouched here) failed in the full run and pass alone.
+- Not verified on the hardware: OpenRGB honouring the detector switch (0.9+git20251009), liquidctl then working,
+  the Hydro Platinum's `set led color off`, and the night fan level's temperatures under load.

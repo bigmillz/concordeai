@@ -154,7 +154,10 @@ class TestRepo(unittest.TestCase):
     def test_setup_installs_every_unit_it_enables(self):
         setup = open(os.path.join(U.KIT, "setup.sh")).read()
         units = set(os.listdir(os.path.join(U.KIT, "systemd")))
+        retired = {"ollama1-cpu-perf.service"}          # hand-made, removed by setup (6b601), never shipped
         for m in re.findall(r"(ollama1-[a-z-]+\.(?:service|timer|path))", setup):
+            if m in retired:
+                continue
             self.assertIn(m, units, m)
 
     def test_allow_list_ships_empty(self):

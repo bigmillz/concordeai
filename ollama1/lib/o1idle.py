@@ -19,6 +19,7 @@ import subprocess
 import time
 
 from o1common import Paths, read_json_safe, write_json_atomic
+import o1quiet
 
 MIN_MINUTES, MAX_MINUTES, DEFAULT_MINUTES = 5, 1440, 30
 GPU_IDLE_PCT = 10            # busy below this counts as idle
@@ -597,8 +598,13 @@ class Idle:
             self.wake_at = mono
         cfg = read_config()
         act = read_activity(now)
+        # quiet hours (6b601): the night's shorter idle time; only the minutes change, never how it sleeps
+        try:
+            minutes = o1quiet.sleep_minutes(cfg["minutes"], now)
+        except Exception:
+            minutes = cfg["minutes"]
         inputs = {
-            "enabled": cfg["enabled"], "supported": supported, "minutes": cfg["minutes"], "now": now,
+            "enabled": cfg["enabled"], "supported": supported, "minutes": minutes, "now": now,
             "last_activity": act["last"], "boot_time": self._probe("boot_time"),
             "loadavg": self._probe("loadavg"), "gpu_present": self._probe("gpu_present"),
             "last_resume": self.last_resume, "inflight": act["inflight"],
@@ -614,6 +620,9 @@ class Idle:
             # (6b396): sleep_ok, the exact reason decide() gave, and the idle seconds it counted
             write_json_atomic(idle_file(), {"at": int(now), "supported": supported, "wake": self.wake[:MAX_WAKE],
                                             "enabled": cfg["enabled"], "minutes": cfg["minutes"],
+                                            # quiet hours (6b601): "minutes" stays the saved setting; these say
+                                            # what this tick counted (the panel's countdown uses it)
+                                            "count_minutes": minutes, "night": minutes != cfg["minutes"],
                                             "sleep_ok": bool(sleep), "reason": why[:160],
                                             "idle_s": idle_seconds(inputs)}, mode=0o644)
         except OSError:

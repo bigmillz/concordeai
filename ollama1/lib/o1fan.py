@@ -102,6 +102,7 @@ import time
 import o1aio
 import o1common
 import o1cpu
+import o1quiet
 import o1sleep
 import o1work
 from o1common import read_json_safe, write_json_atomic
@@ -391,11 +392,15 @@ class Fan:
     jump); `wall` stamps the status file."""
 
     def __init__(self, probes, clock=time.monotonic, wall=time.time, log=print, io=None, sysroot=None,
-                 boot_id=read_boot_id, aio=None, aio_inline=False, work_pct=None, levels=None):
+                 boot_id=read_boot_id, aio=None, aio_inline=False, work_pct=None, levels=None,
+                 night_cap=None):
         self.p, self.clock, self.wall, self.log = probes, clock, wall, log
         self.work_pct = FULL_PCT if work_pct is None else work_pct    # a fixed level (6b495; the tests) ...
         self.heavy_pct, self.level_source = self.work_pct, "default" if work_pct is None else "setting"
         self.levels = levels           # ... or o1work.Levels(): the calibration's quiet and heavy levels (6b505)
+        self.base_work, self.base_heavy = self.work_pct, self.heavy_pct   # the day's levels (6b601)
+        self.night_cap = night_cap if night_cap is not None else (lambda: o1quiet.fan_cap(self.wall()))
+        self.night = False             # quiet hours hold the working level down (6b601)
         self.stepped, self.step_at, self.step_why = False, None, ""   # at the heavy level, since when, why
         self.cool_top = None           # the level when the work ended: the hold and the ramp start from it
         self.tuning = None             # the calibration's test level, while it holds one
@@ -732,9 +737,22 @@ class Fan:
         if self.levels is not None:
             try:
                 L = self.levels()
-                self.work_pct, self.heavy_pct, self.level_source = L["quiet"], L["heavy"], L["source"]
+                self.base_work, self.base_heavy, self.level_source = L["quiet"], L["heavy"], L["source"]
             except Exception:
                 pass                                             # keep the last levels
+        # quiet hours (6b601): the working level is capped at night, and the day's level becomes the heavy level,
+        # so a temperature near its limit (heavy_guard) still raises the fans at once; "hot" (100%) is untouched
+        try:
+            cap = self.night_cap()
+        except Exception:
+            cap = None
+        cap = cap if isinstance(cap, int) and not isinstance(cap, bool) else None
+        self.night = cap is not None and max(o1work.WORK_MIN_PCT, cap) < self.base_work
+        if self.night:
+            self.work_pct = max(o1work.WORK_MIN_PCT, cap)
+            self.heavy_pct = max(self.base_heavy, self.base_work)
+        else:
+            self.work_pct, self.heavy_pct = self.base_work, self.base_heavy
         temps = read_temps(self.sysroot)
         working, wwhy = self.working(now, temps)
         temps = temps + self._nv_temps()
@@ -865,7 +883,8 @@ class Fan:
               "aio": aio,
               "hottest": live["hottest"], "closest": live["closest"], "hot": sorted(self.hot.values()),
               # the working levels (6b505): the lights are red at "work"; "levels" says where they came from
-              "work": self.work_pct, "heavy": self.heavy_pct, "levels": self.level_source, "stepped": self.stepped}
+              "work": self.work_pct, "heavy": self.heavy_pct, "levels": self.level_source, "stepped": self.stepped,
+              "night": self.night}
         st["line"] = status_line(st)
         try:
             os.makedirs(os.path.dirname(status_path()), exist_ok=True)

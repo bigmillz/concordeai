@@ -39,7 +39,7 @@ however you like. This page writes it as `<server-name>`, your user as
   - SSH accepts keys only (your Mac's), for the one user you name, with no
     root login.
   - Services run as users with no shell.
-  - Security updates install automatically, with a reboot at 04:00 when an
+  - Security updates install automatically, with a reboot at 15:00 when an
     update needs one.
   - Ollama is updated weekly, from verified downloads.
 - It has a graphical information panel on the server's monitor (a text
@@ -1621,6 +1621,46 @@ and their mode (and, under each, its zones with the LEDs each has after the resi
 bluing, blue, waking, rising, working, cooling), `rgb`, `brightness` (always 1.0), `blue` (0 white to 1 blue), `working`, `cool_left`, `idle_s`, `gpu_pct` and `fans` (the fan service's phase as the lights last read it, or null: no fan service), and per device `zones` (`name`, `leds`). The admin page's lights card lists the same zones. The admin panel's CPU card shows one line, "Lights: ...". Logs:
 `journalctl -u ollama1-leds -u ollama1-openrgb` (states and counts only).
 
+## Quiet hours
+
+The server lives in a home. From **23:00 to 08:00** in the server's own time zone (6b601) it is as quiet and dark
+as it can be while staying reachable:
+
+| What | By day | Quiet hours |
+|---|---|---|
+| Auto sleep (when it is on) | the minutes you chose | 12 minutes, or yours if shorter. Only the count changes: how it sleeps does not |
+| A model after its last request | Ollama's 30 minutes | unloaded after 2 minutes |
+| The fans' working level | your level (`fan_work_pct`, or the calibration's) | 35%; your level becomes the heavy level, so a temperature within 12 C of its limit raises them at once. The overheat override (100%) is unchanged |
+| The lights | as in "Lights" | off, the liquid cooler's own lights too |
+| Model downloads from the app | at once | refused with `quiet_hours` ("model downloads wait until then"); removing models still works |
+
+The tunnel, SSH, the firewall and the network are never touched. The app hears about quiet hours from
+`/v1/sleep-config` and `/v1/whoami` (`"quiet": {"enabled", "start", "end", "tz", "now", "sleep_minutes"}`) and
+doesn't wake the server during them unless someone picked that server alone.
+
+**Change or turn off:** `/etc/ollama1/quiet.json` (read again when it changes; no restart), with any of
+`{"enabled": false}`, `"start": "22:30"`, `"end": "07:00"`, `"sleep_minutes"` (5 to 120), `"fan_pct"` (30 to 100),
+`"keep_alive_s"` (60 to 1800), `"lights_off": false`. A value of the wrong kind is ignored for that key. No file:
+on, with the values above.
+
+**Daytime only, for the same reason:** an update's reboot happens at 15:00 (it was 04:00), and the weekly Ollama
+update runs on Sundays around 15:30 (it was 03:30).
+
+**The cooler belongs to liquidctl.** OpenRGB opens a Corsair Hydro's USB device too, and the two programs' replies
+crossed: every liquidctl call timed out (from 2026-11-08 on the owner's server), so the cooler was neither
+driven nor put on its safe curve. With liquidctl installed, the lights' OpenRGB server now turns its
+"Corsair Hydro ..." detectors off in its own settings before it starts; the cooler's lights are set through
+liquidctl (off in quiet hours, white again after). A lights command that fails is retried after 5 minutes and
+never counts toward putting the cooler on its safe curve.
+
+**Installing it on its own** (without setup.sh, which would also reapply the firewall and SSH and restart the
+tunnel): `sudo bash tools/install-quiet.sh`. It refuses while the gateway has served a request in the last 90 s,
+copies every file it replaces into `/var/backups/ollama1/quiet-<time>.tar`, installs the kit's programs, the
+Ollama update timer and the unattended-upgrades file, retires a hand-made `ollama1-cpu-perf.service` if there is
+one (a copy is kept), and restarts the gateway, the admin panel, auto sleep, the fans and the lights. If one of
+them doesn't come back within 30 s, it puts the copy back by itself. **Undo:**
+`sudo bash tools/install-quiet.sh --uninstall` (the last copy, and the hand-made unit enabled again).
+
 ## Hardware watchdog
 
 **On unless you say `--watchdog off`**: `sudo ./setup.sh --watchdog on|off` (or
@@ -2183,8 +2223,8 @@ not apply. The services, timers, tunnel and config keep working: they live in
 ## Updates
 
 - **Ubuntu security updates and cloudflared:** unattended-upgrades runs
-  daily and reboots at 04:00 (the server's time zone) when an update needs it.
-- **Ollama:** `ollama1-update-ollama.timer` runs Sundays around 03:30.
+  daily and reboots at 15:00 (the server's time zone) when an update needs it.
+- **Ollama:** `ollama1-update-ollama.timer` runs Sundays around 15:30.
   - It downloads the release's linux-amd64 archive and, unless the card is an NVIDIA one (or `ollama_rocm` in
     config.json says otherwise), the ROCm component. The base archive carries CUDA.
   - Each must match the release's `sha256sum.txt`, and GitHub's own digest

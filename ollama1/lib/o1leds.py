@@ -63,6 +63,7 @@ and get the very same frames as every other LED. A zone that already has more th
 touched. A length longer than the strip is harmless (what is written past its end goes
 nowhere); one that is too short leaves the strip's tail dark, so the default errs long.
 """
+import json
 import os
 import select
 import shutil
@@ -76,6 +77,7 @@ import time
 
 import o1common
 import o1fan
+import o1quiet
 import o1sleep
 import o1work
 from o1common import read_json_safe, write_json_atomic
@@ -84,6 +86,7 @@ HOST = "127.0.0.1"                # the SDK server is bound here and nowhere els
 PORT = 6742
 CLIENT_NAME = "ollama1-leds"
 WHITE = (255, 255, 255)
+OFF = (0, 0, 0)                   # quiet hours (6b601)
 RED = (255, 0, 0)
 STOPS = ((0.0, WHITE), (1 / 3, (255, 255, 0)), (2 / 3, (255, 128, 0)), (1.0, RED))
 SAMPLE_S = 0.25                   # the card's busy percent is read this often
@@ -538,8 +541,10 @@ class Leds:
     The brightness is 100% always; there is no dimming."""
 
     def __init__(self, probes, client=None, clock=time.monotonic, wall=time.time, log=print, poll_s=POLL_S,
-                 status=True, fans=None):
+                 status=True, fans=None, dark=None):
         self.probes = probes
+        self.dark = dark or (lambda: o1quiet.lights_off(self.wall()))   # quiet hours: off (6b601)
+        self.dark_seen = False
         self.client = client or Client()
         self.clock, self.wall, self.log = clock, wall, log
         self.poll_s, self.status = poll_s, status
@@ -785,6 +790,15 @@ class Leds:
         self.last = now
         self.move(now)
         rgb = self.rgb()
+        try:
+            dark = bool(self.dark())                            # quiet hours (6b601): the lights are off at night
+        except Exception:
+            dark = False
+        if dark != self.dark_seen:
+            self.log("quiet hours: the lights are %s" % ("off" if dark else "back on"))
+            self.dark_seen = dark
+        if dark:
+            rgb = OFF
         if self.client.connected and (rgb != self.sent or polled):
             try:
                 self.client.show(rgb)
@@ -842,6 +856,7 @@ class Leds:
               "idle": self.phase == "idle", "idle_s": int(self.idle_s(now)), "cool_left": self.cool_left(now),
               "working": self.trigger.on, "gpu_pct": None if self.gpu is None else round(self.gpu, 1),
               "gpu_reading": self.gpu is not None,
+              "dark": self.dark_seen,                    # quiet hours: off (6b601)
               "fans": self.fan_phase,                     # the fan service's phase, or None: no fan service running
               "connected": c.connected, "error": self.err, "protocol": c.ver if c.connected else None,
               "devices": [{"name": d.name, "vendor": d.vendor, "leds": d.nleds,
@@ -970,7 +985,55 @@ def openrgb_argv(run=subprocess.run, which=shutil.which):
     return argv, bound
 
 
-def run_openrgb(log=print, execv=os.execv, sleep=time.sleep, **kw):
+# The liquid cooler belongs to liquidctl (6b601). OpenRGB opens a Corsair Hydro's HID device too, and the two
+# programs' reports cross: from 2026-11-08 every liquidctl call timed out, so the fan service could neither drive
+# the cooler nor put it on its safe curve. With liquidctl installed, OpenRGB's Corsair Hydro detectors are turned
+# off in its own settings file before it starts; the cooler's lights are then liquidctl's (o1aio).
+HYDRO_PREFIX = "Corsair Hydro"
+
+
+def openrgb_settings_path(home=None):
+    home = home or os.environ.get("XDG_CONFIG_HOME") or os.path.join(os.path.expanduser("~"), ".config")
+    return os.path.join(home, "OpenRGB", "OpenRGB.json")
+
+
+def leave_hydro_to_liquidctl(path=None, which=shutil.which, log=print):
+    """Turn off OpenRGB's Corsair Hydro detectors when liquidctl is installed. Returns the names turned off now
+    ([] when there was nothing to change, no settings file yet, or no liquidctl). OpenRGB writes the file, with
+    every detector listed, the first time it runs; from then on this applies at each start."""
+    if not which("liquidctl"):
+        return []
+    path = path or openrgb_settings_path()
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return []
+    if not isinstance(d, dict):
+        return []
+    det = (d.get("Detectors") or {}).get("detectors") if isinstance(d.get("Detectors"), dict) else None
+    if not isinstance(det, dict):
+        return []
+    names = sorted(k for k, v in det.items() if isinstance(k, str) and k.startswith(HYDRO_PREFIX) and v is not False)
+    if not names:
+        return []
+    for k in names:
+        det[k] = False
+    try:
+        write_json_atomic(path, d, mode=0o600)
+    except OSError as e:
+        log("couldn't hand the Corsair cooler to liquidctl (%s)" % e)
+        return []
+    log("the Corsair cooler is left to liquidctl: OpenRGB's %s detector%s turned off" % (
+        ", ".join(names) if len(names) <= 3 else "%d Corsair Hydro" % len(names), "" if len(names) == 1 else "s"))
+    return names
+
+
+def run_openrgb(log=print, execv=os.execv, sleep=time.sleep, hand_off=None, **kw):
+    try:
+        (hand_off or leave_hydro_to_liquidctl)(log=log, which=kw.get("which") or shutil.which)
+    except Exception as e:                       # never keep the lights' server from starting
+        log("couldn't check OpenRGB's cooler settings (%s)" % type(e).__name__)
     argv, bound = openrgb_argv(**kw)
     if argv is None:
         log("openrgb is not installed (sudo ./setup.sh --leds on installs it); waiting %d s" % NO_SERVER_WAIT_S)

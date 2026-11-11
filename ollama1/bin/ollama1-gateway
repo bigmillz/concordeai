@@ -71,6 +71,7 @@ from o1pair import DeviceStore, read_public, spool_request, wait_result  # noqa:
 import o1gen  # noqa: E402
 import o1gpu  # noqa: E402
 import o1idle  # noqa: E402
+import o1quiet  # noqa: E402
 import o1modelplan  # noqa: E402
 import o1sleep  # noqa: E402
 import o1stats  # noqa: E402
@@ -445,7 +446,15 @@ class Gateway:
         exactly {enabled, minutes, supported, wake}."""
         cfg = o1idle.read_config()
         return {"enabled": cfg["enabled"], "minutes": cfg["minutes"],
-                "supported": o1idle.deep_sleep_supported(), "wake": o1idle.published_wake()}
+                "supported": o1idle.deep_sleep_supported(), "wake": o1idle.published_wake(),
+                "quiet": self.quiet_view()}
+
+    def quiet_view(self):
+        """Quiet hours (6b601), for the app: it does not wake the server during them unless asked for it alone."""
+        try:
+            return o1quiet.view(self.clock())
+        except Exception:
+            return {"enabled": False, "start": "23:00", "end": "08:00", "tz": "", "now": False, "sleep_minutes": 12}
 
     def sleep_set(self, changes):
         with self.sleep_lock:
@@ -554,6 +563,10 @@ class Gateway:
         clean, problem = o1modelplan.parse_request(obj)
         if problem:
             raise GatewayError(400, "bad_request", problem)
+        q = self.quiet_view()
+        if clean["add"] and q["now"]:
+            # quiet hours (6b601): a download is heavy work nobody is waiting on at night; removals still go
+            raise GatewayError(409, "quiet_hours", "quiet hours until %s: model downloads wait until then" % q["end"])
         if not self.plan_lock.acquire(blocking=False):
             raise GatewayError(409, "busy", "not now: a model set is being handed to the server")
         try:
@@ -995,6 +1008,12 @@ class Gateway:
             raise GatewayError(400, "bad_request", "body must be a JSON object")
         out = {k: v for k, v in obj.items() if k in FIELDS[kind]}
         out["model"] = model_name
+        try:
+            ka = o1quiet.keep_alive(self.clock())        # quiet hours (6b601): unloaded 2 minutes after the last request
+        except Exception:
+            ka = None
+        if ka:
+            out["keep_alive"] = ka
         opts = obj.get("options") if isinstance(obj.get("options"), dict) else {}
         clean = {k: v for k, v in opts.items() if k in SAMPLING_OPTIONS}
         n_ctx = None
@@ -1252,7 +1271,7 @@ def make_handler(gw, lan=False):
                 return self.generate(method, route, body, dev_id)
             if method == "GET" and route == "/v1/whoami":
                 return self.send_json(200, {"device_id": dev_id, "name": dev["name"],
-                                            "server_time": int(gw.clock())})
+                                            "server_time": int(gw.clock()), "quiet": gw.quiet_view()})
             if method == "GET" and route == "/api/tags":
                 st, data = o1ollama.call(gw.base, "GET", "/api/ps", timeout=10)
                 running = (data or {}).get("models", []) or [] if st == 200 else []

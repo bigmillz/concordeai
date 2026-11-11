@@ -52,6 +52,7 @@ import subprocess
 import threading
 
 import o1common
+import o1quiet
 import o1work
 from o1common import read_json_safe, write_json_atomic
 
@@ -59,6 +60,7 @@ STATUS_S = 5                     # the cooler's status at most this often
 MIN_WRITE_S = 5                  # and a changed target is sent no more often than this
 DETECT_S = 300                   # looking again for liquidctl / a cooler
 CALL_TIMEOUT_S = 4               # every liquidctl call (the service's watchdog is 10 s)
+LED_RETRY_S = 300                # a lights command that failed is tried again after this long (6b601)
 FAILS_MAX = 5                    # this many failed calls in a row: the cooler is left on its safe curve
 COOLANT_HOT_C, COOLANT_HYST_C = 40, 5
 SETTLE_S = 6
@@ -131,8 +133,12 @@ class Aio:
     """One cooler. `step(now)` is the whole machine (a thread calls it every second in the service; the tests call it
     on a fake clock); `set_phase` says what the fans are doing."""
 
-    def __init__(self, binary=None, log=print, run=subprocess.run, which=shutil.which):
+    def __init__(self, binary=None, log=print, run=subprocess.run, which=shutil.which, dark=None):
         self.binary, self.log, self.run, self.which = binary, log, run, which
+        # quiet hours (6b601): the cooler's own lights off at night, back to white after; OpenRGB leaves the
+        # cooler to liquidctl (o1leds), so these are the only commands its lights get
+        self.dark = dark or (lambda: o1quiet.lights_off())
+        self.applied_led, self.led_retry_at = None, -1e9
         self.lock = threading.Lock()
         self.learned, self.persist = {}, (lambda: None)
         self.phase, self.pct = "idle20", 20
@@ -178,6 +184,7 @@ class Aio:
             self.applied_pump, self.applied, self.since, self.checked = None, {}, {}, {}
             self.write_at = -1e9
             self.status_at = -1e9
+            self.applied_led, self.led_retry_at = None, -1e9
 
     def active(self):
         return self.match is not None and not self.disabled
@@ -375,6 +382,29 @@ class Aio:
             self.write(now, pump, fans)
             if self.fails >= FAILS_MAX:
                 self.fail_safe()
+                return
+        self.lights(now)
+
+    def lights(self, now):
+        """The cooler's lights (6b601): off during quiet hours; at their end, white again, but only if they were
+        turned off here (a cooler this kit never darkened is left as it is). A failure is retried after
+        LED_RETRY_S and never counts toward FAILS_MAX: the lights must not put the cooler on its safe curve."""
+        try:
+            want = "off" if self.dark() else "on"
+        except Exception:
+            return
+        if want == "on" and self.applied_led is None:
+            return
+        if want == self.applied_led or now < self.led_retry_at:
+            return
+        args = ["set", "led", "color", "off"] if want == "off" else ["set", "led", "color", "fixed", "ffffff"]
+        ok, _out = self.call(["--match", self.match] + args, match=False)
+        if ok:
+            self.applied_led = want if want == "off" else None
+            self.log("the cooler's lights: %s" % ("off for quiet hours" if want == "off" else "white again"))
+        else:
+            self.led_retry_at = now + LED_RETRY_S
+            self.say(("led", want), "couldn't turn the cooler's lights %s; trying again in %d s" % (want, LED_RETRY_S))
 
     def fail_safe(self):
         self.log("liquidctl failed %d times in a row: the cooler is left on its safe curve, the case fans go on"

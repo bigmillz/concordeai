@@ -37,6 +37,9 @@ for d in ("etc/ollama1", "run/ollama1/pair", "run/ollama1/pair-spool", "run/olla
           "var/lib/ollama1-gateway", "var/lib/ollama1", "var/lib/ollama1-admin", "srv/models",
           "opt/ollama/versions"):
     os.makedirs(os.path.join(PREFIX, d), exist_ok=True)
+# quiet hours (6b601) off for every test unless one turns them on: their outcome must not hang on the Mac's clock
+with open(os.path.join(PREFIX, "etc/ollama1/quiet.json"), "w") as _qf:
+    _qf.write('{"enabled": false}')
 sys.path.insert(0, LIB)
 sys.path.insert(0, HERE)
 

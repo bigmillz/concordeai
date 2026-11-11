@@ -747,7 +747,7 @@ def sleep_summary(st, now):
     if idle.get("sleep_ok") is True:
         return "Going to sleep now", "warn"
     reason = str(idle.get("reason") or "").strip()
-    minutes, idle_s = D._f(idle.get("minutes")), D._f(idle.get("idle_s"))
+    minutes, idle_s = D._f(idle.get("count_minutes", idle.get("minutes"))), D._f(idle.get("idle_s"))   # 6b601
     if reason.startswith("idle ") and minutes and idle_s is not None:      # only the timer is left
         left = minutes * 60 - idle_s - max(0.0, now - at)
         if left <= 0:

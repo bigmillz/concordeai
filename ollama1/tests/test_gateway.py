@@ -392,7 +392,9 @@ class TestSleepRoutes(unittest.TestCase):
 
     def test_default_view_has_exactly_four_keys(self):
         v = self.view(call("GET", "/v1/sleep-config"))
-        self.assertEqual(sorted(v), ["enabled", "minutes", "supported", "wake"])
+        # + the quiet hours (6b601): six plain fields, no more
+        self.assertEqual(sorted(v), ["enabled", "minutes", "quiet", "supported", "wake"])
+        self.assertEqual(sorted(v["quiet"]), ["enabled", "end", "now", "sleep_minutes", "start", "tz"])
         self.assertEqual((v["enabled"], v["minutes"], v["wake"]), (False, 30, []))
         self.assertIsInstance(v["supported"], bool)
 
