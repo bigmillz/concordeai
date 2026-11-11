@@ -57796,10 +57796,10 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz:not(.hz-kb) #imp-veil button:focus-visible,.hz:not(.hz-kb) #imp-veil [tabindex]:focus-visible{box-shadow:none}
 /* TIGHT (6b625, per Patrick: "very concise, very tight"): every row one line and 40 high, label left and control right;
    24 px pane padding; no helper sentences; no boxed sub-cards but the server cards; What's new behind one link */
-.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row,.hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil #dictlang-row,.hz #about-veil .toggle-row,.hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}
 .hz #about-veil label.sx-line{display:flex;flex-direction:row-reverse;align-items:center;justify-content:space-between;gap:16px;margin:0;border-top:var(--sx-hl) solid rgba(255,255,255,.08);cursor:pointer}
 .hz #about-veil label.sx-line>span{font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
-.hz #about-veil .sx-rowt b,.hz #about-veil .toggle-row>span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hz #about-veil .sx-rowt b,.hz #about-veil .toggle-row>span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span,.hz #about-veil #dictlang-row>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hz #about-veil .sx-ctls{display:flex;align-items:center;gap:16px;flex:none}
 .hz #about-veil .sx-link{height:28px;padding:0;border:0;background:none;color:var(--sx-ink2);font:450 13px/1 var(--hz-font-ui);cursor:pointer}
 .hz #about-veil .sx-link:hover{color:var(--sx-ink)}
@@ -57857,7 +57857,7 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #about-veil .sx-group>*{margin:0;padding-left:14px;padding-right:14px;border:0}
 .hz #about-veil .sx-group>*+*{background-image:linear-gradient(rgba(255,255,255,.07),rgba(255,255,255,.07));background-size:calc(100% - 14px) 1px;background-position:14px 0;background-repeat:no-repeat}
 .hz #about-veil .sx-group>.toggle-row:hover,.hz #about-veil .sx-group>label.sx-line:hover{background-color:rgba(255,255,255,.025)}
-.hz #about-veil .sx-group>#sx-ver-row,.hz #about-veil .sx-group>#beta-row,.hz #about-veil .sx-group>#look-row,.hz #about-veil .sx-group>#fx-level-row,.hz #about-veil .sx-group>.toggle-row{padding-left:14px;padding-right:14px;border-top:0}
+.hz #about-veil .sx-group>#sx-ver-row,.hz #about-veil .sx-group>#beta-row,.hz #about-veil .sx-group>#look-row,.hz #about-veil .sx-group>#fx-level-row,.hz #about-veil .sx-group>#dictlang-row,.hz #about-veil .sx-group>.toggle-row{padding-left:14px;padding-right:14px;border-top:0}
 .hz #about-veil #sx-ver-row #up-reldate{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hz #about-veil #sx-p-general>#up-notes{margin:-4px 0 12px;padding:12px 14px;border-radius:12px;background:rgba(0,0,0,.2)}
 .hz #about-veil .sx-link{color:#a9c6fb}

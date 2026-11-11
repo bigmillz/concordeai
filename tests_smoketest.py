@@ -44231,7 +44231,8 @@ def _c36_updater(f):
         and "if status.code() == Some(0) {\n            app.exit(0);" in rs
         and "watch_sidecar(app.clone(), log_path.clone());" in rs
         and rs.index("*sc.child.lock().unwrap() = Some(child);") < rs.index("watch_sidecar(app.clone(), log_path.clone());")
-        and rs.count("#[tauri::command]") == 1)
+        and rs.count("#[tauri::command]") == 2   # api_token, and 6b628's pick_folder (which asks api_token first)
+        and "fn pick_folder(webview: tauri::Webview, bridge: State<'_, Bridge>) -> Option<String> {\n    api_token(webview, bridge)?;" in rs)
     # (6b630: the setup's own screen and "Try again"; a venv too old for the engine is made again)
     out["shell: venv bootstrap on a fresh Mac"] = (
         "fn bootstrap_venv(app: &AppHandle, py: &Path) -> Option<bool>" in rs
@@ -45033,7 +45034,7 @@ check("6b542 Balanced (the default): the traced opening without streak or glint,
       and not _c542_bal(_hz_js, _hz_css.replace(".hz.hz-bal .msg.ai.live .who .dot{", ".hz.hz-bal .msg.ai .who .dot{")), "")
 check("6b542 the Horizon rules added stay scoped under .hz and name no outside URL",
       _hz_scoped(_hz_css) and _hz_no_external(_hz_css, _hz_js), "")
-# ==== calm by default, balanced, balance and sting (6b542): end ====
+# ==== CALM BY DEFAULT, BALANCED, BALANCE AND STING (6b542, per Patrick): end ====
 
 # ==== plain names, the Ultra moment, the focus hairline, the writing star (6b544): begin ====
 # Patrick (2026-11-09): the Greek names go ("Fast · Thinking · Pro · Max · Deep"; effort "Low · Medium ·
@@ -45511,9 +45512,10 @@ check("6b555 the composer, flat and low: 99 px at rest on the home and 95 on a p
       and (_ch554_height(_hz_css.replace("padding:0 2px;min-height:26px;max-height:156px;", "padding:0 2px;min-height:52px;max-height:156px;")) or {}).get("home") != 99   # two lines at rest
       and (_ch554_height(_hz_css.replace(".hz #crow .cbtn,.hz #crow #model-chip{width:32px;height:32px}", ".hz #crow .cbtn,.hz #crow #model-chip{width:40px;height:40px}")) or {}).get("phone") != 95,
       "%r" % (_ch554_h,))
-check("6b555 no shine on the composer's keys: send, attach and mic flat at every level, Ultra included (no gradient, sheen, filter, glow, pulse or lift; hairlines and blur-free rings only); the send key ember only with text, the night's arrow on it, a flat lighter ember on hover, a 1 px press; the mic's listening state a plain fill; the mutants are caught",
+check("6b555 no shine on the composer's keys: send, attach and mic flat at every level, Ultra included (no gradient, sheen, filter, glow, pulse or lift; hairlines and blur-free rings only); the send key silver only with text (beta 4), a flat white on hover, a 1 px press; the mic's listening state a plain fill; the mutants are caught",
       _ch554_flat(_hz_css)
-      and ".hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ed5169;color:var(--hz-night)}" in _hz_css
+      and ".hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#fff;color:#141416}" in _hz_css   # silver since beta 4 (per Patrick: no ember fill), its hover white
+      and "#ed5169" not in _hz_css
       and ".hz #crow .cbtn:active,.hz #crow .hz-pick:active,.hz #crow #model-chip:active,.hz #hz-lanes button:active{transform:translateY(1px) scale(.985);transition-duration:80ms}" in _hz_css
       and ".hz #mic.rec{animation:none;color:var(--hz-ink);background:rgba(255,255,255,.12);border-color:var(--hz-line)}" in _hz_css
       and not _ch554_flat(_hz_css + ".hz.hz-ultra #send{background:linear-gradient(90deg,#8fb7ff,#a58bff)}")                       # a gradient at Ultra
@@ -48132,6 +48134,7 @@ def _px_remote(src, autonomy, answers, cmds):
     ns_ = {"remote_driver": lambda: ("local", "stand-in"), "cloud_allowed": lambda: True, "work_ladder": lambda k: [], "AppText": str,
            "REMOTE_SYSTEM": "", "REMOTE_CAP": 4, "_fence_output": lambda o_, n_=0: o_, "_SSH_HOSTKEY_RX": re.compile("x^"),
            "claude_refusal_conf": lambda c_: None, "ssh_wait_back": lambda *a_, **k_: (True, ""), "time": time,
+           "lockout_hint": lambda c_: "",   # 6b620's safer-way line (trust-1), none for these commands
            "_agent_turn": lambda d_, c_, budget=0: json.dumps(acts.pop(0)) if acts else "", "_parse_action": lambda t_: json.loads(t_) if t_ else {},
            "classify_cmd": lambda c_: "danger" if re.search(r"\brm -rf|\bmkfs|\bdd ", c_) else "write" if re.search(r"\b(apt|systemctl)\b", c_) else "read"}
     def _ssh(conf, c_, timeout=0):
@@ -48378,7 +48381,7 @@ def _px_set_ok(r, phone=False):
             and (s_.get("focus") or "").startswith("button.snav|General")
             and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
             and s_.get("rows") == ["General", "Appearance", "Models", "You", "About"] and s_.get("kids") == ["Local", "Cloud", "Servers", "Usage"]
-            and s_.get("genCtl") == 4 and s_.get("adv") == [True]
+            and s_.get("genCtl") == 5 and s_.get("adv") == [True]   # (beta 4) + the Dictation language menu (6b641) in the Microphone group
             and s_.get("panes") == ["sx-whatsnew,about-check,beta-row,autochk-toggle,up-notes,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,about-site,set-spec"]
             and bool(re.match(r"ConcordeAI \d.* \(build \d+\)", (s_.get("about") or [""])[0])) and (s_.get("about") or ["", ""])[1] == "none"
             and _px_tight_ok(r.get("tight") or {})
@@ -49366,8 +49369,9 @@ _F640_FLOW = r'''  await size(1440);
   await ev(`(()=>{const i=document.querySelector("#input");i.value="Find me in this chat";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`);
   await sleep(2500);
   out.closedAtStart = await ev(`document.querySelector("#findbar").hidden`);
-  await ev(`findOpen()`); await sleep(300);
-  for (const w of [1440, 1377, 1100, 760]) { await size(w); await sleep(350);
+  // each width: the bar shut, the window sized, then opened (so it is placed by findOpen itself, not by the resize)
+  for (const w of [1440, 1377, 1100, 760]) { await ev(`document.querySelector("#findbar").hidden=true`); await size(w); await sleep(350);
+    await ev(`findOpen()`); await sleep(300);
     out.cases.push(Object.assign({ w }, await ev(`(()=>{
       const V=s=>{const e=document.querySelector(s);if(!e)return null;const c=getComputedStyle(e),r=e.getBoundingClientRect();
         return r.width>0&&r.height>0&&c.display!=="none"&&c.visibility!=="hidden"?{s,e,l:r.left,t:r.top,r:r.right,b:r.bottom}:null;};
@@ -50547,7 +50551,10 @@ check("6b627 the page: %d mutants served in place of the page, each caught by th
 _R627.stop()
 # (2b) mutated copies of the app, each caught by the live scene it breaks
 _R627_SM = [
-    ("the end mark not checked", "drop", "        if emitted and not fin:\n", "        if False:\n"),
+    # (beta 4) the end mark is read twice since trust-1 (6b620's stream_done marks the answer cut, 6b627's EngineCut
+    # raises), so the mutant drops both readings
+    ("the end mark not checked", "drop", "        stream_done(p0, emitted and not fin, model_label)      # (6b620)\n        if emitted and not fin:\n",
+     "        stream_done(p0, False, model_label)      # (6b620)\n        if False:\n"),
     ("the failure said before the rescue (the old order: it never ran)", "refused",
      "            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:\n",
      "            emit(\"\\n\" + offline_hint(kind, exc))\n            if not sent[0] and not cloud_only and not _srv_lbl and not _srv_only:\n"),
@@ -51126,9 +51133,11 @@ check("trust: every one of the audit's %d lockout commands, %d hidden ones and %
       % (len(_T620_AUDIT), len(_T620_HIDDEN), len(_T620_MORE), len(_T620_KEEP)),
       not _t620_bad and all(_t620_mbad.values()), "%r" % [_t620_bad[:6], _t620_mbad])
 _t620_a1 = _t620_agent(_t620_src, ["systemctl stop ssh", "ls -la", "netplan apply"])
-_t620_a2 = _t620_agent(_t620_src.replace('                   or (autonomy == "auto" and risk != "read")\n                   or risk == "danger")',
-                                         '                   or (autonomy == "auto" and risk != "read"))', 1),
-                       ["systemctl stop ssh"])
+# (beta 4) 6b625 prices the card by rrisk (a batch's danger commands ask on their own); the mutant drops its danger clause
+_t620_m2 = ('                                  or (autonomy == "auto" and rrisk != "read")\n                                  or rrisk == "danger")',
+            '                                  or (autonomy == "auto" and rrisk != "read"))')
+_t620_a2 = (_t620_agent(_t620_src.replace(*_t620_m2, 1), ["systemctl stop ssh"]) if _t620_src.count(_t620_m2[0]) == 1
+            else (["anchor missing"], []))
 check("trust: Full autonomy asks before \"systemctl stop ssh\" and \"netplan apply\" (danger), the second with "
       "\"netplan try\" beside it, and runs neither when told no; a read runs unasked; the mutant (Full never asks) is caught",
       [a[:2] for a in _t620_a1[0]] == [("systemctl stop ssh", "danger"), ("netplan apply", "danger")]
@@ -51797,9 +51806,11 @@ del _T620Stub.connects[:]
 _t620_s = _t620_ask(_T620, "ctrustweb0001", q="Who won the 1998 FIFA World Cup final and what was the score?", web=True)
 _t620_hosts = sorted(set(_T620Stub.connects))
 _t620_done = [json.loads(f[1]) for f in _t620_s[2] if f[0] == "DONE" and f[1]]
-check("trust (live): one searched question reaches only the named engines (the audit's reached nine hosts), and the "
-      "answer names them",
-      _t620_s[0] == 200 and _t620_hosts and set(_t620_hosts) <= {"html.duckduckgo.com", "search.brave.com"}
+# (beta 4) every copy searches the stand-in engine now (MILLENAI_SEARCH_STUB, no test reaches a real one), so the
+# question reaches no host at all, the proxy's audit stays empty, and the answer still names the engines it asked by name
+check("trust (live): one searched question reaches only the named engines (the audit's reached nine hosts; under the "
+      "stand-in, none), and the answer names them",
+      _t620_s[0] == 200 and _t620_hosts == []
       and _t620_done and set(_t620_done[-1].get("web") or []) <= {"DuckDuckGo", "Brave"} and _t620_done[-1].get("web"),
       "%r" % [_t620_hosts, _t620_done])
 # a quit mid-answer: kept, and saved as stopped; a crash mid-answer: the journal puts most of it back, cut
@@ -51877,7 +51888,7 @@ def _l631_blue_ok(o, pg):
             and .3 < o.get("dawn", 0) < .9 and .3 < o.get("dusk", 0) < .9 and len(hs) == 96 and max(steps) <= .12   # eased, never a step
             and '+"float le=dot(earth,vec3(.2126,.7152,.0722)),cw=clamp((max(earth.g,earth.b)-earth.r)/(le+.01),0.,1.);earth=mix(earth,vec3(le),blim*cw);"' in pg
             and pg.index("earth=mix(earth,vec3(le),blim*cw);") < pg.index('"vec3 col=screen(screen(screen(sky*(1.-gx.z*wf*fw*ef),earth),moonL)')   # on the footage, before it meets the sky
-            and "gl.uniform1f(pS.U.blim,hzBlueLim(hr));" in pg and "hiT,hmix,lim,starsOn,blim;" in pg)
+            and "gl.uniform1f(pS.U.blim,hzBlueLim(hr));" in pg and "hiT,hmix,lim,starsOn,dbl,blim;" in pg)   # 6b621's double-star uniform sits before it
 _l631_bo = _l631_blue(page)
 _l631_bm = [(d_, _l631_blue_ok(_l631_blue(page.replace(a_, b_, 1)), page.replace(a_, b_, 1)) if a_ in page else "anchor missing") for d_, a_, b_ in [
     ("no fold by day either", "return .3+.6*e;}", "return .6*e;}"),
