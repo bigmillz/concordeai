@@ -2828,6 +2828,9 @@ _PAGE_HOST |= {"__IMP_DEMO__"}        # 6b529: a dev copy's imp-demo hook, "" ot
 _PAGE_HOST |= {"Int16Array"}         # 6b543: the page turns captured audio into 16 kHz PCM
 _PAGE_HOST |= {"isNaN"}              # 6b544: the writing star tests its unset position (isNaN is on window in WKWebView, WebView2 and Qt)
 _PAGE_HOST |= {"HTMLSelectElement"}  # 6b551: Settings' controls watch a select's own value and selectedIndex (the prototype's setters)
+# beta 4 (6b640): the GPU sky's buffers (Float64Array, Uint16Array) and the prototypes beta 4's controls read
+# (HTMLElement, HTMLTextAreaElement): all four on window in WKWebView, WebView2 and Qt
+_PAGE_HOST |= {"Float64Array", "Uint16Array", "HTMLElement", "HTMLTextAreaElement"}
 _undecl = _jsscan.undeclared(_jsscan.page_script(_MILLENAI_SRC))
 _brand = _MILLENAI_SRC.split("the brand chameleon runs on its own gentle clock")[1][:600]
 check("the page has no reference to an undeclared perf",
@@ -3242,7 +3245,7 @@ check("giants box says what they need, from the catalog, per platform",
       and _it.endswith("Won't run on this computer.")
       and "Mac" not in _gl
       and "128 GB+" not in _MILLENAI_SRC.split('HTML_CONTENT = r"""')[1]
-      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 3,
+      and _MILLENAI_SRC.count("__GIANT_LABEL__") == 2 and "id=\"wiz-gi\"" not in _MILLENAI_SRC,   # the setup wizard's giants row went with 6b630's Starter-first wizard: Settings' box and its fill remain
       "%s | %s | %s | %s" % (_gl, _gt, _wt, _it))
 _rt = {k: z["MODEL_ROUTES"] for k, z in _plat.items()}
 _sp = {k: {l for l, v in z["SUPPORTED"].items() if v} for k, z in _plat.items()}
@@ -5405,7 +5408,7 @@ check("settings: descriptions + Account pane + scoped forget",
 # is the one that opens. Usage (6b325) comes last, Your servers (6b334)
 # just before it. Your stuff (6b530) follows Personality: the person's own
 # things together, under Account.
-_nav = re.findall(r'data-pane="(p-[a-z]+)"', page)
+_nav = re.findall(r'<button class="snav[^"]*" data-pane="(p-[a-z]+)"', page)   # the rail's own buttons (beta 4: 6b625's script names panes in its selectors)
 _panes = re.findall(r'class="spane[^"]*" id="(p-[a-z]+)"', page)
 _want = ["p-about", "p-account", "p-persona", "p-know", "p-cloud", "p-models", "p-servers", "p-usage"]
 # the nav lists Models' three panes as Local, Cloud, Servers (6b350); the panes keep their own order
@@ -7690,6 +7693,7 @@ const aboutVeil={hidden:false};
 const calls=[];
 const api=url=>new Promise(res=>calls.push({url,res}));
 const reply=(i,ok,body)=>calls[i].res({ok,json:async()=>body});
+function sxPl(n,one,many){return (+n||0)===1?one:(many||one+"s");}   // 6b625's plural, defined in its own block
 """ + _MILLENAI_SRC[_MILLENAI_SRC.index("function esc(s){"):
                     _MILLENAI_SRC.index(";}\n", _MILLENAI_SRC.index("function esc(s){")) + 3]
           + _MILLENAI_SRC[_us1:_us2] + r"""
@@ -7861,7 +7865,7 @@ _mac_left = re.findall(r"\b(?:[Tt]his|[Yy]our|[Tt]he) [Mm]ac\b", _pc_page)
 check("off a Mac the app says PC; on a Mac nothing changes",
       not _mac_left and _mac_page == _page_src
       # (6b551) settings-2's approved copy says neither Mac nor PC here: "Setting up." and "On this computer"
-      and '"Setting up. Chat opens when the first model is ready.");' in _pc_page
+      and '"Pick a set. Chat works as soon as the first model is here.");' in _pc_page   # 6b630's approved copy, neither Mac nor PC
       and '<div class="ros-gh">On this computer</div>' in _pc_page
       and "HTML_CONTENT = pc_words(HTML_CONTENT)" in _MILLENAI_SRC
       and "Pictures on this computer need Apple" in _MILLENAI_SRC
@@ -22578,7 +22582,7 @@ def _soc_flyout(src):
         and "        ev.stopPropagation();hideTierPop();closeEngMenus();openAdv();});" in src
         and src.count("    wireModeRow(el);\n") == 2,
         # Esc and an outside click
-        "esc wired": "    if(engMenuEsc()){e.preventDefault();return;}\n    if(generating&&abortCtl)" in src,
+        "esc wired": "    if(engMenuEsc()){e.preventDefault();return;}\n    if(typeof sxHostEsc===\"function\"&&sxHostEsc()){e.preventDefault();return;}   // the host sheet (6b625)\n    if(robStopHere()){" in src,   # the menu, then the host sheet, before any stop (6b625, 6b627)
         "outside": "  if(em&&!e.target.closest(\"#engmenu\")&&!e.target.closest(\"#engsub\")\n"
                    "     &&!e.target.closest(\"#tierpop\")\n"
                    "     &&!e.target.closest(\"#model-chip\"))closeEngMenus();" in src
@@ -30903,7 +30907,7 @@ _M53_MUT = [
     ("no repaint when the servers go", "    srvAllPaint();return;\n  }", "    return;\n  }"),
     ("focus not moved in", 'const c=document.getElementById("srvall-close");if(c)c.focus();', ""),
     ("focus not given back", "if(back&&back.focus)back.focus();", ""),
-    ("close that says it closed when it wasn't open", 'if(!v||v.hidden)return false;', 'if(!v)return false;'),
+    ("close that says it closed when it wasn't open", '\n  if(!v||v.hidden)return false;', '\n  if(!v)return false;'),   # (beta 4) the line, not 6b625's host sheet's twin
     ("Escape not closing it", "    if(srvAllClose()){e.preventDefault();return;}\n", ""),
     ("a click outside not closing it", 'v.addEventListener("click",e=>{if(e.target===v)srvAllClose();});', ""),
     ("Tab free to leave", 'if(e.key==="Tab"){e.preventDefault();$("#srvall-close").focus();}', ""),
@@ -37608,12 +37612,14 @@ console.log(JSON.stringify([unreadDecision(true,false,false,"a","b",true),unread
 _ur = json.loads(subprocess.run(["node", _uj], capture_output=True, text=True, timeout=30).stdout or "[]")
 check("unread decision: finished in another chat marks; in the open, visible chat it does not; hidden window marks; errors, stops and empty answers never (6b471)",
       _ur == [True, False, True, False, False, False], str(_ur))
-check("unread dot: 7px solid blue, out of flow, aria-label, menu reads 30 days / All time, opening a chat clears it (6b471)",
+check("unread dot: 7px solid blue in Classic, 6 px silver in Horizon, out of flow, aria-label, menu reads 30 days / All time, opening a chat clears it (6b471)",
       "--unread:#4a8cf7" in page and ".chat-item .cdot{position:absolute;" in page
       and "width:7px;height:7px" in page and "background:var(--unread)" in page
       and 'class="cdot" role="img" aria-label="unread"' in page
       and '[14,"14 days"],' in page and '"1 month"' not in page.split("RECENT_RANGES=")[1][:200]
-      and 'field:"unread"' in page and "markSeen();\n}" in page)
+      and 'field:"unread"' in page and "markSeen();\n  chatArrive(id);" in page   # opening clears it, then the chat lands (6b590)
+      # Horizon (6b624, the less-blue pass): the dot silver at the row's end, 6 px; Classic keeps its blue 7 px
+      and ".hz .chat-item .cdot{left:auto;right:10px;width:6px;height:6px;margin-top:-3px;background:var(--hz-ink);box-shadow:none}" in page)
 with tempfile.TemporaryDirectory() as _cd:
     _o = lambda ops: _cs["chat_ops"](ops, _cd)["results"]
     _ua = "c" + "u" * 26
@@ -38956,7 +38962,7 @@ _exec_names(_g18, {"_SC_SPLIT_RX", "_SC_NUM_RX", "_SC_ASK_RX", "_SC_WORLD_RX", "
                    "srv_role_ok",
                    # (6b626) needs_search asks answer_kind first: a sum, the chat itself, a plain how-to
                    "answer_kind", "_ak_arith", "_AK_LEAD_RX", "_AK_TAIL_RX", "_AK_NUM", "_AK_OP", "_AK_EXPR_RX",
-                   "_AK_OPS_RX", "_AK_CHAT_RX", "_AK_HOWTO_RX", "_AK_WORLD_RX"})
+                   "_AK_OPS_RX", "_AK_CHAT_RX", "_AK_HOWTO_RX", "_AK_WORLD_RX", "_AK_SOCIAL_RX", "_AK_SOCIAL_NOT_RX"})
 _g18["server_label"] = lambda l: isinstance(l, str) and " · " in l
 _g18["SERVER_SEP"] = " · "
 _Q27 = ("A flight+hotel package is $2,400. Booking separately: flight $1,350 and the hotel $95 a night for 11 "
@@ -42462,6 +42468,7 @@ def _c546_page(src):
     js = ("const els={};const $=q=>els[q]||(els[q]={hidden:true,innerHTML:'',classList:{add(){},remove(){}},"
           "offsetWidth:0});\nlet pendingImages=[],docErr='',input={value:'When?'};const ICO={file:'<svg></svg>'};\n"
           "const document={createElement:()=>({className:'',innerHTML:''})};\n"
+          "function chatClamp(){}   // 6b590's fold of a long question, not under test here\n"
           + "\n".join(cst(n) for n in ("DOC_MODE_TXT", "DOC_PDF_BIG", "DOC_PDF_BAD")) + "\n"
           + "\n".join(_js522(pg, n) for n in ("esc", "docSize", "docPl", "docPages", "docK", "docTip", "paintChips",
                                                 "docNeed", "docAsks", "paintDocWarn", "fmtTok", "userBody")) + "\n"
@@ -44873,6 +44880,14 @@ def _c542_over(fg, bg, a):
     return "#" + "".join("%02x" % round(int(fg[i:i + 2], 16) * a + int(bg[i:i + 2], 16) * (1 - a)) for i in (1, 3, 5))
 _c542_ember = re.search(r"--hz-ember:(#[0-9a-f]{6})", _hz_css)
 _c542_ember = _c542_ember.group(1) if _c542_ember else "#000000"
+# (beta 4) the ember's places, rule by rule (the count, 10 in 6b555, could not follow beta 4's new focus rings and
+# error lines): every Horizon rule that paints var(--hz-ember) is a keyboard focus ring or a field's focus, the send
+# strike, an error or failure line, or a danger tag or card; anything else (a filled key, a hover, a chip) fails
+def _c542_ember_places(css):
+    body_ = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules_ = re.findall(r"([^{}]*)\{([^{}]*var\(--hz-ember\)[^{}]*)\}", body_)
+    ok_rx = re.compile(r":focus|hz-strike|\.err\b|chat-err|retrybtn|ghostnote|\.fail\b|risk\.d|danger|:root", re.I)
+    return len(rules_) >= 10 and all(ok_rx.search(sel_) for sel_, _ in rules_)
 def _c542_sting(css, js, ember):
     return (_c542_cr(ember, "#030305") >= 4.5 and _c542_cr(ember, _c542_over("#ffffff", "#030305", .075)) >= 4.5   # AA on the night and on the composer's glass
             and _c542_cr("#030305", ember) >= 4.5                                                                 # the night's arrow on the ember key (6b555: 5.2:1)
@@ -44881,21 +44896,25 @@ def _c542_sting(css, js, ember):
             and 'const c=$("#composer");if(!c||!hzMotionOK()||!c.animate)return;' in js
             and '{duration:300,easing:"cubic-bezier(.3,0,.2,1)",fill:"forwards"});\n  hzFxTask(hzS.fx,[a],()=>{s.hidden=true;},300);' in js   # once, 300 ms, then gone
             and ".hz #composer:focus-within{border-color:var(--hz-line);" in css and "#composer.hastext:focus-within" not in css   # a focused composer: the silver line (6b555)
-            and ".hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:var(--hz-night);box-shadow:none}" in css
+            # (beta 4, per Patrick: the send key SILVER once there's text, no rose anywhere; the edit's Send too)
+            and ".hz #composer.hastext #send:not(:disabled):not(.stop){background:#e9ebf0;color:#141416;box-shadow:none}" in css
+            and ".hz .uedit-ok{background:#e9ebf0;color:#141416;border:0}" in css and _c542_ember_places(css)
             and ".hz #send{width:36px;height:36px;border-radius:8px;background:transparent;color:var(--hz-ink);box-shadow:inset 0 0 0 1px var(--hz-line);" in css
             and ".hz #send svg{stroke-width:1.5;transform:translateY(-.5px)}" in css
             and ".hz .msg.ai:has(>.retrybtn)>.body,.hz .msg.ai .body.err,.hz .ghostnote{border-left:1px solid var(--hz-ember);padding-left:12px}" in css
             and "outline:0;box-shadow:0 0 0 1px var(--hz-ember)}" in css
-            and css.count("var(--hz-ember)") == 10 and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the beam's keyboard pill, 6b544; 6b555: the keyboard's rings on the send key, the filled send key, a lane and a row; the text-and-focus border gone)
+            and "infinite" not in css[css.index("/* ---- the sting"):css.index("/* ---- BALANCED (6b542")]   # the ember never loops (the beam's keyboard pill, 6b544; 6b555: the keyboard's rings on the send key, the filled send key, a lane and a row; the text-and-focus border gone)
             and ':root{--hz-r-composer:14px;--hz-ember:' in css
             and "rotate(45deg);transition:transform 120ms ease}" not in css and ".hz .hz-elevel{font-family:var(--hz-font-mono)" not in css   # the beam's diamond and caps went in 6b552
             and ".hz .hz-ib,.hz .cbtn,.hz #attach,.hz #model-chip{border-radius:8px}" in css and ".hz .hz-pick{height:36px;border-radius:8px;" in css   # the row's controls all 36 (6b555)
             and 'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/>' in js)
-check("6b542 Sting: one ember (%s), AA on the night and the glass, at the send strike (once, 300 ms), the full send key (the night's arrow on it, 6b555), an error's left rule and the keyboard focus ring, never looping; no balance beam left (6b552); 8 px keys, a 14 px composer; the mutants are caught" % _c542_ember,
+check("6b542 Sting: one ember (%s), AA on the night and the glass, at the send strike (once, 300 ms), never on a filled key (the send key silver with text, beta 4, per Patrick), an error's left rule and the keyboard focus ring, never looping; no balance beam left (6b552); 8 px keys, a 14 px composer; the mutants are caught" % _c542_ember,
       _c542_sting(_hz_css, _hz_js, _c542_ember)
       and not _c542_sting(_hz_css, _hz_js, "#8a1c2b")                                                     # too dark on the night
       and not _c542_sting(_hz_css.replace("transform:scaleX(0);opacity:0}", "transform:scaleX(0);opacity:0;animation:hzRing 2s linear infinite}"), _hz_js, _c542_ember)
-      and not _c542_sting(_hz_css + ".hz .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}", _hz_js, _c542_ember), "")   # the diamond back
+      and not _c542_sting(_hz_css + ".hz .hz-sl-thumb{transform:translateX(var(--hz-eff-px,0px)) rotate(45deg);transition:transform 120ms ease}", _hz_js, _c542_ember)
+      and not _c542_sting(_hz_css.replace(".hz #composer.hastext #send:not(:disabled):not(.stop){background:#e9ebf0;color:#141416;box-shadow:none}", ".hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:var(--hz-night);box-shadow:none}"), _hz_js, _c542_ember)   # the ember key back (beta 4)
+      and not _c542_sting(_hz_css + "\n.hz .hz-chipx{background:var(--hz-ember)}", _hz_js, _c542_ember), "")   # the diamond back; an ember fill on a chip
 # ONE GREETING: hzHeadline run in node on a stand-in element: one text node at every level (6b555: the preview's
 # greeting, never a copy); Calm shows it at once, Balanced and Full wait for the trace; a tracer in flight is killed first
 _c542_hl_js = _jsfn(_hz_js, "function hzHeadline(g,text){")
@@ -46547,7 +46566,7 @@ _b4_mr = [(d_, _b4_ok(_b4_out(page.replace(a_, b_, 1))) if a_ in page else "anch
 check("6b580 the flow's mutants are each caught: %s" % "; ".join(d_ for d_, _ in _b4_mr), all(r_ is False for _, r_ in _b4_mr), "%r" % (_b4_mr,))
 # the css: the column only with room (hz-flow, the chat at least 1000 wide), the proof line otherwise; rounded-square nodes,
 # no circles in the block; the header's chips folded into the dot's card; the byline and the working line share one row
-_b4_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE PROOF LINE AND THE READING (6b580"):_MILLENAI_SRC.index("/* ============================================================ HORIZON end */")]
+_b4_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE PROOF LINE AND THE READING (6b580"):_MILLENAI_SRC.index("/* ==== THE CHAT (6b590", _MILLENAI_SRC.index("/* ==== THE PROOF LINE AND THE READING (6b580"))]   # 6b580's own block (beta 4: the later blocks after it are checked by their own)
 def _b4_layout(css, js):
     return (".hz .msg.ai>aside.behind{display:none}" in _MILLENAI_SRC
             and ".hz.hz-flow .msg.ai>aside.behind{display:block;grid-column:2;grid-row:1/span 12;align-self:start;position:sticky;top:96px;" in css
@@ -46999,7 +47018,8 @@ _C590_M = [
      "the actions fade in on hover, nothing moves"),
     ("the raw error", "err", [["  if(isErr&&!wasAborted)chatErrPaint(aiDiv,full);", ""]], "kind error lines with Try again, the raw text only in the tooltip"),
     ("a big paste as text", "paste", [["  input.addEventListener(\"paste\",chatPaste);", ""]], "a big paste is a file; a short one is text"),
-    ("the jump key gone when it lands", "keys", [["(generating||chatUnseen)&&!chatPinned", "(generating)&&!chatPinned"]],
+    # (beta 4) 6b624's chatFar keeps the key a screen up as well, so the mutant takes both reasons a landed answer keeps it
+    ("the jump key gone when it lands", "keys", [["(generating||chatUnseen)&&!chatPinned&&chatGap()>CHAT_SLACK)||chatFar());", "(generating)&&!chatPinned&&chatGap()>CHAT_SLACK));"]],
      "the jump key: while it streams out of sight, and for one that landed there"),
     ("no announcement", "keys", [["  chatSay(stopped?", "  void(stopped?"]], "one announcement per answer"),
     ("the old 10 px, 900 ms rise", "motion", [["animation:chatTurnIn .2s var(--hz-ease-out) both}", "animation:hzRise .9s var(--hz-ease-out) both}"]],
@@ -48208,7 +48228,7 @@ _PX_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000)
       return {rec:m.classList.contains("rec"),cv:!!cv,ink,w:Math.round(m.getBoundingClientRect().width),send:getComputedStyle(document.querySelector("#send")).backgroundColor,val:document.querySelector("#input").value};})()`);
     await click("#mic"); await sleep(800); await ev(`(()=>{const i=document.querySelector("#input");i.value="";i.dispatchEvent(new Event("input",{bubbles:true}));return 1;})()`);
     // ---- the Code lane: the host chip, its sheet, a danger command's own card
-    await ev(`(()=>{switchLane("code");setAgent("Remote");return 1;})()`); await sleep(500);
+    await ev(`(()=>{switchLane("code");chatFresh();setAgent("Remote");return 1;})()`); await sleep(500);   // (beta 4) Code opens its own last chat since 6b628: New chat for its home
     out.chip = await ev(`(()=>{const b=document.querySelector("#sx-host");return {shown:!b.hidden&&getComputedStyle(b).display!=="none",text:b.textContent,ph:document.querySelector("#input").placeholder,
       line:(document.querySelector("#hero #sx-lanehome")||{}).textContent||"",side:!!document.querySelector("#sidebar #remote-bar")&&getComputedStyle(document.querySelector("#remote-bar")).display};})()`);
     out.chipHit = await click("#sx-host"); await sleep(300);
@@ -48274,7 +48294,7 @@ def _px_set_ok(r, phone=False):
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
             and (r.get("you") or {}).get("head") == "You" and (r.get("you") or {}).get("fields") == ["user-name", "persona"]
-            and (r.get("you") or {}).get("labels") == ["What should Concorde call you?", "Anything to keep in mind?"]
+            and (r.get("you") or {}).get("labels") == ["What should we call you?", "Anything to keep in mind?"]
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True

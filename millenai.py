@@ -55577,7 +55577,7 @@ __HZ_FONTS__
 /* ---- the sidebar on the home: closed unless opened; in a conversation open unless hidden */
 .hz body:has(#main #hero):not(.sbopen) #sidebar{display:none}
 .hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}
-.hz.sbhide body:not(:has(#main #hero)) #sidebar{display:none}
+.hz.sbhide body:not(:has(#main #hero)):not(.sbopen) #sidebar{display:none}   /* the drawer under 760 opens even when the sidebar was shut (beta 4) */
 .hz #mburger{display:none!important}
 /* ---- the home: the headline centred in the room above the composer, the
    composer floating mid-page, recent chats as hairline rows under it */
@@ -55975,8 +55975,8 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #send svg{stroke-width:1.5;transform:translateY(-.5px)}
 .hz #send:hover{background:rgba(255,255,255,.04);color:var(--hz-ink);box-shadow:inset 0 0 0 1px rgba(255,255,255,.6);transform:none}
 .hz #send:disabled{background:transparent;color:var(--hz-ink-3);box-shadow:inset 0 0 0 1px var(--hz-hair)}
-.hz #composer.hastext #send:not(:disabled):not(.stop){background:var(--hz-ember);color:var(--hz-night);box-shadow:none}
-.hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#ed5169;color:var(--hz-night)}
+.hz #composer.hastext #send:not(:disabled):not(.stop){background:#e9ebf0;color:#141416;box-shadow:none}   /* silver, never ember (per Patrick, beta 4) */
+.hz #composer.hastext #send:not(:disabled):not(.stop):hover{background:#fff;color:#141416}
 .hz #send.stop,.hz #composer.hastext #send.stop{background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 0 0 1px var(--hz-hair-3)}
 /* ---- the sting: on send, one 1 px ember line strikes along the composer's top edge (hzStrike,
    about 300 ms, once); still under reduced motion and with the effects off */
@@ -56920,8 +56920,8 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
 .hz .uedit-x,.hz .chat-err-go,.hz .msg.ai>.retrybtn,.hz .offerrow button{background:transparent;color:var(--chat-ink);border:var(--chat-hw) solid var(--chat-line-2)}
 .hz .uedit-x{color:var(--chat-ink-2)}
 .hz .uedit-x:hover,.hz .chat-err-go:hover,.hz .msg.ai>.retrybtn:hover,.hz .offerrow button:hover{background:rgba(255,255,255,.06);color:var(--chat-ink);border-color:rgba(255,255,255,.24)}
-.hz .uedit-ok{background:var(--hz-ember);color:var(--hz-night);border:0}
-.hz .uedit-ok:hover{background:#ed5169}
+.hz .uedit-ok{background:#e9ebf0;color:#141416;border:0}   /* silver, like the send key (per Patrick, beta 4) */
+.hz .uedit-ok:hover{background:#fff}
 .hz .uedit-ok:disabled{background:rgba(255,255,255,.08);color:var(--chat-ink-3);cursor:default}
 .hz .msg.user.saving .uedit{opacity:.6}
 /* ---- the actions, yours and the answer's: small grey keys that fade in on hover or focus and take no room of their
@@ -57772,6 +57772,9 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #findbar input{font:450 13px/20px var(--hz-font-ui);letter-spacing:-.005em;color:var(--hz-ink)}
 .hz #findbar button{width:28px;height:28px;border-radius:8px;font-size:14px}
 /* ==== find (beta 4): end ==== */
+/* the greeting's bloom (its ::before, 22 % wider than the words) never makes the page scroll sideways on a phone (beta 4:
+   24 px at 390); clipped across only, at the home's own edges, where the light has already faded */
+.hz #hero{overflow-x:clip}
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -60342,7 +60345,7 @@ function modeShow(which){
   // the starter chips are lane-specific (6b250) — repaint on every switch
   if(typeof syncSuggest==="function")setTimeout(syncSuggest,0);
   if(globalThis.hzReady){hzLanePaint();setTimeout(hzHistoryPaint,0);}   // Horizon's lanes, and the home's rows (beta 4)
-  sxLaneSoon();                          // the lane's placeholder, home line, host chip, funnel form (6b625)
+  (typeof sxLaneSoon==="function"&&sxLaneSoon());                          // the lane's placeholder, home line, host chip, funnel form (6b625)
 }
 // each tab owns its lane: opening CODE activates a code specialist on
 // the spot (the tab IS the mode); leaving it drops back to the standard
@@ -60418,7 +60421,7 @@ function setAgent(name,guess){
   paintAgents();
   if(typeof wsRefresh==="function")wsRefresh();
   if(typeof remoteRefresh==="function")remoteRefresh();
-  sxLaneSoon();                          // 6b625
+  (typeof sxLaneSoon==="function"&&sxLaneSoon());                          // 6b625
 }
 
 /* -------------------------------------------------- task library (6b250) */
@@ -60556,7 +60559,7 @@ async function remoteRefresh(){
         :"Key-only SSH. On a new server, install your key first: "+keyCopyCmd("user","host");
     }
   }catch(e){}
-  sxLaneSoon();                        // the host chip says the saved host (6b625)
+  (typeof sxLaneSoon==="function"&&sxLaneSoon());                        // the host chip says the saved host (6b625)
 }
 // the key-install command for this computer (6b317): Windows has no
 // ssh-copy-id, so a PC gets the PowerShell line that does the same
@@ -65263,7 +65266,7 @@ function resetHero(){
   inner.innerHTML='<div id="hero"><p class="greet">'+esc(greeting())+'</p></div>';
   paintSuggest();
   if(globalThis.hzReady)hzHomePaint();        // Horizon's words and rows (6b526)
-  sxLaneSoon();                               // the lane's home (6b625)
+  (typeof sxLaneSoon==="function"&&sxLaneSoon());                               // the lane's home (6b625)
 }
 // NAMING (6b322): a small model names the chat once, through two set
 // operations; each lands only if the field still holds what the page
@@ -66085,7 +66088,7 @@ function fnHzReady(box,d){
   if(!box.classList.contains("hz-stage"))return;
   box.classList.remove("wait");
   const p=box.querySelector(".fpath");if(p)p.textContent="Stage "+d.stage+" of "+d.total;
-  sxFnProg(box,(d.stage-1)/Math.max(1,d.total));sxLaneSoon();   // stage N of M on the trail; "Or type your own answer" (6b625)
+  sxFnProg(box,(d.stage-1)/Math.max(1,d.total));(typeof sxLaneSoon==="function"&&sxLaneSoon());   // stage N of M on the trail; "Or type your own answer" (6b625)
 }
 // a pick (a card, or words typed in the box): the stage is done, its choice flies into the trail
 function fnHzPick(box,d,label){
@@ -66108,7 +66111,7 @@ function fnHzPick(box,d,label){
 function fnHzDone(box,d){
   if(!box.classList.contains("hz-stage"))return false;
   const c=box.closest(".hz-fn"),w=c&&c.querySelector(":scope>.who");if(w)w.textContent="Funnel · done";
-  sxFnProg(box,1);sxLaneSoon();   // 6b625
+  sxFnProg(box,1);(typeof sxLaneSoon==="function"&&sxLaneSoon());   // 6b625
   box.className="hz-stage verdict";box.setAttribute("role","listitem");
   box.querySelector(".body").innerHTML='<span class="fn-k">The pick</span>'+renderMD(d.summary||"");
   return true;
@@ -73349,7 +73352,7 @@ async function hzTraceIn(el,opts){
 // THE HEADLINES (beta 4, per Patrick: "I would like more variety in the headlines"): a pool, each line with when it
 // may show: h [from,to] hours (wraps past midnight), d weekdays (0 = Sunday), m months (0-11), lane ("ai", "code",
 // "funnel"), first (the first open only, true; returning only, false); n is the same line with the person's name
-// ({name}, from "what should Concorde call you"), used SOME of the time, never always. One line is picked per visit
+// ({name}, from "what to call you" in Settings), used SOME of the time, never always. One line is picked per visit
 // to the home (the pick holds while the conditions hold, so a repaint never swaps it), never the line shown last
 // time when another fits, a lane's own lines first. Every line is the same one greeting: the same face, size and
 // draw-in (hzHeadline, hzHeadlineShow); a longer line is fitted to one line (hzGreetFit) and a short one is never
@@ -75687,7 +75690,7 @@ function sxSetSimplify(){
   if(pp){const h=pp.querySelector(".set-h");if(h)h.textContent="You";
     pp.querySelectorAll(":scope>.tdesc").forEach(x=>x.classList.add("sx-gone"));
     const nm=g("#user-name"),ps=g("#persona");
-    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should Concorde call you?"));}
+    if(nm){nm.placeholder="Optional";nm.before(sxLabel("user-name","What should we call you?"));}
     if(ps){ps.placeholder="Short answers, and say what you're unsure of.";ps.before(sxLabel("persona","Anything to keep in mind?"));}
     sxAdv(pp,[g("#acct-card"),g("#acct-crypto"),g("#imp-settings-row"),g("#about-forget"),g("#forget-steps"),g("#sugg-toggle"),g("#sugg-note")]);}
   if(pa)pa.querySelectorAll(":scope>.tdesc,:scope>.set-h").forEach(x=>x.classList.add("sx-gone"));
