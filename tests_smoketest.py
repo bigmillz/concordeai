@@ -75,6 +75,7 @@ class Instance:
         self.env.update(MILLENAI_DEV="1", MILLENAI_HOME=self.home,
                         MILLENAI_NOWINDOW="1", MILLENAI_PORT=str(port))
         self.env.update(env or {})
+        self.env.setdefault("MILLENAI_SEARCH_STUB", "1")   # (beta 4) no copy of the gauntlet searches the real web
         self.seed = seed
         self.proc = self.key = self.token = self.boot = None
 
@@ -49313,6 +49314,20 @@ _s640_msrc = _MILLENAI_SRC.replace('        return "social"            # small t
 check("6b640 small talk never searches: \"What are we up to today?\" and ten like it are social (no web, no carried evidence, a short human answer with one question back); the weather, the news, a race result, TV tonight and stocks still search; the mutant is caught",
       _s640_ok(_s640_r, _MILLENAI_SRC) and _s640_msrc != _MILLENAI_SRC and not _s640_ok(_s640_run(_s640_msrc), _s640_msrc),
       json.dumps(_s640_r)[:900])
+# NO TEST SEARCHES THE REAL WEB (6b640, the rule of 2026-11-11: our traffic got Patrick's address a bot page at
+# DuckDuckGo and 429s at Brave): every copy this run starts carries MILLENAI_SEARCH_STUB=1, honoured only in a dev copy,
+# which swaps DDGS for a stand-in and keeps the offline probe home. Mutants: the stub honoured outside a dev copy; the
+# probe asking a real host under the stub.
+def _w640_ok(src, me):
+    return ('SEARCH_STUB = bool(DEV_HOME) and os.environ.get("MILLENAI_SEARCH_STUB", "").strip() == "1"' in src
+            and "if SEARCH_STUB:\n    DDGS = _StubDDGS\n    HAS_SEARCH = True" in src and '"MILLENAI_SEARCH_STUB",' in src
+            and "def _net_probe():\n    if SEARCH_STUB:\n        return" in src and "http://127.0.0.1:9/stand-in/" in src
+            and 'self.env.setdefault("MILLENAI_SEARCH_STUB", "1")' in me)
+_w640_me = open(os.path.abspath(__file__)).read()
+check("6b640 no test searches the real web: every copy starts with the stand-in engine (a dev copy's only), the offline probe stays home; the mutants are caught",
+      _w640_ok(_MILLENAI_SRC, _w640_me)
+      and not _w640_ok(_MILLENAI_SRC.replace('SEARCH_STUB = bool(DEV_HOME) and os.environ', 'SEARCH_STUB = True and os.environ', 1), _w640_me)
+      and not _w640_ok(_MILLENAI_SRC.replace("def _net_probe():\n    if SEARCH_STUB:\n        return", "def _net_probe():\n    if False:\n        return", 1), _w640_me), "")
 # ==== 6b640 beta-4 integration: end ====
 
 # ==== 6b626 answers: begin ====

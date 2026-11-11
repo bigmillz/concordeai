@@ -668,6 +668,8 @@ _KNOWN_ENV = frozenset((
     # a dev copy's release feed (6b537): the updater proven against a local
     # stand-in for api.github.com; honoured only when DEV_HOME is set
     "MILLENAI_UPDATE_API",
+    # a dev copy's stand-in search engine (beta 4): no test ever reaches a real one
+    "MILLENAI_SEARCH_STUB",
     # a dev copy's dictation helper (6b543; missing here until 6b641, so a
     # copy that named one refused to start); honoured only when DEV_HOME is set
     "MILLENAI_DICT_HELPER",
@@ -890,6 +892,45 @@ except ImportError:
         HAS_SEARCH = False
     except ImportError:
         HAS_SEARCH = False
+
+# A TEST COPY NEVER SEARCHES THE REAL WEB (beta 4, the rule of 2026-11-11: our test traffic got Patrick's address a
+# bot page at DuckDuckGo and 429s at Brave, and his own app's searches came back empty). With MILLENAI_SEARCH_STUB=1 a
+# dev copy (only a dev copy) searches a stand-in: every engine call answers at once with a few made-up hits about the
+# query, whose pages sit on a closed local port (so a page read fails fast and nothing leaves this computer), and the
+# offline probe asks nothing. The gauntlet starts every copy this way.
+SEARCH_STUB = bool(DEV_HOME) and os.environ.get("MILLENAI_SEARCH_STUB", "").strip() == "1"
+
+
+class _StubDDGS:
+    """The stand-in engine (SEARCH_STUB): DDGS's text, news and images, made up from the query."""
+    def __init__(self, *a, **k):
+        pass
+
+    @staticmethod
+    def _hits(query, n, kind):
+        q = " ".join(str(query or "").split())[:80] or "the question"
+        out = []
+        for i in range(1, max(1, min(int(n or 5), 8)) + 1):
+            url = "http://127.0.0.1:9/stand-in/%s/%d" % (kind, i)
+            out.append({"title": "%s: stand-in source %d" % (q, i), "href": url, "url": url,
+                        "body": "A stand-in search result %d about %s, for tests; it says nothing real." % (i, q),
+                        "date": "2026-11-11T00:00:00+00:00", "source": "Stand-in", "image": url + ".jpg",
+                        "thumbnail": url + "-t.jpg", "width": 640, "height": 480})
+        return out
+
+    def text(self, query, max_results=5, **k):
+        return self._hits(query, max_results, "text")
+
+    def news(self, query, max_results=5, **k):
+        return self._hits(query, max_results, "news")
+
+    def images(self, query, max_results=5, **k):
+        return self._hits(query, max_results, "images")
+
+
+if SEARCH_STUB:
+    DDGS = _StubDDGS
+    HAS_SEARCH = True
 
 try:
     import psutil
@@ -6749,6 +6790,8 @@ def net_err_offline(exc) -> bool:
 
 
 def _net_probe():
+    if SEARCH_STUB:
+        return                           # a test copy asks no real host (beta 4)
     req = urllib.request.Request(NET_PROBE_URL, method="HEAD", headers={
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
                       "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"})
