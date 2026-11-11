@@ -22407,6 +22407,14 @@ the fall back paints and saves nothing).
 reach, said once), Wake only when asleep, "Use for answers", the rest under Advanced; its copy approved by Patrick as
 written. The rest of 6b625's Settings copy (the sections, "How much the sky moves.") is still waiting on him.
 
+**The near-60 fps cap in the Tauri shell (from 6b617's finding): beta 5.** Measured on this Mac's 120 Hz screen with
+a bare WKWebView (scratchpad `b4i/fps/`): rAF 60 fps by default; switching "PreferPageRenderingUpdatesNear60FPSEnabled"
+off through WKPreferences' feature SPI AFTER the web view exists (the only hook Tauri/wry give, `with_webview`) leaves
+it at 60, even after a reload; switched off on the configuration BEFORE the web view is made, 120. wry builds its
+configuration inside, so the port needs a hook before creation (a vendored wry patch, or swizzling WKWebView's
+initWithFrame:configuration: in the shell before the window opens): not cheap or safe enough for a frozen beta 4.
+The effects level already follows prefs.json since 6b628 (fx_level); a fresh install has none, so it starts Balanced.
+
 **Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
