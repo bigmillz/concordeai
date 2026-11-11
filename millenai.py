@@ -54562,7 +54562,7 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
 .hz.hz-kb .mab:focus-visible,.hz.hz-kb .umore:focus-visible,.hz.hz-kb .uedit-row button:focus-visible,.hz.hz-kb .chat-err-go:focus-visible,.hz.hz-kb #jumpdown:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
 /* ---- the jump key: a 32 px flat key with a drawn arrow, only while an answer is on its way or has landed out of
    sight and you are up the page; it fades in and out (the hidden attribute still says whether it is there) */
-.hz #jumpdown,.hz #jumpdown[hidden]{display:flex;width:32px;height:32px;border-radius:8px;left:calc(50% - 16px);transform:none;padding:0;
+.hz #jumpdown,.hz #jumpdown[hidden]{display:flex;width:32px;height:32px;border-radius:8px;left:50%;margin-left:-16px;transform:none;padding:0;
   background:var(--chat-bubble);color:var(--chat-ink-2);border:var(--chat-hw) solid var(--chat-line-2);
   -webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 4px 12px -6px rgba(0,0,0,.7);
   transition:opacity .18s var(--hz-ease-out),visibility 0s,background .15s var(--hz-ease-out),color .15s var(--hz-ease-out)}
@@ -54595,7 +54595,7 @@ html.hz #sidebar{background:var(--chat-panel);-webkit-backdrop-filter:none;backd
   color:var(--chat-ink);-webkit-font-smoothing:antialiased}
 .hz #chat-search input:focus{box-shadow:inset 0 0 0 var(--chat-hw) var(--chat-line-2)}
 /* ---- for a screen reader: the landed answer, once */
-.chat-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+:root .chat-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
 @media (prefers-reduced-motion:reduce){
   .hz #chat-inner>.msg,.hz #chat-inner.chat-swap,.hz .uedit{animation:none!important}
   .hz #input,.hz .msg .mact,.hz #jumpdown,.hz #jumpdown[hidden],.hz #chat-queued{transition:none}}
