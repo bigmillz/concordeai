@@ -39892,7 +39892,7 @@ check("horizon: the night is one GPU canvas over the app's own aerial (same-orig
       and 'document.documentElement.classList.add("hz-novfx")' in _hz_js and ".hz.hz-novfx #hz-vid{opacity:1;" in _hz_css
       and "S.level=function(m,e){e=Math.max(0,Math.min(4,e));S.lvl=[.2,.28,.45,.58,.66][Math.max(0,Math.min(4,m))]+Math.min(e,3)*.035+Math.max(0,e-3)*.14;S.setNeon();};" in _hz_js   # (6b621) Ultra lifts the curtain .14 more   # the preview's level (6b555): Ultra lifts by its own light
       and "S.setBusy=function(on){S.boostTo=on?1.7:1;busyOn=on;S.busy=on;S.setNeon();};" in _hz_js
-      and "neon=neonBase*(1+.56*ultraE*amp_+.45*surge*amp_);" in _hz_js
+      and "neon=neonBase*(1+.56*ultraE*amp_+.45*surge*slm_);surgeNow=surge;" in _hz_js and 'const amp_=skyMode==="full"?1:.5,slm_=skyMode==="full"?1.3:1;' in _hz_js   # (6b677) the arrival's surge at full in Balanced, the rest at half
       and "uniform1f(pS.U.moon,.08+.62*lit)" in _hz_js and 'localStorage.getItem("millen.fxlevel")==="full"' in _hz_js
       and ".hz .hz-rig.mlx,.hz [data-v=mlx]{--ac:#c9ccd2;--ag:#e4e7ee}.hz .hz-rig.nvidia,.hz [data-v=nvidia]{--ac:#76b900;--ag:#93dc1a}" in _hz_css
       and ".hz .hz-rig.amd,.hz [data-v=amd]{--ac:#ed1c24;--ag:#ff4d55}.hz .hz-rig.intel,.hz [data-v=intel]{--ac:#0071c5;--ag:#3d9df5}" in _hz_css, "")
@@ -45818,7 +45818,7 @@ def _arr553_css(css):
 def _arr553_gate_run(js):
     gate = _jsfn(js, "function hzUltraGate(now,last,dragFired,dragging){")
     src = gate + r"""
-const seq=[[100,0,false,false],[900,0,false,false],[1700,0,false,false],[5000,3000,false,false],[5000,1000,true,true],[5000,1000,true,false],[5000,1000,false,true]];
+const seq=[[100,0,false,false],[2600,0,false,false],[3200,0,false,false],[7000,4000,false,false],[5000,1000,true,true],[5000,1000,true,false],[5000,1000,false,true]];
 let last=0,fired=false;const out=[];
 for(const [t,_l,df,dr] of seq.slice(0,3)){const ok=hzUltraGate(t,last,false,false);out.push(ok);if(ok)last=t;}
 for(const [t,l,df,dr] of seq.slice(3))out.push(hzUltraGate(t,l,df,dr));
@@ -45860,47 +45860,51 @@ def _arr553(css, js, pg):
     ign = _jsfn(js, "function hzIgnite(){"); paint = _jsfn(js, "function hzEffortPaint(){"); wire = _jsfn(js, "function hzControlsWire(host){")
     fire = _jsfn(js, "function hzUltraFire(){")
     g = _arr553_gate_run(js)
-    i_fx, i_gate, i_ant, i_set = ign.find("if(!hzUltraFx()){"), ign.find("if(!hzUltraGate("), ign.find("hzS.sky.anticipate();"), ign.find("hzS.fireT=setTimeout(hzUltraFire,140);")
-    return (g == [True, False, True, True, False, True, True]                                   # once per arrival: 1.5 s, once per drag
+    i_fx, i_gate, i_ant, i_set = ign.find("if(!hzUltraFx()){"), ign.find("if(!hzUltraGate("), ign.find("hzS.sky.anticipate();"), ign.find("hzS.fireT=setTimeout(hzUltraFire,200);")
+    return (g == [True, False, True, True, False, True, True]                                   # once per arrival: 3 s (6b677), once per drag
             and "if(i===4&&was!=null&&was!==4)hzIgnite();" in paint                              # only from a lower level
             and 0 <= i_fx < i_gate < i_ant < i_set                                               # Calm and reduced motion stop first, then the gate, the held breath, the release at 140 ms (6b555)
             and 'root.classList.add("hz-ignite")' not in ign and 'void root.offsetWidth;root.classList.add("hz-ignite");' in fire
             and fire.startswith("function hzUltraFire(){\n  const root=document.documentElement;hzS.fireT=0;if(hzS.effI!==4||!hzUltraFx())return;")   # left Ultra (or Calm) in the 140 ms: nothing fires
             and "hzS.ultraAt=now;hzS.ultraDrag=dragging;" in ign and "hzS.ultraDrag=false;" in wire
             and 'function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}' in js
-            # the edge: from the knob's x, both ways, 80-500 ms; dimmer in Balanced
+            # the edge: from the knob's x, both ways, 80-500 ms; at full in Balanced too (6b677), longer in Full
             and ".hz.hz-ignite #composer>.hz-uedge{animation:hzUEdge .42s cubic-bezier(.16,1,.3,1) .04s both}" in a
+            and ".hz.hz-full.hz-ignite #composer>.hz-uedge{animation:hzUEdge .56s cubic-bezier(.16,1,.3,1) .04s both}" in a
             and "transform-origin:var(--hz-kx,50%) 50%;transform:scaleX(0)}" in a
-            and ".hz.hz-bal.hz-ignite #composer>.hz-uedge{animation-name:hzUEdgeBal}" in a
-            and max(float(x) for x in re.findall(r"opacity:([.\d]+)", re.search(r"@keyframes hzUEdgeBal\{.*?\}\}", a).group(0))) <= .6
+            and "hzUEdgeBal" not in a and "hz-bal" not in a
             and 'cb.style.setProperty("--hz-kx",' in js
-            # the burst (6b555, on the GPU): three waves from the knob (60, 36, 24; half in Balanced) and the knob's glint
-            and "const hm=!!$(\"#hero\"),ax=hzUAnchor(hm,c,hzS.ukx),ky=hm?hzKnobY(c):c.top;b.burst(ax,ky,!full);b.glint(ax,ky);if(hm&&b.stream)b.stream(ax,ky);" in fire   # from the knob (6b621)
-            and "[[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));" in js and "[[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));" in js
+            # the burst (6b555, on the GPU): three waves from the knob (60, 36, 24; 6b677: all of them in Balanced, a
+            # third more in Full) and the knob's glint
+            and "const hm=!!$(\"#hero\"),ax=hzUAnchor(hm,c,hzS.ukx),ky=hm?hzKnobY(c):c.top;b.burst(ax,ky,HZ_SLAM_K[full?1:0]);b.glint(ax,ky);if(hm&&b.stream)b.stream(ax,ky);" in fire   # from the knob (6b621)
+            and "const HZ_SLAM_K=[1,1.35];" in js and "[[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*sk);" in js and "burst(cx,cy,sk){sk=sk===true?.5:+sk||1;" in js
             # the field launches from the box's edge (each after 80-340 ms), two or three going further, and hangs
             and "hzSkyUltra(true,true);" in fire and "P.forEach((p,i)=>{if(p.deep){p.born=now+400;return;}p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1700+Math.random()*400;" in js   # (6b621) a longer float
             and "while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))" in js
-            # the kick: Full only, 1 > 1.012 > 1 in 360 ms on the in-out, no wobble (it never goes under 1)
-            and ".hz.hz-full.hz-ignite #composer{animation:hzUKick .36s cubic-bezier(.65,0,.35,1) both}" in a
+            # the kick: 1 > 1.012 > 1 in 360 ms on the in-out (6b677: Balanced too; Full 1.018), no wobble (never under 1)
+            and ".hz.hz-ignite:not(.hz-calm) #composer{animation:hzUKick .36s cubic-bezier(.65,0,.35,1) both}" in a
+            and ".hz.hz-full.hz-ignite #composer{animation-name:hzUKickFull}" in a
             and [float(x) for x in re.findall(r"scale:([.\d]+)", re.search(r"@keyframes hzUKick\{.*?\}\}", a).group(0))] == [1, 1.012, 1]
+            and [float(x) for x in re.findall(r"scale:([.\d]+)", re.search(r"@keyframes hzUKickFull\{.*?\}\}", a).group(0))] == [1, 1.018, 1]
             # the label's one fast sweep, then the slow one
             and "hzLumSweep .45s cubic-bezier(.3,0,.2,1) both,hzLumSweep 2.5s cubic-bezier(.45,0,.25,1) .6s infinite" in css   # in step with the fill's marquee (6b555)
             # off in reduced motion and with the effects off
             and "@media (prefers-reduced-motion:reduce){.hz #composer>.hz-uedge{display:none!important}.hz #composer{animation:none!important}}" in a
             and ".hz .novideo #composer>.hz-uedge{display:none}" in a
             and _arr553_colours_ok(a) and _arr553_shapes_ok(a) and _arr553_motion_ok(a))
-check("6b553 the Ultra arrival: once per arrival from a lower level (1.5 s, once per drag), off in Calm, reduced motion and with the effects off; the light rush, the edge from the knob both ways (dimmer in Balanced), the stars launching from the box with two or three going further, the kick in Full only, the label's one fast sweep; ice, violet and white only, no circles, rings or ovals, transform and opacity only; the mutants are caught",
+check("6b553 the Ultra arrival: once per arrival from a lower level (3 s since 6b677, once per drag), off in Calm, reduced motion and with the effects off; the light rush, the edge from the knob both ways (at full in Balanced since 6b677), the stars launching from the box with two or three going further, the kick (Balanced too since 6b677, Full a little more), the label's one fast sweep; ice, violet and white only, no circles, rings or ovals, transform and opacity only; the mutants are caught",
       _arr553(_hz_css, _hz_js, page)
-      and not _arr553(_hz_css, _hz_js.replace("now-last<1500", "now-last<0"), page)                                                        # no debounce
+      and not _arr553(_hz_css, _hz_js.replace("now-last<3000", "now-last<0"), page)                                                        # no debounce
+      and not _arr553(_hz_css, _hz_js.replace("now-last<3000", "now-last<1500"), page)                                                     # the old 1.5 s (6b677)
       and not _arr553(_hz_css, _hz_js.replace("return !(dragging&&dragFired)&&", "return "), page)                                          # re-firing while dragging
       and not _arr553(_hz_css, _hz_js.replace("if(i===4&&was!=null&&was!==4)hzIgnite();", "if(i===4)hzIgnite();"), page)                   # on every paint
       and not _arr553(_hz_css, _hz_js.replace("  if(!hzUltraFx()){clearTimeout(hzS.igniteT);", "  if(false){clearTimeout(hzS.igniteT);"), page)   # on in Calm
-      and not _arr553(_hz_css.replace(".hz.hz-full.hz-ignite #composer{animation:hzUKick", ".hz.hz-ignite #composer{animation:hzUKick"), _hz_js, page)   # the kick in Balanced
+      and not _arr553(_hz_css.replace(".hz.hz-ignite:not(.hz-calm) #composer{animation:hzUKick", ".hz.hz-full.hz-ignite #composer{animation:hzUKick"), _hz_js, page)   # the kick in Full only (6b677: Balanced kicks too)
       and not _arr553(_hz_css.replace("35%{scale:1.012}", "35%{scale:1.04}"), _hz_js, page)                                                # a bigger kick
-      and not _arr553(_hz_css, _hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,140);", "hzUltraFire();"), page)                               # no held breath: it fires at once
+      and not _arr553(_hz_css, _hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,200);", "hzUltraFire();"), page)                               # no held breath: it fires at once
       and not _arr553(_hz_css, _hz_js.replace("hzS.fireT=0;if(hzS.effI!==4||!hzUltraFx())return;", "hzS.fireT=0;"), page)                      # fires after leaving Ultra
-      and not _arr553(_hz_css, _hz_js.replace("n=Math.round(n*(half?.5:1));", "n=Math.round(n*1);"), page)                                    # Balanced's burst at full
-      and not _arr553(_hz_css.replace("62%{opacity:.5;transform:scaleX(1)}", "62%{opacity:1;transform:scaleX(1)}"), _hz_js, page)          # Balanced's edge at full
+      and not _arr553(_hz_css, _hz_js.replace("const HZ_SLAM_K=[1,1.35];", "const HZ_SLAM_K=[.5,1];"), page)                                  # Balanced's burst at half (6b677: the old lighter arrival)
+      and not _arr553(_hz_css.replace("@keyframes hzUEdge{", ".hz.hz-bal.hz-ignite #composer>.hz-uedge{animation-name:hzUEdgeBal}\n@keyframes hzUEdgeBal{0%{opacity:.5;transform:scaleX(0)}62%{opacity:.5;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}\n@keyframes hzUEdge{"), _hz_js, page)   # Balanced's edge dimmer (6b677)
       # a ring at the knob, a round burst, an oval glow, a ring shadow
       and not _arr553(_hz_css.replace(".hz .novideo #composer>.hz-uedge{display:none}", ".hz .novideo #composer>.hz-uedge{display:none}\n.hz.hz-ignite .hz-sl-thumb::after{content:\"\";position:absolute;inset:-6px;border-radius:50%;box-shadow:0 0 0 1.5px #fff}"), _hz_js, page)
       and not _arr553(_hz_css.replace("background:linear-gradient(90deg,rgba(220,232,255,0),#fff 10%,#eef4ff 50%,#fff 90%,rgba(220,232,255,0));", "background:radial-gradient(closest-side,#fff,rgba(220,232,255,0));"), _hz_js, page)
@@ -46150,7 +46154,7 @@ def _b3_sky(js, css, pg):
             and '"vec2 gg=(qq-mrect.xy)/11.,cell=floor(gg),fo=(fract(gg)-.5)*11.;float led=1.-smoothstep(.65,1.15,max(abs(fo.x),abs(fo.y)));"' in sky
             and '"float lw=.04+.31*mw0.w*exp(-sq((dot(cc,mw0.xy)-mw0.z)/52.))' in sky and "exp(-pow(" not in sky   # (6b621) squares written out: pow() of a negative base is undefined in GLSL ES and "length(cc" not in sky
             and "if(live)w.s+=dt*180;" in sky and 'MX.next=nowT+(skyMode==="full"?3400+Math.random()*1200:6000+Math.random()*2000)*(Math.random()<.25?.4:1);' in sky   # Balanced 6-8 s (6b621, the demo's)
-            and 'lvm=skyMode==="full"?1:.5;' in sky
+            and 'lvm=skyMode==="full"?1:.5+.5*slamE(nowT);' in sky   # (6b677) Balanced's matrix at full through the slam, half at rest
             # the star signs: every 20-30 s (the first 9-15 s after arriving), 4-6 stars joined by their minimum spanning
             # tree, 420 ms a line, held 2 s, dissolving over 1.2 s; lines and points, no art
             and "nextSign=nowT+9000+Math.random()*5000;" in sky and "nextSign=n+1500+Math.random()*300;sign=null;hzS.signForce=2;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
@@ -46170,8 +46174,9 @@ check("6b555 the sky: the near-black ground with the hour in the footage's grade
       and not _b3_sky(_hz_js.replace("exp(-sq((dot(cc,mw0.xy)-mw0.z)/52.))", "exp(-sq((length(cc-mw0.xy)-mw0.z)/52.))"), _hz_css, page)   # a radial sweep (a ring)
       and not _b3_sky(_hz_js.replace("nextSign=nowT+9000+Math.random()*5000;", "nextSign=nowT+2000+Math.random()*1000;"), _hz_css, page)      # star signs every 2 s
       and not _b3_sky(_hz_js.replace("if(on&&fxLive()&&!sign&&nowT>nextSign)", "if(on&&!sign&&nowT>nextSign)"), _hz_css, page), "")            # star signs while hidden
-# ONCE PER ARRIVAL, WITH ITS HANG: hzIgnite and hzUltraFire run in node over a sequence: an arrival fires once, 140 ms
-# after the held breath; a return within 1.5 s is quiet; leaving inside the 140 ms fires nothing; Calm never fires
+# ONCE PER ARRIVAL, WITH ITS HANG: hzIgnite and hzUltraFire run in node over a sequence: an arrival fires once, 200 ms
+# after the held breath (6b677; was 140); a return within 3 s is quiet (6b677; was 1.5); leaving inside the 200 ms fires
+# nothing; Calm never fires
 def _b3_arrival_run(js):
     fns = "".join(_jsfn(js, h) for h in ("function hzUltraGate(now,last,dragFired,dragging){", "function hzIgnite(){", "function hzUltraFire(){", "function hzUltraOut(){"))
     src = r"""
@@ -46185,11 +46190,11 @@ const $=()=>null;function hzUltraFx(){return !calm;}function hzMotionOK(){return
 function hzSkyUltra(on,smash){if(on&&!smash)quiet++;}
 const arrive=t=>{run(t);hzS.effI=4;hzIgnite();},leave=t=>{run(t);hzS.effI=1;hzUltraOut();};
 const out=[];
-arrive(1000);run(1100);out.push(fires);run(1200);out.push(fires);   // nothing in the held breath; the release at 140 ms
-leave(1600);arrive(1800);run(2200);out.push(fires,quiet);           // back within 1.5 s: quiet
-leave(3500);arrive(4000);run(4300);out.push(fires);                 // a new arrival
-leave(6000);arrive(7000);leave(7050);run(7400);out.push(fires);     // left inside the 140 ms: nothing fires
-calm=true;leave(9000);arrive(10000);run(10400);out.push(fires,quiet,ant);
+arrive(1000);run(1150);out.push(fires);run(1200);out.push(fires);   // nothing in the held breath; the release at 200 ms
+leave(1600);arrive(3800);run(4200);out.push(fires,quiet);           // back within 3 s: quiet
+leave(4500);arrive(5000);run(5300);out.push(fires);                 // a new arrival
+leave(6000);arrive(8100);leave(8250);run(8600);out.push(fires);     // left inside the 200 ms: nothing fires
+calm=true;leave(11000);arrive(12000);run(12400);out.push(fires,quiet,ant);
 process.stdout.write(JSON.stringify(out));
 """
     try:
@@ -46200,26 +46205,28 @@ def _b3_arrival(js, css):
     r = _b3_arrival_run(js)
     sky = _jsfn(js, "function hzSkyBoot(){")
     return (r == [0, 1, 1, 1, 2, 2, 2, 2, 3]
-            # the hang: the breath dims to .92 in 140 ms and the clock to a tenth, back by 500 ms; the settle 1600-2600 ms
-            and "return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<2000?.92:.92+.08*ease(2000,3200,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];" in sky   # (6b621) the hang held to 2 s, settled by 3.2 s
+            # the hang: the breath dims by antD (.16, Full .2; 6b677) in 150 ms and holds the beat, the clock to a tenth, back
+            # by 560 ms; held through the hang, settled 2000-3200 ms
+            and "return [ms<150?1-antD*(1-Math.pow(1-ms/150,3)):ms<2000?1-antD:1-antD+antD*ease(2000,3200,ms),ms<200?.1:ms<560?.1+.9*ease(200,560,ms):1];" in sky
+            and 'antAt=performance.now();antD=skyMode==="full"?.2:.16;' in sky
             # the field's stars: nine tenths on a hard ease-out in 420 ms, the last tenth floating on the smootherstep
             and "e=.9*(u1>=1?1:1-Math.pow(2,-10*u1))+.1*ss5(u2);" in sky
             # the matrix's sweep out from the knob, then the wave up to the greeting from 360 ms (1.1 s, in-out)
-            and 'if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;' in sky and "const u=(nowT-MX.up)/1100;" in sky   # Full's (6b621)
+            and 'if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=n+360;' in sky and "const u=(nowT-MX.up)/1100;" in sky   # (6b677) Balanced's too
             # the aurora's swell x^2 e^(2(1-x)), peak at 1 s; the twist 5.5 deg on a smootherstep over 1.6 s, springing back
             and "env=sx<7?sx*sx*Math.exp(2*(1-sx)):0" in sky and "UTW_DEG=5.5,UTW_S=1.6" in sky
-            # the greeting's rim light rides the hang (Full 1.16 s at full, Balanced .86 s at half), fades over 1.2 s
-            and 'g.style.setProperty("--hz-rim-a",full?"1":".5");g.classList.add("hz-rim");' in js and "},full?1160:860);" in js
+            # the greeting's rim light rides the hang (1.16 s at full, Balanced too since 6b677), holds a beat, fades over 1.2 s
+            and 'g.style.setProperty("--hz-rim-a","1");g.classList.add("hz-rim");' in js and "hzS.rimT=setTimeout(()=>g.classList.remove(\"hz-rim\"),full?640:520);},1160);" in js
             and '.hz #hero .greet::after{content:attr(data-g);position:absolute;inset:0;z-index:-1;pointer-events:none;color:transparent;-webkit-text-fill-color:transparent;\n  text-shadow:0 -1px 0 rgba(214,230,255,.9),0 -1px 3px rgba(170,200,255,.3);opacity:0;transition:opacity 1.2s ease}' in css
             and ".hz #hero .greet.hz-rimglide::after{opacity:.55;" in css and "animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) both}" in css
             and 'if(hzS.effI!==4||hzFxLevel()!=="full"||!hzMotionOK()||document.documentElement.classList.contains("hz-pause"))return;' in js   # the rest glide: Full, live
             and "if(!hzS.rimI)hzS.rimI=setInterval(hzRimGlide,16000);" in js
             and ".hz.hz-calm #hero .greet::after,.hz .novideo #hero .greet::after{display:none}" in css and "@media (prefers-reduced-motion:reduce){.hz #hero .greet::after{display:none}}" in css)
-check("6b555 Ultra's arrival with its hang: once per arrival (140 ms of held breath, then the release; a return within 1.5 s quiet; leaving inside the breath fires nothing; never in Calm), the stars' float at the top of their arc, the matrix's wave, the aurora's swell, the twist, the greeting's rim light (no sideways offset, under the letters, no loop; the rest glide Full only); the mutants are caught",
+check("6b555 Ultra's arrival with its hang: once per arrival (200 ms of held breath since 6b677, then the release; a return within 3 s quiet; leaving inside the breath fires nothing; never in Calm), the stars' float at the top of their arc, the matrix's wave, the aurora's swell, the twist, the greeting's rim light (no sideways offset, under the letters, no loop; the rest glide Full only); the mutants are caught",
       _b3_arrival(_hz_js, _hz_css)
       and not _b3_arrival(_hz_js.replace("if(!hzUltraGate(now,hzS.ultraAt||0,!!hzS.ultraDrag,dragging))", "if(false)"), _hz_css)                     # every return fires
       and not _b3_arrival(_hz_js.replace("hzS.fireT=0;if(hzS.effI!==4||!hzUltraFx())return;", "hzS.fireT=0;"), _hz_css)                         # fires after leaving
-      and not _b3_arrival(_hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,140);", "hzUltraFire();"), _hz_css)                                   # no held breath
+      and not _b3_arrival(_hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,200);", "hzUltraFire();"), _hz_css)                                   # no held breath
       and not _b3_arrival(_hz_js.replace("+.1*ss5(u2);", "+.1*u2;"), _hz_css)                                                                  # no float: a linear landing
       and not _b3_arrival(_hz_js, _hz_css.replace("text-shadow:0 -1px 0 rgba(214,230,255,.9),", "text-shadow:2px -1px 0 rgba(214,230,255,.9),"))   # a sideways double
       and not _b3_arrival(_hz_js, _hz_css.replace("animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) both}", "animation:hzRimGlide 2s cubic-bezier(.45,0,.25,1) infinite}")), "")   # the rim looping
@@ -48703,7 +48710,7 @@ def _u621_aur(js):
             # roof"): 450 births (225 Balanced) sweeping out from the composer, 60 (30) kept for the rest, 30 (15) trails; each
             # blooms over 900 ms or more (a slow bright one 2.5 s): never a flash; the trail ice-white; built only when Ultra
             # lifts the sky (never Calm or reduced motion); the hand's shimmer and the typing shimmer gentle
-            and "n=full?450:225,keep=full?60:30,trails=full?30:15" in sky and "bloom:big?2500:900" in sky
+            and "n=full?600:450,keep=full?60:30,trails=full?40:30" in sky and "bloom:big?2500:900" in sky   # (6b677) the slam: 450 in Balanced, 600 in Full; the rest keeps 60 (30)
             and "pfx.line(p.tr.x+(p.x-p.tr.x)*(e-tl),p.tr.y+(p.y-p.tr.y)*(e-tl),hx,hy,1,[.86,.91,1],0," in sky
             and "setTimeout(()=>{if(ultraWant&&lift())wave=buildWave(n);},16);" in sky and "if(!cb||!home())return [];" in sky
             and "a*=1+.6*pe*Math.exp(-q/8100);" in sky
@@ -53169,6 +53176,122 @@ check("6b644 the same in a real WKWebView (the shipped engine, a borderless wind
       and any(k_ == "settings w640" for k_, _ in _h644_bad(_h644_wm)),
       json.dumps({"err": _h644_wo.get("err"), "bad": _h644_bad(_h644_wo)[:6], "mut": _h644_bad(_h644_wm)[:4]})[:900])
 # ==== 6b644 half a screen: end ====
+
+# ==== 6b677 ultra slam: begin ====
+# Patrick (relayed 2026-11-11): "default, not going all the way to ultra, but make ultra slam super hard". Ultra is a
+# deliberate choice: Low to Extra are kept as the last pick, Ultra never is, so a launch or a new chat starts at the last
+# level below Ultra (Medium if none); inside a chat Ultra stays until it is changed. The arrival (the one-shot moment)
+# plays at full strength in Balanced too and a little more in Full; it replays on every return to Ultra, at most once
+# per 3 s; the resting Ultra keeps Balanced's half. The whole sky draws back a hair in the held breath and swells past
+# the window at the release (scale only, one compositor layer). Calm and reduced motion: none of it.
+print("== the Ultra slam (6b677) ==")
+def _u677_line(src, head):
+    a = src.index(head)
+    return src[a:src.index("\n", a) + 1]
+def _u677_effort_run(js):
+    try:
+        fns = (_u677_line(js, "function hzEffortKept(){") + _jsfn(js, "function hzEffort(){") + _jsfn(js, "function hzEffortSet(i){")
+               + _u677_line(js, "function hzEffortFresh(){"))
+    except ValueError:
+        return {"err": "a function is missing"}
+    src = fns + r"""
+const L={};const localStorage={getItem:k=>k in L?L[k]:null,setItem:(k,v)=>{L[k]=String(v);}};
+const HZ_EMAX=4;let hzS={effort:null},paints=0;function hzEffortPaint(){paints++;}
+const out=[];
+out.push(hzEffort());                                   // nothing kept: Medium
+hzEffortSet(2);out.push(L["millen.effort"]);            // High is kept
+hzEffortSet(4);out.push(L["millen.effort"],hzEffort()); // Ultra: on now, never kept
+hzS={effort:null};out.push(hzEffort());                 // a launch: back to High
+L["millen.effort"]="4";hzS={effort:null};out.push(hzEffort());   // an Ultra an older build kept: Medium
+L["millen.effort"]="3";hzS={effort:null};hzEffortSet(4);hzEffortFresh();out.push(hzEffort(),L["millen.effort"]);   // a new chat from Ultra: Extra
+hzEffortSet(0);hzEffortFresh();out.push(hzEffort(),L["millen.effort"]);   // a new chat below Ultra keeps its level
+process.stdout.write(JSON.stringify(out));
+"""
+    try:
+        return _node_json(src, "u677effort.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _u677_effort(js, src_all):
+    try:
+        fresh = _jsfn(src_all, "function chatFresh(){")
+    except ValueError:
+        return False
+    return (_u677_effort_run(js) == [1, "2", "2", 4, 2, 1, 3, "3", 0, "0"]
+            and 'if(typeof hzEffortFresh==="function")hzEffortFresh();' in fresh
+            and fresh.index("resetHero();renderChats();") < fresh.index("hzEffortFresh();"))
+_u677_e = _u677_effort_run(_hz_js)
+check("6b677 Ultra is not sticky: Low to Extra kept as the last pick, Ultra never kept; a launch starts at the last level below Ultra (Medium if none, an older build's kept Ultra read as none); a new chat comes down from Ultra to the kept level and keeps a lower level as it is",
+      _u677_effort(_hz_js, _MILLENAI_SRC)
+      and not _u677_effort(_hz_js.replace('if(i<HZ_EMAX)try{localStorage.setItem("millen.effort",String(i));}', 'try{localStorage.setItem("millen.effort",String(i));}'), _MILLENAI_SRC)   # Ultra kept (the old sticky Ultra)
+      and not _u677_effort(_hz_js.replace("/^[0-3]$/.test(s))v=+s;", "/^[0-4]$/.test(s))v=+s;"), _MILLENAI_SRC)                      # an old kept Ultra honoured
+      and not _u677_effort(_hz_js.replace("hzS.effort=hzEffortKept();hzEffortPaint();}", "hzS.effort=1;hzEffortPaint();}"), _MILLENAI_SRC)   # a new chat to Medium, not the kept level
+      and not _u677_effort(_hz_js.replace("function hzEffortFresh(){if(!hzS||hzEffort()!==HZ_EMAX)return;", "function hzEffortFresh(){if(!hzS||hzEffort()===HZ_EMAX)return;"), _MILLENAI_SRC)   # a new chat keeps Ultra
+      and not _u677_effort(_hz_js, _MILLENAI_SRC.replace('  if(typeof hzEffortFresh==="function")hzEffortFresh();   // a new chat starts below Ultra (6b677)\n', "")),   # not wired to a new chat
+      json.dumps(_u677_e)[:300])
+def _u677_slam(js, css):
+    try:
+        a = re.sub(r"/\*.*?\*/", "", _arr553_css(css), flags=re.S)
+    except ValueError:
+        return False
+    try:
+        sky = _jsfn(js, "function hzSkyBoot(){"); fire = _jsfn(js, "function hzUltraFire(){"); ign = _jsfn(js, "function hzIgnite(){")
+    except ValueError:
+        return False
+    kf = lambda n: re.search(r"@keyframes %s\{(.*?)\}\}" % n, a, re.S)
+    d, df = kf("hzSlamDepth"), kf("hzSlamDepthFull")
+    if not d or not df:
+        return False
+    sc = lambda m: [float(x) for x in re.findall(r"scale:([.\d]+)", m.group(1))]
+    props = lambda m: {p_.strip() for p_ in re.findall(r"[{;]\s*([a-z-]+)\s*:", "{" + m.group(1))}
+    return (# the arrival at full strength in Balanced: no Balanced-only lighter rule in the arrival, the kick in both
+            ".hz-bal" not in a and ".hz.hz-ignite:not(.hz-calm) #composer{animation:hzUKick" in a
+            and "const HZ_SLAM_K=[1,1.35];" in js and "b.burst(ax,ky,HZ_SLAM_K[full?1:0]);" in fire
+            and 'g.style.setProperty("--hz-rim-a","1");' in fire and "},1160);" in fire and "full?1160:860" not in fire
+            # the sky's part: the surge at full in Balanced (slm_ 1), 1.3 in Full; the matrix's wave in both; the matrix at
+            # full through the slam; more stars in the landing (450 / 600) and births (12 / 16); the rest unchanged
+            and 'slm_=skyMode==="full"?1.3:1;' in sky and "+.45*surge*slm_);surgeNow=surge;" in sky
+            and "MX.up=n+360;" in sky and 'lvm=skyMode==="full"?1:.5+.5*slamE(nowT);' in sky
+            and "n=full?600:450,keep=full?60:30" in sky and 'm=skyMode==="full"?16:12;' in sky
+            and "else if(on&&lift()){surgeAt=n;slamAt=n;" in sky and "return 1-ease(2600,3600,ms);};" in sky
+            # the held beat: the scene dims (.16, Full .2) in 150 ms and holds to the release at 200 ms; never a step up
+            and "hzS.fireT=setTimeout(hzUltraFire,200);" in ign and 'antD=skyMode==="full"?.2:.16;' in sky
+            and "1-antD+antD*ease(2000,3200,ms)" in sky
+            # the depth: 1 > .996 > 1.016 (Full 1.02) > 1 over 2.8 s, scale alone (the compositor's), never in Calm,
+            # reduced motion or with the effects off; started in the held breath, never restarted mid-swell
+            and sc(d) == [1, .996, 1.016, 1] and sc(df) == [1, .996, 1.02, 1] and max(sc(df)) <= 1.025
+            and props(d) <= {"scale", "animation-timing-function"} and props(df) <= {"scale", "animation-timing-function"}
+            and ".hz.hz-slam:not(.hz-calm) #hz-gl{animation:hzSlamDepth 2.8s both}" in a and ".hz.hz-full.hz-slam #hz-gl{animation-name:hzSlamDepthFull}" in a and "#hz-sky{animation" not in a
+            and ".hz .novideo #hz-gl{animation:none!important}" in a and "@media (prefers-reduced-motion:reduce){.hz #hz-gl{animation:none!important}}" in a
+            and 'if(!root.classList.contains("hz-slam")){root.classList.add("hz-slam");' in ign
+            and ign.index("if(!hzUltraFx()){") < ign.index('root.classList.add("hz-slam")')
+            and _arr553_colours_ok(a) and _arr553_shapes_ok(a) and _arr553_motion_ok(a))
+check("6b677 the slam: the arrival at full strength in Balanced (the edge, the kick, every star of the burst, the matrix's wave, the greeting's rim light, the aurora's surge) and more in Full (a third more burst, 600 stars, the surge x1.3, a longer edge, a 1.018 kick); a deeper held beat (the scene dims .16/.2 and holds to 200 ms); the sky's depth swell 1 > .996 > 1.016/1.02 > 1 in scale alone; none of it in Calm, reduced motion or with the effects off; still ice, violet and white, no circles",
+      _u677_slam(_hz_js, _hz_css)
+      and not _u677_slam(_hz_js.replace("const HZ_SLAM_K=[1,1.35];", "const HZ_SLAM_K=[.5,1];"), _hz_css)                                     # Balanced's burst at half again
+      and not _u677_slam(_hz_js.replace('slm_=skyMode==="full"?1.3:1;', 'slm_=skyMode==="full"?1:.5;'), _hz_css)                           # Balanced's surge at half
+      and not _u677_slam(_hz_js.replace("MX.up=n+360;", 'MX.up=skyMode==="full"?n+360:0;'), _hz_css)                                     # no matrix wave in Balanced
+      and not _u677_slam(_hz_js, _hz_css.replace(".hz.hz-ignite:not(.hz-calm) #composer{animation:hzUKick", ".hz.hz-full.hz-ignite #composer{animation:hzUKick"))   # no kick in Balanced
+      and not _u677_slam(_hz_js, _hz_css.replace("28%{scale:1.02;", "28%{scale:1.06;"))                                                     # a lurch, not a breath
+      and not _u677_slam(_hz_js, _hz_css.replace("7%{scale:.996;animation-timing-function:cubic-bezier(.16,1,.3,1)}28%{scale:1.016;", "7%{scale:.996;filter:brightness(1.4);animation-timing-function:cubic-bezier(.16,1,.3,1)}28%{scale:1.016;"))   # a flash in the swell
+      and not _u677_slam(_hz_js, _hz_css.replace(".hz.hz-slam:not(.hz-calm) #hz-gl{", ".hz.hz-slam #hz-gl{"))                         # the swell in Calm
+      and not _u677_slam(_hz_js, _hz_css.replace(".hz.hz-slam:not(.hz-calm) #hz-gl{animation:hzSlamDepth 2.8s both}", ".hz.hz-slam:not(.hz-calm) #hz-sky{animation:hzSlamDepth 2.8s both}"))   # the whole sky swelling (re-layers the footage: a 40 ms click in WKWebView)
+      and not _u677_slam(_hz_js.replace('if(!root.classList.contains("hz-slam")){root.classList.add("hz-slam");', '{root.classList.add("hz-slam");'), _hz_css)   # restarted mid-swell
+      and not _u677_slam(_hz_js.replace("hzS.fireT=setTimeout(hzUltraFire,200);", "hzS.fireT=setTimeout(hzUltraFire,140);"), _hz_css), "")   # the short beat
+def _u677_gate_run(js):
+    gate = _jsfn(js, "function hzUltraGate(now,last,dragFired,dragging){")
+    return _node_json(gate + r"""
+const out=[];let last=0;for(const t of [1000,2400,3900,6800,7000,9900,12000]){const ok=hzUltraGate(t,last,false,false);out.push(ok);if(ok)last=t;}
+process.stdout.write(JSON.stringify(out));""", "u677gate.js")
+def _u677_gate(js):
+    try:
+        return _u677_gate_run(js) == [True, False, False, True, False, True, False]
+    except Exception:
+        return False
+check("6b677 the slam replays on every return to Ultra, at most once per 3 s (a return inside 3 s is quiet: no spam)",
+      _u677_gate(_hz_js)
+      and not _u677_gate(_hz_js.replace("now-last<3000", "now-last<1500"))      # the old 1.5 s: spammy
+      and not _u677_gate(_hz_js.replace("now-last<3000", "now-last<9000")), "")  # never replays
+# ==== 6b677 ultra slam: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
