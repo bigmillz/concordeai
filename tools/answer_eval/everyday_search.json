@@ -1,0 +1,26 @@
+{
+ "about": "The everyday eval's stand-in web (6b650): INVENTED results, dated around 2026-11-11, so no eval or test asks a real search engine from this Mac (the engines flagged its connection). A query holding every word of a group's `match` gets that group's rows; anything else finds nothing, which measures the no-results path (the bitcoin question is left out on purpose). Pages are what the reader 'fetches'.",
+ "queries": [
+  {"match": ["knicks"], "rows": [
+    {"title": "Knicks 118, Bulls 109: Brunson scores 34 as New York pulls away late - ESPN", "href": "https://www.espn.com/nba/recap/_/gameId/fixture-knicks-bulls",
+     "body": "Jalen Brunson scored 34 points and Karl-Anthony Towns added 22 points and 13 rebounds as the New York Knicks beat the Chicago Bulls 118-109 on Tuesday night at Madison Square Garden. The Knicks improved to 7-4.", "date": "2026-11-11"},
+    {"title": "Knicks schedule 2026-27 - NBA.com", "href": "https://www.nba.com/knicks/schedule",
+     "body": "Next: Thursday, Nov. 13 vs. Boston Celtics, 7:30 PM ET, MSG. Last: Tue, Nov. 11 W 118-109 vs. Chicago.", "date": "2026-11-11"}]},
+  {"match": ["news"], "rows": [
+    {"title": "Senate passes stopgap funding bill, averting a shutdown through January - AP News", "href": "https://apnews.com/article/fixture-stopgap-funding",
+     "body": "The Senate voted 71-28 late Tuesday to keep the government funded through Jan. 30, sending the bill to the president.", "date": "2026-11-11"},
+    {"title": "Veterans Day: ceremonies at Arlington and across the country - Reuters", "href": "https://www.reuters.com/world/us/fixture-veterans-day",
+     "body": "Americans mark Veterans Day on Wednesday with ceremonies at Arlington National Cemetery and parades in New York and other cities.", "date": "2026-11-11"},
+    {"title": "COP31 climate talks open in Antalya with finance fight front and center - Reuters", "href": "https://www.reuters.com/sustainability/fixture-cop31",
+     "body": "Delegates from nearly 200 countries opened two weeks of UN climate talks in Antalya, Turkey, on Monday, with adaptation finance the main dispute.", "date": "2026-11-10"},
+    {"title": "Stocks edge higher as investors await Thursday's inflation report - CNBC", "href": "https://www.cnbc.com/fixture-markets-nov-11",
+     "body": "The S&P 500 rose 0.3% on Tuesday; the October consumer price index is due Thursday.", "date": "2026-11-11"}]},
+  {"match": ["movie"], "rows": [
+    {"title": "New movies in theaters this weekend (Nov. 14): what to see - Vulture", "href": "https://www.vulture.com/fixture-new-movies-this-weekend",
+     "body": "Opening Friday, Nov. 14: 'The Long Walk Home', a family drama starring Florence Pugh; 'Night Shift 2', the horror sequel; and the animated 'Pip and the Paper Moon'. Still strong in its third weekend: 'Overland', the Western with Austin Butler.", "date": "2026-11-10"}]},
+  {"match": ["l train"], "rows": [
+    {"title": "L train service status - MTA", "href": "https://new.mta.info/fixture-l-train-status",
+     "body": "L trains are running with good service on Wednesday, Nov. 11. Planned work: this weekend (Sat-Sun, Nov. 14-15), no L trains between Broadway Junction and Canarsie; free shuttle buses replace them.", "date": "2026-11-11"}]}
+ ],
+ "pages": {}
+}

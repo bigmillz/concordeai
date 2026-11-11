@@ -1248,7 +1248,10 @@ SYSTEM_PROMPT = {
         "NEVER respond with only "
         "clarifying questions — when a request is broad, make a reasonable "
         "assumption, name it in one clause, and deliver the substance "
-        "anyway. "
+        "anyway. Name an assumption only when it changes the answer, and "
+        # (6b650) "Since I can't see your kitchen ... I'll assume" opened a breakfast answer
+        "never as an opener about what you can't see or know ('Since I "
+        "can't see your kitchen, I'll assume…'): just start helping. "
         "CALIBRATE depth to the ask, the way the best assistants do: a "
         "simple factual question gets a tight, confident answer with the "
         "number or name up front and one line of useful context — not an "
@@ -6295,11 +6298,25 @@ _AK_TAIL_RX = re.compile(
     r"(?:in|as)\s+(?:a\s+)?(?:decimal|fraction|percent(?:age)?))\b)\s*$", re.I)
 _AK_NUM = r"\d[\d,]*(?:\.\d+)?%?|\.\d+%?"
 _AK_OP = (r"[-+*/x×÷^−()=]|plus|minus|times|multiplied\s+by|divided\s+by|over|"
-          r"to\s+the\s+power\s+of|squared|cubed|percent\s+of|(?:the\s+)?(?:sum|product)\s+of|add|"
+          r"to\s+the\s+power\s+of|to\s+the(?=\s+\d+(?:st|nd|rd|th)\b)|(?<=\d)(?:st|nd|rd|th)(?:\s+power)?\b|"  # 2 to the 10th (6b650)
+          r"squared|cubed|percent\s+of|(?:the\s+)?(?:sum|product)\s+of|add|"
           r"of|mod|modulo|(?:the\s+)?(?:square|cube)\s+root\s+of|sqrt|and")
 _AK_EXPR_RX = re.compile(r"(?:\s*(?:%s|%s))+\s*" % (_AK_NUM, _AK_OP), re.I)
-_AK_OPS_RX = re.compile(r"[-+*/x×÷^−]|\b(?:plus|minus|times|multiplied|divided|over|power|"
+_AK_OPS_RX = re.compile(r"[-+*/x×÷^−]|\b(?:plus|minus|times|multiplied|divided|over|power|to\s+the|"
                         r"squared|cubed|percent|of|add|mod|modulo|root|sqrt)\b", re.I)
+# A UNIT CONVERSION IS A SUM (6b650): "how many minutes in 3.5 hours", "30 Celsius in Fahrenheit", "how many
+# ounces in a cup" searched the web and came back with citations for a fixed ratio. Currencies are not here.
+_AK_UNIT = (r"(?:minutes?|mins?|seconds?|secs?|hours?|hrs?|days?|weeks?|months?|years?|ounces?|oz|fl\.?\s*oz|cups?|"
+            r"tablespoons?|tbsps?|teaspoons?|tsps?|grams?|g|kilos?|kilograms?|kg|pounds?|lbs?|stones?|inch(?:es)?|in\.|"
+            r"feet|foot|ft|yards?|yds?|miles?|mi|km|kilomet(?:er|re)s?|met(?:er|re)s?|m|cm|centimet(?:er|re)s?|mm|"
+            r"millimet(?:er|re)s?|lit(?:er|re)s?|l|ml|millilit(?:er|re)s?|gallons?|gal|quarts?|qt|pints?|pt|"
+            r"°?\s*(?:celsius|centigrade|fahrenheit|kelvin|c|f|k)|degrees(?:\s+(?:celsius|fahrenheit|c|f))?|"
+            r"acres?|hectares?|mph|kph|km/h|bytes?|kb|mb|gb|tb)")
+_AK_CONVERT_RX = re.compile(
+    r"^\W*(?:(?:so|ok|okay|quick(?:ly)?|hey)[,\s]+)?(?:"
+    r"how\s+many\s+%(u)s\s+(?:are\s+(?:there\s+)?)?(?:in|per|to)\s+(?:a|an|one|\d[\d.,/]*)\s*%(u)s|"
+    r"(?:(?:what(?:'s|’s|s|\s+is)|convert|how\s+much\s+is)\s+)?(?:a|an|one|\d[\d.,/]*)\s*%(u)s\s+"
+    r"(?:in|to|into|as|in\s+terms\s+of)\s+%(u)s)\W*$" % {"u": _AK_UNIT}, re.I)
 _AK_CHAT_RX = re.compile(
     r"\b(?:did|do)\s+(?:i|you|we)\s+(?:just\s+|already\s+|ever\s+|first\s+)?(?:say|ask|tell|write|type|"
     r"mention|mean|talk|discuss|decide|agree|send)\b|"
@@ -6312,11 +6329,21 @@ _AK_CHAT_RX = re.compile(
     r"(?:chat|conversation|thread|discussion)\b|"
     r"^\W*(?:summari[sz]e|recap|repeat|quote|shorten|simplify)\b.{0,30}\b(?:this|our|that|your)\s+"
     r"(?:chat|conversation|thread|discussion|answer|reply|last\s+answer)\b|"
-    r"^\W*(?:say|repeat)\s+(?:that|it)\s+again\b", re.I)
+    r"^\W*(?:say|repeat)\s+(?:that|it)\s+again\b|"
+    # (6b650) a rewrite of the last answer, or what it said: "can you say that shorter?", "which one did you suggest
+    # first?" searched the web
+    r"^\W*(?:(?:can|could|would)\s+you\s+|please\s+)?(?:say|put|make|write|explain|give)\s+(?:that|it|this)\s+"
+    r"(?:again\s+)?(?:shorter|simpler|more\s+simply|in\s+(?:fewer|plain(?:er)?|simple(?:r)?)\s+words|"
+    r"in\s+(?:a\s+)?(?:sentence|line|nutshell)|briefly|more\s+briefly)\b|"
+    r"^\W*(?:shorter|simpler|tl;?dr)\b\W*(?:please)?\W*$|"
+    r"\b(?:which|what)\s+(?:one|name|thing|option|idea)?\s*(?:did|do)\s+you\s+(?:suggest|recommend|mention|"
+    r"pick|list|say|give)\b", re.I)
 _AK_HOWTO_RX = re.compile(
     r"^\W*(?:(?:so|ok|okay|and|also|quick\s+question)[,:\s]+)?(?:"
     r"how\s+(?:do|can|should|would|could|might)\s+(?:i|you|we|one|someone|people)\b|how\s+to\b|"
     r"how\s+(?:does|do)\s+(?:a|an|the)\b[^?]{0,40}\bwork\b|"
+    r"how\s+long\s+(?:do|should|does|to|would)\s+(?:i|you|we|it\s+take\s+to)?\s*(?:boil|cook|bake|roast|grill|fry|"
+    r"steam|microwave|poach|rest|soak|marinate|steep|brew|simmer|toast|thaw|defrost)\b|"   # the kitchen's clock (6b650)
     r"what(?:'s|’s|s|\s+is)\s+the\s+(?:best|easiest|right|proper|fastest|quickest)\s+way\s+to\b|"
     r"(?:give|tell)\s+me\s+(?:a\s+few\s+|some\s+|\w+\s+)?(?:tips|steps|ways|ideas)\b|"
     r"(?:any\s+)?tips\s+(?:for|on)\b|explain\s+how\b|walk\s+me\s+through\b|steps\s+to\b|"
@@ -6345,6 +6372,43 @@ _AK_SOCIAL_NOT_RX = re.compile(
     r"\b(?:weather|forecast|rain|news|headlines?|score|scores|result|results|match|game|stocks?|market|price|"
     r"traffic|open\s+now|showing|playing|on\s+tv|tv\s+tonight|events?|concerts?|election|f1|nba|nfl|"
     r"premier\s+league|in\s+the\s+world)\b", re.I)
+# HOW THE PERSON FEELS, AND WHAT THEY'LL EAT (6b650, per Patrick: "I'm asking it, what's for breakfast, and saying,
+# I'm tired, and it's giving me a bunch of crap"; "What if I'm run down?" came back as a clinical lecture on
+# cortisol, the autonomic nervous system and NSDR: "it's great, but it's not a very inviting answer"). A message
+# that says how the person feels (tired, run down, stressed, can't sleep, a headache, "ugh, Monday") or asks for an
+# everyday bite (what's for breakfast, what should I eat, what can I make with eggs and spinach, pizza or tacos
+# tonight) is "personal": a friend's answer from what the model knows, never the web, never the polish pass or a
+# council's reviews. A place, a fresh fact or a named thing still searches (_AK_SOCIAL_NOT_RX, venues, near me).
+_AK_FEEL_RX = re.compile(
+    r"\b(?:i'?m|i\s+am|im|i\s+feel|i'?m\s+feeling|feeling|feel|i've\s+been|i\s+have\s+been)\s+"
+    r"(?:(?:so|really|kind\s+of|kinda|sort\s+of|a\s+(?:bit|little)|pretty|super|very|totally|just|all|"
+    r"completely|getting|still|too|way\s+too)\s+)*"
+    r"(?:tired|exhausted|wiped(?:\s+out)?|beat|drained|sleepy|run[\s-]*down|rundown|worn[\s-]*out|"
+    r"burn(?:ed|t)[\s-]*out|stressed(?:\s+out)?|anxious|nervous|overwhelmed|sad|down|low|blue|lonely|bored|"
+    r"sick|ill|unwell|under\s+the\s+weather|hungover|grumpy|cranky|frustrated|upset|unmotivated|lazy|sore|"
+    r"achy|hungry|starving|meh|off|crappy|crap|awful|terrible|rough|groggy|foggy|restless|stuck)\b|"
+    r"\b(?:can'?t|cannot|couldn'?t|can\s+not)\s+(?:sleep|fall\s+asleep|stay\s+asleep|focus|concentrate|"
+    r"get\s+up|wake\s+up|relax|switch\s+off|stop\s+worrying|get\s+going|get\s+motivated)\b|"
+    r"\b(?:i\s+have|i'?ve\s+got|i\s+got|got)\s+(?:a\s+|the\s+|such\s+a\s+|this\s+)?(?:bad\s+|terrible\s+|"
+    r"splitting\s+|killer\s+|little\s+)?(?:headache|cold|hangover|sore\s+throat|cramps|migraine|"
+    r"stomach\s*ache|tummy\s*ache|the\s+flu|flu|cough|the\s+sniffles|no\s+energy|zero\s+energy)\b|"
+    r"\b(?:slept|sleeping)\s+(?:badly|poorly|terribly|bad|awful(?:ly)?|like\s+crap)\b|"
+    r"\b(?:didn'?t|barely|hardly)\s+sleep\b|\bno\s+sleep\b|\blittle\s+sleep\b|"
+    r"\b(?:long|rough|bad|tough|hard|crappy|awful)\s+(?:day|night|week|morning)\b|"
+    r"^\W*(?:ugh+|meh|sigh|blah|oof|bleh)\b", re.I)
+_AK_FOOD_RX = re.compile(
+    r"\bwhat(?:'s|’s|s|\s+is|\s+are)\s+(?:for|we\s+having\s+for|good\s+for|a\s+good)\s+(?:breakfast|brunch|lunch|"
+    r"dinner|supper|a\s+snack|snack|dessert)\b|"
+    r"\bwhat\s+(?:should|can|could|do|shall)\s+(?:i|we)\s+(?:eat|cook|make|have|snack\s+on|whip\s+up)\b|"
+    r"\bwhat\s+to\s+(?:eat|cook|make)\b|"
+    r"\b(?:breakfast|brunch|lunch|dinner|supper|snack|meal)\s+(?:idea|ideas|suggestion|suggestions)\b|"
+    r"\bwhat\s+can\s+i\s+(?:make|cook)\s+with\b|"
+    r"\b(?:i\s+have|i'?ve\s+got|got)\s+[^?]{2,80}?\bwhat\s+can\s+i\s+(?:make|cook)\b|"
+    r"^\W*[\w'’ -]{2,24}\s+or\s+[\w'’ -]{2,24}\s+(?:tonight|today|for\s+(?:dinner|lunch|breakfast))\W*$", re.I)
+# a capitalised word that names a cuisine is not a thing to look up ("how do I make French toast")
+_AK_CUISINE = frozenset(
+    "French Italian Greek Thai Mexican Chinese Japanese Indian Korean Spanish Turkish Vietnamese Caesar Cobb "
+    "Belgian English Irish Swedish German Cajun Buffalo Sicilian Neapolitan Margherita Bolognese Alfredo".split())
 # a how-to whose answer moves with the world: software and devices, money,
 # rules and paperwork, travel, anything named or dated
 _AK_WORLD_RX = re.compile(
@@ -6367,6 +6431,21 @@ def _ak_arith(p: str) -> bool:
         len(nums) >= 2 or (len(nums) == 1 and bool(re.search(r"squared|cubed|root|sqrt", s, re.I))))
 
 
+def _ak_personal(p: str) -> bool:
+    """How the person feels, or an everyday bite (6b650): short, about them, and nothing the web would know
+    better: no place, venue, fresh fact, figure or named thing (a cuisine is not one)."""
+    if len(p.split()) > 30 or not (_AK_FEEL_RX.search(p) or _AK_FOOD_RX.search(p)):
+        return False
+    low = p.lower()
+    if _AK_SOCIAL_NOT_RX.search(low) or re.search(r"\b(?:where|nearest|closest|open|delivery|deliver|restaurants?)\b", low):
+        return False               # "I'm hungry, where's open?" is a place question
+    if _ZIP_RX.search(low) or _NEARBY_RX.search(low) or _ASKY_RX.search(low) or place_anchor(p)[0]:
+        return False
+    ents = [e for e in _sc_entities(p) if e not in _AK_CUISINE
+            and e.lower() not in _REL_WORDS and e.lower() not in ("ugh", "meh", "sigh", "ok", "okay", "what", "and")]
+    return not ents
+
+
 def answer_kind(text: str) -> str:
     """"arith" (17 times 23), "chat" (what did I say first) or "howto" (how
     do I hard-boil an egg) for a question answered without the web (6b626);
@@ -6377,15 +6456,18 @@ def answer_kind(text: str) -> str:
     p = _PREAMBLE_RX.sub("", p, count=1).strip() or p
     if not p or len(p) > 300:
         return ""
-    if _ak_arith(p):
+    if _ak_arith(p) or _AK_CONVERT_RX.match(p):
         return "arith"
     if _AK_CHAT_RX.search(p):
         return "chat"
+    if _ak_personal(p):
+        return "personal"          # how they feel, what they'll eat (6b650)
     if _AK_SOCIAL_RX.match(p) and not _AK_SOCIAL_NOT_RX.search(p) and len(p.split()) <= 14:
         return "social"            # small talk, the person's own day (beta 4)
     if _AK_HOWTO_RX.match(p):
         low = p.lower()
-        if (not _AK_WORLD_RX.search(low) and not _sc_entities(p) and not re.search(r"\d", p)
+        if (not _AK_WORLD_RX.search(low) and not [e for e in _sc_entities(p) if e not in _AK_CUISINE]
+                and not re.search(r"\d", p)
                 and not (_VENUE_RX.search(low) or _ZIP_RX.search(low) or _NEARBY_RX.search(low))
                 and not any(w in low for w in _FRESH_WORDS)
                 and not any(rx.search(low) for rx in _FRESH_PATTERNS)):
@@ -6422,7 +6504,7 @@ def grounded_followup(text: str, prior_question: str = "") -> bool:
     the population?") or shares the earlier question's subject."""
     t = strip_greeting(str(text or "")).strip()
     t = _PREAMBLE_RX.sub("", t, count=1).strip() or t
-    if not t or answer_kind(t) in ("arith", "chat", "social"):   # small talk carries no evidence (beta 4)
+    if not t or answer_kind(t) in ("arith", "chat", "social", "personal"):   # small talk carries no evidence (beta 4, 6b650)
         return False
     if _OTHER_AI_RX.search(t) or _FU_LEAD_RX.match(t):
         return True
@@ -7026,11 +7108,15 @@ def place_turn(query: str, snippets: str, matched: bool, placey: bool,
             "reader to other sites is failure: never open "
             "with what you can't see, never hand over a "
             "list of places to go look instead of an "
-            "answer. Commit — name the actual current "
-            "wide releases or major events you know of "
-            "this month, plus anything the data adds, "
-            "each with a few honest words on what it is "
-            "and who it's for. NAMES ONLY: an item is "
+            "answer. Commit — name the current releases "
+            "or events the data names, each with a few "
+            "honest words on what it is and who it's for. "
+            # (6b650) with no listings, 2024's films came back as "this weekend, November 14, 2026"
+            "When the data names none, say so in ONE plain "
+            "sentence (\"I couldn't get this week's listings "
+            "just now.\"), then name recent ones you know "
+            "with the month and year they opened, never as "
+            "playing this weekend. NAMES ONLY: an item is "
             "reported under its real proper title or not "
             "at all — a description the data left in "
             "place of a title ('the zombie sequel', 'the "
@@ -7102,6 +7188,26 @@ SOCIAL_RULE = ("\n\nTHIS TURN is small talk or a question about the person's own
                "(the date and time in the question; something from this chat or a remembered note only if it "
                "clearly fits), never list news, prices or search results, never guess at their plans, and end "
                "with one useful question back, offering two or three concrete things you could help with.")
+# HOW THEY FEEL, A BITE TO EAT (6b650, per Patrick: "What if I'm run down?" got cortisol, the autonomic nervous
+# system, a header and NSDR, "not a very inviting answer"; "What's for breakfast?" got "Since I can't see your
+# kitchen ... I'll assume you're looking for a reliable, high-protein breakfast ... the standard high-utility
+# choice", "kind of rubbish ... Claude still looks so much cleaner"). A friend's answer, the same at every effort.
+PERSONAL_RULE = (
+    "\n\nTHIS TURN is about the person (how they feel, or an everyday need like a meal), not a question about the "
+    "world. Answer like a warm friend who is good at this, never like a textbook, a coach or a nutrition label:\n"
+    "- If they said how they feel, open with one short, human line that meets it (\"Sorry you're dragging today.\"), "
+    "then help. Never skip it, never dwell on it.\n"
+    "- Then two to four simple, doable ideas in plain words. For food, a **bolded name** and one tempting line each "
+    "(\"**Peanut butter banana toast**: two minutes, no pan, and it actually fills you up.\").\n"
+    "- Plain words only: no science or jargon (no hormones, cortisol, nervous system, macros, protein targets, "
+    "'high-utility', 'optimize', 'reset'), no headings, no tables, no news, no sources.\n"
+    "- Start helping at once: never open with an assumption (\"Since I can't see your kitchen, I'll assume...\") or "
+    "by restating what they said.\n"
+    "- Keep it to about 40 to 120 words, whatever the effort setting: more effort means more care, not more words.\n"
+    "- Health: one gentle line about a doctor only if it has been going on a while or sounds serious; anything "
+    "urgent (chest pain, trouble breathing, thoughts of harming themselves) gets a plain line to get help now.\n"
+    "- End with at most one light, specific question when it helps (\"Want something sweet, or what's in the "
+    "fridge?\"), or with nothing.")
 LENGTH_ASKED = (" The person's own words win over this setting: asked for a "
                 "length or a long piece (an essay, 1,500 words, a full guide), "
                 "write it in full. Never mention a length limit, a word cap or "
@@ -26872,15 +26978,29 @@ GROUND_RULES = (
     "- Never describe your own data access: 'the evidence', 'the sources "
     "above', 'the snippets', 'I can't pull live data' are banned. Speak as "
     "yourself ('I found', 'as of June 2026').\n")
+# (6b650, per Patrick via the lead) NO RESULTS, SAID HONESTLY: with the engines refusing this connection, "who won the
+# Knicks game last night?" came back "I don't have access to live sports scores ... check ESPN", the news "check
+# Google News", and the week's films were 2024's presented as this weekend's. A stable question is still answered
+# with nothing said about the search; a current one gets ONE plain line that live results didn't come through, then
+# what is known, dated, and never a remembered fact as current.
 GROUND_NONE = (
-    "Your web search for '{query}' found nothing usable; the reader can't "
-    "see this.\n"
+    "Your web search for '{query}' found nothing usable just now; the "
+    "reader can't see this.\n"
     "Today is {today}. Your training data ends before today and is out of "
-    "date for anything current. Answer from what you reliably know, label "
-    "any fact that may have changed with the month it was last true for you "
-    "(never present it as 'right now'); only for a current fact (a price, "
-    "hours, a score, news) say in one clause what to check and where. Never "
-    "mention the search, a cutoff or your training data (6b626).\n")
+    "date for anything current.\n"
+    "- A stable question (how a thing works, a method, a definition, a sum, "
+    "a long-standing fact): answer it from what you reliably know and say "
+    "nothing about the search.\n"
+    "- A question that needs something current (news, a score, a price, "
+    "what's playing, service status, hours, who leads now): begin with ONE "
+    "plain sentence that live results didn't come through just now, naming "
+    "what you couldn't check (\"I couldn't get live results just now, so I "
+    "can't check last night's score.\"). Then give what you do know, each "
+    "fact with the month or year it was last true for you; never present "
+    "it as 'right now' or as this week's. Never answer by sending the "
+    "person to a website; at most one short pointer at the very end.\n"
+    "- Never mention your training data or a cutoff, and never describe "
+    "your access ('I don't have access to live…').\n")
 # DATING EVERY FIGURE (6b520, per Patrick): round 2's judges marked fresh
 # answers down for current figures with no date ("$2.27 a dozen", "3.75%")
 # and for stale ones stated as now. The writer dates each current figure
@@ -27762,6 +27882,10 @@ CLAUDE_PRICES = {
     "claude-sonnet-4-6": (3.0, 15.0, 0.30, 3.75),
     "claude-sonnet-4-5": (3.0, 15.0, 0.30, 3.75),
     "claude-haiku-4-5": (1.0, 5.0, 0.10, 1.25),
+    # (6b650) Haiku 5.5, the quick ladder's first Claude rung, had no entry, so its calls were counted at Fable
+    # 5.1's price (100x). $0.10 / $0.50 per the claude-api skill's table (2026-10-06), prompts up to 100K tokens;
+    # cache read and write assumed at the usual 0.1x and 1.25x of input (not checked)
+    "claude-haiku-5-5": (0.10, 0.50, 0.01, 0.125),
 }
 PRICES_BY_PROVIDER = {"claude": CLAUDE_PRICES}
 # only providers that charge by the token and have no balance of their own
@@ -38855,6 +38979,16 @@ def _ans_asked(question: str) -> str:
     return q[i + 8:] if i >= 0 else q
 
 
+# AN OPENER ABOUT WHAT IT CAN'T SEE (6b650, per Patrick): "What's for breakfast?" began "Since I can't see your kitchen
+# or know your specific dietary preferences, I'll assume you're looking for a reliable, high-protein breakfast that
+# fits a busy morning schedule." The first sentence goes when it is only that and the answer goes on after it.
+_ANS_ASSUME_RX = re.compile(
+    r"\s*(?:Since|As|Because|Given\s+that|Without)\b[^.!?\n]{0,140}?\b(?:can['’]?t|cannot|don['’]?t|do\s+not|no\s+way\s+"
+    r"to|not\s+able\s+to|knowing)\b[^.!?\n]{0,140}?\bI(?:['’]ll|\s+will|\s+am\s+going\s+to|['’]ve|\s+have)\s+"
+    r"(?:just\s+)?(?:assume|guess|go\s+with|give|provide|offer|suggest|cover|share|lay\s+out|put\s+together|list|outline|"
+    r"pick|break\s+(?:it|this)\s+down)\b[^.!?\n]{0,240}[.!?:]\s+")
+
+
 def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
     """(text, notes) for a finished single-writer answer (6b523): its
     arithmetic re-computed, its reais-to-dollar figures checked against the
@@ -38888,6 +39022,11 @@ def answer_polish(text: str, pack: str = "", question: str = "") -> tuple:
     if m:
         t = t[m.end():]
         notes.append("heading dropped")
+    m = _ANS_ASSUME_RX.match(t)            # (6b650) "Since I can't see your kitchen..., I'll assume..."
+    if m and len(t[m.end():].strip()) >= 40:
+        t = t[m.end():]
+        t = t[:1].upper() + t[1:]
+        notes.append("assumption opener dropped")
     t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)
     if t2.rstrip() != t.rstrip():          # (6b560) trailing space alone is no recap
         t = t2
@@ -47857,6 +47996,8 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         # reason (_srv_think.brief). Pictures, files, agents, Cloud Only, Max and
         # Deep keep their own runs.
         _triage = turn_triage(prompt)
+        if _triage == "full" and answer_kind(prompt) in ("social", "personal"):
+            _triage = "short"     # how they feel, a bite to eat: one seat, one pass, no council (6b650)
         _plain_turn = (not images and not req_json.get("docs")
                        and not str(req_json.get("agent") or ""))
         _brief_turn = bool(
@@ -48707,8 +48848,11 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
         _lv = max(1, min(5, _lv))
         if _LEN.get(_lv):
             dated_system["content"] += "\n\nLENGTH: " + _LEN[_lv] + LENGTH_ASKED
-        if messages and answer_kind(str(messages[-1].get("content") or "")) == "social":
+        _kind = answer_kind(str(messages[-1].get("content") or "")) if messages else ""
+        if _kind == "social":
             dated_system["content"] += SOCIAL_RULE      # small talk: short, human, one question back (beta 4)
+        elif _kind == "personal":
+            dated_system["content"] += PERSONAL_RULE    # how they feel, a bite to eat: a friend's answer (6b650)
         if auto_web and messages:
             # THE CLOCK RIDES THE QUESTION (6b264): the system-prompt
             # binding lost to a Beijing-hosted model's own calendar
@@ -49449,6 +49593,10 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     or AGENTS.get(agent_name, {}).get("workspace")
                     or str(req_json.get("lane") or "") == "code"):
                 _kn_want = know_wants(prompt)
+            # (6b650) "I'm tired" is a cue only by its "I'm": small talk and how the person feels look through their
+            # chats only when they ask for them ("remind me", "what did I…"), never for an old breakfast to cite
+            if _kn_want == 1 and answer_kind(prompt) in ("social", "personal", "arith"):
+                _kn_want = 0
             if _kn_want:
                 _kn_cfg = know_settings(user_base)
                 _kn_away = bool(cloud_only or _max_bench)     # bound for the cloud
@@ -49675,7 +49823,9 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                     first_s=None,
                     polish=(_so_revise if (effort_polish(user_prefs(user_base).get("polish", True), _effort)
                                            and (not query or bookish)
-                                           and _is_substantive(prompt)) else None))
+                                           and _is_substantive(prompt)
+                                           and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b650)
+                                else None))
                 if _so_res == "server":
                     _single_polish()      # the post-pass (6b560)
             elif _srv_lbl:
@@ -49789,7 +49939,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                             and not images and (not query or bookish)
                             and not _links
                             and _is_substantive(prompt)
-                            and answer_kind(prompt) not in ("chat", "arith"))   # (6b626)
+                            and answer_kind(prompt) not in ("chat", "arith", "social", "personal"))   # (6b626, 6b650)
 
                     def _revise(_d):
                         _sq = (ground_clip(full_messages[-1]["content"], 10000)
@@ -49824,7 +49974,7 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
                           and _is_substantive(prompt)
                           # (6b626) a reviser shown only the question can't see the
                           # chat: "what did I say first" came back as itself
-                          and answer_kind(prompt) not in ("chat", "arith")
+                          and answer_kind(prompt) not in ("chat", "arith", "social", "personal")   # (6b650) no reviser
                           and not slow_giant(lbl))
                 if polish:
                     step("draft", "Drafting the answer", "run", lbl)
@@ -76326,6 +76476,74 @@ def _retire_contribute():
         except OSError:
             pass
 
+
+
+# ==== 6b650 search fixture: begin ====
+# NO TEST TRAFFIC TO A REAL SEARCH ENGINE (6b650, per Patrick via the lead: the benches and gauntlets run from this
+# Mac got its connection bot-flagged; DuckDuckGo answered 202 "anomaly" and Brave 429, and every search came back
+# empty). A dev copy with the `search-fixture=<file.json>` hook answers every search from that file and never from the
+# network: the engines (ddgs text, news, images), the page reader (a fixture's pages, else nothing), the official
+# feeds (none) and the connection probe (online). The file: {"queries": [{"match": ["knicks"], "rows": [{"title",
+# "href", "body", "date"}], "news": [...]}], "pages": {url: text}}; a group answers a query that holds every one of its
+# match words (lower case), and a query nothing matches finds nothing (the no-results path, measured as such).
+def _fx_load():
+    path = _hook_arg("search-fixture")
+    if not path:
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            d = json.load(fh)
+        return d if isinstance(d, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+_FX = _fx_load()
+
+
+def _fx_rows(query: str, kind: str = "rows") -> list:
+    q = str(query or "").lower()
+    for g in (_FX or {}).get("queries") or []:
+        words = [str(w).lower() for w in g.get("match") or []]
+        if words and all(w in q for w in words):
+            return [dict(r) for r in (g.get(kind) or (g.get("rows") if kind == "news" else []) or [])]
+    return []
+
+
+class _FixtureDDGS:
+    """ddgs.DDGS's three calls, answered from the fixture file."""
+    def __init__(self, *a, **kw):
+        pass
+
+    def text(self, query, max_results=10, **kw):
+        return _fx_rows(query)[:max_results]
+
+    def news(self, query, max_results=10, **kw):
+        return _fx_rows(query, "news")[:max_results]
+
+    def images(self, query, max_results=10, **kw):
+        return []
+
+
+if _FX is not None:
+    DDGS, HAS_SEARCH = _FixtureDDGS, True
+    _fx_pages = {str(k): str(v) for k, v in ((_FX or {}).get("pages") or {}).items()}
+
+    def _page_read(url, want_photo=False, timeout=6.0):     # noqa: F811 (the fixture's reader)
+        t = _fx_pages.get(str(url))
+        if not t:
+            return None
+        return {"title": "", "date": "", "paras": [p for p in t.split("\n") if p.strip()], "image": ""}
+
+    def _page_text(url, cap=2600, meta=None):               # noqa: F811
+        return _fx_pages.get(str(url), "")[:cap]
+
+    def _net_probe():                                        # noqa: F811 (online, asked of nobody)
+        return None
+
+    def _official_get(url, timeout=6.0, data=None):          # noqa: F811
+        raise OSError("no network under the search fixture")
+# ==== 6b650 search fixture: end ====
 
 if __name__ == "__main__":
     # NO PAGE OUTSIDE THE APP WINDOW (6b320): a launch that can't draw
