@@ -68499,8 +68499,9 @@ function hzUFieldStar(p,b,glint,home,rnd){
 }
 function hzUFieldPlan(home,g,c,vw,full,rnd){
   const b=hzUFieldBox(home,g,c,vw);if(!b)return null;
-  const n=Math.round((full?40:20)*(home?1:.5)),P=[];let glints=home?(full?4:2):0;
+  const n=Math.round((full?60:30)*(home?1:.5)),P=[];let glints=home?(full?6:3):0;   // (6b621, per Patrick: "more stars": was 40 and 20, four glints and two)
   for(let i=0;i<n;i++)P.push(hzUFieldStar({},b,glints-->0,home,rnd));
+  if(home)for(let i=0,m=full?30:15;i<m;i++){const p=hzUFieldStar({},b,false,home,rnd);p.s=.9+rnd()*.6;p.a=.18+rnd()*.17;p.deep=1;P.push(p);}   // the deeper layer (6b621): tiny (.9-1.5 px), dim (.18-.35), drifting at half the pace
   return {box:b,P};
 }
 function hzSkyBoot(){
@@ -68596,7 +68597,7 @@ function hzSkyBoot(){
   // motion's amplitude (Full 1, Balanced .6, Calm and reduced motion 0). NO DENT: the crest cap and the soft knee behind
   // the greeting are gone; the whole curtain dims by up to 30 % in a soft full-width band at the greeting's height
   // (feathered over 22 % of the height), where Ultra's 20 % lift is withheld.
-  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa;uniform vec4 grt;"
+  const AUR="precision highp float;varying vec2 uv;uniform float time,asp,neon,c2,rich,cool,acx,awd,tph,tam,spl,lt,hb,rch,flo,wam,ft,fa,tws;uniform vec4 grt;"
     +"float h1(float n){return fract(sin(n)*43758.5453123);}"
     +"float nz(vec2 x){vec2 p=floor(x),f=fract(x);f=f*f*(3.-2.*f);float n=p.x+p.y*57.;return mix(mix(h1(n),h1(n+1.),f.x),mix(h1(n+57.),h1(n+58.),f.x),f.y);}"
     +"float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*nz(p);p=p*2.03+vec2(1.7,9.2);a*=.5;}return v;}"
@@ -68607,6 +68608,7 @@ function hzSkyBoot(){
     // the folded ribbon, and the fold wave travelling sideways on the continuous clock
     +"float x=p.x+tam*(.12*sin(p.x*2.2-tph)+.05*sin(p.x*5.1+tph*1.7+fk))+fa*.06*sin(p.x*4.-ft*.13+fk*1.3);"
     // the rays' pattern slides sideways and back (at most about 15 px/s)
+    +"x+=tws*(p.y-.62)*sin(p.x*2.6-tph*.7+fk*1.9);"   // the ribbon twist (6b621): rays lean with height, left here and right there
     +"float xn=x+fa*(.35*sin(ft*.045)+.2*sin(ft*.071+1.3+fk));"
     +"float wave=fbm(vec2(xn*.9+t*.6+fk*3.7,t*.2+fk))*2.-1.;"
     +"float wav=wam*(.07*sin(x*4.2+lt*1.2+fk*1.7)+.03*sin(x*7.3-lt*.35+fk));"
@@ -68672,7 +68674,17 @@ function hzSkyBoot(){
   const inR=(x,y,r,m)=>x>r.left-m&&x<r.right+m&&y>r.top-m&&y<r.bottom+m;
   const fxLive=()=>!document.hidden&&!hzS.blurred;
   // ---- the level: Calm (one still frame), Balanced (the default) or Full; Ultra lifts Balanced's sky to Full
-  const SURGE_T=1,WAVE_MS=700,UTW_DEG=5.5,UTW_S=1.6,EASE_S=.3;
+  const SURGE_T=1.2,WAVE_MS=700,UTW_DEG=5.5,UTW_S=1.6,EASE_S=.3;
+  // THE ARRIVAL'S TWIST (6b621, per Patrick: "add a little bit more twist when we hit ultra"): as Ultra arrives the
+  // aurora's folds roll a little further and twist one way or the other (each arrival picks), then settle back into the
+  // resting drift. It rides the surge's own envelope x^2 e^(2(1-x)) (0 at the release, its peak at 1 s in the hang,
+  // most of it gone by 3 s; Balanced half, Calm and reduced motion none): the folds' amplitude x (1 + ATW_AMP x env)
+  // (.45 to .72 at the peak) and their phase pushed ATW_PH x env radians (.25 at the peak, about a quarter of a fold
+  // turn), its fastest push .4 rad/s against the folds' own .16-.31: a lean, never a spin. No colour, no brightness.
+  // The ribbon twist (per Patrick: "More twist, not just necessarily rotation"): ATW_SH x (ATW_REST x Ultra + the swell)
+  // of shear, x += tws (y - .62) sin(2.6 x - .7 phase): the rays lean up to about 24 deg in the swell's peak and about 6 at
+  // resting Ultra, the lean changing sign along the curtain and drifting with the folds (Balanced half, Calm none).
+  const ATW_AMP=.6,ATW_PH=.25,ATW_SH=.35,ATW_REST=.28;let twDir=1,aTwNow=[1,0,0];
   let skyMode="bal",calm=1,calmTo=1,fw=.85,fwTo=.85,tw=1,twTo=1,spd=.012,spdTo=.012,c2E=0,c2To=0,neon=.1,neonTo=.1,neonBase=.1,busyOn=false,
     ultraWant=false,ultraE=0,surgeAt=0,surgeNow=0,rich=0,starB=1,vg=0,flareNow=0,waveAt=0,waveX=0,waveY=0,waveR=0,waveA=0,auT=0,lastAur=1,warmed=false,
     skyClock=0,camX=0,camY=0,antAt=0,uTwAt=0,uTwFrom=0,uTwTo=0,twistNow=0,arcNow=0,held=false,heldAt=0,restartAt=0,hmix=1,hourAt=0;
@@ -68694,8 +68706,8 @@ function hzSkyBoot(){
   // the held breath (the arrival's anticipation): dim to .92 in 140 ms, held through the hang, back to 1 over
   // 1600-2600 ms; the sky's clock slows to a tenth for the 140 ms and eases back to full speed by 500 ms
   const ss5=u=>u*u*u*(u*(u*6-15)+10),ease=(a,b,x)=>ss5(Math.max(0,Math.min(1,(x-a)/(b-a))));
-  function breath(nowT){if(!antAt)return [1,1];const ms=nowT-antAt;if(ms>2700){antAt=0;return [1,1];}
-    return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<1600?.92:.92+.08*ease(1600,2600,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];}
+  function breath(nowT){if(!antAt)return [1,1];const ms=nowT-antAt;if(ms>3300){antAt=0;return [1,1];}   // (6b621) the hang held to 2 s, the settle to 3.2 s (was 1.6 and 2.6)
+    return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<2000?.92:.92+.08*ease(2000,3200,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];}
   const vel=u=>30*u*u*(1-u)*(1-u)/1.875;
   function uTwDeg(nowT){return uTwAt?uTwFrom+(uTwTo-uTwFrom)*ss5(Math.min(1,(nowT-uTwAt)/(UTW_S*1000))):uTwFrom;}
   function twistAt(nowT){let v=0;if(uTwAt){const u=Math.min(1,(nowT-uTwAt)/(UTW_S*1000));v=vel(u)*.8;}return [-uTwDeg(nowT)*Math.PI/180,v];}
@@ -68762,7 +68774,8 @@ function hzSkyBoot(){
   function buildField(launch){const cb=R(cbox());if(!cb)return null;const hm=home(),plan=hzUFieldPlan(hm,R(greetEl()),cb,innerWidth,skyMode==="full",Math.random);if(!plan)return null;
     const b=plan.box,P=plan.P,now=performance.now(),n=P.length;
     if(launch&&hm){const far=new Set();while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))far.add(Math.floor(Math.random()*n));
-      P.forEach((p,i)=>{p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1300+Math.random()*300;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});}
+      P.forEach((p,i)=>{if(p.deep){p.born=now+400;return;}p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1700+Math.random()*400;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});   // a longer float (6b621: was 1.3-1.6 s)
+      for(let k=0,m=skyMode==="full"?8:4;k<m;k++){const q=hzUFieldStar({},b,k<2,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
     else P.forEach(p=>{p.born=now;});
     // in a conversation the field is the short, light version (6b580, per Patrick: "we don't have to litter the place with
     // stars"; 6b621 the preview's): half the stars, centred over the composer's top edge, each living 2-4 s (hzUFieldStar)
@@ -68773,12 +68786,15 @@ function hzSkyBoot(){
     const fin=Math.min(1,(nowT-field.t0)/600);
     if(live&&nowT>field.nextUp){field.nextUp=nowT+4000+Math.random()*4000;const p=field.P[Math.floor(Math.random()*field.P.length)];if(!p.up)p.up=nowT;}
     for(const p of field.P){const sw=Math.sin(field.clock*p.w+p.ph),twv=p.sh?Math.pow(.5+.5*sw,4):.5+.5*sw;
-      const yw=field.y0+(((p.y-field.y0-drift)%H_)+H_)%H_;let y=yw,edge=Math.max(0,Math.min(1,(yw-field.y0)/14,(field.y1-yw)/14)),a=p.a*(1-p.amp+p.amp*twv);const born=Math.min(1,(nowT-p.born)/600);
+      const yw=field.y0+(((p.y-field.y0-drift*(p.deep?.5:1))%H_)+H_)%H_;let y=yw,edge=Math.max(0,Math.min(1,(yw-field.y0)/14,(field.y1-yw)/14)),a=p.a*(1-p.amp+p.amp*twv);const born=Math.min(1,(nowT-p.born)/600);
       if(p.lt){const u=(nowT-p.lt)/p.lu;if(u<0)continue;const to=p.far!=null?p.far:yw;
         const u1=Math.min(1,(nowT-p.lt)/420),u2=Math.max(0,Math.min(1,(nowT-p.lt-420)/(p.lu-420))),e=.9*(u1>=1?1:1-Math.pow(2,-10*u1))+.1*ss5(u2);y=p.l0+(to-p.l0)*e;a*=Math.min(1,u*4);edge=1;
         if(p.far!=null){a*=Math.max(0,1-u);if(u>=1){p.lt=0;p.far=null;hzUFieldStar(p,field,p.big,field.hm,Math.random);p.born=nowT;continue;}}else if(u>=1)p.lt=0;}
       if(p.life){const u=(nowT-p.born)/p.life;if(u>=1){hzUFieldStar(p,field,false,false,Math.random);p.born=nowT;continue;}a*=Math.sin(Math.PI*u);}   // a conversation: each fades in and out over its life (6b621)
-      if(p.up){const u=(nowT-p.up)/3000;if(u>=1){hzUFieldStar(p,field,p.big,field.hm,Math.random);p.born=nowT;continue;}y-=28*u*(2-u);a*=1-u;}
+      if(p.up){const u=(nowT-p.up)/3000;if(u>=1){hzUFieldStar(p,field,p.big,field.hm,Math.random);if(p.deep){p.s=.9+Math.random()*.6;p.a=.18+Math.random()*.17;}p.born=nowT;continue;}y-=28*u*(2-u);a*=1-u;}
+      // A STAR'S BIRTH (6b621): it blooms in over 1.4 s on the smootherstep with a soft four-point glint that rises and
+      // falls once (sin), turning a few degrees, then it stays in the field
+      if(p.bt){if(nowT<p.bt)continue;const u=Math.min(1,(nowT-p.bt)/1400);a*=ss5(u);pfx.star(p.x,y,p.s*5*(1-.4*u),WHITE,.5*Math.sin(Math.PI*u)*edge*fin*ultraE,u*.3);if(u>=1)p.bt=0;}
       pfx.star(p.x,y,p.s*2.2,p.col,a*edge*fin*born*ultraE,0);if(p.big)pfx.star(p.x,y,p.s*.9,WHITE,.35*a*edge*fin*born*ultraE,0);}}
   const MX={w:[{a:0},{a:0}],next:0,arr:0,kx:0,top:0,up:0};
   function matrixUniforms(nowT,dt){const f=field,on=f&&!hzS.reduced&&skyMode!=="calm",lvm=skyMode==="full"?1:.5;
@@ -68807,7 +68823,7 @@ function hzSkyBoot(){
     while(inT.length<P.length){let best=null;for(const i of inT)for(let j=0;j<P.length;j++){if(inT.includes(j))continue;const dd=Math.hypot(P[i].sx-P[j].sx,P[i].sy-P[j].sy);if(!best||dd<best[2])best=[i,j,dd];}inT.push(best[1]);edges.push([best[0],best[1]]);}
     if(Math.random()<.35&&P.length>4){const b2=P.length-1;if(!edges.some(e=>(e[0]===0&&e[1]===b2)||(e[0]===b2&&e[1]===0)))edges.push([0,b2]);}
     return {P,edges,t0:performance.now(),drift:Math.random()<.35};}
-  function drawSign(nowT,t,on){if(on&&fxLive()&&!sign&&nowT>nextSign){sign=buildSign(t);nextSign=nowT+20000+Math.random()*10000;}
+  function drawSign(nowT,t,on){if(on&&fxLive()&&!sign&&nowT>nextSign){sign=buildSign(t);nextSign=nowT+14000+Math.random()*6000;}
     if(!sign)return;const age=(nowT-sign.t0)/1000,per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;
     if(age>draw+hold+fade){sign=null;return;}
     const fa=(age<draw+hold?1:1-(age-draw-hold)/fade)*workF,dy=sign.drift&&age>draw+hold?-(age-draw-hold)*9:0,P=sign.P.map(p=>{const v=toScreen(p.qx,p.qy,t);return [v[0],v[1]+dy];}),lit=new Set([sign.edges[0][0]]);
@@ -68932,11 +68948,12 @@ function hzSkyBoot(){
     auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);if(AURSPD>1)auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1)*(AURSPD-1);   // ?hz=aurspeed=N (dev copies): the flow N times faster
     if(waveAt){const wp=(nowT-waveAt)/WAVE_MS;if(wp>=1){waveAt=0;waveA=0;}else{const e=wp<.5?2*wp*wp:1-Math.pow(-2*wp+2,2)/2;waveR=waveY+(-40-waveY)*e;waveA=Math.min(1,wp/.3)*Math.pow(1-wp,1.1)*ultraE;   /* the band comes up over 210 ms: no flash (6b555) */}}
     aurWander(dt);
+    const aTw=[1+ATW_AMP*surgeNow,twDir*ATW_PH*surgeNow,lift()?ATW_SH*(ATW_REST*ultraE*amp_+surgeNow):0];aTwNow=aTw;   // THE ARRIVAL'S TWIST (6b621)
     if(nowT-aurFloAt>1000){aurFloAt=nowT;const cb=R(cbox()),g=R(greetEl()),box=r=>r?[r.left/innerWidth,1-r.bottom/innerHeight,r.right/innerWidth,1-r.top/innerHeight]:[0,0,0,0];
       aurFlo=cb?Math.min(.9,1-(cb.top-36)/innerHeight):.2;aurGr=box(home()?g:null);}   // the edge never comes within 36 px of the composer, never crosses the greeting
     if(neon>.002||lastAur>.002){gl.useProgram(pA);quad(pA);gl.bindFramebuffer(gl.FRAMEBUFFER,S.au.f);gl.viewport(0,0,S.au.w,S.au.h);
       gl.uniform1f(pA.U.time,auT);gl.uniform1f(pA.U.asp,S.W/S.H);gl.uniform1f(pA.U.neon,neon);gl.uniform1f(pA.U.c2,Math.max(c2E,skyMode==="bal"?rich:0));gl.uniform1f(pA.U.rich,rich);gl.uniform1f(pA.U.cool,Math.min(1.3,ultraE*(1+.3*surgeNow)));
-      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph);gl.uniform1f(pA.U.tam,AW.tam);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
+      gl.uniform1f(pA.U.acx,AW.cx);gl.uniform1f(pA.U.awd,AW.w);gl.uniform1f(pA.U.tph,AW.tph+aTw[1]);gl.uniform1f(pA.U.tam,AW.tam*aTw[0]);gl.uniform1f(pA.U.tws,aTw[2]);gl.uniform1f(pA.U.spl,AW.spl);gl.uniform1f(pA.U.lt,AW.lt);
       gl.uniform1f(pA.U.hb,AW.hb*(1+.22*surgeNow));gl.uniform1f(pA.U.rch,AW.rch);gl.uniform1f(pA.U.ft,AW.ft);gl.uniform1f(pA.U.fa,AW.fa);gl.uniform1f(pA.U.wam,skyMode==="full"&&!hzS.reduced?1:.5);gl.uniform1f(pA.U.flo,aurFlo);
       gl.uniform4f(pA.U.grt,aurGr[0],aurGr[1],aurGr[2],aurGr[3]);
       gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
@@ -68984,15 +69001,15 @@ function hzSkyBoot(){
     if(on){if(!chand||chandOff){chandOff=0;chand=null;setTimeout(()=>{if(ultraWant&&!chand&&lift())chand=buildChand();},16);}}   // built a frame later: the arrival's own frame stays light
     else{if(chand&&!chandOff)chandOff=n;if(uTwAt||uTwFrom){uTwFrom=uTwDeg(n);uTwTo=0;uTwAt=n;}}
     if(on&&lift()&&!smash){if(!field)setTimeout(()=>{if(ultraWant&&!field)field=buildField(false);},16);}
-    else if(on&&lift()){surgeAt=n;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
-      nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+9000+Math.random()*6000;sign=null;nextShower=0;
+    else if(on&&lift()){surgeAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
+      nextShoot=n+4000+Math.random()*3000;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1800+Math.random()*800;sign=null;nextShower=n+1300;   // (6b621) a star sign and a shower in the landing
       if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
       requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
     shoot:!!shoot,shower:shower.length,rain:rain.length,aur:{cx:+AW.cx.toFixed(3),w:+AW.w.toFixed(3),spl:+AW.spl.toFixed(3),rch:+AW.rch.toFixed(3)},breath:breath(performance.now()),hmix:+hmix.toFixed(3),held,fw:+fw.toFixed(3),calm:+calm.toFixed(3),
     matrix:field?[field.x0,field.y0,field.x1,field.y1].map(v=>Math.round(v)):null,twist:+(twistNow*180/Math.PI).toFixed(2),
-    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
+    fspan:field?[Math.min(...field.P.map(p=>p.x)),Math.max(...field.P.map(p=>p.x))].map(v=>Math.round(v)):null,flife:field?Math.max(0,...field.P.map(p=>p.life||0)):0,workF:+workF.toFixed(3),aurfa:AW.fa,atw:[+aTwNow[0].toFixed(3),+aTwNow[1].toFixed(3),+aTwNow[2].toFixed(3)],births:field?field.P.filter(p=>p.bt).length:0,deep:field?field.P.filter(p=>p.deep).length:0};};   // (6b621) the field's spread and lives, the working view's fade, the aurora's motion
   addEventListener("resize",()=>{S.size();field=null;if(ultraWant)S.ultra(true,null,null,false);if(hzFxLevel()==="calm")S.once();});
   mode(lvKey());c2E=c2To;spd=spdTo;calm=calmTo;fw=fwTo;tw=twTo;neonBase=neonTo;   // the first level is not eased in
   S.level(hzModeIndex(typeof tier==="string"?tier:""),hzEffort());
