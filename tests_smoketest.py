@@ -45473,7 +45473,7 @@ def _b3_sky(js, css, pg):
             and 'lvm=skyMode==="full"?1:.5;' in sky
             # the star signs: every 20-30 s (the first 9-15 s after arriving), 4-6 stars joined by their minimum spanning
             # tree, 420 ms a line, held 2 s, dissolving over 1.2 s; lines and points, no art
-            and "nextSign=nowT+9000+Math.random()*5000;" in sky and "nextSign=n+1800+Math.random()*800;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
+            and "nextSign=nowT+9000+Math.random()*5000;" in sky and "nextSign=n+1500+Math.random()*300;sign=null;hzS.signForce=2;" in sky and "nextShower=n+1300;" in sky   # (6b621) every 14-20 s, one drawing in on landing, a shower at 1.3 s
             and "const P=pts.slice(0,4+Math.floor(Math.random()*3)),inT=[0],edges=[];" in sky and "per=.42,draw=sign.edges.length*per,hold=2,fade=1.2;" in sky
             # meteor showers: every 60-90 s in Full (110-130 s in Balanced), 3-5 from one radiant
             and 'nextShower=nowT+(skyMode==="full"?60000+Math.random()*30000:110000+Math.random()*20000);' in sky and "n=landing?5+Math.floor(Math.random()*4):3+Math.floor(Math.random()*3);landing=false;" in sky
@@ -46796,6 +46796,14 @@ def _u621_aur(js):
             and "pow((" not in sky                                                                   # (the one pow left squares a value in 0..1)
             # Ultra pushed again: the curtain taller and lifted whatever the mode, its tips deeper violet
             and "+Math.max(0,e-3)*.14;S.setNeon();};" in sky and "mix(vec3(.7,.6,1.),vec3(.6,.46,1.),.6*min(cool,1.))" in aur
+            # THE STARS' LANDING (per Patrick: "push the star effect ... a lot harder while still not being tacky"; "through the
+            # roof"): 450 births (225 Balanced) sweeping out from the composer, 60 (30) kept for the rest, 30 (15) trails; each
+            # blooms over 900 ms or more (a slow bright one 2.5 s): never a flash; the trail ice-white; built only when Ultra
+            # lifts the sky (never Calm or reduced motion); the hand's shimmer and the typing shimmer gentle
+            and "n=full?450:225,keep=full?60:30,trails=full?30:15" in sky and "bloom:big?2500:900" in sky
+            and "pfx.line(p.tr.x+(p.x-p.tr.x)*(e-tl),p.tr.y+(p.y-p.tr.y)*(e-tl),hx,hy,1,[.86,.91,1],0," in sky
+            and "setTimeout(()=>{if(ultraWant&&lift())wave=buildWave(n);},16);" in sky and "if(!cb||!home())return [];" in sky
+            and "a*=1+.6*pe*Math.exp(-q/8100);" in sky
             and '"float o=spl*.1,env=' in aur                                                        # the lobes +-10 %: one curtain widening, no gap
             and "cl=mix(" not in aur and "/(1.+lk/.06)" not in aur and "gm" not in aur              # no crest cap, no knee
             and "gb=grt.z>grt.x?1.-smoothstep(gh,gh+.22,abs(uv.y-gc)):0." in aur and '"col*=1.-.3*gb;"' in aur   # the greeting's band, full width
@@ -46826,7 +46834,10 @@ check("6b621 the aurora's shader: the travelling fold wave, the pulse and the sl
       and not _u621_aur(_hz_js.replace("sin(xn*9.-ft*.35+fk*1.7)", "sin(xn*9.-ft*3.5+fk*1.7)"))
       and not _u621_aur(_hz_js.replace('  catch(e){hzS.gpuErr=String(e&&e.message||e);console.error("[sky] the GPU sky could not start (a shader would not compile or link):",hzS.gpuErr);', '  catch(e){'))   # a silent fallback again
       and not _u621_aur(_hz_js.replace("exp(-sq((uv.x-sgx)/.12))", "exp(-pow((uv.x-sgx)/.12,2.))"))                                     # pow() of a negative base again
-      and not _u621_aur(_hz_js.replace('if(hzS.debug&&hzS.debug.gpu==="1")hzGpuBadge();', "hzGpuBadge();")), "")                          # the badge outside a dev copy                                   # ripples ten times faster                          # a spin, not a lean                           # the rays parked
+      and not _u621_aur(_hz_js.replace('if(hzS.debug&&hzS.debug.gpu==="1")hzGpuBadge();', "hzGpuBadge();"))
+      and not _u621_aur(_hz_js.replace("bloom:big?2500:900", "bloom:big?2500:60"))                                                   # births that pop in (a flash)
+      and not _u621_aur(_hz_js.replace("hx,hy,1,[.86,.91,1],0,", "hx,hy,1,[1,.62,.76],0,"))                                          # a rose trail
+      and not _u621_aur(_hz_js.replace("setTimeout(()=>{if(ultraWant&&lift())wave=buildWave(n);},16);", "setTimeout(()=>{wave=buildWave(n);},16);")), "")   # the wave without the lift's gate                          # the badge outside a dev copy                                   # ripples ten times faster                          # a spin, not a lean                           # the rays parked
 # THE WORKING VIEWS' SKY (THE GOVERNING RULE): the field in a conversation is the short light version (pure, in node):
 # half the stars, centred over the composer's top edge (.18-.82 of the band, the grid's half pitch either way), each
 # living 2-4 s; the home's live on
@@ -46866,7 +46877,7 @@ def _u621_work(css, js, pg):
             and '<div id="hz-band"></div>\n    <div id="hz-scrim"></div>\n  </div>' in pg
             and 'b.style.setProperty("--hz-bcx",Math.round(r.left+pl+w/2)+"px");b.style.setProperty("--hz-bhw",Math.round(w/2+24)+"px");' in js
             and "S.footMul+=(S.footTo*(home()?1:.12)-S.footMul)" in sky
-            and "workF=home()?1:Math.max(0,workF-dt/.9);if(!workF){cons=null;shoot=null;shower.length=0;rain.length=0;sign=null;}" in sky
+            and "workF=home()?1:Math.max(0,workF-dt/.9);if(!workF){cons=null;shoot=null;shower.length=0;rain.length=0;sign=null;wave.length=0;}" in sky
             and "if(!home()){cons=null;" not in sky
             and "*ultraE*amp*(m.band?1:workF)" in sky and "const fa=(age<draw+hold?1:1-(age-draw-hold)/fade)*workF" in sky
             and "if(hmOn&&ultraE>.9&&fxLive()&&nowT>nextShoot&&!shoot)" in sky and "if(on&&fxLive()&&!sign&&nowT>nextSign)" in sky)   # none born in a conversation
@@ -46953,9 +46964,9 @@ _U621_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 12000
   // the arrival, sampled on a timer while it runs
   out.arr = await ev(`new Promise(res=>{const S=[],t0=performance.now(),root=document.documentElement,lit=document.querySelector("#composer>.hz-ulit"),core=document.querySelector("#hz-effort .hz-sl-core");
     hzEffortSet(4);const tick=()=>{const t=performance.now()-t0;S.push({t,ant:root.classList.contains("hz-ant"),ign:root.classList.contains("hz-ignite"),
-      rev:lit?getComputedStyle(lit).getPropertyValue("--hz-urev").trim():"",anim:core?getComputedStyle(core).animationName:"",sk:(({atw,births,shower,sign})=>({atw,births,shower,sign}))(hzS.sky.state())});if(t<2600)setTimeout(tick,40);else res(S);};tick();})`);
+      rev:lit?getComputedStyle(lit).getPropertyValue("--hz-urev").trim():"",anim:core?getComputedStyle(core).animationName:"",sk:(({atw,births,shower,sign,waveLit})=>({atw,births,shower,sign,waveLit}))(hzS.sky.state())});if(t<2600)setTimeout(tick,40);else res(S);};tick();})`);
   await sleep(4500);
-  out.restSk = await ev(`(({atw,deep,field})=>({atw,deep,field}))(hzS.sky.state())`);
+  out.restSk = await ev(`(({atw,deep,field,wave})=>({atw,deep,field,wave}))(hzS.sky.state())`);
   out.rest = await ev(`({motes:document.querySelectorAll("#hz-motes>i").length,field:hzS.sky.state().field,lit:!!document.querySelector("#composer>.hz-ulit"),after:getComputedStyle(document.querySelector("#composer"),"::after").display})`);
   const sideways = async () => { const r = []; for (const w of [760, 1440]) { await send("Emulation.setDeviceMetricsOverride", { width: w, height: 900, deviceScaleFactor: 1, mobile: false }); await sleep(700);
     r.push(await ev(`[document.documentElement.scrollWidth,innerWidth]`)); } return r; };
@@ -47003,7 +47014,7 @@ def _u621_push_ok(r):
     tw = [x.get("atw") or [1, 0, 0] for x in sk]
     peak = max((t for t in tw), key=lambda t: t[2], default=[1, 0, 0])
     return (bool(sk) and peak[0] >= 1.6 and abs(peak[1]) >= .15 and .3 <= peak[2] <= .5      # the twist in the swell: folds deeper, a lean of ~24 deg, a phase push
-            and max(x.get("births", 0) for x in sk) >= 9 and any(x.get("shower", 0) > 0 for x in sk)   # stars born in the hang, a shower on landing
+            and max(x.get("births", 0) for x in sk) >= 9 and max(x.get("waveLit", 0) for x in sk) >= 300 and rs.get("wave") == 60   # the wave: the sky about 2.5 x denser in the hang, 60 kept and any(x.get("shower", 0) > 0 for x in sk)   # stars born in the hang, a shower on landing
             and rs.get("deep") == 90 and .05 <= (rs.get("atw") or [0, 0, 0])[2] <= .14 and abs((rs.get("atw") or [1, 1, 0])[0] - 1.35) < .05)   # at rest the folds settle to Ultra's deeper 1.35   # the resting twist, and the deeper layer
 def _u621_conv_ok(r):
     c, st = r.get("conv") or {}, r.get("rest") or {}
