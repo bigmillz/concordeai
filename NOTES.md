@@ -20547,7 +20547,11 @@ edge, a daytime window, start == end over the whole day, off, the zone in July, 
 at 03:00; "<name> Only" before and after the headers wakes it; an awake server is used; no card, nothing to say;
 08:00, 14:00, no `quiet`, turned off and start == end all wake as before); the line (each wording, markup in a name,
 never "Mac", once a request, the handler's wiring and the picture's); no secret in anything new. 34 mutations, each
-caught.
+caught. One older fixture moved: 6b357's `_p8c_slow` execs `server_make` alone and now stands in
+`server_take_quiet_notes`. Full gauntlet on 9901-9903: 1,524 of 1,526, exit 1; the two reds were that fixture
+(fixed after the run, re-run alone: green) and `fluent (page, live)`, whose first answer's text read in the real page
+carried the chat list's rows ("1 say hello in one word 339f Nov 10 ...") after the thirty words: page-side, nothing
+this branch touches, not re-run on beta-3 to confirm it predates this.
 
 **Left / worth knowing.**
 - Not tried against a real kit (`kit-quiet` isn't installed); the contract above is all this side knows.
