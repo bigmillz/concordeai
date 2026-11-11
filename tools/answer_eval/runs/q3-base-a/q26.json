@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.6,\"ftok\":297,\"est\":false}",
+  "X-Hurry": "165ca203fde40d72"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 19.65,
+ "elapsed_s": 22.62,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.15,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.15,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.15,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.87,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 21 passages"
+   }
+  },
+  {
+   "t": 12.87,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.87,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.87,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.87,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.65,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.62,
+   "tag": "RATE",
+   "data": {
+    "tps": 80.8,
+    "tok": 239,
+    "s": 3.0
+   }
+  },
+  {
+   "t": 22.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "959 chars"
+   }
+  },
+  {
+   "t": 22.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   10.15,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.15
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.15
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 21 passages",
+   "t_s": 12.87
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.87
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.87
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "959 chars",
+   "t_s": 22.62
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 22.62
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Without the Amazon’s ‘flying rivers’ South America would be ...",
+   "u": "https://www.cnn.com/climate/amazon-flying-rivers-south-america-would-be-at-risk-c2e-spc",
+   "d": "2026-08-24"
+  },
+  {
+   "t": "Amazon.com: South America",
+   "u": "https://www.amazon.com/south-america/s?k=south+america",
+   "d": ""
+  },
+  {
+   "t": "Amazon biome - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_biome",
+   "d": "2014-11-05"
+  },
+  {
+   "t": "Amazon (company) - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_(company)",
+   "d": ""
+  },
+  {
+   "t": "Amazon in Other Countries 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-in-other-countries",
+   "d": "2026"
+  },
+  {
+   "t": "Amazons In South America - ArcGIS StoryMaps",
+   "u": "https://storymaps.arcgis.com/stories/623229ba725843cd87048998a1592f89",
+   "d": "2023-10-18"
+  },
+  {
+   "t": "AmazonGlobal Export Countries and Regions - Amazon Customer ...",
+   "u": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GCBBSZMUXA6U2P8R",
+   "d": ""
+  },
+  {
+   "t": "Amazon Users by Country 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-users-by-country",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.87,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 80.8,
+  "tok": 239,
+  "s": 3.0
+ },
+ "answer_raw": "Amazon has a footprint in South America, but its operations are not as pervasive as they are in North America or Europe.\n\n**Brazil** is the primary country with a dedicated, localized Amazon marketplace in South America [5]. While the company has established localized storefronts in several large economies, South American-based users primarily access Amazon through international shipping options [5].\n\nBecause localized marketplaces are limited, people in other South American countries typically use the following methods:\n\n*   **International Shipping** — A large number of countries in South America can access Amazon via international shipping despite lacking a local marketplace [5].\n*   **Regional Alternatives** — The provided evidence does not specify which local competitors people use instead of Amazon in South America; you would need to check local market share reports or regional e-commerce leaderboards to identify the primary local players.",
+ "answer": "Amazon has a footprint in South America, but its operations are not as pervasive as they are in North America or Europe.\n\n**Brazil** is the primary country with a dedicated, localized Amazon marketplace in South America [5]. While the company has established localized storefronts in several large economies, South American-based users primarily access Amazon through international shipping options [5].\n\nBecause localized marketplaces are limited, people in other South American countries typically use the following methods:\n\n*   **International Shipping** — A large number of countries in South America can access Amazon via international shipping despite lacking a local marketplace [5].\n*   **Regional Alternatives** — The provided evidence does not specify which local competitors people use instead of Amazon in South America; you would need to check local market share reports or regional e-commerce leaderboards to identify the primary local players.",
+ "chars": 959,
+ "raw_bytes": 2890,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.6,
+ "rate_gen_tok_s": 80.72,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:21:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

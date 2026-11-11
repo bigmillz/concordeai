@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.8,\"ftok\":134,\"est\":false}",
+  "X-Hurry": "18884f3648ad6f82"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.59,
+ "elapsed_s": 29.39,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 27 passages"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.08,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.59,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.39,
+   "tag": "RATE",
+   "data": {
+    "tps": 42.6,
+    "tok": 502,
+    "s": 11.8
+   }
+  },
+  {
+   "t": 29.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2011 chars"
+   }
+  },
+  {
+   "t": 29.39,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 29.39,
+   "tag": "DONE",
+   "data": {
+    "f": 17.59,
+    "t": 29.39,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 27 passages",
+   "t_s": 13.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.08
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.08
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2011 chars",
+   "t_s": 29.39
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 29.39
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Neighborhoods in Florianópolis 2026: Where Expats ...",
+   "u": "https://relomap.app/blog/florianopolis-brasile-neighborhoods-guide",
+   "d": "2026-05-24"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Best Neighborhoods in Florianópolis (2026): Lagoa vs Campeche ...",
+   "u": "https://rentihome.com/florianopolis/best-neighborhoods-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Where to stay in Florianópolis: the 5 neighborhoods to know ...",
+   "u": "https://www.avygeo.com/en/guide/americas/brazil/751-florianopolis/where-to-stay",
+   "d": "2026-10-19"
+  },
+  {
+   "t": "THE BEST Florianopolis Neighborhoods to Visit (2026) - Tripadvisor",
+   "u": "https://www.tripadvisor.com/Attractions-g303576-Activities-c47-t34-Florianopolis_State_of_Santa_Catarina.html",
+   "d": "2026"
+  },
+  {
+   "t": "Lavaca Neighborhood - safety, walkability? - Tripadvisor",
+   "u": "https://www.tripadvisor.com.sg/ShowTopic-g60956-i76-k14148740-Lavaca_Neighborhood_safety_walkability-San_Antonio_Texas.html",
+   "d": "2026-05-20"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.08,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 27,
+   "d": 906,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4975,
+   "o": 509,
+   "d": 16256,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 42.6,
+  "tok": 502,
+  "s": 11.8
+ },
+ "app_first_s": 17.59,
+ "app_total_s": 29.39,
+ "answer_raw": "For a six-month stay that balances beach access, walkability, and stability, your best options are **Lagoa da Conceição**, **Campeche**, or **Barra da Lagoa**.\n\nThe \"best\" choice depends on whether you prioritize being in the social center or having easy, flat access to the water.\n\n## Neighborhood Breakdown\n\n**Lagoa da Conceição** — The social engine.\nThis area is the island's social hub and is a top choice for digital nomads [1]. It offers a walkable town environment where you can find everything you need within a central core [3].\n\n**Campeche** — The active lifestyle choice.\nIf you want to bike everywhere and prefer a lifestyle centered around surfing and the beach, this is the best fit [3]. It is one of the primary areas where expats choose to live [1].\n\n**Barra da Lagoa** — The coastal village.\nThis is a fishing village where the lagoon meets the ocean. It features a walkable core, surf schools, and honest restaurants, with furnished rentals typically ranging from $400–700 as of 2026 [3].\n\n**Centro** — The logistics-first option.\nIf you prioritize being near bridges and errands over having the beach at your doorstep, the city center is a runner-up option with furnished rentals around $450–800 as of 2026 [3].\n\n## Comparison for a 6-Month Stay\n\n| Neighborhood | Vibe | Key Feature |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | Social/Nomad | Central social hub [3] |\n| **Campeche** | Active/Surf | Flat streets, easy biking [3] |\n| **Barra da Lagoa** | Village/Surf | Walkable coastal core [3] |\n| **Centro** | Urban/Logistics | Proximity to transit/errands [3] |\n\n## Strategy for Arrival\n\nDo not sign a long-term lease immediately upon arrival. The best approach is to book 5–7 nights in a hotel or well-located rental first [5]. Use that first week to walk your shortlist of neighborhoods at different hours to check safety, walkability, and local feel [5]. After that initial period, you can transition into a 1–2 month furnished rental before committing to a longer contract [5].",
+ "answer": "For a six-month stay that balances beach access, walkability, and stability, your best options are **Lagoa da Conceição**, **Campeche**, or **Barra da Lagoa**.\n\nThe \"best\" choice depends on whether you prioritize being in the social center or having easy, flat access to the water.\n\n## Neighborhood Breakdown\n\n**Lagoa da Conceição** — The social engine.\nThis area is the island's social hub and is a top choice for digital nomads [1]. It offers a walkable town environment where you can find everything you need within a central core [3].\n\n**Campeche** — The active lifestyle choice.\nIf you want to bike everywhere and prefer a lifestyle centered around surfing and the beach, this is the best fit [3]. It is one of the primary areas where expats choose to live [1].\n\n**Barra da Lagoa** — The coastal village.\nThis is a fishing village where the lagoon meets the ocean. It features a walkable core, surf schools, and honest restaurants, with furnished rentals typically ranging from $400–700 as of 2026 [3].\n\n**Centro** — The logistics-first option.\nIf you prioritize being near bridges and errands over having the beach at your doorstep, the city center is a runner-up option with furnished rentals around $450–800 as of 2026 [3].\n\n## Comparison for a 6-Month Stay\n\n| Neighborhood | Vibe | Key Feature |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | Social/Nomad | Central social hub [3] |\n| **Campeche** | Active/Surf | Flat streets, easy biking [3] |\n| **Barra da Lagoa** | Village/Surf | Walkable coastal core [3] |\n| **Centro** | Urban/Logistics | Proximity to transit/errands [3] |\n\n## Strategy for Arrival\n\nDo not sign a long-term lease immediately upon arrival. The best approach is to book 5–7 nights in a hotel or well-located rental first [5]. Use that first week to walk your shortlist of neighborhoods at different hours to check safety, walkability, and local feel [5]. After that initial period, you can transition into a 1–2 month furnished rental before committing to a longer contract [5].",
+ "chars": 2011,
+ "raw_bytes": 4450,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.11,
+ "rate_gen_tok_s": 42.61,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:23:05",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

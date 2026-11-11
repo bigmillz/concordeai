@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":110,\"est\":false}",
+  "X-Hurry": "a4b30755958f9412"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 1.38,
+ "elapsed_s": 30.95,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 1.38,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.86,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 32 passages"
+   }
+  },
+  {
+   "t": 14.86,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.86,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.86,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.86,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 30.95,
+   "tag": "RATE",
+   "data": {
+    "tps": 39.3,
+    "tok": 421,
+    "s": 10.7
+   }
+  },
+  {
+   "t": 30.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1685 chars"
+   }
+  },
+  {
+   "t": 30.95,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 32 passages",
+   "t_s": 14.86
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.86
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.86
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1685 chars",
+   "t_s": 30.95
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 30.95
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "EIU Global Liveability Index 2026",
+   "u": "https://www.eiu.com/n/wp-content/uploads/2026/07/EIU_Liveability-Index-2026.pdf",
+   "d": "2026-07"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "World's Best Cities to Live in With the Highest Quality of Life — San...",
+   "u": "https://www.mic.com/articles/136015/world-s-best-cities-to-live-in-with-the-highest-quality-of-life-and-none-are-in-the-us",
+   "d": "2016-02-23"
+  },
+  {
+   "t": "2026 Global Cities Index | Oxford Economics",
+   "u": "https://www.oxfordeconomics.com/global-cities-index/",
+   "d": "2026"
+  },
+  {
+   "t": "Prague tops Mercer quality of life rankings in CEE, places 69th...",
+   "u": "https://english.radio.cz/prague-tops-mercer-quality-life-rankings-cee-places-69th-globally-8136209",
+   "d": "2020-09-20"
+  },
+  {
+   "t": "Quality of Life Index by Country 2026 Mid-Year",
+   "u": "https://www.numbeo.com/quality-of-life/rankings_by_country.jsp",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in ...",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026-07"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.86,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 39.3,
+  "tok": 421,
+  "s": 10.7
+ },
+ "answer_raw": "Top cities vary depending on whether you prioritize economic power or purely livable environments, with **New York** taking the top spot for overall global influence while European cities like **Vienna** lead in specific quality of life metrics. \n\nThe rankings depend entirely on the methodology used by the research firms:\n\n**Oxford Economics (2026 Global Cities Index)** — This index ranks 1,000 cities across four categories: economics, human capital, environment, and quality of life [2][4]. In the overall ranking, **New York** is No. 1 as of October 2026 [2]. While the US has eight cities in the top 20, the quality of life category (which accounts for 25% of the score) is not a strength for the US, with only one US city making that specific cut [2]. **Canberra** also performs well in the quality of life category, though it ranks 45th overall [8].\n\n**EIU (Global Liveability Index)** — This index assesses 173 cities across five categories: stability, healthcare, culture and environment, education, and infrastructure [1]. The average liveability score across all cities is **76.1 out of 100** as of July 2026 [1].\n\n**Monocle (Quality of Life 2026)** — This survey uses correspondent judgment to assess safety, connectivity, governance, and green space [7]. As of July 2026, North American cities have struggled due to crime, inequality, and housing issues, making cities like **Perth** more attractive [7].\n\n**Mercer (Quality of Living Survey)** — Historically, this survey has ranked **Vienna** as the best place to live, followed by **Zurich** and **Auckland** [3]. In 2020, **Prague** was ranked 69th globally and topped the rankings for Central and Eastern Europe [5].",
+ "answer": "Top cities vary depending on whether you prioritize economic power or purely livable environments, with **New York** taking the top spot for overall global influence while European cities like **Vienna** lead in specific quality of life metrics. \n\nThe rankings depend entirely on the methodology used by the research firms:\n\n**Oxford Economics (2026 Global Cities Index)** — This index ranks 1,000 cities across four categories: economics, human capital, environment, and quality of life [2][4]. In the overall ranking, **New York** is No. 1 as of October 2026 [2]. While the US has eight cities in the top 20, the quality of life category (which accounts for 25% of the score) is not a strength for the US, with only one US city making that specific cut [2]. **Canberra** also performs well in the quality of life category, though it ranks 45th overall [8].\n\n**EIU (Global Liveability Index)** — This index assesses 173 cities across five categories: stability, healthcare, culture and environment, education, and infrastructure [1]. The average liveability score across all cities is **76.1 out of 100** as of July 2026 [1].\n\n**Monocle (Quality of Life 2026)** — This survey uses correspondent judgment to assess safety, connectivity, governance, and green space [7]. As of July 2026, North American cities have struggled due to crime, inequality, and housing issues, making cities like **Perth** more attractive [7].\n\n**Mercer (Quality of Living Survey)** — Historically, this survey has ranked **Vienna** as the best place to live, followed by **Zurich** and **Auckland** [3]. In 2020, **Prague** was ranked 69th globally and topped the rankings for Central and Eastern Europe [5].",
+ "chars": 1685,
+ "raw_bytes": 4089,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.39,
+ "rate_gen_tok_s": 16.11,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:11:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 20.23,
+ "app_total_s": 30.95,
+ "first_text_s_unreliable": true
+}

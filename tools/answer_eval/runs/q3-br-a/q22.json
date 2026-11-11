@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.6,\"ftok\":250,\"est\":false}",
+  "X-Hurry": "f3458152d3967c13"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.26,
+ "elapsed_s": 22.71,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.76,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.76,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.76,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.76,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.76,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.26,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.71,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.5,
+    "tok": 268,
+    "s": 4.4
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "RESET"
+  },
+  {
+   "t": 22.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1054 chars"
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 28 passages",
+   "t_s": 12.76
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.76
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.76
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 22.71
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1054 chars",
+   "t_s": 22.71
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 22.71
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius50 Top High-Payin",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "50 Top High-Paying Jobs Without a Degree in 2026",
+   "u": "https://www.apollotechnical.com/top-high-paying-jobs-without-a-degree/",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Top 10 Jobs That Pay Well Without a Degree in 2026: Skip ...",
+   "u": "https://blog.theinterviewguys.com/jobs-that-pay-well-without-a-degree/",
+   "d": "2026-05-04"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree in 2026 (Ranked)",
+   "u": "https://skillscouter.com/high-paying-jobs-without-a-degree/",
+   "d": "2026-07-16"
+  },
+  {
+   "t": "Best Skilled Trades to Learn (2026): Pay, Demand & Training Time",
+   "u": "https://tradecareerpath.com/guides/best-skilled-trades/",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  },
+  {
+   "t": "Highest Paying Jobs Without A Degree - photos and vectors",
+   "u": "https://dishcuss.com/explore/highest-paying-jobs-without-a-degree",
+   "d": ""
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.76,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 60.5,
+  "tok": 268,
+  "s": 4.4
+ },
+ "answer_raw": "The best realistic paths involve trading academic degrees for specialized certifications, licenses, or apprenticeships.\n\n**Airline Captain** — medians above **$226,600** as of September 2026 — requires extensive flight hours, FAA certifications, and union seniority rather than a degree [6].\n\n**Locomotive Engineer** — median of **$75,680** as of March 2026 — requires on-the-job training and Federal Railroad Administration (FRA) certification [2].\n\n**Building Inspector** — median of **$72,120** as of March 2026 — requires a high school diploma plus relevant certifications or construction experience [2].\n\n**Wind Turbine Technician** — median of **$64,120** as of October 2026 — requires specialized technical training and has a high growth outlook [5].\n\n**Sound Engineer** — median of **$66,430** as of March 2026 — typically requires postsecondary non-degree technical training [2].\n\nI didn't find the exact number of months or years required for every role, so you should check specific certification bodies or trade schools for precise timelines.",
+ "answer": "The best realistic paths involve trading academic degrees for specialized certifications, licenses, or apprenticeships.\n\n**Airline Captain** — medians above **$226,600** as of September 2026 — requires extensive flight hours, FAA certifications, and union seniority rather than a degree [6].\n\n**Locomotive Engineer** — median of **$75,680** as of March 2026 — requires on-the-job training and Federal Railroad Administration (FRA) certification [2].\n\n**Building Inspector** — median of **$72,120** as of March 2026 — requires a high school diploma plus relevant certifications or construction experience [2].\n\n**Wind Turbine Technician** — median of **$64,120** as of October 2026 — requires specialized technical training and has a high growth outlook [5].\n\n**Sound Engineer** — median of **$66,430** as of March 2026 — typically requires postsecondary non-degree technical training [2].\n\nI didn't find the exact number of months or years required for every role, so you should check specific certification bodies or trade schools for precise timelines.",
+ "chars": 1054,
+ "raw_bytes": 4375,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.6,
+ "rate_gen_tok_s": 59.21,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:12:20",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

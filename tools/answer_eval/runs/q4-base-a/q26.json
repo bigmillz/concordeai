@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":21.6,\"ftok\":310,\"est\":false}",
+  "X-Hurry": "6771c8f0d271bb36"
+ },
+ "first_byte_s": 0.1,
+ "first_text_s": 0.6,
+ "elapsed_s": 20.3,
+ "events": [
+  {
+   "t": 0.1,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.6,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.68,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.68,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 25 passages"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.97,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.3,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.2,
+    "tok": 295,
+    "s": 4.4
+   }
+  },
+  {
+   "t": 20.3,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1181 chars"
+   }
+  },
+  {
+   "t": 20.3,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.1,
+   "Searching the web…"
+  ],
+  [
+   10.68,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.1
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.68
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.68
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 25 passages",
+   "t_s": 11.97
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.97
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.97
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1181 chars",
+   "t_s": 20.3
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.3
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "South America - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/South_America",
+   "d": ""
+  },
+  {
+   "t": "Amazon.com: South America",
+   "u": "https://www.amazon.com/south-america/s?k=south+america",
+   "d": ""
+  },
+  {
+   "t": "Amazon rainforest - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_rainforest",
+   "d": ""
+  },
+  {
+   "t": "Into the Amazon | South America",
+   "u": "https://www.heynadine.com/into-the-amazon/",
+   "d": "2012-12-22"
+  },
+  {
+   "t": "Latin America - Amazon Sustainability",
+   "u": "https://sustainability.aboutamazon.com/global-action/latin-america",
+   "d": ""
+  },
+  {
+   "t": "MercadoLibre Is the Amazon of Latin America ... or Is It?",
+   "u": "https://www.fool.com/investing/2025/09/26/mercadolibre-is-the-amazon-of-latin-america-or-is/",
+   "d": "2025-09-26"
+  },
+  {
+   "t": "Sell on Amazon | Start selling on Amazon.com today",
+   "u": "https://sell.amazon.com/",
+   "d": ""
+  },
+  {
+   "t": "Amazon in Other Countries 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-in-other-countries",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.97,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.2,
+  "tok": 295,
+  "s": 4.4
+ },
+ "answer_raw": "Amazon has a limited but functional presence in South America, though it does not have the same localized marketplace saturation found in North America or Europe.\n\n**Brazil** is the primary country with a dedicated, localized Amazon marketplace [8, undated]. While Amazon maintains operations and a presence in the region, much of South America relies on international shipping to access Amazon's services rather than local storefronts [8, undated].\n\n## Regional Logistics and Alternatives\n\nBecause localized marketplaces are limited, residents in many South American countries use alternative platforms that are better optimized for the local infrastructure and economy.\n\n*   **MercadoLibre** — Often referred to as the \"Amazon of Latin America,\" it is a dominant force in the region with a deep ecosystem that includes fintech services [6, 2025-09-26].\n*   **International Shipping** — Many people across South America, Asia, and Oceania access Amazon by utilizing international shipping options to receive products from established marketplaces like the US or UK [8, 2026].\n\nThe availability of these services can change as Amazon expands or shifts its business model [8, 2026].",
+ "answer": "Amazon has a limited but functional presence in South America, though it does not have the same localized marketplace saturation found in North America or Europe.\n\n**Brazil** is the primary country with a dedicated, localized Amazon marketplace [8, undated]. While Amazon maintains operations and a presence in the region, much of South America relies on international shipping to access Amazon's services rather than local storefronts [8, undated].\n\n## Regional Logistics and Alternatives\n\nBecause localized marketplaces are limited, residents in many South American countries use alternative platforms that are better optimized for the local infrastructure and economy.\n\n*   **MercadoLibre** — Often referred to as the \"Amazon of Latin America,\" it is a dominant force in the region with a deep ecosystem that includes fintech services [6, 2025-09-26].\n*   **International Shipping** — Many people across South America, Asia, and Oceania access Amazon by utilizing international shipping options to receive products from established marketplaces like the US or UK [8, 2026].\n\nThe availability of these services can change as Amazon expands or shifts its business model [8, 2026].",
+ "chars": 1181,
+ "raw_bytes": 3173,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.2,
+ "rate_gen_tok_s": 17.73,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:31:27",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 15.9,
+ "app_total_s": 20.3,
+ "first_text_s_unreliable": true
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.6,\"ftok\":151,\"est\":false}",
+  "X-Hurry": "e0e99b924692daf4"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 20.33,
+ "elapsed_s": 27.12,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.74,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.74,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.74,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.46,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 16.46,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.46,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.46,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.46,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.33,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.12,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.6,
+    "tok": 459,
+    "s": 6.8
+   }
+  },
+  {
+   "t": 27.12,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1838 chars"
+   }
+  },
+  {
+   "t": 27.12,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   10.74,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.74
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.74
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 16.46
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.46
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.46
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1838 chars",
+   "t_s": 27.12
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 27.12
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Healthy diet - World Health Organization (WHO)WHO-EM/NUT/282/E Healthy diet - Wo",
+   "u": "https://www.who.int/news-room/fact-sheets/detail/healthy-diet",
+   "d": "2010"
+  },
+  {
+   "t": "National Institute on Alcohol Abuse and Alcoholism (NIAAA)",
+   "u": "https://www.niaaa.nih.gov/",
+   "d": ""
+  },
+  {
+   "t": "Pizza Consumption: 2026 Verified Stats & Trends",
+   "u": "https://gitnux.org/pizza-consumption-statistics/",
+   "d": "2026"
+  },
+  {
+   "t": "20 Pizza Consumption Statistics To Make You Hungry (2026) - Soocial",
+   "u": "https://www.soocial.com/pizza-consumption-statistics/",
+   "d": "2026"
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Pizzeria & Lieferservice in Bad Vilbel | Il-Sorriso",
+   "u": "https://il-sorriso-pizzeria.de/",
+   "d": "2025-05-04"
+  },
+  {
+   "t": "Is Burnt pizza bad for you? - CyberPost",
+   "u": "https://cyberpost.co/is-burnt-pizza-bad-for-you/",
+   "d": ""
+  },
+  {
+   "t": "FINAL REPORT - World Health Organization",
+   "u": "https://cdn.who.int/media/docs/default-source/nutrition-and-food-safety/complementary-feeding/cf-guidelines/systematic-review-unhealthy-foods-and-beverages.pdf",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.46,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.6,
+  "tok": 459,
+  "s": 6.8
+ },
+ "answer_raw": "Pizza is not inherently \"bad,\" but its nutritional impact depends entirely on ingredients and frequency. Whether it is healthy or problematic depends on the balance of sodium, saturated fat, and caloric density.\n\n## Nutritional Profile\nThe health impact of a slice varies wildly based on what is on it. A plain cheese slice contains roughly **220 calories** per slice, which is relatively low [4]. However, depending on the toppings, a single slice can reach **400 calories** [4].\n\nThe primary health risks associated with frequent consumption are:\n*   **Sodium and Fat**: High salt and saturated fat levels can lead to health issues. For example, teenagers on pizza-eating days consumed **484 mg more salt** and **5 grams more saturated fat** than on other days, which can cause significant nutritional problems [4].\n*   **Weight Management**: Consuming pizza too often can lead to obesity due to high sugar and sodium content [4].\n*   **Acrylamide**: If you eat burnt pizza, the crust is a particular concern because it is composed of starch, which is a key component in the formation of acrylamides [7].\n\n## Frequency and Quality\nA pizza made with whole ingredients, a homemade crust, and nutritious toppings is considered a healthy option [4]. Because of this, \"how often is fine\" is a matter of personal dietary balance.\n\nIn terms of current habits, eating pizza once a week is common but not universal; for instance, **8.5% of US adults** reported eating pizza at least once per week in 2022 [3]. For comparison, per capita consumption in 2022 varied significantly by region, with Washington averaging **16.9 kg/year** and Italy averaging **6.2 kg/year** [3].\n\nIf you are looking to mitigate health risks, focus on the quality of the ingredients (like using whole foods) and watch the cumulative intake of sodium and saturated fats.",
+ "answer": "Pizza is not inherently \"bad,\" but its nutritional impact depends entirely on ingredients and frequency. Whether it is healthy or problematic depends on the balance of sodium, saturated fat, and caloric density.\n\n## Nutritional Profile\nThe health impact of a slice varies wildly based on what is on it. A plain cheese slice contains roughly **220 calories** per slice, which is relatively low [4]. However, depending on the toppings, a single slice can reach **400 calories** [4].\n\nThe primary health risks associated with frequent consumption are:\n*   **Sodium and Fat**: High salt and saturated fat levels can lead to health issues. For example, teenagers on pizza-eating days consumed **484 mg more salt** and **5 grams more saturated fat** than on other days, which can cause significant nutritional problems [4].\n*   **Weight Management**: Consuming pizza too often can lead to obesity due to high sugar and sodium content [4].\n*   **Acrylamide**: If you eat burnt pizza, the crust is a particular concern because it is composed of starch, which is a key component in the formation of acrylamides [7].\n\n## Frequency and Quality\nA pizza made with whole ingredients, a homemade crust, and nutritious toppings is considered a healthy option [4]. Because of this, \"how often is fine\" is a matter of personal dietary balance.\n\nIn terms of current habits, eating pizza once a week is common but not universal; for instance, **8.5% of US adults** reported eating pizza at least once per week in 2022 [3]. For comparison, per capita consumption in 2022 varied significantly by region, with Washington averaging **16.9 kg/year** and Italy averaging **6.2 kg/year** [3].\n\nIf you are looking to mitigate health risks, focus on the quality of the ingredients (like using whole foods) and watch the cumulative intake of sodium and saturated fats.",
+ "chars": 1838,
+ "raw_bytes": 3721,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.94,
+ "rate_gen_tok_s": 67.67,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:47:21",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

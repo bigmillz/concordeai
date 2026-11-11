@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":87,\"est\":false}",
+  "X-Hurry": "f908daaf5acf235a"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 0.87,
+ "elapsed_s": 29.18,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 0.87,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 6.69,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.69,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.69,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.71,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 29.18,
+   "tag": "RATE",
+   "data": {
+    "tps": 42.1,
+    "tok": 407,
+    "s": 9.7
+   }
+  },
+  {
+   "t": 29.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1631 chars"
+   }
+  },
+  {
+   "t": 29.18,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.69,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.69
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.69
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 13.71
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.71
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.71
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1631 chars",
+   "t_s": 29.18
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 29.18
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "NYC to Miami Road Trip Cost 2026: Gas Cost, Tolls, EV Charging",
+   "u": "https://costofdriving1.com/nyc-to-miami-fl-road-trip-cost/",
+   "d": "2026"
+  },
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": ""
+  },
+  {
+   "t": "Trip Cost Calculator — Gas & Tolls for US Road Trips",
+   "u": "https://tripcostcalc.com/us/",
+   "d": ""
+  },
+  {
+   "t": "Flying vs driving between Arenal and Manuel Antonio... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g291982-i813-k10211377-Flying_vs_driving_between_Arenal_and_Manuel_Antonio-Costa_Rica.html",
+   "d": ""
+  },
+  {
+   "t": "Trip Calculator 2026 | Tolls, Gas, Routes - Free - TollGuru",
+   "u": "https://tollguru.com/trip-calculator",
+   "d": "2026"
+  },
+  {
+   "t": "Car Toll & Gas Calculator 2026 | Road Trip Costs, E-ZPass",
+   "u": "https://tollguru.com/car-toll-calculator",
+   "d": "2026"
+  },
+  {
+   "t": "Road Trip Cost Calculator 2026: Gas, Rooms, Food and Tolls",
+   "u": "https://mileagebystate.com/en/road-trip-cost-calculator/",
+   "d": "2026-10-05"
+  },
+  {
+   "t": "Design Miami · Design Miami",
+   "u": "https://designmiami.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.71,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 42.1,
+  "tok": 407,
+  "s": 9.7
+ },
+ "answer_raw": "**Flying is cheaper** for two people on a one-week trip, likely saving you roughly $400–$600 compared to driving.\n\nDriving from Brooklyn to Miami involves a 1,280–1,330 mile trip taking roughly 19–21 hours without stops [1]. For a single gas vehicle, the cost for fuel is roughly $140–$190, and staying in a hotel for one night costs $100–$180 or two nights costs $200–$360 [1]. This brings the total driving cost to roughly $280–$450 for one overnight stop or $380–$650 for two [1]. Since you are traveling as a pair, you would need to account for two round-trip flights, which typically cost $300–$500 per person for a one-week trip (as of 2026, check current), totaling $600–$1,000. However, driving costs for two people would involve doubling the food budget and potentially higher maintenance or wear-and-tear costs not captured in the base fuel/hotel figures.\n\nIf you drive, you'll likely spend $380–$650 on fuel and lodging alone [1], which is the baseline cost for one vehicle's transit. While driving is often more economical for larger groups, flying is generally more efficient for two people when factoring in the time lost to a 20-hour transit [2].\n\nThe delta between the two depends on your specific flight prices and whether you own the car you're driving. If you own your vehicle, the driving cost is roughly $380–$650 for the trip (with two hotel nights) [1], whereas flying for two would likely land in the $600–$1,000 range. If you have to rent a car in Miami or pay for two flights, the comparison shifts. You'll need to check current flight-only prices and rental car rates in Miami to get a definitive winner.",
+ "answer": "**Flying is cheaper** for two people on a one-week trip, likely saving you roughly $400–$600 compared to driving.\n\nDriving from Brooklyn to Miami involves a 1,280–1,330 mile trip taking roughly 19–21 hours without stops [1]. For a single gas vehicle, the cost for fuel is roughly $140–$190, and staying in a hotel for one night costs $100–$180 or two nights costs $200–$360 [1]. This brings the total driving cost to roughly $280–$450 for one overnight stop or $380–$650 for two [1]. Since you are traveling as a pair, you would need to account for two round-trip flights, which typically cost $300–$500 per person for a one-week trip (as of 2026, check current), totaling $600–$1,000. However, driving costs for two people would involve doubling the food budget and potentially higher maintenance or wear-and-tear costs not captured in the base fuel/hotel figures.\n\nIf you drive, you'll likely spend $380–$650 on fuel and lodging alone [1], which is the baseline cost for one vehicle's transit. While driving is often more economical for larger groups, flying is generally more efficient for two people when factoring in the time lost to a 20-hour transit [2].\n\nThe delta between the two depends on your specific flight prices and whether you own the car you're driving. If you own your vehicle, the driving cost is roughly $380–$650 for the trip (with two hotel nights) [1], whereas flying for two would likely land in the $600–$1,000 range. If you have to rent a car in Miami or pay for two flights, the comparison shifts. You'll need to check current flight-only prices and rental car rates in Miami to get a definitive winner.",
+ "chars": 1631,
+ "raw_bytes": 3766,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.85,
+ "rate_gen_tok_s": 16.34,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:05:07",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 19.48,
+ "app_total_s": 29.18,
+ "first_text_s_unreliable": true
+}

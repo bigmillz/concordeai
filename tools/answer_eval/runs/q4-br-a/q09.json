@@ -1,0 +1,345 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":98,\"est\":false}",
+  "X-Hurry": "1b30755bb0869427"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 0.81,
+ "elapsed_s": 21.61,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.81,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 6.71,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.71,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.71,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.38,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 37 passages"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 images found"
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.39,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 10.39,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.61,
+   "tag": "RATE",
+   "data": {
+    "tps": 44.5,
+    "tok": 239,
+    "s": 5.4
+   }
+  },
+  {
+   "t": 21.61,
+   "tag": "RESET"
+  },
+  {
+   "t": 21.61,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 21.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "937 chars"
+   }
+  },
+  {
+   "t": 21.61,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   6.71,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.71
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.71
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 37 passages",
+   "t_s": 10.38
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.39
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 images found",
+   "t_s": 10.39
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.39
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 21.61
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "937 chars",
+   "t_s": 21.61
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.61
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Cost of Living in Florianópolis 2026: A Full Monthly Breakdown",
+   "u": "https://escapenelevate.com/cost-of-living-in-florianopolis/",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "Cost of Living Comparison Between Lisbon, Portugal And...",
+   "u": "https://www.numbeo.com/cost-of-living/compare_cities.jsp?country1=Portugal&city1=Lisbon&country2=Brazil&city2=Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Cost of Living in Florianópolis 2026: Rent, Budget & Prices",
+   "u": "https://expatlife.ai/brazil/cities/florianopolis/cost-of-living",
+   "d": "2026"
+  },
+  {
+   "t": "Comparativa Florianópolis vs Malaga: Costo de vida y guía... | Onbuju",
+   "u": "https://onbuju.com/es/compare/florianopolis-vs-malaga",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Durham. Oct 2026. Prices in Durham",
+   "u": "https://www.numbeo.com/cost-of-living/in/Durham-United-Kingdom",
+   "d": "2026-10"
+  },
+  {
+   "t": "Rental Prices in Florianópolis 2026: Costs by Neighborhood ...",
+   "u": "https://regenteimoveis.com.br/en/guides/rental-properties/rental-prices-in-florianopolis-2026-costs-by-neighborhood-property-types-and-ways-to-save/",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "Cost of living in Toronto – single, family & student",
+   "u": "https://www.instarem.com/blog/cost-of-living-in-toronto/",
+   "d": "2025-05-09"
+  },
+  {
+   "t": "Voos de Medellín (MDE) para... - Voos low cost em eDreams",
+   "u": "https://www.edreams.pt/voos/medellin-florianopolis/MDE/FLN/",
+   "d": ""
+  }
+ ],
+ "photos": [
+  "https://a1.odistatic.net/images/landingpages/destinations/1920x800/destination-default_1920x800.jpg",
+  "https://expatlife.ai/countries/brazil.jpg",
+  "https://images.unsplash.com/photo-1543059080-f9014b202ee2?auto=format&amp;fit=crop&amp;q=80&amp;w=1200"
+ ],
+ "run_frames": [
+  [
+   10.39,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 44.5,
+  "tok": 239,
+  "s": 5.4
+ },
+ "answer_raw": "**Florianópolis** offers the greatest stretch for your money, as a single person can live comfortably there for roughly **$1,500 per month** (as of June 2026) [1].\n\nI didn't find cost of living or rent specifics for Medellín, so you should check local expat forums or Numbeo for those current figures.\n\nFor the available comparisons:\n\n**Florianópolis** — A one-bedroom in a good area costs between **R$2,500 and R$3,800** (as of 2026) [3], while a downtown one-bedroom runs approximately **R$3,550** (as of June 2026) [1]. Total monthly living costs for one person, including food and transport, sit around **R$8,093 (~$1,500)** (as of June 2026) [1].\n\n**Lisbon** — Rent is significantly higher here, as Florianópolis rent prices are **57.7% lower** than in Lisbon (undated) [2]. The cost of living in Florianópolis is **43.4% lower** than in Lisbon when including rent (undated) [2].\n\n**Medellín** — Data was not provided for this city.",
+ "answer": "**Florianópolis** offers the greatest stretch for your money, as a single person can live comfortably there for roughly **$1,500 per month** (as of June 2026) [1].\n\nI didn't find cost of living or rent specifics for Medellín, so you should check local expat forums or Numbeo for those current figures.\n\nFor the available comparisons:\n\n**Florianópolis** — A one-bedroom in a good area costs between **R$2,500 and R$3,800** (as of 2026) [3], while a downtown one-bedroom runs approximately **R$3,550** (as of June 2026) [1]. Total monthly living costs for one person, including food and transport, sit around **R$8,093 (~$1,500)** (as of June 2026) [1].\n\n**Lisbon** — Rent is significantly higher here, as Florianópolis rent prices are **57.7% lower** than in Lisbon (undated) [2]. The cost of living in Florianópolis is **43.4% lower** than in Lisbon when including rent (undated) [2].\n\n**Medellín** — Data was not provided for this city.",
+ "chars": 937,
+ "raw_bytes": 4732,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.46,
+ "rate_gen_tok_s": 11.91,
+ "id": "q09",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Cost of living comparison",
+ "question": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:05:57",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 16.22,
+ "app_total_s": 21.61,
+ "first_text_s_unreliable": true
+}

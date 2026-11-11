@@ -1,0 +1,53 @@
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 56584)
+Traceback (most recent call last):
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 496, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/server.py", line 484, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41849, in do_GET
+    self._run(self._do_GET)
+    ~~~~~~~~~^^^^^^^^^^^^^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 41827, in _run
+    fn()
+    ~~^^
+  File "/Users/patrickmiller/My Drive/Projects/Concorde/ConcordeAI/.claude/worktrees/agent-a4c6d26ea28c00af9/millenai.py", line 42205, in _do_GET
+    self.wfile.write(body)
+    ~~~~~~~~~~~~~~~~^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.6/Frameworks/Python.framework/Versions/3.14/lib/python3.14/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------
+
+  ConcordeAI 7.0 beta 2
+  running on http://127.0.0.1:9916
+
+  no window — serving. ctrl-c to stop.
+
+Fetching 15 files:   0%|          | 0/15 [00:00<?, ?it/s]Fetching 15 files: 100%|██████████| 15/15 [00:00<00:00, 2234.82it/s]
+ground: who wrote one hundred years of solitude, and when did it com | queries=['wrote One Hundred Years Solitude', 'out One Hundred Years Solitude', 'wrote One Hundred Years Solitude out', 'One Hundred Years of Solitude author', 'One Hundred Years of Solitude publication date'] model=['One Hundred Years of Solitude author', 'One Hundred Years of Solitude publication date'] | official=[] | hits=80 kept=8 read=5 passages=13 pack=5603 | plan=0.62 search=7.15 read=2.4 total=9.6 | per-query One Hundred Years of Solitude author: 16 hits 3.2s; wrote One Hundred Years Solitude out: 16 hits 7.1s; wrote One Hundred Years Solitude: 16 hits 5.9s; One Hundred Years of Solitude publicatio: 16 hits 4.2s; out One Hundred Years Solitude: 16 hits 6.6s
+ground: how many time zones does brazil have? | queries=['time zones Brazil'] model=[] | official=[] | hits=16 kept=7 read=7 passages=32 pack=5436 | plan=0.27 search=5.63 read=4.88 total=10.53 | per-query time zones Brazil: 16 hits 5.6s
+ground: what's the us dollar to brazilian real exchange rate right n | queries=['US dollar Brazilian real exchange rate 2026', 'USD to BRL exchange rate November 10 2026', 'US dollar to Brazilian real exchange rate site:bloomberg.com'] model=['USD to BRL exchange rate November 10 2026', 'US dollar to Brazilian real exchange rate site:bloomberg.com'] | official=['frankfurter.app'] | hits=54 kept=8 read=4 passages=22 pack=4285 | plan=0.59 search=7.16 read=1.92 total=9.1 | per-query news: US dollar Brazilian real exchange : 8 hits 0.6s; US dollar Brazilian real exchange rate 2: 16 hits 5.7s; USD to BRL exchange rate November 10 202: 16 hits 5.3s; US dollar to Brazilian real exchange rat: 14 hits 6.6s
+ground: a train is scheduled to leave at 9:40 and the trip takes 2 h | queries=['train scheduled leave 40 trip takes hours 35 minutes', 'leaves 15 minutes late', 'arrive train scheduled leave 40', 'train scheduled leave 40 trip takes hours 35', 'No search queries needed.'] model=['No search queries needed.'] | official=[] | hits=72 kept=8 read=4 passages=24 pack=5362 | plan=0.36 search=6.52 read=2.49 total=9.07 | per-query train scheduled leave 40 trip takes hour: 16 hits 4.8s; leaves 15 minutes late: 16 hits 5.2s; train scheduled leave 40 trip takes hour: 8 hits 4.6s; arrive train scheduled leave 40: 16 hits 5.9s; No search queries needed.: 16 hits 6.2s
+ground: which is bigger, 2^30 or 10^9, and by roughly how much? | queries=['bigger 30 10', '^30 vs 10^9 calculation'] model=['^30 vs 10^9 calculation'] | official=[] | hits=32 kept=8 read=8 passages=34 pack=6036 | plan=0.55 search=6.31 read=2.59 total=8.92 | per-query bigger 30 10: 16 hits 6.3s; ^30 vs 10^9 calculation: 16 hits 5.3s
+ground: all bloops are razzies, and some razzies are lazzies. does i | queries=['bloops razzies lazzies', 'follow bloops lazzies', 'bloops razzies lazzies follow'] model=[] | official=[] | hits=48 kept=8 read=3 passages=13 pack=5089 | plan=0.78 search=6.04 read=2.56 total=8.62 | per-query bloops razzies lazzies: 16 hits 5.6s; bloops razzies lazzies follow: 16 hits 6.0s; follow bloops lazzies: 16 hits 5.6s
+ground: in javascript, why does [1, 2, 10].sort() give [1, 10, 2], a | queries=['JavaScript 10', 'numbers properly JavaScript 10', 'MDN JavaScript Array.prototype.sort documentation', 'MDN JavaScript Array.prototype.sort numeric comparison 2026'] model=['MDN JavaScript Array.prototype.sort documentation', 'MDN JavaScript Array.prototype.sort numeric comparison 2026'] | official=[] | hits=64 kept=8 read=5 passages=26 pack=5555 | plan=0.8 search=6.96 read=1.6 total=8.62 | per-query JavaScript 10: 16 hits 4.6s; MDN JavaScript Array.prototype.sort docu: 16 hits 2.8s; numbers properly JavaScript 10: 16 hits 6.7s; MDN JavaScript Array.prototype.sort nume: 16 hits 6.2s
+ground: what does this command do: find . -name '*.log' -mtime +7 -d | queries=['command name log mtime delete', 'find command manual', 'find -name -mtime -delete documentation'] model=['find command manual', 'find -name -mtime -delete documentation'] | official=[] | hits=48 kept=8 read=6 passages=38 pack=5828 | plan=0.37 search=5.84 read=1.92 total=7.82 | per-query find -name -mtime -delete documentation: 16 hits 4.2s; find command manual: 16 hits 5.0s; command name log mtime delete: 16 hits 5.8s
+ground: give me three name ideas for a small coffee shop in florianó | queries=['three name ideas small coffee shop Florianópolis one line', 'coffee shop name ideas Florianópolis 2026', 'Florianópolis coffee shop names'] model=['coffee shop name ideas Florianópolis 2026', 'Florianópolis coffee shop names'] | official=[] | hits=48 kept=8 read=8 passages=40 pack=6660 | plan=0.64 search=6.59 read=2.87 total=9.51 | per-query Florianópolis coffee shop names: 16 hits 3.2s; three name ideas small coffee shop Flori: 16 hits 6.1s; coffee shop name ideas Florianópolis 202: 16 hits 6.0s
+ground: is it okay to take ibuprofen and acetaminophen together for  | queries=['take ibuprofen acetaminophen together headache', 'ibuprofen and acetaminophen combination safety', 'ibuprofen acetaminophen together medical guidelines'] model=['ibuprofen and acetaminophen combination safety', 'ibuprofen acetaminophen together medical guidelines'] | official=[] | hits=48 kept=8 read=8 passages=30 pack=6759 | plan=0.56 search=6.05 read=2.25 total=8.35 | per-query ibuprofen acetaminophen together medical: 16 hits 2.9s; ibuprofen and acetaminophen combination : 16 hits 4.8s; take ibuprofen acetaminophen together he: 16 hits 6.0s
+ground: i have $10,000. should i pay off my 6% car loan early or put | queries=['$10 000', 'one pick $10 000', 'historical index fund returns 2026', '% car loan math vs index fund returns'] model=['historical index fund returns 2026', '% car loan math vs index fund returns'] | official=[] | hits=64 kept=8 read=7 passages=27 pack=6594 | plan=0.67 search=5.46 read=3.22 total=8.76 | per-query one pick $10 000: 16 hits 3.7s; historical index fund returns 2026: 16 hits 3.2s; $10 000: 16 hits 5.5s; % car loan math vs index fund returns: 16 hits 4.0s
+ground: according to my notes, when does my lease end and how much i | queries=['According notes lease end', 'rent According notes lease end'] model=[] | official=[] | hits=32 kept=8 read=7 passages=23 pack=7042 | plan=0.67 search=5.98 read=6.86 total=12.9 | per-query rent According notes lease end: 16 hits 4.0s; According notes lease end: 16 hits 6.0s
+ground-plan: seat='Ollama1 · gemma4:12b' secs=1.98 out=''
+ground: in two sentences: what does a gpu's vram limit mean for runn | queries=["two sentences GPU's VRAM limit running 30-billion-parameter model", 'NVIDIA data center GPU 2026 site:nvidianews.nvidia.com'] model=[] | official=[] | hits=24 kept=8 read=7 passages=22 pack=5975 | plan=3.4 search=5.66 read=1.7 total=7.42 | per-query NVIDIA data center GPU 2026 site:nvidian: 8 hits 3.6s; two sentences GPU's VRAM limit running 3: 16 hits 5.6s

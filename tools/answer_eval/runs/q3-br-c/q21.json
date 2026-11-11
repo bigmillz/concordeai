@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.3,\"ftok\":112,\"est\":false}",
+  "X-Hurry": "c3b8f3f1889d4546"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 22.93,
+ "elapsed_s": 30.78,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 14.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.61,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.61,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 22.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 30.78,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.4,
+    "tok": 497,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 30.78,
+   "tag": "RESET"
+  },
+  {
+   "t": 30.78,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 30.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1971 chars"
+   }
+  },
+  {
+   "t": 30.78,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 14.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.61
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.61
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 30.78
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1971 chars",
+   "t_s": 30.78
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 30.78
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Packing Light for South America: Weight Compliance Tips – Titantrek",
+   "u": "https://titantrekstore.com/blogs/travel-guides/packing-light-for-south-america-weight-compliance-tips",
+   "d": "2025-03-25"
+  },
+  {
+   "t": "A condição da Azul, Latam e Gol para não subirem os preços",
+   "u": "https://www.metropoles.com/colunas/andreza-matais/a-condicao-da-azul-latam-e-gol-para-nao-subirem-os-precos",
+   "d": "2025-08-20"
+  },
+  {
+   "t": "CEOs da Latam, Azul e Gol se unem em apoio a Lito Sousa",
+   "u": "https://www.correiobraziliense.com.br/brasil/2026/08/7487850-ceos-da-latam-azul-e-gol-se-unem-em-apoio-a-lito-sousa.html",
+   "d": "2026-08"
+  },
+  {
+   "t": "3 Weeks In South America | The 5 Best Itineraries To Do It",
+   "u": "https://threeweektraveller.com/3-weeks-south-america-itinerary/",
+   "d": "2025-11-18"
+  },
+  {
+   "t": "Azul, GOL e LATAM ampliam voos para os EUA durante a Copa do...",
+   "u": "https://epocanegocios.globo.com/empresas/noticia/2026/05/azul-gol-e-latam-ampliam-voos-para-os-eua-durante-a-copa-do-mundo.ghtml",
+   "d": "2026-05"
+  },
+  {
+   "t": "Azul, Gol e Latam contam como aplicam tecnologia nos processos...",
+   "u": "https://www.panrotas.com.br/aviacao/tecnologia/2024/12/azul-gol-e-latam-contam-como-aplicam-tecnologia-nos-processos-e-experiencia-do-cliente_212564.html",
+   "d": "2024-12"
+  },
+  {
+   "t": "5 Transportation Tips for South America - Truth of Traveling",
+   "u": "https://truthoftraveling.com/5-transportation-tips-for-south-america/",
+   "d": "2019-08-27"
+  },
+  {
+   "t": "Carry-on baggage fees | LATAM Airlines",
+   "u": "https://www.latamairlines.com/us/en/experience/prepare-your-trip/baggage/cabin-baggage-fees",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.61,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 63.4,
+  "tok": 497,
+  "s": 7.8
+ },
+ "answer_raw": "Most South American airlines enforce strict weight limits between **17–22 lbs (8–10 kg)** and specific size requirements [1].\n\nI didn't find the specific dimensions (length, width, height) for LATAM, GOL, or Azul; you will need to check their official websites or your specific ticket class to see if they allow a personal item in addition to a carry-on [1][7][8].\n\n## Packing Strategy\n\nSince you are traveling for three weeks with only a carry-on, your strategy should focus on layering, versatility, and weight management.\n\n**The Essentials**\n*   **Versatile clothing**: Focus on items that can be layered. Pack items like moisture-wicking base layers, a lightweight fleece, and one waterproof outer shell.\n*   **Capsule wardrobe**: Stick to a cohesive color palette so every top matches every bottom. Aim for **two bottoms** (one casual, one slightly dressier) and **five to seven tops** that can be mixed and matched.\n*   **Footletwear**: Wear your heaviest shoes (like hiking boots or sturdy sneakers) on the plane to save weight and space in your bag. Pack one pair of lightweight sandals or slim flats.\n*   **Tech and toiletries**: Bring a universal travel adapter, a power bank, and solid toiletries (shampoo bars, solid deodorant) to avoid liquid weight and leaks.\n\n**The Logistics**\n*   **Compression gear**: Use packing cubes or compression sacks to maximize volume and keep your bag organized [1].\n*   **Laundry plan**: Since you'll be traveling for three weeks, plan to wash clothes at hostels or via local laundry services every 7–10 days to keep your bag light. \n*   **Weight distribution**: Place heavy items (like shoes or tech kits) near the wheels/bottom of the bag to maintain balance.\n\nA three-week itinerary in South America can be challenging due to the continent's massive size and varying climates [4]. If you are on a tight budget, you might expect to spend roughly **$1,300** for the full three weeks if you utilize hostels and street food [4].",
+ "answer": "Most South American airlines enforce strict weight limits between **17–22 lbs (8–10 kg)** and specific size requirements [1].\n\nI didn't find the specific dimensions (length, width, height) for LATAM, GOL, or Azul; you will need to check their official websites or your specific ticket class to see if they allow a personal item in addition to a carry-on [1][7][8].\n\n## Packing Strategy\n\nSince you are traveling for three weeks with only a carry-on, your strategy should focus on layering, versatility, and weight management.\n\n**The Essentials**\n*   **Versatile clothing**: Focus on items that can be layered. Pack items like moisture-wicking base layers, a lightweight fleece, and one waterproof outer shell.\n*   **Capsule wardrobe**: Stick to a cohesive color palette so every top matches every bottom. Aim for **two bottoms** (one casual, one slightly dressier) and **five to seven tops** that can be mixed and matched.\n*   **Footletwear**: Wear your heaviest shoes (like hiking boots or sturdy sneakers) on the plane to save weight and space in your bag. Pack one pair of lightweight sandals or slim flats.\n*   **Tech and toiletries**: Bring a universal travel adapter, a power bank, and solid toiletries (shampoo bars, solid deodorant) to avoid liquid weight and leaks.\n\n**The Logistics**\n*   **Compression gear**: Use packing cubes or compression sacks to maximize volume and keep your bag organized [1].\n*   **Laundry plan**: Since you'll be traveling for three weeks, plan to wash clothes at hostels or via local laundry services every 7–10 days to keep your bag light. \n*   **Weight distribution**: Place heavy items (like shoes or tech kits) near the wheels/bottom of the bag to maintain balance.\n\nA three-week itinerary in South America can be challenging due to the continent's massive size and varying climates [4]. If you are on a tight budget, you might expect to spend roughly **$1,300** for the full three weeks if you utilize hostels and street food [4].",
+ "chars": 1971,
+ "raw_bytes": 6435,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.01,
+ "rate_gen_tok_s": 62.77,
+ "id": "q21",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Carry-on travel in South America",
+ "question": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:13:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Three weeks in South America carry-on only. What are the carry-on size and weight limits on LATAM, GOL and Azul, and what would you pack?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

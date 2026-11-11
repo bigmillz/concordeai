@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":152,\"est\":false}",
+  "X-Hurry": "ecb76fea1fc90f74"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 17.33,
+ "elapsed_s": 23.01,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.11,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.11,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.11,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 22 passages"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.25,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.33,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.01,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.1,
+    "tok": 341,
+    "s": 5.7
+   }
+  },
+  {
+   "t": 23.01,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1365 chars"
+   }
+  },
+  {
+   "t": 23.01,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.01,
+   "tag": "DONE",
+   "data": {
+    "f": 17.33,
+    "t": 23.01,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   11.11,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.11
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.11
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 22 passages",
+   "t_s": 13.25
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.25
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.25
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1365 chars",
+   "t_s": 23.01
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.01
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius11 Highest Paying",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Highest Paying Jobs in Australia Without a Degree",
+   "u": "https://www.marieclaire.com.au/life/highest-paying-jobs-without-degree/",
+   "d": "2019-01-08"
+  },
+  {
+   "t": "11 Highest Paying Jobs Without a College Degree (2026-2027)",
+   "u": "https://coverlettersandresume.com/articles/highest-paying-jobs-without-a-college-degree/",
+   "d": ""
+  },
+  {
+   "t": "226 Jobs That Pay Over $50K Without a Degree (2026 BLS Data)",
+   "u": "https://www.apollotechnical.com/jobs-that-pay-over-50k-without-a-degree/",
+   "d": "2026-08"
+  },
+  {
+   "t": "10 high-paying jobs that can lead to wealth without a college degree",
+   "u": "https://www.msn.com/en-us/news/other/10-high-paying-jobs-that-can-lead-to-wealth-without-a-college-degree/ar-AA2g6QeP?ocid=BingNewsVerp",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "Highest Paying Occupations : Occupational Outlook Handbook ...",
+   "u": "https://blsmon1.bls.gov/ooh/print/highest-paying.htm",
+   "d": "2019-09-04"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2026-08-27"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.25,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 22,
+   "d": 498,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4810,
+   "o": 362,
+   "d": 9710,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 60.1,
+  "tok": 341,
+  "s": 5.7
+ },
+ "app_first_s": 17.33,
+ "app_total_s": 23.01,
+ "answer_raw": "The highest-paying roles without a degree generally require specialized certifications, apprenticeships, or enough time on the ground to move from front-line work into management.\n\n| Job Title | Typical Pay | Time to Entry/Path |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220** (as of August 2026) [5] | Requires postsecondary nondegree awards, flight training, and an FAA certificate [5]. |\n| **Construction Manager** | **$155,463** (ass of January 2019) [3] | Typically involves working up from front-line roles into supervision [5]. |\n| **Transportation Manager** | **>$50,980** (as of October 2026) [1] | Front-line experience followed by promotion to management [5]. |\n| **Police Supervisor** | **>$50,980** (as of October 2026) [1] | Typically requires five years or more of experience in the field [5]. |\n| **Firefighting Supervisor** | **>$50,980** (as of October 2026) [1] | Typically requires five years or more of experience in the field [5]. |\n\nWhile the provided data lists these specific roles, it does not provide exact timelines (in months or years) for the pilot training or the specific years of experience required for the supervisor roles beyond a general \"five years or more\" [5]. For a more granular breakdown of the pilot training timeline, you would need to check specific flight school curricula or FAA regulatory requirements.",
+ "answer": "The highest-paying roles without a degree generally require specialized certifications, apprenticeships, or enough time on the ground to move from front-line work into management.\n\n| Job Title | Typical Pay | Time to Entry/Path |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220** (as of August 2026) [5] | Requires postsecondary nondegree awards, flight training, and an FAA certificate [5]. |\n| **Construction Manager** | **$155,463** (ass of January 2019) [3] | Typically involves working up from front-line roles into supervision [5]. |\n| **Transportation Manager** | **>$50,980** (as of October 2026) [1] | Front-line experience followed by promotion to management [5]. |\n| **Police Supervisor** | **>$50,980** (as of October 2026) [1] | Typically requires five years or more of experience in the field [5]. |\n| **Firefighting Supervisor** | **>$50,980** (as of October 2026) [1] | Typically requires five years or more of experience in the field [5]. |\n\nWhile the provided data lists these specific roles, it does not provide exact timelines (in months or years) for the pilot training or the specific years of experience required for the supervisor roles beyond a general \"five years or more\" [5]. For a more granular breakdown of the pilot training timeline, you would need to check specific flight school curricula or FAA regulatory requirements.",
+ "chars": 1365,
+ "raw_bytes": 3742,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.83,
+ "rate_gen_tok_s": 60.08,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:44:25",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

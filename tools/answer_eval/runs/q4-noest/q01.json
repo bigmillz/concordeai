@@ -1,0 +1,327 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.6,\"ftok\":31,\"est\":false}",
+  "X-Hurry": "6d2595539cd04f02"
+ },
+ "first_byte_s": 4.12,
+ "first_text_s": 25.51,
+ "elapsed_s": 28.92,
+ "events": [
+  {
+   "t": 4.12,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 4.12,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 14.99,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.99,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.99,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.55,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 18.56,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.56,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.56,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.56,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.51,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.92,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.9,
+    "tok": 200,
+    "s": 3.4
+   }
+  },
+  {
+   "t": 28.92,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "803 chars"
+   }
+  },
+  {
+   "t": 28.92,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 28.92,
+   "tag": "DONE",
+   "data": {
+    "f": 25.5,
+    "t": 28.91,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   4.12,
+   "Searching the web…"
+  ],
+  [
+   14.99,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 4.12
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.99
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.99
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 18.55
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.56
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.56
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "803 chars",
+   "t_s": 28.92
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 28.92
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "[2026 Latest] Google's Proprietary 'TPU' Chip is Transforming the AI Semiconduct",
+   "u": "https://note.com/dote_taro/n/n2f85bdbb304a?hl=en",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "Issue #70: Anthropic's Million TPU Google Deal, Crusoe Heads to...",
+   "u": "https://thegpu.ai/p/issue-70-anthropic-million-tpu-google-deal-neocloud-crusoe-heads-to-orbit-ai-browsers",
+   "d": "2025-10-25"
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": "2024-12-11"
+  },
+  {
+   "t": "Photo | The NVIDIA Tesla V100 data center GPU... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/file?fid=59134e2fed6ae56721d47bbe",
+   "d": ""
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Claude Opus 4.5 System Card - anthropic.com",
+   "u": "https://www.anthropic.com/claude-opus-4-5-system-card",
+   "d": "2025-11-24"
+  },
+  {
+   "t": "Claude Opus \\ Anthropic",
+   "u": "https://www.anthropic.com/claude/opus",
+   "d": "2026-05-28"
+  },
+  {
+   "t": "SpaceX signs record $40B Apollo GPU financing for Nvidia Vera Rubin chips, toppi",
+   "u": "https://www.msn.com/en-us/technology/hardware-and-devices/spacex-signs-record-40b-apollo-gpu-financing-for-nvidia-vera-rubin-chips-topping-anthropic-s-deal/ar-AA2g92CG",
+   "d": "2026-10-27"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.56,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 246,
+   "o": 23,
+   "d": 839,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5281,
+   "o": 217,
+   "d": 10315
+  }
+ ],
+ "rate_writer": {
+  "tps": 58.9,
+  "tok": 200,
+  "s": 3.4
+ },
+ "app_first_s": 25.5,
+ "app_total_s": 28.91,
+ "answer_raw": "The most powerful AI hardware currently being deployed at scale is **Nvidia's Vera Rubin chips** (as of October 2026), which were secured through a $40 billion financing deal by SpaceX [8].\n\n**Anthropic** is using **Google's TPU clusters** to power its Claude models as part of a deal for up to 1 million specialized AI chips worth tens of billions of dollars (per Bloomberg, as of October 2025) [2].\n\nOther major players use the following:\n- **Google** uses its own **Trillium TPUs** (the sixth-generation and most performant version, as of December 2024) to train its Gemini 2.0 models [3].\n- **SpaceX** has committed to **Nvidia's Vera Rubin chips** through a $40 billion lease (as of October 2026) [8].\n- **Meta and OpenAI** are reportedly moving toward adopting **Google's TPU** infrastructure [1].",
+ "answer": "The most powerful AI hardware currently being deployed at scale is **Nvidia's Vera Rubin chips** (as of October 2026), which were secured through a $40 billion financing deal by SpaceX [8].\n\n**Anthropic** is using **Google's TPU clusters** to power its Claude models as part of a deal for up to 1 million specialized AI chips worth tens of billions of dollars (per Bloomberg, as of October 2025) [2].\n\nOther major players use the following:\n- **Google** uses its own **Trillium TPUs** (the sixth-generation and most performant version, as of December 2024) to train its Gemini 2.0 models [3].\n- **SpaceX** has committed to **Nvidia's Vera Rubin chips** through a $40 billion lease (as of October 2026) [8].\n- **Meta and OpenAI** are reportedly moving toward adopting **Google's TPU** infrastructure [1].",
+ "chars": 803,
+ "raw_bytes": 3161,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.94,
+ "rate_gen_tok_s": 58.87,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:05:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

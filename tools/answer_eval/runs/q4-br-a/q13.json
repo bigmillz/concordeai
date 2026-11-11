@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":104,\"est\":false}",
+  "X-Hurry": "107bd7af9d81922c"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 0.62,
+ "elapsed_s": 23.27,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 0.62,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.34,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 34 passages"
+   }
+  },
+  {
+   "t": 14.34,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.34,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.34,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.34,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.27,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.1,
+    "tok": 251,
+    "s": 3.6
+   }
+  },
+  {
+   "t": 23.27,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1005 chars"
+   }
+  },
+  {
+   "t": 23.27,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 34 passages",
+   "t_s": 14.34
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.34
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.34
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1005 chars",
+   "t_s": 23.27
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.27
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How Often Should You Eat Pizza for Good Health: Surprising ...",
+   "u": "https://mypizzadoc.com/how-often-should-you-eat-pizza-for-good-health/",
+   "d": "2026-01-02"
+  },
+  {
+   "t": "How Often Should You Eat Pizza? - Food Blog Alliance",
+   "u": "https://foodblogalliance.com/how-often-should-you-eat-pizza/",
+   "d": "2026-06-20"
+  },
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "Pizza Consumption: 2026 Verified Stats & Trends - Gitnux",
+   "u": "https://gitnux.org/pizza-consumption-statistics/",
+   "d": "2026-02-13"
+  },
+  {
+   "t": "Pizza Consumption Statistics | 2026 Sourced Report",
+   "u": "https://worldmetrics.org/pizza-consumption-statistics/",
+   "d": "2026-02-12"
+  },
+  {
+   "t": "How Many Slices of Pizza Does the Average Person Eat?",
+   "u": "https://foodblogalliance.com/how-many-slices-of-pizza-does-the-average-person-eat/",
+   "d": "2026-07-27"
+  },
+  {
+   "t": "Pizza Frequency: How Much is Too Much? - avzri.com",
+   "u": "https://avzri.com/how-many-times-should-i-eat-pizza-in-a-week-for-a-balanced-diet",
+   "d": "2025-11-04"
+  },
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.34,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 70.1,
+  "tok": 251,
+  "s": 3.6
+ },
+ "answer_raw": "Pizza is not inherently \"bad,\" but its impact on your health depends on ingredient choices and portion control [2]. While eating it every day can lead to weight gain, heart problems, and nutrient deficiencies due to high calories, saturated fats, and refined carbs, it can fit into a healthy diet when consumed in moderation [1].\n\n**Once or twice a week** is an optimal frequency to allow for a balanced diet while still enjoying the food [2]. While 38% of Americans eat pizza at least once a week as of June 2026 [5], regular daily consumption is generally discouraged for most people [1]. \n\nYou can mitigate health risks by choosing healthier ingredients and practicing portion control [2]. For example, a European study noted that pizza consumption is not linked to increased type 2 diabetes risk when it is balanced with other foods [5]. Additionally, the nutritional value can vary; pizza can provide protein, vitamins, and carbohydrates, but the specific benefits are contingent on your choices [6].",
+ "answer": "Pizza is not inherently \"bad,\" but its impact on your health depends on ingredient choices and portion control [2]. While eating it every day can lead to weight gain, heart problems, and nutrient deficiencies due to high calories, saturated fats, and refined carbs, it can fit into a healthy diet when consumed in moderation [1].\n\n**Once or twice a week** is an optimal frequency to allow for a balanced diet while still enjoying the food [2]. While 38% of Americans eat pizza at least once a week as of June 2026 [5], regular daily consumption is generally discouraged for most people [1]. \n\nYou can mitigate health risks by choosing healthier ingredients and practicing portion control [2]. For example, a European study noted that pizza consumption is not linked to increased type 2 diabetes risk when it is balanced with other foods [5]. Additionally, the nutritional value can vary; pizza can provide protein, vitamins, and carbohydrates, but the specific benefits are contingent on your choices [6].",
+ "chars": 1005,
+ "raw_bytes": 3160,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.14,
+ "rate_gen_tok_s": 13.5,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:07:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 19.69,
+ "app_total_s": 23.27,
+ "first_text_s_unreliable": true
+}

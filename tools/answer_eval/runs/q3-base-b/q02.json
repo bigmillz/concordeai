@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.5,\"ftok\":142,\"est\":false}",
+  "X-Hurry": "d7ad94a2f6663b67"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 17.44,
+ "elapsed_s": 28.63,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.96,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.96,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.96,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.47,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.47,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.48,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.48,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.44,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.63,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.3,
+    "tok": 563,
+    "s": 11.2
+   }
+  },
+  {
+   "t": 28.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2252 chars"
+   }
+  },
+  {
+   "t": 28.63,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   8.96,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.96
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.96
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 12.47
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.47
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.48
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2252 chars",
+   "t_s": 28.63
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 28.63
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone 14 review: Is it worth buying in 2026? - Back MarketIs iPhone 14 Worth Bu",
+   "u": "https://www.backmarket.com/en-us/c/iphone/iphone-14-test",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "iPhone 18 Pro Max vs. iPhone 17 Pro Max: Is Apple’s Latest Flagship Actually Wor",
+   "u": "https://www.geeky-gadgets.com/iphone-18-pro-max-vs-17-pro-max-2/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "I broke my 5-year iPhone upgrade rule with the latest model... - ZDNET",
+   "u": "https://www.zdnet.com/article/iphone-17-pro-vs-iphone-14-pro/",
+   "d": "2026-02-08"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026? - Tech in Deep",
+   "u": "https://www.techindeep.com/is-iphone-14-worth-buying-in-2026-73659",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone Price List 2026: Every Model and What to Pay",
+   "u": "https://geekblog.net/mobile/iphone-price-list-2026/",
+   "d": "2026-07-08"
+  },
+  {
+   "t": "Apple's New 2026 iPhone Lineup: Prices for Every Storage Tier",
+   "u": "https://www.macrumors.com/2026/09/12/how-much-each-iphone-18-pro-model-costs/",
+   "d": "2026-09-12"
+  },
+  {
+   "t": "Need to Upgrade Your iPhone? Get Last Year's Model. | Reviews by...",
+   "u": "https://www.nytimes.com/wirecutter/reviews/the-iphone-is-our-favorite-smartphone/",
+   "d": "2026-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.48,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 50.3,
+  "tok": 563,
+  "s": 11.2
+ },
+ "answer_raw": "The newest flagship is the **iPhone 18 Pro Max** [3], though Apple also recently released the **iPhone Duo** (its first foldable) in October 2026 [1].\n\n## Pricing and Value\n\nThe cost of the latest flagships depends on the specific model and storage tier you select. Based on the September 2026 release, the **iPhone 18 Pro Max** carries a higher price tag than the previous generation due to global RAM shortages [3]. \n\nWhile specific price lists for the 18 Pro series are not fully detailed in the available reports, here is the pricing structure for the current lineup as of September 20s, 2026:\n\n| Model | Price (US MSRP) |\n| :--- | :--- |\n| **iPhone 17e** | ~$599 (as of July 2026) [6] |\n| **iPhone 17 Pro** | ~$1,099 (as of July 2026) [6] |\n| **iPhone 17 Pro Max** | ~$1,199 (as of July 2026) [6] |\n\n*Note: For the iPhone 18 series, the Pro Max is noted to be more expensive than the 17 Pro Max [3].*\n\n## Is it worth the upgrade from an iPhone 14?\n\nUpgrading from an iPhone 14 to an iPhone 18 Pro Max represents a significant leap in hardware and capability. Whether it is \"worth it\" depends on your tolerance for the price increase and your need for specific new features.\n\n**The Case for Upgrading**\nIf you are moving from an iPhone 14, the jump to the 18 Pro Max will feel massive. You will gain the **A19 Pro chip**, a significantly improved camera array for photography and selfies, and enhanced scratch resistance [4]. Additionally, the iPhone 14 lacks support for **Apple Intelligence**, whereas the newer models are built to leverage these AI capabilities [2][4].\n\n**The Case for Waiting**\nThe iPhone 18 Pro Max does not deliver enough radical feature changes to justify the price increase for everyone, especially since it refines the existing formula rather than reinventing it [3]. If your iPhone 14 still meets your daily needs, the most cost-effective move is to keep it, as the 14 remains a dependable device with years of iOS support left [2].\n\n**Summary of the leap**\n*   **Performance:** You move from the A15 Bionic to the **A19 Pro** [2][4].\n*   **AI:** You gain access to **Apple Intelligence**, which the iPhone 14 lacks [2][4].\n*   **Display/Build:** You get improved scratch resistance and more advanced camera hardware [4].",
+ "answer": "The newest flagship is the **iPhone 18 Pro Max** [3], though Apple also recently released the **iPhone Duo** (its first foldable) in October 2026 [1].\n\n## Pricing and Value\n\nThe cost of the latest flagships depends on the specific model and storage tier you select. Based on the September 2026 release, the **iPhone 18 Pro Max** carries a higher price tag than the previous generation due to global RAM shortages [3]. \n\nWhile specific price lists for the 18 Pro series are not fully detailed in the available reports, here is the pricing structure for the current lineup as of September 20s, 2026:\n\n| Model | Price (US MSRP) |\n| :--- | :--- |\n| **iPhone 17e** | ~$599 (as of July 2026) [6] |\n| **iPhone 17 Pro** | ~$1,099 (as of July 2026) [6] |\n| **iPhone 17 Pro Max** | ~$1,199 (as of July 2026) [6] |\n\n*Note: For the iPhone 18 series, the Pro Max is noted to be more expensive than the 17 Pro Max [3].*\n\n## Is it worth the upgrade from an iPhone 14?\n\nUpgrading from an iPhone 14 to an iPhone 18 Pro Max represents a significant leap in hardware and capability. Whether it is \"worth it\" depends on your tolerance for the price increase and your need for specific new features.\n\n**The Case for Upgrading**\nIf you are moving from an iPhone 14, the jump to the 18 Pro Max will feel massive. You will gain the **A19 Pro chip**, a significantly improved camera array for photography and selfies, and enhanced scratch resistance [4]. Additionally, the iPhone 14 lacks support for **Apple Intelligence**, whereas the newer models are built to leverage these AI capabilities [2][4].\n\n**The Case for Waiting**\nThe iPhone 18 Pro Max does not deliver enough radical feature changes to justify the price increase for everyone, especially since it refines the existing formula rather than reinventing it [3]. If your iPhone 14 still meets your daily needs, the most cost-effective move is to keep it, as the 14 remains a dependable device with years of iOS support left [2].\n\n**Summary of the leap**\n*   **Performance:** You move from the A15 Bionic to the **A19 Pro** [2][4].\n*   **AI:** You gain access to **Apple Intelligence**, which the iPhone 14 lacks [2][4].\n*   **Display/Build:** You get improved scratch resistance and more advanced camera hardware [4].",
+ "chars": 2252,
+ "raw_bytes": 4333,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.66,
+ "rate_gen_tok_s": 50.31,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:41:27",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

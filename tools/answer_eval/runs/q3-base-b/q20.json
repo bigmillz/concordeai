@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.9,\"ftok\":152,\"est\":false}",
+  "X-Hurry": "758d8b9e9e1c4bf6"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 24.88,
+ "elapsed_s": 47.82,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.83,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 13.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.61,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.61,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 47.81,
+   "tag": "RATE",
+   "data": {
+    "tps": 23.0,
+    "tok": 527,
+    "s": 22.9
+   }
+  },
+  {
+   "t": 47.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2110 chars"
+   }
+  },
+  {
+   "t": 47.81,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   9.83,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.83
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.83
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 13.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.61
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.61
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2110 chars",
+   "t_s": 47.81
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 47.81
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Global Liveability Index - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Global_Liveability_Index",
+   "d": "2015-11-04"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in... - Monocle",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026"
+  },
+  {
+   "t": "Copenhagen tops EIU Global Liveability Index 2026 as Indian cities lag",
+   "u": "https://testneeti.in/current-affairs/2026-07-13/copenhagen-tops-eiu-global-liveability-index-2026-as-indian-citie-jul-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "2026 Global Cities Index | Oxford Economics",
+   "u": "https://www.oxfordeconomics.com/global-cities-index/",
+   "d": "2026"
+  },
+  {
+   "t": "Mercer Quality of Living Survey - EverybodyWiki Bios & Wiki",
+   "u": "https://en.everybodywiki.com/Mercer_Quality_of_Living_Survey",
+   "d": "2026-08-11"
+  },
+  {
+   "t": "Top 10 Cities With the Best Quality of Life in 2026 - Life ...",
+   "u": "https://en.tempo.co/read/2122228/top-10-cities-with-the-best-quality-of-life-in-2026",
+   "d": "2026-10-23"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.61,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 23.0,
+  "tok": 527,
+  "s": 22.9
+ },
+ "answer_raw": "The top cities depend entirely on which metric a ranking uses—specifically whether they prioritize economic dominance or pure livability.\n\n## The Leading Rankings\n\nThere is no single \"best\" city because different organizations use different weighted variables. As of October 2026, the two most prominent datasets provide different winners:\n\n**The EIU Global Liveability Index**\nThis index focuses on stability, healthcare, culture, environment, education, and infrastructure. It is a measure of how \"livable\" a city is for its residents.\n*   **Top City:** **Copenhagen**, Denmark, is ranked as the world's most liveable city as of July 2026 [4].\n*   **Follow-up:** **Vienna**, Austria, and **Melbourne**, Australia, take the second and third spots [4].\n\n**The Oxford Economics Global Cities Index**\nThis ranking evaluates 1,000 cities across five categories: economics, human capital, environment, and quality of life. Because it includes economic strength, it results in a different hierarchy.\n*   **Top City:** **New York** takes the No. 1 spot for the overall index as of October 2026 [2].\n*   **Quality of Life Leader:** When looking specifically at the quality of life category within this index, **Canberra** is the top-ranked city as of October 2026 [8]. \n*   **US Performance:** While New York leads the overall index, only one US city made the top 20 for quality of life specifically, with **San Jose** ranking 13th as of October 2026 [2][8].\n\n## Summary of Rankings\n\n| Ranking Authority | Primary Focus | Top City |\n| :--- | :--- | :--- |\n| **EIU** (as of July 2026) | Stability, Infrastructure, Culture | **Copenhagen** [4] |\n| **Oxford Economics** (as of Oct 2026) | Economic & Human Capital | **New York** [2] |\n| **Oxford Economics** (as of Oct 2026) | Pure Quality of Life Metric | **Canberra** [8] |\n\nThe discrepancy between these lists is due to the weighting of \"economics.\" A city like New York dominates in global economic influence, but for a resident seeking green space or safety, a city like Copenhagen or Canberra currently holds the edge in specialized quality-of-life metrics [3][5].",
+ "answer": "The top cities depend entirely on which metric a ranking uses—specifically whether they prioritize economic dominance or pure livability.\n\n## The Leading Rankings\n\nThere is no single \"best\" city because different organizations use different weighted variables. As of October 2026, the two most prominent datasets provide different winners:\n\n**The EIU Global Liveability Index**\nThis index focuses on stability, healthcare, culture, environment, education, and infrastructure. It is a measure of how \"livable\" a city is for its residents.\n*   **Top City:** **Copenhagen**, Denmark, is ranked as the world's most liveable city as of July 2026 [4].\n*   **Follow-up:** **Vienna**, Austria, and **Melbourne**, Australia, take the second and third spots [4].\n\n**The Oxford Economics Global Cities Index**\nThis ranking evaluates 1,000 cities across five categories: economics, human capital, environment, and quality of life. Because it includes economic strength, it results in a different hierarchy.\n*   **Top City:** **New York** takes the No. 1 spot for the overall index as of October 2026 [2].\n*   **Quality of Life Leader:** When looking specifically at the quality of life category within this index, **Canberra** is the top-ranked city as of October 2026 [8]. \n*   **US Performance:** While New York leads the overall index, only one US city made the top 20 for quality of life specifically, with **San Jose** ranking 13th as of October 2026 [2][8].\n\n## Summary of Rankings\n\n| Ranking Authority | Primary Focus | Top City |\n| :--- | :--- | :--- |\n| **EIU** (as of July 2026) | Stability, Infrastructure, Culture | **Copenhagen** [4] |\n| **Oxford Economics** (as of Oct 2026) | Economic & Human Capital | **New York** [2] |\n| **Oxford Economics** (as of Oct 2026) | Pure Quality of Life Metric | **Canberra** [8] |\n\nThe discrepancy between these lists is due to the weighting of \"economics.\" A city like New York dominates in global economic influence, but for a resident seeking green space or safety, a city like Copenhagen or Canberra currently holds the edge in specialized quality-of-life metrics [3][5].",
+ "chars": 2110,
+ "raw_bytes": 4262,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.03,
+ "rate_gen_tok_s": 22.99,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:53:00",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

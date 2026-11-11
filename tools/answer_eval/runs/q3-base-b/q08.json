@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.3,\"ftok\":127,\"est\":false}",
+  "X-Hurry": "1b2d0e936478eff5"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 16.53,
+ "elapsed_s": 25.26,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.96,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 19 passages"
+   }
+  },
+  {
+   "t": 11.96,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.96,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.96,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.53,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.1,
+    "tok": 462,
+    "s": 8.7
+   }
+  },
+  {
+   "t": 25.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1851 chars"
+   }
+  },
+  {
+   "t": 25.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 19 passages",
+   "t_s": 11.96
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.96
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.96
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1851 chars",
+   "t_s": 25.26
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 25.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Boston To NYC Amtrak Stops: Essential Travel Guide, Schedule...",
+   "u": "https://travelpander.com/boston-to-nyc-amtrak-stops/",
+   "d": "2025-07-10"
+  },
+  {
+   "t": "Amtrak rolls out $20 tickets between NYC and Boston for the summer",
+   "u": "https://secretnyc.co/heap-train-nyc-boston-amtrak-20/",
+   "d": "2026"
+  },
+  {
+   "t": "Boston to New York: Train, Bus or Plane? | The Boston Report",
+   "u": "https://thebostonreport.com/2026/10/25/boston-to-nyc-train-bus-flight-guide-2026/",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "Madrid Valencia — Train vs Flight (Door-to-Door Time, Cost & CO₂e)",
+   "u": "https://odysseydiscoveries.com/madrid-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "New York to Boston Train — Schedules, Times & Fares",
+   "u": "https://newyorkbostontrains.com/",
+   "d": "2026-08-17"
+  },
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Distance Between Boston and NY: Travel Guide... - GetAcademy.blog",
+   "u": "https://getacademy.blog/distance-boston-ny-travel-guide",
+   "d": ""
+  },
+  {
+   "t": "Go Buses NYC to Boston, Washington, D.C. and Virginia",
+   "u": "https://www.gobuses.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.96,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 53.1,
+  "tok": 462,
+  "s": 8.7
+ },
+ "answer_raw": "The **train** is the better option for most travelers because it delivers city-center to city-center service without the massive time penalty of airport logistics.\n\n## Comparison\n\n| Mode | Line-haul Time | Total Door-to-Door Time | Typical Cost |\n| :--- | :--- | :--- | :--- |\n| **Train (Amtrak)** | ~3.5 to 4.5 hours [1][5] | ~3.5 to 5.25 hours [6] | $20 (Night Owl) to $150 [1][2] |\n| **Flight** | ~1 hour [4] | ~3.75 to 5.5 hours [6] | Varies by carrier/booking time |\n\n## The Breakdown\n\n**The Train Advantage**\nThe rail journey from New York Penn Station to Boston (South Station or Back Bay) typically takes between 3 hours 41 minutes and 4 hours 30 minutes [5]. For those opting for the high-speed Acela—which uses newer NextGen trainsets capable of 160 mph as of late summer 2025 [3]—the travel time is often shorter and more efficient for business travelers [7].\n\nThe \"door-to-door\" metric is where flying loses its edge. While a flight's scheduled flight time is roughly 1 hour [4], the total time including airport access, security, and transfers often lands between 3 hours 45 minutes and 5.5 hours [6]. Because trains connect useful city-center stations and bypass heavy airport processing, they remain highly competitive on total travel time [6][7].\n\n**Cost and Booking**\nPricing is demand-based and fluctuates like airline fares [5]. You can find much lower fares, such as **$20** one-way \"Night Owl\" tickets for summer weekend travel [2]. Standard tickets generally range from $49 to $150 depending on the class and how far in advance you book [1].\n\n**The Verdict**\nI'd pick the **train**. The ability to bypass TSA and airport-to-city transit transfers makes the rail option more reliable for total travel time [7]. It is also more efficient for productivity, as you avoid the fragmentation of airport security and terminal wait times.",
+ "answer": "The **train** is the better option for most travelers because it delivers city-center to city-center service without the massive time penalty of airport logistics.\n\n## Comparison\n\n| Mode | Line-haul Time | Total Door-to-Door Time | Typical Cost |\n| :--- | :--- | :--- | :--- |\n| **Train (Amtrak)** | ~3.5 to 4.5 hours [1][5] | ~3.5 to 5.25 hours [6] | $20 (Night Owl) to $150 [1][2] |\n| **Flight** | ~1 hour [4] | ~3.75 to 5.5 hours [6] | Varies by carrier/booking time |\n\n## The Breakdown\n\n**The Train Advantage**\nThe rail journey from New York Penn Station to Boston (South Station or Back Bay) typically takes between 3 hours 41 minutes and 4 hours 30 minutes [5]. For those opting for the high-speed Acela—which uses newer NextGen trainsets capable of 160 mph as of late summer 2025 [3]—the travel time is often shorter and more efficient for business travelers [7].\n\nThe \"door-to-door\" metric is where flying loses its edge. While a flight's scheduled flight time is roughly 1 hour [4], the total time including airport access, security, and transfers often lands between 3 hours 45 minutes and 5.5 hours [6]. Because trains connect useful city-center stations and bypass heavy airport processing, they remain highly competitive on total travel time [6][7].\n\n**Cost and Booking**\nPricing is demand-based and fluctuates like airline fares [5]. You can find much lower fares, such as **$20** one-way \"Night Owl\" tickets for summer weekend travel [2]. Standard tickets generally range from $49 to $150 depending on the class and how far in advance you book [1].\n\n**The Verdict**\nI'd pick the **train**. The ability to bypass TSA and airport-to-city transit transfers makes the rail option more reliable for total travel time [7]. It is also more efficient for productivity, as you avoid the fragmentation of airport security and terminal wait times.",
+ "chars": 1851,
+ "raw_bytes": 3839,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.32,
+ "rate_gen_tok_s": 53.01,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:44:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

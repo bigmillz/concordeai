@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.1,\"ftok\":95,\"est\":false}",
+  "X-Hurry": "f8eb82fe0a3a5044"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.4,
+ "elapsed_s": 19.61,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.43,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 12.43,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.43,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.43,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.4,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.61,
+   "tag": "RATE",
+   "data": {
+    "tps": 43.8,
+    "tok": 97,
+    "s": 2.2
+   }
+  },
+  {
+   "t": 19.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "388 chars"
+   }
+  },
+  {
+   "t": 19.61,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 19.61,
+   "tag": "DONE",
+   "data": {
+    "f": 17.4,
+    "t": 19.61,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 12.43
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.43
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.43
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "388 chars",
+   "t_s": 19.61
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.61
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "BLS average price: Eggs, grade A, large (U.S. city average)",
+   "u": "https://data.bls.gov/timeseries/APU0000708111",
+   "d": "2026-09"
+  },
+  {
+   "t": "Egg Prices Today: Average Price Of Eggs Per Dozen + Chart (2026)",
+   "u": "https://coopeduplife.com/egg-prices/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "CPI: Average Price Data - U.S. Bureau of Labor StatisticsCPI Home : U.S. Bureau ",
+   "u": "https://www.bls.gov/cpi/factsheets/average-prices.htm",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Average egg price per dozen (2026) | Basket Report",
+   "u": "https://basketreport.com/prices/eggs/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Average Price: Eggs, Grade A, Large (Cost per Dozen)... | St. Louis Fed",
+   "u": "https://fred.stlouisfed.org/series/APU0000708111",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Average price data (in U.S. dollars), selected items",
+   "u": "https://www.bls.gov/charts/consumer-price-index/consumer-price-index-average-price-data.htm",
+   "d": "2026-10"
+  },
+  {
+   "t": "US egg prices increase to record high, dashing hopes of... | AP News",
+   "u": "https://apnews.com/article/egg-prices-bird-flu-cpi-b0ded420e9f7c0a707277c9c63396a76",
+   "d": ""
+  },
+  {
+   "t": "US Egg Prices per Dozen: Latest Average and History (BLS ...",
+   "u": "https://eggcostcheck.com/egg-prices/",
+   "d": "2026-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.43,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 230,
+   "o": 28,
+   "d": 726,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5531,
+   "o": 134,
+   "d": 7121,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 43.8,
+  "tok": 97,
+  "s": 2.2
+ },
+ "app_first_s": 17.4,
+ "app_total_s": 19.61,
+ "answer_raw": "A dozen Grade A large eggs cost **$2.27** as of September 2026, which is roughly **35% cheaper** than the **$3.49** average seen in September 2025 [1][2][4].\n\nThe price has trended downward since the previous year's levels, hitting a low of **$2.14** in June 2026 before settling at the current **$2.27** [2]. This remains well below the record peak of **$6.23** set in March 2025 [2][4].",
+ "answer": "A dozen Grade A large eggs cost **$2.27** as of September 2026, which is roughly **35% cheaper** than the **$3.49** average seen in September 2025 [1][2][4].\n\nThe price has trended downward since the previous year's levels, hitting a low of **$2.14** in June 2026 before settling at the current **$2.27** [2]. This remains well below the record peak of **$6.23** set in March 2025 [2][4].",
+ "chars": 388,
+ "raw_bytes": 2591,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.95,
+ "rate_gen_tok_s": 43.89,
+ "id": "q06",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Egg prices",
+ "question": "How much is a dozen eggs in the US right now compared to a year ago?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:50:29",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "How much is a dozen eggs in the US right now compared to a year ago?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

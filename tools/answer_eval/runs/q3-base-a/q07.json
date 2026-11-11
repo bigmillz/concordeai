@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.2,\"ftok\":129,\"est\":false}",
+  "X-Hurry": "4a6415b64f3a187f"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 19.55,
+ "elapsed_s": 28.67,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 33 passages"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.13,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 28.66,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.4,
+    "tok": 532,
+    "s": 9.1
+   }
+  },
+  {
+   "t": 28.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2130 chars"
+   }
+  },
+  {
+   "t": 28.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 33 passages",
+   "t_s": 15.13
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.13
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.13
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2130 chars",
+   "t_s": 28.67
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 28.67
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Flying vs. Driving from Washington DC to Miami... - Alternative News",
+   "u": "https://alternativenews.net/flying-vs-driving-from-washington-dc-to-miami/",
+   "d": "2024-07-09"
+  },
+  {
+   "t": "Driving vs. Flying to a Florida Cruise in 2026: The Post-Spirit Math",
+   "u": "https://cruises.scottsanfilippo.com/driving-vs-flying-to-a-florida-cruise-in-2026-the-post-spirit-math/",
+   "d": "2026"
+  },
+  {
+   "t": "Flights from New York to Miami: Prices & Best Time (2026)",
+   "u": "https://www.journeyfinder.net/routes/new-york-to-miami-flight",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Moving to Miami? 2026 Living Costs & Relocation Tips - MoverDB.com",
+   "u": "https://moverdb.com/moving-to-miami/",
+   "d": "2026"
+  },
+  {
+   "t": "$52 Cheap Flights to Miami in November 2026 | KAYAK",
+   "u": "https://www.kayak.com/flight-routes/United-States-US0/Miami-MIA.November.M11.ksp",
+   "d": "2026-11"
+  },
+  {
+   "t": "Driving Cost between Brooklyn Center, Minnesota and Minneapolis...",
+   "u": "https://www.meetways.com/info/travel-cost/Brooklyn+Center,+Minnesota/Minneapolis,+Minnesota",
+   "d": ""
+  },
+  {
+   "t": "Driving Vs Flying Calculator: Your 2026 Travel Guide",
+   "u": "https://economadtravel.com/driving-vs-flying-calculator/",
+   "d": "2026-04-10"
+  },
+  {
+   "t": "Driving vs. Flying Calculator: Compare Cost & Time",
+   "u": "https://smartonlinecalculator.com/driving-vs-flying-calculator.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.13,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 58.4,
+  "tok": 532,
+  "s": 9.1
+ },
+ "answer_raw": "Flying is likely to be cheaper for two people than driving, potentially saving you **$600–$800** in total, though driving offers more flexibility for a week-long stay.\n\nBecause the distance from Brooklyn to Miami is roughly 1,300 miles, driving involves significant fuel, maintenance, and transit costs that often outweigh the cost of airfare for two travelers.\n\n## Cost Comparison\n\n**Flying**\nThe cost for two people will depend on how much you value seat selection and checked bags. \n*   **Airfare:** For a round-trip from New York to Miami, you can expect to pay roughly **$301–$347** on average as of November 2026 [5]. Off-peak one-way fares can be as low as **$60–$150** per person [3].\n*   **Transit:** You'll need to factor in the cost of getting to the airport and from the airport to your destination (e.g., a **$30–$80** spread if flying into Fort Lauderdale instead of Miami) [3].\n*   **Total Estimate:** For two people, a mid-range round-trip budget would be roughly **$700–$800** total [5].\n\n**Driving**\nDriving is a heavy lift for a one-week trip due to the 20+ hours of road time and variable fuel costs.\n*   **Fuel & Maintenance:** You would be covering approximately 2,600 miles round-trip. While specific 2026 fuel prices aren't in the data, you'd need to calculate your vehicle's MPG against current rates.\n*   **Hidden Costs:** You must account for tolls, parking in Miami, and the \"cost\" of time.\n*   **Total Estimate:** While driving avoids the per-person ticket overhead, the wear on a vehicle and the fuel for two people typically pushes the cost higher than a budget-conscious flight [7].\n\n## The Verdict\n\n**Flying is the winner for cost and time.**\n\nA flight from New York to Miami takes about **3 to 3.25 hours** [3]. Driving from Brooklyn to Miami is a multi-day undertaking. For two people, the cost of two round-trip tickets (roughly **$600–$700** total) is almost certainly lower than the combined cost of gas, tolls, and vehicle wear for a 2,600-mile journey.\n\nIf you are looking to minimize cost, booking flights 2–3 months in advance is the standard move to catch those lower off-peak rates [3].",
+ "answer": "Flying is likely to be cheaper for two people than driving, potentially saving you **$600–$800** in total, though driving offers more flexibility for a week-long stay.\n\nBecause the distance from Brooklyn to Miami is roughly 1,300 miles, driving involves significant fuel, maintenance, and transit costs that often outweigh the cost of airfare for two travelers.\n\n## Cost Comparison\n\n**Flying**\nThe cost for two people will depend on how much you value seat selection and checked bags. \n*   **Airfare:** For a round-trip from New York to Miami, you can expect to pay roughly **$301–$347** on average as of November 2026 [5]. Off-peak one-way fares can be as low as **$60–$150** per person [3].\n*   **Transit:** You'll need to factor in the cost of getting to the airport and from the airport to your destination (e.g., a **$30–$80** spread if flying into Fort Lauderdale instead of Miami) [3].\n*   **Total Estimate:** For two people, a mid-range round-trip budget would be roughly **$700–$800** total [5].\n\n**Driving**\nDriving is a heavy lift for a one-week trip due to the 20+ hours of road time and variable fuel costs.\n*   **Fuel & Maintenance:** You would be covering approximately 2,600 miles round-trip. While specific 2026 fuel prices aren't in the data, you'd need to calculate your vehicle's MPG against current rates.\n*   **Hidden Costs:** You must account for tolls, parking in Miami, and the \"cost\" of time.\n*   **Total Estimate:** While driving avoids the per-person ticket overhead, the wear on a vehicle and the fuel for two people typically pushes the cost higher than a budget-conscious flight [7].\n\n## The Verdict\n\n**Flying is the winner for cost and time.**\n\nA flight from New York to Miami takes about **3 to 3.25 hours** [3]. Driving from Brooklyn to Miami is a multi-day undertaking. For two people, the cost of two round-trip tickets (roughly **$600–$700** total) is almost certainly lower than the combined cost of gas, tolls, and vehicle wear for a 2,600-mile journey.\n\nIf you are looking to minimize cost, booking flights 2–3 months in advance is the standard move to catch those lower off-peak rates [3].",
+ "chars": 2130,
+ "raw_bytes": 4228,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.57,
+ "rate_gen_tok_s": 58.39,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:10:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

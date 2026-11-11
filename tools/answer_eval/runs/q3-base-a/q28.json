@@ -1,0 +1,199 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":9.6,\"ftok\":294,\"est\":false}",
+  "X-Hurry": "cb26ce0fea977c7f"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 25.79,
+ "elapsed_s": 33.94,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 17.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "618 chars"
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 17.7,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 25.79,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 33.94,
+   "tag": "RATE",
+   "data": {
+    "tps": 12.3,
+    "tok": 100,
+    "s": 8.2
+   }
+  },
+  {
+   "t": 33.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "400 chars"
+   }
+  },
+  {
+   "t": 33.94,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   17.7,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "618 chars",
+   "t_s": 17.7
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 17.7
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "400 chars",
+   "t_s": 33.94
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 33.94
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 12.3,
+  "tok": 100,
+  "s": 8.2
+ },
+ "answer_raw": "It will take **5.04 years** for Car B to break even on fuel savings.\n\n**Car A** annual fuel cost:\n14,000 miles / 24 mpg = 583.33 gallons\n583.33 gallons * $3.40 = **$1,983.33**\n\n**Car B** annual fuel cost:\n14,000 miles / 48 mpg = 291.67 gallons\n291.67 gallons * $3.40 = **$991.67**\n\nThe $5,000 price difference divided by the **$991.66** annual savings results in a break-even point of **5.04 years**.",
+ "answer": "It will take **5.04 years** for Car B to break even on fuel savings.\n\n**Car A** annual fuel cost:\n14,000 miles / 24 mpg = 583.33 gallons\n583.33 gallons * $3.40 = **$1,983.33**\n\n**Car B** annual fuel cost:\n14,000 miles / 48 mpg = 291.67 gallons\n291.67 gallons * $3.40 = **$991.67**\n\nThe $5,000 price difference divided by the **$991.66** annual savings results in a break-even point of **5.04 years**.",
+ "chars": 400,
+ "raw_bytes": 925,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 2.95,
+ "rate_gen_tok_s": 12.27,
+ "id": "q28",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Hybrid break-even",
+ "question": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:22:37",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

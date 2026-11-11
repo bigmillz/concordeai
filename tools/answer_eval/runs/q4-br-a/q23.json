@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.1,\"ftok\":254,\"est\":false}",
+  "X-Hurry": "2b8a62e93a6dfb73"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.64,
+ "elapsed_s": 28.7,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.64,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 29 passages"
+   }
+  },
+  {
+   "t": 13.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 28.7,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.1,
+    "tok": 619,
+    "s": 10.0
+   }
+  },
+  {
+   "t": 28.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2479 chars"
+   }
+  },
+  {
+   "t": 28.7,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 29 passages",
+   "t_s": 13.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.23
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.23
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2479 chars",
+   "t_s": 28.7
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 28.7
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "50+ AI Job Displacement Statistics: Trends & Hiring Impact (2026)",
+   "u": "https://recruitingconnection.org/blog/ai-job-displacement-statistics-trends/",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "AI Job Displacement Statistics 2026: Jobs at Risk &.",
+   "u": "https://aitoolreviews.co/stats/ai-job-displacement-statistics-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S. Employment",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "Will AI Take My Job? What the 2026 US Data Shows",
+   "u": "https://techjournal.org/will-ai-take-my-job",
+   "d": "2026"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist!",
+   "u": "https://www.npr.org/2026/11/04/nx-s1-6028029/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-11-05"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 62.1,
+  "tok": 619,
+  "s": 10.0
+ },
+ "answer_raw": "Your job is unlikely to disappear entirely, but it will fundamentally change from managing systems to managing the AI that manages them.\n\nThe risk of total displacement for an IT professional over the next five years is low, but the risk of task-level disruption is high. While Goldman Sachs estimates **300 million jobs** globally could be impacted [2], and McKinsey suggests a worst-case of **800 million** by 2030 [2], much of this refers to the transformation of roles rather than their outright elimination. For your field, AI is more likely to replace specific routine tasks or entry-level positions than the entire sysadmin function [7]. The World Economic Forum projects that while **22% of jobs** globally will be disrupted by 2030, there will be a net gain of **78 million jobs** through the creation of new roles [3].\n\n**The real risk for IT ops is \"task-based\" displacement.**\nIn the next five years, AI will absorb much of the routine, manual work currently handled by junior admins—such as basic troubleshooting, log analysis, or scripted provisioning—effectively reducing the headcount needed for certain operational tiers [1][3]. This creates a shift where human oversight remains essential, but the \"human-to-server\" ratio changes [1]. While only **22% of workers** believe they will be personally displaced within five years [2], the reality is that your job's requirements will shift toward higher-level architecture and oversight.\n\n**What you should do about it:**\nSince 55% of workers say they would retrain for AI-complementary roles [2], you should focus on becoming the person who manages the automation rather than the person competing with it.\n\n*   **Move up the stack:** Shift from manual execution to architecture and high-level orchestration. If you are managing the tools that automate the work, you are less likely to be the one replaced by them.\n*   **Focus on AI-complementary skills:** Specialize in AI-integrated operations (AIOps). Learn how to build, secure, and audit the models that are running your infrastructure. \n*   **Target \"human-in-the-loop\" roles:** Position yourself for roles that require the human judgment, complex problem-solving, and accountability that current AI lacks [1].\n*   **Upskill in security and governance:** As automation scales, the risks of automated errors or malicious AI-driven attacks grow. Being the expert who governs these systems provides a layer of job security that task-level automation cannot touch.",
+ "answer": "Your job is unlikely to disappear entirely, but it will fundamentally change from managing systems to managing the AI that manages them.\n\nThe risk of total displacement for an IT professional over the next five years is low, but the risk of task-level disruption is high. While Goldman Sachs estimates **300 million jobs** globally could be impacted [2], and McKinsey suggests a worst-case of **800 million** by 2030 [2], much of this refers to the transformation of roles rather than their outright elimination. For your field, AI is more likely to replace specific routine tasks or entry-level positions than the entire sysadmin function [7]. The World Economic Forum projects that while **22% of jobs** globally will be disrupted by 2030, there will be a net gain of **78 million jobs** through the creation of new roles [3].\n\n**The real risk for IT ops is \"task-based\" displacement.**\nIn the next five years, AI will absorb much of the routine, manual work currently handled by junior admins—such as basic troubleshooting, log analysis, or scripted provisioning—effectively reducing the headcount needed for certain operational tiers [1][3]. This creates a shift where human oversight remains essential, but the \"human-to-server\" ratio changes [1]. While only **22% of workers** believe they will be personally displaced within five years [2], the reality is that your job's requirements will shift toward higher-level architecture and oversight.\n\n**What you should do about it:**\nSince 55% of workers say they would retrain for AI-complementary roles [2], you should focus on becoming the person who manages the automation rather than the person competing with it.\n\n*   **Move up the stack:** Shift from manual execution to architecture and high-level orchestration. If you are managing the tools that automate the work, you are less likely to be the one replaced by them.\n*   **Focus on AI-complementary skills:** Specialize in AI-integrated operations (AIOps). Learn how to build, secure, and audit the models that are running your infrastructure. \n*   **Target \"human-in-the-loop\" roles:** Position yourself for roles that require the human judgment, complex problem-solving, and accountability that current AI lacks [1].\n*   **Upskill in security and governance:** As automation scales, the risks of automated errors or malicious AI-driven attacks grow. Being the expert who governs these systems provides a layer of job security that task-level automation cannot touch.",
+ "chars": 2479,
+ "raw_bytes": 4796,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 23.49,
+ "rate_gen_tok_s": 24.03,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:13:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 18.73,
+ "app_total_s": 28.7,
+ "first_text_s_unreliable": true
+}

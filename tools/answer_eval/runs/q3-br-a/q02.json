@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.0,\"ftok\":119,\"est\":false}",
+  "X-Hurry": "daaa09722c61f570"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 21.82,
+ "elapsed_s": 26.62,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 32 passages"
+   }
+  },
+  {
+   "t": 16.65,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.65,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.82,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.61,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.4,
+    "tok": 256,
+    "s": 4.8
+   }
+  },
+  {
+   "t": 26.62,
+   "tag": "RESET"
+  },
+  {
+   "t": 26.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 26.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1005 chars"
+   }
+  },
+  {
+   "t": 26.62,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 32 passages",
+   "t_s": 16.65
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.65
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.65
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 26.62
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1005 chars",
+   "t_s": 26.62
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.62
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iphone 17 worth upgrading from iphone 16",
+   "u": "https://smartphoneindia.in/tag/iphone-17-worth-upgrading-from-iphone-16/",
+   "d": "2026-08-12"
+  },
+  {
+   "t": "iPhone 18 Pro Max vs. iPhone 17 Pro Max: Is Apple’s Latest Flagship Actually Wor",
+   "u": "https://www.geeky-gadgets.com/iphone-18-pro-max-vs-17-pro-max-2/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Identify your iPhone model - Apple Support",
+   "u": "https://support.apple.com/en-us/108044",
+   "d": "2026"
+  },
+  {
+   "t": "How Much Is It to Upgrade Your iPhone? A 2026 Cost Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/how-much-to-upgrade-your-iphone-in-2026",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026 - uptradeit.com",
+   "u": "https://uptradeit.com/blog/is-iphone-14-worth-buying",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": ""
+  },
+  {
+   "t": "iPhone 14 vs iPhone 14 Plus: key differences - PhoneArena",
+   "u": "https://www.phonearena.com/reviews/iPhone-14-vs-iPhone-14-Plus_id5445",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.65,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 53.4,
+  "tok": 256,
+  "s": 4.8
+ },
+ "answer_raw": "The newest flagship is the **iPhone 18 Pro Max**, which arrived in October 2026 [3].\n\nThe price for the iPhone 18 Pro Max has increased compared to the previous generation due to global RAM shortages affecting production costs [3]. I didn't find the exact MSRP for the iPhone 18 Pro Max, so you would need to check the Apple Store for the current starting price [1].\n\nUpgrading from an iPhone 14 is **worth it** if you want a significant leap in performance and features, as those moving from an iPhone 16 or older will notice the most substantial changes [3].\n\n**Comparison of upward paths**\n\n*   **iPhone 18 Pro Max** — The current top-tier choice; the upgrade will feel massive compared to a 14, though the price premium is higher due to component costs [3].\n*   **iPhone 17 Pro Max** — A predecessor to the current flagship; it features a 6.3-inch 120Hz ProMotion display, 40W charging, and 256GB base storage as of August 2026 [2].\n*   **iPhone Duo** — The latest lineup released in October 2026 [1].",
+ "answer": "The newest flagship is the **iPhone 18 Pro Max**, which arrived in October 2026 [3].\n\nThe price for the iPhone 18 Pro Max has increased compared to the previous generation due to global RAM shortages affecting production costs [3]. I didn't find the exact MSRP for the iPhone 18 Pro Max, so you would need to check the Apple Store for the current starting price [1].\n\nUpgrading from an iPhone 14 is **worth it** if you want a significant leap in performance and features, as those moving from an iPhone 16 or older will notice the most substantial changes [3].\n\n**Comparison of upward paths**\n\n*   **iPhone 18 Pro Max** — The current top-tier choice; the upgrade will feel massive compared to a 14, though the price premium is higher due to component costs [3].\n*   **iPhone 17 Pro Max** — A predecessor to the current flagship; it features a 6.3-inch 120Hz ProMotion display, 40W charging, and 256GB base storage as of August 2026 [2].\n*   **iPhone Duo** — The latest lineup released in October 2026 [1].",
+ "chars": 1005,
+ "raw_bytes": 4021,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.44,
+ "rate_gen_tok_s": 52.34,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:01:00",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

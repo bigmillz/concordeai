@@ -1,0 +1,353 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":98,\"est\":false}",
+  "X-Hurry": "a3d2d3e42bb6e073"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.67,
+ "elapsed_s": 23.13,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 6.62,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.62,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.62,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 13.63,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.63,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.63,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.67,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.13,
+   "tag": "RATE",
+   "data": {
+    "tps": 30.1,
+    "tok": 164,
+    "s": 5.5
+   }
+  },
+  {
+   "t": 23.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "656 chars"
+   }
+  },
+  {
+   "t": 23.13,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.13,
+   "tag": "DONE",
+   "data": {
+    "f": 17.67,
+    "t": 23.13,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   6.62,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.62
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.62
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 13.63
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.63
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.63
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "656 chars",
+   "t_s": 23.13
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.13
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Beach Nearby - Discover the best beaches near you",
+   "u": "https://beachnearby.com/",
+   "d": ""
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Furnished apartments for rent Florianópolis | Long & short-term...",
+   "u": "https://www.theblueground.com/m/furnished-apartments/florianopolis-bra",
+   "d": ""
+  },
+  {
+   "t": "Furnished Rentals Florianópolis — Monthly Apartments & Homes ...",
+   "u": "https://rentihome.com/florianopolis/furnished-apartments-florianopolis.html",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Nov 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-11"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.63,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 28,
+   "d": 891,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4812,
+   "o": 248,
+   "d": 9433,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 30.1,
+  "tok": 164,
+  "s": 5.5
+ },
+ "app_first_s": 17.67,
+ "app_total_s": 23.13,
+ "answer_raw": "Pick **Lagoa/Campeche** for the best balance of lifestyle and reliability, as these areas offer the \"sweet spot\" of being walkable to cafes or surf and having reliable fiber internet [7].\n\n**Lagoa/Campeche** — roughly **$800/month (R$ 4,420) as of July 2026** for a 1BR in the Lagoa core or Campeche [7] (using the exchange rate of 1 USD = 5.5167 BRL from Nov 9, 2026 [5]).\n\n**Barra da Lagoa/Centro** — roughly **$550/month (R$ 3,044) as of July 2026** for a 1BR in the village or city center [7] (using the exchange rate of 1 USD = 5.5167 BRL from Nov 9, 2026 [5]).\n\n**North/East** — general 1BR rent averages **R$ 3,000 - 5,000 per month (undated)** [2].",
+ "answer": "Pick **Lagoa/Campeche** for the best balance of lifestyle and reliability, as these areas offer the \"sweet spot\" of being walkable to cafes or surf and having reliable fiber internet [7].\n\n**Lagoa/Campeche** — roughly **$800/month (R$ 4,420) as of July 2026** for a 1BR in the Lagoa core or Campeche [7] (using the exchange rate of 1 USD = 5.5167 BRL from Nov 9, 2026 [5]).\n\n**Barra da Lagoa/Centro** — roughly **$550/month (R$ 3,044) as of July 2026** for a 1BR in the village or city center [7] (using the exchange rate of 1 USD = 5.5167 BRL from Nov 9, 2026 [5]).\n\n**North/East** — general 1BR rent averages **R$ 3,000 - 5,000 per month (undated)** [2].",
+ "chars": 656,
+ "raw_bytes": 2938,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.09,
+ "rate_gen_tok_s": 30.04,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:12:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "The **North** and **East** zones offer the best balance for your requirements, depending on whether you prioritize resort-style amenities or a bohemian vibe [2].\n\n**North** — best for resort-style living and infrastructure [2].\n**East** — best for a bohemian, nature-focused, and surfing vibe [2].\n**Central/South** — offers historic centers and calm villages, but lacks direct ocean beach access in some areas [2].\n\nI didn't find specific rent prices, walkability scores, or internet speed metrics for individual neighborhoods, so you should check local rental platforms and ISP coverage maps for the 2026 market."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,374 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.8,\"ftok\":107,\"est\":false}",
+  "X-Hurry": "c34f438337482f68"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 18.53,
+ "elapsed_s": 21.29,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.23,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 23 passages"
+   }
+  },
+  {
+   "t": 14.23,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.23,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.53,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.29,
+   "tag": "RATE",
+   "data": {
+    "tps": 74.2,
+    "tok": 205,
+    "s": 2.8
+   }
+  },
+  {
+   "t": 21.29,
+   "tag": "RESET"
+  },
+  {
+   "t": 21.29,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 21.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "798 chars"
+   }
+  },
+  {
+   "t": 21.29,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.29,
+   "tag": "DONE",
+   "data": {
+    "f": 18.53,
+    "t": 21.29,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 23 passages",
+   "t_s": 14.23
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.23
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.23
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 21.29
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "798 chars",
+   "t_s": 21.29
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.29
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Magnesium Forms: Evidence, Doses and Safety",
+   "u": "https://purecityresearch.org/magnesium/",
+   "d": "2026-07-02"
+  },
+  {
+   "t": "Magnesium For Anxiety Clinical Research – Verdant Wellness",
+   "u": "https://verdantwellness.co/blogs/cortisol-balance/magnesium-for-anxiety-clinical-research",
+   "d": "2026-08-06"
+  },
+  {
+   "t": "Magnesium for Anxiety: Which Form Actually Works?",
+   "u": "https://stopanxiety.org/magnesium-for-anxiety/",
+   "d": "2026-03-13"
+  },
+  {
+   "t": "Magnesium and Anxiety: What 6 Clinical Trials Actually Found",
+   "u": "https://biosudo.com/blogs/news/magnesium-anxiety-clinical",
+   "d": "2026-05-23"
+  },
+  {
+   "t": "Magnesium Glycinate vs Citrate: Which Form Is Better?",
+   "u": "https://naturstack.com/minerals/magnesium/magnesium-glycinate-vs-citrate-which-is-better/",
+   "d": "2026-03-31"
+  },
+  {
+   "t": "Magnesium glycinate vs citrate absorption | Aarja Health Norge",
+   "u": "https://www.aarjahealth.no/en/blogs/our-blog/magnesiumglysinat-vs-sitrat-opptak",
+   "d": ""
+  },
+  {
+   "t": "Magnesium citrate + Zoloft: Can You Take Them Together?Can You Take Magnesium Wi",
+   "u": "https://www.drugs.com/drug-interactions/magnesium-citrate-with-zoloft-1511-0-2057-1348.html",
+   "d": ""
+  },
+  {
+   "t": "Magnesium Glycinate Benefits: Why Form Matters for Stress... | Thorne",
+   "u": "https://www.thorne.com/take-5-daily/article/magnesium-glycinate-for-sleep-and-stress-why-form-matters",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 245,
+   "o": 23,
+   "d": 779,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5014,
+   "o": 177,
+   "d": 7017,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 74.2,
+  "tok": 205,
+  "s": 2.8
+ },
+ "app_first_s": 18.53,
+ "app_total_s": 21.29,
+ "answer_raw": "For anxiety, **magnesium glycinate** is the best all-round choice, with an elemental dose of **200–400mg** [3].\n\n**Magnesium glycinate** is preferred because it offers excellent bioavailability, is gentle on the GI system, and the glycine component adds independent calming effects [3][4]. While the \"better\" label is debated, **magnesium citrate** is often more cost-effective and offers good absorption, though it may have more laxative effects than glycinate [5]. **Magnesium oxide** is generally avoided for this purpose as it has poor bioavailability of approximately 4% and performs poorly in clinical settings [2].\n\nI didn't find information regarding interactions with sertraline or alcohol; you should consult a medical professional or a pharmacist to check for drug-alcohol compatibility.",
+ "answer": "For anxiety, **magnesium glycinate** is the best all-round choice, with an elemental dose of **200–400mg** [3].\n\n**Magnesium glycinate** is preferred because it offers excellent bioavailability, is gentle on the GI system, and the glycine component adds independent calming effects [3][4]. While the \"better\" label is debated, **magnesium citrate** is often more cost-effective and offers good absorption, though it may have more laxative effects than glycinate [5]. **Magnesium oxide** is generally avoided for this purpose as it has poor bioavailability of approximately 4% and performs poorly in clinical settings [2].\n\nI didn't find information regarding interactions with sertraline or alcohol; you should consult a medical professional or a pharmacist to check for drug-alcohol compatibility.",
+ "chars": 798,
+ "raw_bytes": 4124,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.37,
+ "rate_gen_tok_s": 72.28,
+ "id": "q11",
+ "turn": 2,
+ "category": "health",
+ "topic": "Magnesium for anxiety",
+ "question": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:50:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What magnesium dose and form actually helps with anxiety, and how good is the evidence?"
+   },
+   {
+    "role": "assistant",
+    "content": "The best option for anxiety is **magnesium glycinate**, using an elemental dose of **200–400mg daily** [3].\n\n**Magnesium glycinate** is the preferred form because the glycinate chelate improves absorption while the glycine itself provides calming properties [4]. Other forms like **magnesium taurate** are also useful, particularly for those with heart-related anxiety concerns [3][5].\n\nThe evidence is consistent but nuanced. A 2017 systematic review found that magnesium supplementation reduced anxiety, particularly in those with inadequate dietary intake or high stress [3]. Clinical trials have shown consistent anxiolytic effects in populations with suboptimal magnesium status, with moderate effect sizes (0.3–0.5) [4].\n\nWhile 300mg of elemental magnesium daily has been linked to reduced anxiety scores within six weeks [5], the strength of the evidence is subject to debate due to methodological limitations in existing studies, such as small sample sizes and variable dosing [7]. Because of these variations, researchers note that the ability to reduce anxiety is most consistent in individuals with suboptimal magnesium levels [4]. \n\nRegarding safety, staying within the **200–400mg** range is standard [3], but doses above the NIH upper limit of **350mg** per day should only be done under medical supervision to avoid risks like diarrhea or low blood pressure [5]."
+   },
+   {
+    "role": "user",
+    "content": "Any problem taking it with sertraline or with a few drinks? And is glycinate really better than citrate or is that marketing?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

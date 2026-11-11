@@ -1,0 +1,357 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.8,\"ftok\":109,\"est\":false}",
+  "X-Hurry": "e90dde3bbb98f2ed"
+ },
+ "first_byte_s": 13.03,
+ "first_text_s": 19.28,
+ "elapsed_s": 40.81,
+ "events": [
+  {
+   "t": 13.03,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 13.03,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 images found"
+   }
+  },
+  {
+   "t": 13.03,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 13.03,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 13.03,
+   "tag": "PLACEHINT",
+   "data": [
+    {
+     "n": "Spanish Immersion",
+     "d": "",
+     "h": ""
+    }
+   ]
+  },
+  {
+   "t": 13.03,
+   "tag": "CTX",
+   "data": {
+    "loc": "not"
+   }
+  },
+  {
+   "t": 13.03,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.03,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 19.28,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.3,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "1140 chars"
+   }
+  },
+  {
+   "t": 25.3,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.3,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 25.3,
+   "tag": "RESET"
+  },
+  {
+   "t": 39.67,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.6,
+    "tok": 283,
+    "s": 5.8
+   }
+  },
+  {
+   "t": 39.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1133 chars"
+   }
+  },
+  {
+   "t": 39.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 39.68,
+   "tag": "STEP",
+   "step": {
+    "id": "places",
+    "l": "Finding the places",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 40.81,
+   "tag": "STEP",
+   "step": {
+    "id": "places",
+    "l": "Found the places",
+    "s": "done",
+    "d": "0 pinned"
+   }
+  },
+  {
+   "t": 40.81,
+   "tag": "DONE",
+   "data": {
+    "f": 19.27,
+    "t": 40.81,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   13.03,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   25.3,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 13.03
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 images found",
+   "t_s": 13.03
+  },
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.03
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "1140 chars",
+   "t_s": 25.3
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 25.3
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1133 chars",
+   "t_s": 39.68
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 39.68
+  },
+  {
+   "id": "places",
+   "l": "Finding the places",
+   "s": "run",
+   "d": "",
+   "t_s": 39.68
+  },
+  {
+   "id": "places",
+   "l": "Found the places",
+   "s": "done",
+   "d": "0 pinned",
+   "t_s": 40.81
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How can I learn Spanish by immersion inexpensively? | Ask MetaFilter",
+   "u": "https://ask.metafilter.com/226465/How-can-I-learn-Spanish-by-immersion-inexpensively"
+  },
+  {
+   "t": "Spanish Immersion: A Day in the Life in Marbella 🇪🇸 - YouTube",
+   "u": "https://www.youtube.com/watch?v=N41PlfbIiMg"
+  },
+  {
+   "t": "9 Best Cities to Learn Spanish in Spain for Language Enthusiasts",
+   "u": "https://www.spanishexpress.co.uk/9-best-cities-to-learn-spanish-in-spain-for-language-enthusiasts/"
+  },
+  {
+   "t": "5 Best Spanish Classes in Atlanta in 2026 - Learn languages with italki",
+   "u": "https://www.italki.com/en/blog/best-spanish-classes-in-atlanta"
+  }
+ ],
+ "photos": [
+  "https://www.spanishexpress.co.uk/spanex/wp-content/uploads/2022/12/blog-featured-images-15.png",
+  "https://www.spanishexpress.co.uk/spanex/wp-content/uploads/2022/05/tiktok-head-min.png",
+  "https://www.spanishexpress.co.uk/spanex/wp-content/uploads/2020/02/SE-rectangular-min.png"
+ ],
+ "run_frames": [
+  [
+   13.03,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 3687,
+   "o": 242,
+   "d": 12209
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5239,
+   "o": 236,
+   "d": 14302
+  },
+  {
+   "r": "places",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 587,
+   "o": 2,
+   "d": 1064
+  }
+ ],
+ "rate_writer": {
+  "tps": 48.6,
+  "tok": 283,
+  "s": 5.8
+ },
+ "app_first_s": 19.27,
+ "app_total_s": 40.81,
+ "answer_raw": "If you want to avoid the tourist bubble while keeping costs down, you'll likely find your best balance in university towns or secondary cities in Latin America or smaller regional hubs in Spain.\n\n**Xela (Quetzaltenango), Guatemala** — This is a strong candidate for a modest budget, where **$400 a month** is doable with some hustle. It is widely known for having a clear accent and being much more affordable than major tourist hubs.\n\n**Regional Spain** — While major hubs like Madrid can feel like tourist bubbles and carry higher price tags, smaller regional cities in Spain offer a more localized feel. For immersion in these areas, you would focus on natural communication within the local community to ensure you aren't just living in an English-speaking pocket.\n\n**Marbella, Spain** — This is a luxury-leaning destination that likely won't fit a modest budget. While you can practice immersion through natural communication in the heart of the city, it is heavily geared toward tourism.\n\nGive me a rough idea of your monthly budget and whether you prefer a mountain climate or coastal heat, and I'll narrow these options down.",
+ "answer": "If you want to avoid the tourist bubble while keeping costs down, you'll likely find your best balance in university towns or secondary cities in Latin America or smaller regional hubs in Spain.\n\n**Xela (Quetzaltenango), Guatemala** — This is a strong candidate for a modest budget, where **$400 a month** is doable with some hustle. It is widely known for having a clear accent and being much more affordable than major tourist hubs.\n\n**Regional Spain** — While major hubs like Madrid can feel like tourist bubbles and carry higher price tags, smaller regional cities in Spain offer a more localized feel. For immersion in these areas, you would focus on natural communication within the local community to ensure you aren't just living in an English-speaking pocket.\n\n**Marbella, Spain** — This is a luxury-leaning destination that likely won't fit a modest budget. While you can practice immersion through natural communication in the heart of the city, it is heavily geared toward tourism.\n\nGive me a rough idea of your monthly budget and whether you prefer a mountain climate or coastal heat, and I'll narrow these options down.",
+ "chars": 1133,
+ "raw_bytes": 4418,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.94,
+ "rate_gen_tok_s": 13.16,
+ "id": "q18",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Spanish immersion cities",
+ "question": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:56:49",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Best cities to learn Spanish by immersion on a modest budget? I want clear accents, cheap classes, and not a tourist bubble."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,327 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.6,\"ftok\":35,\"est\":false}",
+  "X-Hurry": "bba29d2c3dcaaa9d"
+ },
+ "first_byte_s": 1.23,
+ "first_text_s": 20.58,
+ "elapsed_s": 27.06,
+ "events": [
+  {
+   "t": 1.23,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 1.23,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 12.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.5,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 13.5,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.5,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.5,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.5,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.58,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.05,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.6,
+    "tok": 418,
+    "s": 6.5
+   }
+  },
+  {
+   "t": 27.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1673 chars"
+   }
+  },
+  {
+   "t": 27.06,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 27.06,
+   "tag": "DONE",
+   "data": {
+    "f": 20.57,
+    "t": 27.05,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.23,
+   "Searching the web…"
+  ],
+  [
+   12.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 1.23
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 13.5
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.5
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.5
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1673 chars",
+   "t_s": 27.06
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.06
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Inference Hardware Battle 2026: Google TPU vs Nvidia GPU ...",
+   "u": "https://www.evoart.ai/blog/the-great-ai-inference-race-google-tpu-vs-nvidia-gpu-in-2026",
+   "d": "2026-05-02"
+  },
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "Google TPU vs NVIDIA GPU: Compared 2026 - CloudMinister",
+   "u": "https://cloudminister.com/blog/google-tpu-vs-nvidia-gpu-2026/",
+   "d": "2026-09-02"
+  },
+  {
+   "t": "Cloud TPU documentation | Google Cloud Documentation",
+   "u": "https://docs.cloud.google.com/tpu/docs",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "AI Hardware 2026: NVIDIA H200 vs AMD MI300X vs Google TPU v5 ...",
+   "u": "https://baeseokjae.github.io/posts/ai-hardware-2026/",
+   "d": "2026-04-09"
+  },
+  {
+   "t": "Anthropic-Google TPU deal - AI Wiki",
+   "u": "https://aiwiki.ai/wiki/anthropic_google_tpu_deal",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "Photo | The NVIDIA Tesla V100 data center GPU... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/file?fid=59134e2fed6ae56721d47bbe",
+   "d": ""
+  },
+  {
+   "t": "Designing more efficient quantum circuits with Claude \\ Anthropic",
+   "u": "https://www.anthropic.com/research/designing-efficient-quantum-circuits",
+   "d": "2026-10-16"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.5,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 246,
+   "o": 23,
+   "d": 703,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5314,
+   "o": 403,
+   "d": 13502
+  }
+ ],
+ "rate_writer": {
+  "tps": 64.6,
+  "tok": 418,
+  "s": 6.5
+ },
+ "app_first_s": 20.57,
+ "app_total_s": 27.05,
+ "answer_raw": "There is no single \"most powerful\" chip because the answer depends on whether you prioritize raw flexibility or scaled inference economics. While **Nvidia** still holds over 80% of the market share due to the CUDA ecosystem, **Google's TPUs** (specifically the **Ironwood** generation per reports from September 2026 [3]) have closed the gap for massive-scale inference workloads [1].\n\n**Claude** runs on **Google TPUs** via a significant partnership between Anthropic and Google [2][6]. This arrangement includes approximately **3.5GW** of next-generation TPU capacity starting in 2027, building on the ~1GW of compute already committed for 2026 [2]. Anthropic moved to this TPU-centric infrastructure to avoid being third in the priority queue for Nvidia's most advanced GPUs and to bypass the complexity of managing Nvidia-specific stacks in the cloud [2].\n\n**The Landscape of AI Hardware in 2026**\n\n*   **Nvidia** — remains the market leader with over 80% share, though they often allocate their most advanced GPUs to Microsoft and Google first [2][5].\n*   **Google TPU** — provides vertically integrated economics (chip, network, and framework) that can reduce inference costs by **30–50%** compared to Nvidia [5].\n*   **AMD MI300X** — offers superior memory bandwidth at roughly half the price of Nvidia alternatives (as of April 2026) [5].\n*   **AWS Trainium 2** — serves as another specialized ASIC option for scaled AI workloads (as of April 2026) [5].\n\nThe \"most powerful\" hardware is often a tradeoff: Nvidia offers the most versatile ecosystem, while custom ASICs like Google's TPUs offer the highest efficiency for massive, single-provider inference tasks [5].",
+ "answer": "There is no single \"most powerful\" chip because the answer depends on whether you prioritize raw flexibility or scaled inference economics. While **Nvidia** still holds over 80% of the market share due to the CUDA ecosystem, **Google's TPUs** (specifically the **Ironwood** generation per reports from September 2026 [3]) have closed the gap for massive-scale inference workloads [1].\n\n**Claude** runs on **Google TPUs** via a significant partnership between Anthropic and Google [2][6]. This arrangement includes approximately **3.5GW** of next-generation TPU capacity starting in 2027, building on the ~1GW of compute already committed for 2026 [2]. Anthropic moved to this TPU-centric infrastructure to avoid being third in the priority queue for Nvidia's most advanced GPUs and to bypass the complexity of managing Nvidia-specific stacks in the cloud [2].\n\n**The Landscape of AI Hardware in 2026**\n\n*   **Nvidia** — remains the market leader with over 80% share, though they often allocate their most advanced GPUs to Microsoft and Google first [2][5].\n*   **Google TPU** — provides vertically integrated economics (chip, network, and framework) that can reduce inference costs by **30–50%** compared to Nvidia [5].\n*   **AMD MI300X** — offers superior memory bandwidth at roughly half the price of Nvidia alternatives (as of April 2026) [5].\n*   **AWS Trainium 2** — serves as another specialized ASIC option for scaled AI workloads (as of April 2026) [5].\n\nThe \"most powerful\" hardware is often a tradeoff: Nvidia offers the most versatile ecosystem, while custom ASICs like Google's TPUs offer the highest efficiency for massive, single-provider inference tasks [5].",
+ "chars": 1673,
+ "raw_bytes": 3905,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.46,
+ "rate_gen_tok_s": 64.54,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:48:23",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

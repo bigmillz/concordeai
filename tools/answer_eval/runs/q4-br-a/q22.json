@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.1,\"ftok\":250,\"est\":false}",
+  "X-Hurry": "ff474ed317779a07"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.69,
+ "elapsed_s": 23.29,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.69,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.66,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.66,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.29,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.6,
+    "tok": 276,
+    "s": 5.0
+   }
+  },
+  {
+   "t": 23.29,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1105 chars"
+   }
+  },
+  {
+   "t": 23.29,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 12.66
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.66
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.66
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1105 chars",
+   "t_s": 23.29
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.29
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius15 High-Paying Jo",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "11 Highest Paying Jobs Without a College Degree (2026-2027)",
+   "u": "https://coverlettersandresume.com/articles/highest-paying-jobs-without-a-college-degree/",
+   "d": "2026-11-07"
+  },
+  {
+   "t": "Best Paying Jobs Without a Degree in 2026: High Salaries ...",
+   "u": "https://bestjobsearchapps.com/articles/en/best-paying-jobs-without-a-degree-in-2026-high-salaries-growth-entry-paths",
+   "d": "2026-03-18"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree in 2026 (Ranked)",
+   "u": "https://skillscouter.com/high-paying-jobs-without-a-degree/",
+   "d": "2026-07-16"
+  },
+  {
+   "t": "High-Paying Jobs Without a Degree: 2026 Guide - choosefi.com",
+   "u": "https://choosefi.com/article/high-paying-jobs-without-degree",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "10 high-paying jobs that can lead to wealth without a college degree",
+   "u": "https://www.msn.com/en-us/news/other/10-high-paying-jobs-that-can-lead-to-wealth-without-a-college-degree/ar-AA2g6QeP?ocid=BingNewsVerp",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.66,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 55.6,
+  "tok": 276,
+  "s": 5.0
+ },
+ "answer_raw": "The top five realistic paths involve trading a degree for specialized certifications, flight hours, or rigorous technical training.\n\n**Air Traffic Controller** — median pay of **$144,580** as of March 2026 [3]. Entry requires completing the FAA Academy and passing rigorous testing rather than a college degree [3][6].\n\n**Commercial Pilot** — median pay of **$123,220** as of May 2025 [2]. The path requires flight training and building significant flight hours to reach high-earning levels [2][5].\n\n**Nuclear Reactor Operator** — median pay of **$122,610** as of March 2026 [3]. This role relies on specialized training and technical certification rather than a bachelor's degree [3].\n\n**Airline Captain** — medians can reach above **$226,600** as of September 2026 [8]. This is a senior role reached through years of flight hours, FAA certifications, and union seniority [8].\n\n**Sales** — higher earnings are possible through specialized training or experience [3]. While pay varies wildly based on commission and sector, it offers a path for quick entry via short training or proven performance [3][4].",
+ "answer": "The top five realistic paths involve trading a degree for specialized certifications, flight hours, or rigorous technical training.\n\n**Air Traffic Controller** — median pay of **$144,580** as of March 2026 [3]. Entry requires completing the FAA Academy and passing rigorous testing rather than a college degree [3][6].\n\n**Commercial Pilot** — median pay of **$123,220** as of May 2025 [2]. The path requires flight training and building significant flight hours to reach high-earning levels [2][5].\n\n**Nuclear Reactor Operator** — median pay of **$122,610** as of March 2026 [3]. This role relies on specialized training and technical certification rather than a bachelor's degree [3].\n\n**Airline Captain** — medians can reach above **$226,600** as of September 2026 [8]. This is a senior role reached through years of flight hours, FAA certifications, and union seniority [8].\n\n**Sales** — higher earnings are possible through specialized training or experience [3]. While pay varies wildly based on commission and sector, it offers a path for quick entry via short training or proven performance [3][4].",
+ "chars": 1105,
+ "raw_bytes": 3621,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.21,
+ "rate_gen_tok_s": 14.65,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:12:45",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 18.32,
+ "app_total_s": 23.29,
+ "first_text_s_unreliable": true
+}

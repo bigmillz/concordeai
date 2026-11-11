@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.9,\"ftok\":161,\"est\":false}",
+  "X-Hurry": "ebe6d4eff6d7445d"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 13.8,
+ "elapsed_s": 24.15,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.09,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 27 passages"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.65,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.8,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.15,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.0,
+    "tok": 672,
+    "s": 10.3
+   }
+  },
+  {
+   "t": 24.15,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2688 chars"
+   }
+  },
+  {
+   "t": 24.15,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.15,
+   "tag": "DONE",
+   "data": {
+    "f": 13.8,
+    "t": 24.14,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   8.09,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.09
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.09
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 27 passages",
+   "t_s": 9.65
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.65
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.65
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2688 chars",
+   "t_s": 24.15
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.15
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Occupancy — September 2026",
+   "u": "https://www.guestfavorites.com/airbnb-occupancy-rates-in-florianopolis-santa-catarina-brazil",
+   "d": "2026-09"
+  },
+  {
+   "t": "Airbnb Pricing Strategy 2026: Base Price Calculator + Guide",
+   "u": "https://www.gowithsurge.com/blog/airbnb-pricing-strategy",
+   "d": "2026-09-19"
+  },
+  {
+   "t": "Tri Hotel Florianópolis, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/itaguacu.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Airbnb Pricing Strategy 2026: One Complete Operator System",
+   "u": "https://www.rakidzich.com/articles/airbnb-pricing-strategy-guide",
+   "d": "2026-02-28"
+  },
+  {
+   "t": "Airbnb Pricing Strategy — Complete 2026 Guide",
+   "u": "https://price-bnb.com/guides/airbnb-pricing-strategy",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Airbnb Data, Statistics & Market Analysis ...",
+   "u": "https://www.airroi.com/data-portal/markets/florianopolis-brazil",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.65,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 279,
+   "o": 33,
+   "d": 1061,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5132,
+   "o": 630,
+   "d": 14452,
+   "c": 2249
+  }
+ ],
+ "rate_writer": {
+  "tps": 65.0,
+  "tok": 672,
+  "s": 10.3
+ },
+ "app_first_s": 13.8,
+ "app_total_s": 24.14,
+ "answer_raw": "Trust the **4.6-star rating** with 212 reviews. \n\nIn hospitality, a high volume of reviews provides a much more stable and reliable picture of the guest experience than a small sample size. A 4.9 rating from only 18 reviews is susceptible to \"early adopter bias,\" where only friends, family, or highly enthusiastic first-movers have left feedback, making the score artificially inflated. \n\nThe 4.6 rating is a \"battle-tested\" score; it represents a consistent level of service across hundreds of different guest personalities and expectations. It is much harder to maintain a 4.6 over 200+ reviews than it is to maintain a 4.9 over 18.\n\n## Pricing your 2-bedroom in Florianópolis\n\nFor 30+ night stays, you are moving from short-term hospitality into the \"medium-term\" or \"mid-term\" rental market. Your pricing strategy should shift from chasing weekend peaks to maximizing occupancy and minimizing turnover costs.\n\n**Market Baseline**\nThe average daily rate in the Florianópolis Municipality is **R$486 per night** as of September 2026 [2]. However, because you are targeting 30+ night stays, you should not price your unit at this full market rate.\n\n**The Long-Stay Strategy**\nWhen listing for monthly stays, you are essentially offering a different product: a home rather than a hotel room. You should consider the following:\n\n*   **Discount for Length of Stay:** You should lead with a base price that reflects a monthly lease but apply a significant discount to hit your target occupancy. A common mistake is setting a single flat rate that doesn't account for the lower frequency of check-ins [6].\n*   **Calculate your \"Sanity Check\":** Use your base price multiplied by your expected occupancy to ensure the annual revenue is viable [3]. If your 30-day rate is too high, you might end up with an empty unit; if it's too low, you'll be working harder for less money.\n*   **Targeting the \"Mid-Term\" Resident:** Since you are in Florianópolis, your 30+ night guests may be digital nomads or seasonal workers. They often look for lower nightly rates in exchange for longer, more stable stays.\n\n**Recommended Approach**\nSince specific 2-bedroom monthly rental data for Florianópolis was not provided in the search results, you should look at local rental platforms to see the gap between nightly Airbnb rates and monthly residential leases [1]. \n\nA common starting point is to take the average daily rate of **R$486** (as of September 2026) and apply a discount (typically 30-50%) to create an attractive monthly rate that ensures your unit remains occupied. If you find yourself with too much vacancy, your pricing is likely too high for the \"residential\" profile of a 30-day guest [6].",
+ "answer": "Trust the **4.6-star rating** with 212 reviews. \n\nIn hospitality, a high volume of reviews provides a much more stable and reliable picture of the guest experience than a small sample size. A 4.9 rating from only 18 reviews is susceptible to \"early adopter bias,\" where only friends, family, or highly enthusiastic first-movers have left feedback, making the score artificially inflated. \n\nThe 4.6 rating is a \"battle-tested\" score; it represents a consistent level of service across hundreds of different guest personalities and expectations. It is much harder to maintain a 4.6 over 200+ reviews than it is to maintain a 4.9 over 18.\n\n## Pricing your 2-bedroom in Florianópolis\n\nFor 30+ night stays, you are moving from short-term hospitality into the \"medium-term\" or \"mid-term\" rental market. Your pricing strategy should shift from chasing weekend peaks to maximizing occupancy and minimizing turnover costs.\n\n**Market Baseline**\nThe average daily rate in the Florianópolis Municipality is **R$486 per night** as of September 2026 [2]. However, because you are targeting 30+ night stays, you should not price your unit at this full market rate.\n\n**The Long-Stay Strategy**\nWhen listing for monthly stays, you are essentially offering a different product: a home rather than a hotel room. You should consider the following:\n\n*   **Discount for Length of Stay:** You should lead with a base price that reflects a monthly lease but apply a significant discount to hit your target occupancy. A common mistake is setting a single flat rate that doesn't account for the lower frequency of check-ins [6].\n*   **Calculate your \"Sanity Check\":** Use your base price multiplied by your expected occupancy to ensure the annual revenue is viable [3]. If your 30-day rate is too high, you might end up with an empty unit; if it's too low, you'll be working harder for less money.\n*   **Targeting the \"Mid-Term\" Resident:** Since you are in Florianópolis, your 30+ night guests may be digital nomads or seasonal workers. They often look for lower nightly rates in exchange for longer, more stable stays.\n\n**Recommended Approach**\nSince specific 2-bedroom monthly rental data for Florianópolis was not provided in the search results, you should look at local rental platforms to see the gap between nightly Airbnb rates and monthly residential leases [1]. \n\nA common starting point is to take the average daily rate of **R$486** (as of September 2026) and apply a discount (typically 30-50%) to create an attractive monthly rate that ensures your unit remains occupied. If you find yourself with too much vacancy, your pricing is likely too high for the \"residential\" profile of a 30-day guest [6].",
+ "chars": 2688,
+ "raw_bytes": 4956,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 27.83,
+ "rate_gen_tok_s": 64.93,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:47:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

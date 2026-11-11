@@ -1,0 +1,830 @@
+{
+ "label": "build-279-b",
+ "when": "2026-11-10T08:40:08",
+ "app": {
+  "version": "7.0.0",
+  "build": "279",
+  "beta": "2",
+  "rc": "0"
+ },
+ "head": "d804e0f main",
+ "set_version": 1,
+ "as_of": "2026-11-10",
+ "where": "server",
+ "server": "Ollama1",
+ "tier": "Fast",
+ "judge": "mlx:mlx-community/Qwen3.6-35B-A3B-4bit",
+ "wall_s": 717.4,
+ "records": [
+  {
+   "id": "f01",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Roughly what temperature does water boil at on the top of Everest, and why is it lower than at sea level?",
+   "answer": "It's 50°F and Clear right now, wind 5 mph; Tuesday high 66°F / low 47°F, Sunny; Wednesday high 62°F / low 46°F, Sunny; Thursday high 51°F / low 37°F, Partly Cloudy.\n\nWater boils at approximately **71°C (160°F)** on the summit of Mount Everest.\n\nThe boiling point is lower than the standard **100°C (212°F)** at sea level because of **reduced atmospheric pressure**. Boiling occurs when the **vapor pressure** of a liquid equals the surrounding ambient pressure. \n\nAt the summit of Everest, the atmospheric pressure is roughly **one-third** of that at sea level (approximately **33 kPa** vs. **101.3 kPa**). Because there is significantly less air mass pressing down on the water, the molecules require much less kinetic energy—and therefore a lower temperature—to overcome the ambient pressure and transition into a gaseous state.",
+   "first_text_s": 31.4,
+   "elapsed_s": 32.47,
+   "app_first_s": 31.4,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searched the web: 1 source",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 830 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is factually perfect and follows the direct persona, but the irrelevant weather forecast at the start constitutes padding that violates the conciseness constraint."
+   }
+  },
+  {
+   "id": "f02",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "Who wrote One Hundred Years of Solitude, and when did it come out?",
+   "answer": "**Gabriel García Márquez** wrote *One Hundred Years of Solitude* [2][3][4][5], which was published on **May 30, 1967** [4]. It is considered a masterpiece of the magical realism genre [5].",
+   "first_text_s": 28.99,
+   "elapsed_s": 29.41,
+   "app_first_s": 28.99,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 3 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 6 pages · 20 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 188 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false,
+     false
+    ],
+    "ok": 4,
+    "of": 4
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Accurate and concise, but includes an unsolicited genre classification that slightly violates the strict 'direct answer' preference."
+   }
+  },
+  {
+   "id": "f03",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "How many time zones does Brazil have?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 27.99,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 7 sources",
+    "Reading the pages: 7 pages",
+    "Read the pages: 7 pages · 32 passages",
+    "Searched the web: 7 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 73 chars",
+    "Polished: "
+   ],
+   "error": "empty answer",
+   "facts": {
+    "must": [
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "error"
+   }
+  },
+  {
+   "id": "f04",
+   "category": "facts",
+   "tier": "Fast",
+   "q": "What's the US dollar to Brazilian real exchange rate right now?",
+   "answer": "The exchange rate is **1,102.1 BRL** for every **$200 USD** as of 06:30 AM on November 10, 2026 [2].\n\nThe **ECB reference rate** from November 9, 2026, was **5.5167 BRL** per **1 USD** ([1]).",
+   "first_text_s": 25.88,
+   "elapsed_s": 26.34,
+   "app_first_s": 25.87,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 5 pages · 27 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 191 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 3,
+    "complete": 6,
+    "concise": 8,
+    "fit": 5,
+    "overall": 5,
+    "why": "The answer fails the 'correct' criterion by leading with a confusing, non-standard figure (BRL per $200) instead of the required per-dollar rate, and it violates the user's preference for directness by burying the correct ECB rate in the second sentence."
+   }
+  },
+  {
+   "id": "r01",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "A train is scheduled to leave at 9:40 and the trip takes 2 hours 35 minutes. It leaves 15 minutes late. When does it arrive?",
+   "answer": "The train arrives at **12:30**.\n\nThe provided evidence does not contain the specific numbers for this calculation, so I have derived the answer using the parameters in your prompt.\n\n**Actual Departure**\nAdding the **15-minute** delay to the **09:40** scheduled departure time gives an actual departure of **09:55**.\n\n**Travel Duration**\nAdding the **2-hour 35-minute** trip duration to the 09:55 departure results in an arrival time of **12:30**.",
+   "first_text_s": 27.35,
+   "elapsed_s": 27.98,
+   "app_first_s": 27.34,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 4 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 4 pages · 18 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 446 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is mathematically correct and follows the user's preference for directness, but the unnecessary meta-commentary about missing evidence and the bolded headers constitute minor padding that detracts from the requested brevity."
+   }
+  },
+  {
+   "id": "r02",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "I owe $14,000 on a credit card at 24% APR, compounded monthly. If I pay $700 a month, about how many months until it's paid off, and roughly how much interest will I pay?",
+   "answer": "It will take **26 months** to pay off the debt, with a total interest cost of approximately **$4,060**.\n\nThe calculation assumes a monthly interest rate of **2%** ($24\\% / 12$). In your first month, the interest charge is **$280** ($14,000 \\times 0.02$), meaning **$420** of your **$700** payment goes toward reducing the principal.\n\nAs the principal balance decreases, the monthly interest charge drops, accelerating the payoff. Using the standard amortization formula:\n$n = -\\ln(1 - (r \\cdot L) / P) / \\ln(1 + r)$\nWhere $L = \\$14,000$, $P = \\$700$, and $r = 0.02$, the result is **25.79 months**.\n\nRounding to the nearest full payment cycle gives you the **26-month** timeline. Because the final payment will be smaller than $700, the exact interest is slightly lower than the rounded estimate, but **$4,060** is a reliable figure for planning.\n\nIf you can increase your monthly payment by just **$100** (to $800), you would finish in **22 months** and save roughly **$650** in total interest.",
+   "first_text_s": 31.73,
+   "elapsed_s": 33.33,
+   "app_first_s": 31.73,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 382 chars",
+    "Polishing: ",
+    "Answer written: 995 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is mathematically precise, adheres strictly to the user's direct persona constraints, and matches the reference sheet's key facts without error."
+   }
+  },
+  {
+   "id": "r03",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "Which is bigger, 2^30 or 10^9, and by roughly how much?",
+   "answer": "**2^30** is bigger than **10^9** by **73,741,824**.\n\nSpecifically, **2^30** evaluates to **1,073,741,824**, while **10^9** is exactly **1,000,000,000**. This means **2^30** is roughly **7.37%** larger than the decimal billion.\n\nThis gap is the standard discrepancy between **binary gigabytes (GiB)** and **decimal gigabytes (GB)**. Because $2^{10}$ is **1,024** rather than a clean **1,000**, the difference compounds significantly when raised to the third power.\n\nThe provided sources do not contain the specific mathematical figures for this comparison.",
+   "first_text_s": 25.67,
+   "elapsed_s": 26.84,
+   "app_first_s": 25.67,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 6 sources",
+    "Reading the pages: 6 pages",
+    "Read the pages: 6 pages · 27 passages",
+    "Searched the web: 6 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 555 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Accurate and direct, but the final sentence about missing sources is irrelevant hallucination that violates conciseness."
+   }
+  },
+  {
+   "id": "r04",
+   "category": "reasoning",
+   "tier": "Fast",
+   "q": "All bloops are razzies, and some razzies are lazzies. Does it follow that some bloops are lazzies?",
+   "answer": "No, it does not logically follow.\n\nThe premise that **all bloops are razzies** establishes a subset relationship ($B \\subseteq R$). The second premise, that **some razzies are lazzies**, establishes a non-empty intersection between Razzies and Lazzies ($R \\cap L \\neq \\emptyset$).\n\nHowever, there is no logical requirement for that intersection to overlap with the **Bloop subset**. Because the \"some\" razzies that are lazzies could exist entirely within the portion of razzies that are *not* bloops, a connection between bloops and lazzies is not guaranteed.\n\nSource [2] supports this by noting that \"All Bloops are Lazzies\" is not necessarily true because only a partial overlap exists between razzies and lazzies [2]. Since the \"all\" conclusion is not necessarily true, the \"some\" conclusion is also not a valid deduction.",
+   "first_text_s": 21.64,
+   "elapsed_s": 22.58,
+   "app_first_s": 21.64,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 3 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 3 pages · 13 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 825 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "The answer is logically sound, follows the direct persona constraints, and correctly identifies the invalid deduction with a clear counterexample, though the source citation is unnecessary filler."
+   }
+  },
+  {
+   "id": "c01",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a Python function that returns the n-th Fibonacci number iteratively, and tell me its time complexity.",
+   "answer": "This iterative implementation calculates the **n-th Fibonacci number** with a constant memory footprint.\n\n```python\ndef get_fibonacci(n: int) -> int:\n    if n <= 0:\n        return 0\n    if n == 1:\n        return 1\n        \n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n        \n    return b\n```\n\nThe time complexity is **O(n)** because the algorithm performs",
+   "first_text_s": 43.3,
+   "elapsed_s": 43.85,
+   "app_first_s": 43.29,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 533 chars",
+    "Polishing: ",
+    "Answer written: 382 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "Perfectly adheres to all constraints, preferences, and technical requirements with no flaws."
+   }
+  },
+  {
+   "id": "c02",
+   "category": "code",
+   "tier": "Fast",
+   "q": "In JavaScript, why does [1, 2, 10].sort() give [1, 10, 2], and how do I sort numbers properly?",
+   "answer": "The `.sort()` method defaults to **lexicographical (string-based) sorting**. When you call `.sort()` without a comparator function, JavaScript converts each element to a string and compares their UTF-16 code unit values. Because the character **\"1\"** precedes **\"2\"** in the Unicode table, the string **\"10\"** is sorted before the string **\"2\"**.\n\nTo sort numbers properly, you must provide a **compare function**. This function takes two values, `a` and `b`, and returns a value that tells the engine which should come first. Subtracting `b` from `a` is the standard shorthand for numerical ascending order.\n\n**In-Place Sort**\nThis method modifies the original array.\n\n```javascript\nconst numbers = [1, 2, 10];\nnumbers.sort((a, b) => a - b);\n```\n\n**Non-Mutating Sort (ES2023)**\nIf you prefer to keep the original array intact, use `.toSorted()`. This method was introduced in **ES2023** and returns a new sorted array instead of modifying the input.\n\n```javascript\nconst numbers = [1, 2, 10];\nconst sorted = numbers.toSorted((a, b) => a - b);\n```\n\nThe provided sources do not contain information regarding the specific behavior of the `.sort()` method.",
+   "first_text_s": 27.61,
+   "elapsed_s": 29.1,
+   "app_first_s": 27.61,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 6 pages · 30 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 1153 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Technically accurate and perfectly tailored to the user's direct, technical persona, but the final sentence about missing sources is unnecessary noise that slightly violates conciseness."
+   }
+  },
+  {
+   "id": "c03",
+   "category": "code",
+   "tier": "Fast",
+   "q": "What does this command do: find . -name '*.log' -mtime +7 -delete",
+   "answer": "The command **recursively identifies and deletes** all files in the current directory ending in `.log` that were modified **more than 7 days ago** [1][4][5][6].\n\n**find .** — Initiates the search at the current directory [1].\n\n**-name '*.log'** — Filters the results to files with a `.log` extension [1][3][5][6].\n\n**-mtime +7** — Selects files based on their last modification time. `find` measures this in **discrete 24-hour units** (86,400 seconds) and uses **floor division** [2]. This means the command targets files modified 8 days ago or older [2].\n\n**-delete** — Instructs the command to remove the files that meet all preceding criteria [1][3][4][5][6].\n\n## Operational Notes\n\n**Order of operations** — `find` evaluates arguments from left to right [7]. Since `-delete` is an action, it executes as soon as it is reached in the command string; placing it at the end ensures all filters are applied first [7].\n\n**Safety check** — For production environments, it is best practice to perform a **dry run** by replacing `-delete` with `-print` to verify the target list before execution [1][7].\n\n**Refinement** — Including **-type f** would ensure the command only targets **files** and ignores any directories that might match the name pattern [3][5].",
+   "first_text_s": 24.49,
+   "elapsed_s": 25.88,
+   "app_first_s": 24.49,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 42 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 1257 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 10,
+    "overall": 9,
+    "why": "Technically precise and perfectly aligned with the user's direct, technical persona, though the bullet-point formatting is slightly more verbose than a single sentence."
+   }
+  },
+  {
+   "id": "c04",
+   "category": "code",
+   "tier": "Fast",
+   "q": "Write a SQL query for the top 3 customers by total order amount, from a table orders(customer_id, amount).",
+   "answer": "Use the **LIMIT** clause for **PostgreSQL, MySQL, or SQLite**:\n\n```sql\nSELECT customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC\nLIMIT 3;\n```\n\nIf you are using **SQL Server**, use the **TOP** clause:\n\n```sql\nSELECT TOP 3 customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC;\n```\n\nFor **Oracle**, use the **FETCH FIRST** clause:\n\n```sql\nSELECT customer_id, SUM(amount) AS total_amount\nFROM orders\nGROUP BY customer_id\nORDER BY total_amount DESC\nFETCH FIRST 3 ROWS ONLY;\n```",
+   "first_text_s": 21.59,
+   "elapsed_s": 22.34,
+   "app_first_s": 21.59,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 596 chars",
+    "Polishing: ",
+    "Answer written: 570 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 3,
+    "of": 3
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 8,
+    "concise": 6,
+    "fit": 4,
+    "overall": 6,
+    "why": "The SQL is correct, but providing three dialect-specific solutions violates the user's explicit preference for a single best option and directness, resulting in unnecessary verbosity."
+   }
+  },
+  {
+   "id": "w01",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a two-sentence apology to a client for missing yesterday's call, and offer two new times.",
+   "answer": "I apologize for missing our scheduled call yesterday. Are you available to reconnect **today at 2:00 PM** or **tomorrow at 10:00 AM**?\n\nThis version is **direct** and professional, which is standard for a client relationship. It acknowledges the oversight without over-explaining or offering unnecessary excuses, which can often come across as defensive.\n\nProviding **specific time slots** immediately reduces the scheduling friction and makes it easier for the client to provide a quick \"yes\" or \"no.\" It moves the conversation toward a resolution rather than leaving the next step open-ended.",
+   "first_text_s": 32.45,
+   "elapsed_s": 33.14,
+   "app_first_s": 32.44,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 146 chars",
+    "Polishing: ",
+    "Answer written: 594 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 2,
+    "fit": 2,
+    "overall": 3,
+    "why": "The core message is perfect, but the answer fails the 'direct' preference and 'concise' constraint by including unnecessary meta-commentary and reasoning that violates the instruction to skip preamble and keep answers short."
+   }
+  },
+  {
+   "id": "w02",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Rewrite this to sound friendlier, under 40 words: \"Your invoice is overdue. Pay immediately or service will be suspended.\"",
+   "answer": "Just a friendly reminder that your invoice is past due. To keep your service **active** and running smoothly, please settle the balance at your earliest convenience. Let us know if you have any questions!",
+   "first_text_s": 37.96,
+   "elapsed_s": 38.14,
+   "app_first_s": 37.95,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 343 chars",
+    "Polishing: ",
+    "Answer written: 204 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 8,
+    "fit": 8,
+    "overall": 9,
+    "why": "The rewrite is friendly and under 40 words, but includes unnecessary pleasantries ('Let us know...') that violate the user's explicit preference to skip them."
+   }
+  },
+  {
+   "id": "w03",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Write a README intro for a command-line tool called tidyup that deletes old files from Downloads: a title and one paragraph.",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 60.75,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": false,
+   "resets": 0,
+   "steps": [
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Drafted the answer: 369 chars",
+    "Polishing: ",
+    "Answer written: 73 chars",
+    "Polished: "
+   ],
+   "error": "empty answer",
+   "facts": {
+    "must": [
+     false,
+     false
+    ],
+    "never_hit": [],
+    "ok": 0,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "error"
+   }
+  },
+  {
+   "id": "w04",
+   "category": "writing",
+   "tier": "Fast",
+   "q": "Give me three name ideas for a small coffee shop in Florianópolis, one line each.",
+   "answer": "**Floripa Bloom**\n**The Copper Kettle**\n**Ristretto & Roost**\n\nThese options leverage the **cozy-object** tradition, **technical coffee vocabulary** (bloom, ristretto), and **neighborhood identifiers** to establish a specialty vibe [8].",
+   "first_text_s": 35.02,
+   "elapsed_s": 35.29,
+   "app_first_s": 35.02,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 8 pages · 37 passages",
+    "Searched the web: 8 sources",
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 236 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [],
+    "never_hit": [],
+    "ok": 0,
+    "of": 0
+   },
+   "grade": {
+    "correct": 8,
+    "complete": 6,
+    "concise": 8,
+    "fit": 4,
+    "overall": 6,
+    "why": "The answer fails the 'one line each' constraint by grouping all names into a single block and adding an unrequested explanatory paragraph, violating the user's preference for directness and the reference sheet's shape requirement."
+   }
+  },
+  {
+   "id": "h01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "Is it okay to take ibuprofen and acetaminophen together for a headache?",
+   "answer": "",
+   "first_text_s": null,
+   "elapsed_s": 36.7,
+   "app_first_s": null,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 1 query",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 5 pages · 26 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 73 chars",
+    "Polished: "
+   ],
+   "error": "empty answer",
+   "facts": {
+    "must": [
+     false
+    ],
+    "never_hit": [
+     false
+    ],
+    "ok": 1,
+    "of": 2
+   },
+   "grade": {
+    "correct": 1,
+    "complete": 1,
+    "concise": 1,
+    "fit": 1,
+    "overall": 1,
+    "why": "error"
+   }
+  },
+  {
+   "id": "m01",
+   "category": "advice",
+   "tier": "Fast",
+   "q": "I have $10,000. Should I pay off my 6% car loan early or put it in an index fund? Give me one pick.",
+   "answer": "Pay off the **6% car loan** first.\n\nThe **6% guaranteed return** you get by eliminating the debt is mathematically superior to the risk-adjusted returns of a typical index fund. While a broad market index might have a higher *expected* mean return over a long horizon, it is subject to **market volatility** and your gains will be subject to **capital gains taxes**. By paying off the loan, you secure a \"risk-free\" return that clears the hurdle rate for most conservative financial moves, providing an immediate and certain improvement to your net worth.\n\nThe provided web evidence does not contain current index fund performance data or specific car loan terms.",
+   "first_text_s": 22.63,
+   "elapsed_s": 23.44,
+   "app_first_s": 22.63,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 4 pages · 20 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 663 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true
+    ],
+    "never_hit": [],
+    "ok": 1,
+    "of": 1
+   },
+   "grade": {
+    "correct": 9,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 9,
+    "why": "Flawless execution of the user's strict constraints and the reference sheet's requirements, with only a minor deduction for including an irrelevant web evidence disclaimer."
+   }
+  },
+  {
+   "id": "p01",
+   "category": "private",
+   "tier": "Fast",
+   "q": "According to my notes, when does my lease end and how much is my rent?",
+   "answer": "Your lease ends on **March 31, 2027** [9], and your monthly rent is **R$4,200** [9].\n\nThe payment is due on the **5th of each month** via **Pix** [9]. While the **condominium fee** is included in that amount, the **IPTU** is a separate cost of approximately **R$180** per month [9].\n\nYou signed the lease on **April 1, 2026**, and the agreement requires a **60-day written notice** to vacate [9].",
+   "first_text_s": 22.6,
+   "elapsed_s": 23.19,
+   "app_first_s": 22.6,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 21 passages",
+    "Searched the web: 8 sources",
+    "Looked through your stuff: 1 match",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 396 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 10,
+    "complete": 10,
+    "concise": 9,
+    "fit": 10,
+    "overall": 10,
+    "why": "The answer is factually perfect, adheres strictly to the direct persona constraints, and includes relevant context without violating the 'no padding' rule."
+   }
+  },
+  {
+   "id": "s01",
+   "category": "server",
+   "tier": "srv:5b346919:fast",
+   "q": "In two sentences: what does a GPU's VRAM limit mean for running a 30-billion-parameter model?",
+   "answer": "A GPU's VRAM limit acts as a **hard hardware boundary** where models exceeding that capacity typically trigger **out-of-memory errors** or cause inference to **slow to a crawl** as runtimes fall back to system memory [3].\n\nFor 30B+ parameter models, **12GB VRAM** is a critical failure point [7], while a **32GB VRAM budget** (as of September 2026) is required to run such models comfortably with sufficient room for context [5].",
+   "first_text_s": 29.58,
+   "elapsed_s": 30.23,
+   "app_first_s": 29.58,
+   "x_models": "Ollama1 · gemma4:12b",
+   "searched": true,
+   "resets": 0,
+   "steps": [
+    "Searching the web: 2 queries",
+    "Searched the web: 8 sources",
+    "Reading the pages: 8 pages",
+    "Read the pages: 7 pages · 24 passages",
+    "Searched the web: 8 sources",
+    "Writing the answer: Ollama1 · gemma4:12b",
+    "Answer written: 429 chars",
+    "Polished: "
+   ],
+   "error": "",
+   "facts": {
+    "must": [
+     true,
+     true
+    ],
+    "never_hit": [],
+    "ok": 2,
+    "of": 2
+   },
+   "grade": {
+    "correct": 2,
+    "complete": 6,
+    "concise": 8,
+    "fit": 4,
+    "overall": 3,
+    "why": "The answer contains a critical factual error claiming 32GB is required for 30B models (which fit in 16-20GB at 4-bit per the reference), and it fails the two-sentence constraint by including citation brackets and excessive bolding."
+   }
+  }
+ ]
+}

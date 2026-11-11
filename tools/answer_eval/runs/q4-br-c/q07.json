@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":85,\"est\":false}",
+  "X-Hurry": "e210f99cbe3f134c"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 19.82,
+ "elapsed_s": 25.42,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 30 passages"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.13,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.82,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.41,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.9,
+    "tok": 312,
+    "s": 5.6
+   }
+  },
+  {
+   "t": 25.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1251 chars"
+   }
+  },
+  {
+   "t": 25.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.41,
+   "tag": "DONE",
+   "data": {
+    "f": 19.82,
+    "t": 25.41,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 30 passages",
+   "t_s": 15.13
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.13
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.13
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1251 chars",
+   "t_s": 25.41
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.41
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "$109+ Cheap Flights from Miami to Brooklyn | Cheapflights",
+   "u": "https://www.cheapflights.com/flights-to-brooklyn/miami/",
+   "d": "2026"
+  },
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "$76 Flights from New York (NYCA) to Miami (MIA) | SkyscannerFlights to Miami in ",
+   "u": "https://www.skyscanner.com/routes/nyca/mia/new-york-to-miami-international.html",
+   "d": "2026-03-17"
+  },
+  {
+   "t": "Flights to Miami in November — Prices & Award Space",
+   "u": "https://pointifytravels.com/destinations/miami/november",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "Flying vs driving between Arenal and Manuel Antonio... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g291982-i813-k10211377-Flying_vs_driving_between_Arenal_and_Manuel_Antonio-Costa_Rica.html",
+   "d": ""
+  },
+  {
+   "t": "$155+ Cheap Flights from New York, NY to Miami | Cheapflights",
+   "u": "https://www.cheapflights.com/flights-to-miami/new-york/",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "$53 Cheap Flights to Miami in November 2026 | KAYAK",
+   "u": "https://www.kayak.com/flight-routes/United-States-US0/Miami-MIA.November.M11.ksp",
+   "d": "2026-11"
+  },
+  {
+   "t": "Cheap Flights New York to Miami 2026 — Fares, Airlines & Best ...",
+   "u": "https://aifly.one/2026/03/new-york-to-miami/",
+   "d": "2026-03"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.13,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 23,
+   "d": 622,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5318,
+   "o": 351,
+   "d": 10234,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 55.9,
+  "tok": 312,
+  "s": 5.6
+ },
+ "app_first_s": 19.82,
+ "app_total_s": 25.41,
+ "answer_raw": "Flying is cheaper for two people by roughly **$400–$500** all-in.\n\nAssuming you are traveling in November 2026, the cost breakdown is as follows:\n\n**Flying**\nThe cost for two round-trip tickets would be roughly **$600–$700** total. Based on reports from November 2026, the average cost for a New York to Miami route is between $301 and $347 [7]. For two people, this equals $602–$694. You could potentially lower this to around $400 if you catch evening flights, which can save up to 49% on airfare [1].\n\n**Driving**\nDriving is significantly more expensive due to fuel, tolls, and maintenance for a ~1,300-mile trip each way. A typical round-trip for a fuel-efficient vehicle over 2,600 miles would cost roughly **$400–$500** in gas alone, plus roughly **$100–$200** in tolls and potential maintenance or rental fees. When adding the value of your time and the high cost of a week-long parking/rental situation, the total cost would likely exceed **$1,000**.\n\nThe price difference is roughly **$400** if you find the lower-end flight deals, or closer to **$500** using average flight costs. \n\nI cannot provide an exact driving cost because fuel prices and vehicle efficiency vary, so check current gas prices and your vehicle's MPG to refine the math.",
+ "answer": "Flying is cheaper for two people by roughly **$400–$500** all-in.\n\nAssuming you are traveling in November 2026, the cost breakdown is as follows:\n\n**Flying**\nThe cost for two round-trip tickets would be roughly **$600–$700** total. Based on reports from November 2026, the average cost for a New York to Miami route is between $301 and $347 [7]. For two people, this equals $602–$694. You could potentially lower this to around $400 if you catch evening flights, which can save up to 49% on airfare [1].\n\n**Driving**\nDriving is significantly more expensive due to fuel, tolls, and maintenance for a ~1,300-mile trip each way. A typical round-trip for a fuel-efficient vehicle over 2,600 miles would cost roughly **$400–$500** in gas alone, plus roughly **$100–$200** in tolls and potential maintenance or rental fees. When adding the value of your time and the high cost of a week-long parking/rental situation, the total cost would likely exceed **$1,000**.\n\nThe price difference is roughly **$400** if you find the lower-end flight deals, or closer to **$500** using average flight costs. \n\nI cannot provide an exact driving cost because fuel prices and vehicle efficiency vary, so check current gas prices and your vehicle's MPG to refine the math.",
+ "chars": 1251,
+ "raw_bytes": 3582,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.3,
+ "rate_gen_tok_s": 55.85,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:47:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

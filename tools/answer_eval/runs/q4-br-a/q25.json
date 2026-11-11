@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.2,\"ftok\":260,\"est\":false}",
+  "X-Hurry": "cfacd12e0e1cb96a"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.93,
+ "elapsed_s": 25.36,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 0.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.36,
+   "tag": "RATE",
+   "data": {
+    "tps": 45.1,
+    "tok": 257,
+    "s": 5.7
+   }
+  },
+  {
+   "t": 25.36,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1031 chars"
+   }
+  },
+  {
+   "t": 25.36,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 15.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.06
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.06
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1031 chars",
+   "t_s": 25.36
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.36
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Renting Vs Buying A Home Honest Financial Comparison 2026",
+   "u": "https://nuvolk.com/renting-vs-buying-a-home-honest-financial-comparison-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Rent vs Buy in the U.S. (2026 Cost Comparison Guide)",
+   "u": "https://www.thecostbreakdown.com/rent-vs-buy-home-us/",
+   "d": "2026-03-06"
+  },
+  {
+   "t": "How to Move to Latin America from the USA: Step-by-Step",
+   "u": "https://mylatinlife.com/how-to-move-to-latin-america-from-usa/",
+   "d": "2026-06-22"
+  },
+  {
+   "t": "IMF cuts Latin America, Caribbean growth forecasts on energy shock, little AI bo",
+   "u": "https://www.reuters.com/world/asia-pacific/imf-cuts-latin-america-caribbean-growth-forecasts-energy-shock-little-ai-boost-2026-10-13/",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "Moving to Latin America in 2026: Best Countries for Expats",
+   "u": "https://vidala.co/guides/moving-to-latin-america/",
+   "d": "2026-03-09"
+  },
+  {
+   "t": "Escondido real estate market trends (February 2026)",
+   "u": "https://grokipedia.com/page/Escondido_real_estate_market_trends_February_2026",
+   "d": "2026-02"
+  },
+  {
+   "t": "Latin America bought so many motorcycles last year",
+   "u": "https://www.msn.com/en-ca/autos/motorcycles/latin-america-bought-so-many-motorcycles-last-year/ar-AA2e9w53?ocid=BingNewsVerp",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "United States Housing Market: 2026 Home Prices & Trends | Zillow",
+   "u": "https://www.zillow.com/home-values/102001/united-states/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 45.1,
+  "tok": 257,
+  "s": 5.7
+ },
+ "answer_raw": "You should **rent** where you are now to maintain the flexibility required for a significant international move.\n\nBuying a home in the U.S. involves long-term commitment and potential liquidity issues; for example, the average U.S. home value is **$366,157** as of September 2026 [8]. While real estate has historically offered potential for long-term appreciation [1], the friction of selling a property can disrupt your timeline.\n\nMoving to Latin America is often operationally straightforward [3], allowing you to focus your energy on deciding on a specific location and residency requirements [3]. Since the cost of living in the region can run **50–70% below** U.S. levels [5, as of March 2026], keeping your capital liquid will likely serve you better when you transition.\n\nThe IMF recently trimmed growth forecasts for Latin America and the Caribbean for this year and next [4, as of October 2026], so having accessible funds rather than equity tied up in a domestic house may provide a better buffer during your relocation.",
+ "answer": "You should **rent** where you are now to maintain the flexibility required for a significant international move.\n\nBuying a home in the U.S. involves long-term commitment and potential liquidity issues; for example, the average U.S. home value is **$366,157** as of September 2026 [8]. While real estate has historically offered potential for long-term appreciation [1], the friction of selling a property can disrupt your timeline.\n\nMoving to Latin America is often operationally straightforward [3], allowing you to focus your energy on deciding on a specific location and residency requirements [3]. Since the cost of living in the region can run **50–70% below** U.S. levels [5, as of March 2026], keeping your capital liquid will likely serve you better when you transition.\n\nThe IMF recently trimmed growth forecasts for Latin America and the Caribbean for this year and next [4, as of October 2026], so having accessible funds rather than equity tied up in a domestic house may provide a better buffer during your relocation.",
+ "chars": 1031,
+ "raw_bytes": 3406,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.3,
+ "rate_gen_tok_s": 12.77,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:14:12",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 19.64,
+ "app_total_s": 25.36,
+ "first_text_s_unreliable": true
+}

@@ -1,0 +1,237 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":34.0,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "888e17085a026308"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 2.28,
+ "elapsed_s": 2.28,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 23 passages"
+   }
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources · nothing new to look up"
+   }
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 0.09,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 2.23,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 2.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 2.28,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 2.28,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "66 chars"
+   }
+  },
+  {
+   "t": 2.28,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [],
+ "steps": [
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 23 passages",
+   "t_s": 0.09
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources · nothing new to look up",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 0.09
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 2.23
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "66 chars",
+   "t_s": 2.28
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 2.28
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "Anthropic-Google TPU deal - AI Wiki",
+   "u": "https://aiwiki.ai/wiki/anthropic_google_tpu_deal",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "Photo | The NVIDIA Tesla V100 data center GPU... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/file?fid=59134e2fed6ae56721d47bbe",
+   "d": ""
+  },
+  {
+   "t": "Best GPU for AI in 2026: 7 Picks From $310 to $4,900",
+   "u": "https://bestgpuforai.com/articles/best-gpu-for-ai/",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "Claude Opus \\ Anthropic",
+   "u": "https://www.anthropic.com/claude/opus",
+   "d": "2026-05-28"
+  },
+  {
+   "t": "Hot Chips 2017: A Closer Look At Google's TPU v2 | Tom's Hardware",
+   "u": "https://www.tomshardware.com/news/tpu-v2-google-machine-learning,35370.html",
+   "d": "2017"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "NVIDIA and Microsoft Boost AI Cloud Computing... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidia-and-microsoft-boost-ai-cloud-computing-with-launch-of-industry-standard-hyperscale-gpu-accelerator",
+   "d": "2026-08-31"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   2.23,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "answer_raw": "The engine refused the request (HTTP 404). generation thread died",
+ "answer": "The engine refused the request (HTTP 404). generation thread died",
+ "chars": 65,
+ "raw_bytes": 1908,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.13,
+ "rate_gen_tok_s": null,
+ "id": "q01",
+ "turn": 2,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "I feel like Claude's response beat you. explain more",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:14:18",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   },
+   {
+    "role": "assistant",
+    "content": "The engine refused the request (HTTP 404). generation thread died"
+   },
+   {
+    "role": "user",
+    "content": "I feel like Claude's response beat you. explain more"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

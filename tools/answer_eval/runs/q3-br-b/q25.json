@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":127,\"est\":false}",
+  "X-Hurry": "c7cf04ce6db1fa25"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 14.29,
+ "elapsed_s": 21.47,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "3 pages · 19 passages"
+   }
+  },
+  {
+   "t": 9.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.68,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.68,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.29,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.47,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.0,
+    "tok": 466,
+    "s": 7.2
+   }
+  },
+  {
+   "t": 21.47,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1867 chars"
+   }
+  },
+  {
+   "t": 21.47,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "3 pages · 19 passages",
+   "t_s": 9.67
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.68
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.68
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1867 chars",
+   "t_s": 21.47
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 21.47
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Latin America City Real Estate Guides 2026 | International RE",
+   "u": "https://www.internationalre.org/cities/",
+   "d": "2026"
+  },
+  {
+   "t": "Best Long-Term Rental Sites in Latin America: 2026 Guide",
+   "u": "https://simplestay.ai/en/blogs/best-long-term-rental-sites-in-latin-america-2026-guide",
+   "d": "2026-08-23"
+  },
+  {
+   "t": "Menifee Real Estate Market Trends 2026 | Christian Rios Properties",
+   "u": "https://christianriosproperties.com/menifee-real-estate-market-trends/",
+   "d": "2026"
+  },
+  {
+   "t": "IMF cuts Latin America, Caribbean growth forecasts on energy shock, little AI bo",
+   "u": "https://www.reuters.com/world/asia-pacific/imf-cuts-latin-america-caribbean-growth-forecasts-energy-shock-little-ai-boost-2026-10-13/",
+   "d": "2026-10-13"
+  },
+  {
+   "t": "Housing Market Predictions For 2026 – Forbes AdvisorU.S. Real Estate Market Outl",
+   "u": "https://www.forbes.com/advisor/mortgages/real-estate/housing-market-predictions/",
+   "d": "2026-08-04"
+  },
+  {
+   "t": "Free Ireland Rent vs Buy Calculator 2026 | Should I Rent... | FinzoTools",
+   "u": "https://finzotools.com/rent-vs-buy-calculator.html",
+   "d": "2026-06"
+  },
+  {
+   "t": "Latin America bought so many motorcycles last year",
+   "u": "https://www.msn.com/en-ca/autos/motorcycles/latin-america-bought-so-many-motorcycles-last-year/ar-AA2e9w53?ocid=BingNewsVerp",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "Rent vs Buy Calculator — Analytic Financials",
+   "u": "https://analyticfinancials.com/calculators/rent-vs-buy",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.68,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 65.0,
+  "tok": 466,
+  "s": 7.2
+ },
+ "answer_raw": "You should **rent** where you are now to maintain the mobility required for an international relocation.\n\nBuying a home involves significant transaction costs, such as closing fees and potential capital gains taxes, which can erode your liquidity just as you are preparing to move. Because you plan to leave in one to two years, you likely won't stay in a new property long enough to recoup those costs through equity or appreciation.\n\nIf you are currently in an area like Menifee, the market is described as steady and opportunity-driven in 2026, but it is still a strong market where well-priced homes attract interest [3]. While the likelihood of a housing market crash remains low for 2025 [5], the friction of selling a property in a shifting market can delay your ability to move to Latin America.\n\nIn Latin America, the market environment for your eventual arrival is shifting:\n\n*   **Growth Forecasts**: The IMF recently trimmed growth forecasts for Latin America and the Caribbean for 2026, noting that much of the region is seeing little boost from factors like AI [4, dated October 2026].\n*   **Rental Landscape**: Long-term rental sites in the region are moving toward transparent, subscription-based models to eliminate per-booking commissions and provide predictable monthly pricing [2, dated August 2026].\n*   **Market Variety**: Real estate guides cover diverse markets including Medellín, Panama City, Buenos Aires, São Paulo, and Mexico City [1].\n\nRenting where you are keeps your capital liquid for your transition. If you were to buy, you would need to calculate the \"break-even\" point—the time it takes for property appreciation to exceed the costs of buying and selling—which typically requires a much longer horizon than 24 months. You should check your local tax laws and real estate commissions to determine your specific break-even timeline.",
+ "answer": "You should **rent** where you are now to maintain the mobility required for an international relocation.\n\nBuying a home involves significant transaction costs, such as closing fees and potential capital gains taxes, which can erode your liquidity just as you are preparing to move. Because you plan to leave in one to two years, you likely won't stay in a new property long enough to recoup those costs through equity or appreciation.\n\nIf you are currently in an area like Menifee, the market is described as steady and opportunity-driven in 2026, but it is still a strong market where well-priced homes attract interest [3]. While the likelihood of a housing market crash remains low for 2025 [5], the friction of selling a property in a shifting market can delay your ability to move to Latin America.\n\nIn Latin America, the market environment for your eventual arrival is shifting:\n\n*   **Growth Forecasts**: The IMF recently trimmed growth forecasts for Latin America and the Caribbean for 2026, noting that much of the region is seeing little boost from factors like AI [4, dated October 2026].\n*   **Rental Landscape**: Long-term rental sites in the region are moving toward transparent, subscription-based models to eliminate per-booking commissions and provide predictable monthly pricing [2, dated August 2026].\n*   **Market Variety**: Real estate guides cover diverse markets including Medellín, Panama City, Buenos Aires, São Paulo, and Mexico City [1].\n\nRenting where you are keeps your capital liquid for your transition. If you were to buy, you would need to calculate the \"break-even\" point—the time it takes for property appreciation to exceed the costs of buying and selling—which typically requires a much longer horizon than 24 months. You should check your local tax laws and real estate commissions to determine your specific break-even timeline.",
+ "chars": 1867,
+ "raw_bytes": 4078,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.74,
+ "rate_gen_tok_s": 65.01,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:48:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

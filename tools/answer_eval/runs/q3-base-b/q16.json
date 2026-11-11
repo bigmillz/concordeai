@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.9,\"ftok\":150,\"est\":false}",
+  "X-Hurry": "0a515f07625dff4a"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 23.11,
+ "elapsed_s": 48.24,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.48,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 41 passages"
+   }
+  },
+  {
+   "t": 14.48,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.48,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.48,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.11,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 48.24,
+   "tag": "RATE",
+   "data": {
+    "tps": 23.3,
+    "tok": 584,
+    "s": 25.1
+   }
+  },
+  {
+   "t": 48.24,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2338 chars"
+   }
+  },
+  {
+   "t": 48.24,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 41 passages",
+   "t_s": 14.48
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.48
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.48
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2338 chars",
+   "t_s": 48.24
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 48.24
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Quitlines and Other Cessation Support Resources",
+   "u": "https://www.cdc.gov/tobacco/hcp/patient-care/quitlines-and-other-resources.html",
+   "d": "2025-01-31"
+  },
+  {
+   "t": "What to Say Instead of Nagging. Phrases That Build... — Palme School",
+   "u": "https://www.palmeschool.com/blog/what-to-say-instead-of-nagging/",
+   "d": "2026-09-09"
+  },
+  {
+   "t": "Are Zyn Nicotine Pouches Safe? Health & Addiction Risks",
+   "u": "https://recovered.org/blog/are-zyns-bad-for-you",
+   "d": "2026-10-04"
+  },
+  {
+   "t": "GCSE revision: how parents can help without nagging | MathsGenie",
+   "u": "https://mathsgenie.co.uk/blog/gcse-revision-parents-support-without-nagging",
+   "d": "2026-06-04"
+  },
+  {
+   "t": "Friends Family Guide - Kick It California",
+   "u": "https://kickitca.org/friends-family-guide",
+   "d": ""
+  },
+  {
+   "t": "Guide to Help A Friend or Family Quit Smoking | Way to Quit",
+   "u": "https://waytoquit.org/help-someone-quit-a-guide-for-friends-and-family/",
+   "d": "2025-08-14"
+  },
+  {
+   "t": "Truth Initiative: freedom from nicotine addiction",
+   "u": "https://truthinitiative.org/",
+   "d": "2019-01-04"
+  },
+  {
+   "t": "Nicotine Withdrawal Tips: Patches, Cold Turkey and More",
+   "u": "https://www.healthline.com/health/quit-smoking-nicotine-withdrawal",
+   "d": "2010-09-30"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.48,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 23.3,
+  "tok": 584,
+  "s": 25.1
+ },
+ "answer_raw": "The shift from being monitored to being supported requires moving from a relationship of constant inquiry to one of agreed-upon boundaries.\n\nTo stop the nagging, you need to address the \"pricing problem\"—the loss of value that happens when a request is repeated too often—by setting clear parameters for how they can interact with your progress [2].\n\n## Establish a Support Protocol\n\nNagging often happens because family members feel they need to monitor you to ensure you are succeeding. You can mitigate this by setting clear rules for engagement:\n\n*   **Define the \"check-in\" cadence.** Instead of answering \"How is it going?\" every few hours, suggest specific times or methods for updates. This mimics the idea of \"micro-sessions\" where you decide when a conversation happens, rather than being interrupted by constant commentary [4].\n*   **Clarify their role.** Make it clear that you need them to be a support system, not a supervisor. Expressing that you need their encouragement rather than ultimatums can prevent the pressure that often backfires during the high-stress withdrawal period [6].\n*   **Set boundaries around withdrawal.** Withdrawal can cause significant physical and emotional symptoms [8]. Tell them upfront that if you are irritable or need space during the first week or two, it is a symptom of the process, not a personal slight, and that you need them to respect that space [5][8].\n\n## Use Professional Resources as a Buffer\n\nSometimes, having a third party manage the \"technical\" side of quitting can take the pressure off your family relationships.\n\n*   **Offload the monitoring to experts.** If your family feels they need to track your progress, point them toward professional resources. You can use professional quitlines, such as 800-QUIT-NOW, or FDA-approved cessation tools like patches, gum, or prescribed medications to handle the clinical side of quitting [1][3][8].\n*   **Use digital tools for engagement.** If your family is tech-savvy, they might find it easier to support you through apps (like the National Cancer Institute's quitSTART app) which provide tips and games to keep you engaged without them having to personally prompt you [1].\n\nIf they continue to nag despite these boundaries, you may need to explain that their constant checking is actually counterproductive to your success [6].",
+ "answer": "The shift from being monitored to being supported requires moving from a relationship of constant inquiry to one of agreed-upon boundaries.\n\nTo stop the nagging, you need to address the \"pricing problem\"—the loss of value that happens when a request is repeated too often—by setting clear parameters for how they can interact with your progress [2].\n\n## Establish a Support Protocol\n\nNagging often happens because family members feel they need to monitor you to ensure you are succeeding. You can mitigate this by setting clear rules for engagement:\n\n*   **Define the \"check-in\" cadence.** Instead of answering \"How is it going?\" every few hours, suggest specific times or methods for updates. This mimics the idea of \"micro-sessions\" where you decide when a conversation happens, rather than being interrupted by constant commentary [4].\n*   **Clarify their role.** Make it clear that you need them to be a support system, not a supervisor. Expressing that you need their encouragement rather than ultimatums can prevent the pressure that often backfires during the high-stress withdrawal period [6].\n*   **Set boundaries around withdrawal.** Withdrawal can cause significant physical and emotional symptoms [8]. Tell them upfront that if you are irritable or need space during the first week or two, it is a symptom of the process, not a personal slight, and that you need them to respect that space [5][8].\n\n## Use Professional Resources as a Buffer\n\nSometimes, having a third party manage the \"technical\" side of quitting can take the pressure off your family relationships.\n\n*   **Offload the monitoring to experts.** If your family feels they need to track your progress, point them toward professional resources. You can use professional quitlines, such as 800-QUIT-NOW, or FDA-approved cessation tools like patches, gum, or prescribed medications to handle the clinical side of quitting [1][3][8].\n*   **Use digital tools for engagement.** If your family is tech-savvy, they might find it easier to support you through apps (like the National Cancer Institute's quitSTART app) which provide tips and games to keep you engaged without them having to personally prompt you [1].\n\nIf they continue to nag despite these boundaries, you may need to explain that their constant checking is actually counterproductive to your success [6].",
+ "chars": 2338,
+ "raw_bytes": 4322,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.12,
+ "rate_gen_tok_s": 23.26,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:49:25",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

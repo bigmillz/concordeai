@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":4.5,\"ftok\":165,\"est\":false}",
+  "X-Hurry": "cef1414e47422e06"
+ },
+ "first_byte_s": 0.03,
+ "first_text_s": 3.27,
+ "elapsed_s": 24.43,
+ "events": [
+  {
+   "t": 0.03,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.03,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.27,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 12.0,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2278 chars"
+   }
+  },
+  {
+   "t": 12.0,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 12.0,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 12.0,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.43,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.2,
+    "tok": 468,
+    "s": 7.3
+   }
+  },
+  {
+   "t": 24.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1873 chars"
+   }
+  },
+  {
+   "t": 24.43,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.43,
+   "tag": "DONE",
+   "data": {
+    "f": 3.27,
+    "t": 24.43,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.03,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   12.0,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.03
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2278 chars",
+   "t_s": 12.0
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 12.0
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1873 chars",
+   "t_s": 24.43
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.43
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.03,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2244,
+   "o": 549,
+   "d": 11938
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4080,
+   "o": 461,
+   "d": 12382
+  }
+ ],
+ "rate_writer": {
+  "tps": 64.2,
+  "tok": 468,
+  "s": 7.3
+ },
+ "app_first_s": 3.27,
+ "app_total_s": 24.43,
+ "answer_raw": "Quantization maps high-precision weights (usually **FP16** or **BF16**) to a smaller set of discrete integer values, effectively compressing the model's memory footprint so it can fit on consumer hardware.\n\nIn a standard 16-bit model, each weight uses 16 bits; moving to 4-bit reduces the memory requirement for weights by **75%**. The accuracy loss occurs because you are forcing a continuous range of values into just 16 possible \"buckets\" ($2^4$).\n\nTo mitigate this, modern techniques like **GPTQ**, **AWQ**, or **GGUF** use block-wise scaling. They group weights into blocks and apply a specific scale and zero-point to each group, ensuring the distribution of the original weights is approximated as closely as possible within the 4-bit constraints.\n\n## When It Matters\n\n**VRAM Constraints** — This is the primary driver. A 70B parameter model requires roughly **140GB** of VRAM at FP16. At 4-bit, that requirement drops to approximately **35-40GB**, allowing it to run on a single Mac Studio or a dual-GPU workstation.\n\n**Inference Latency** — Because the weights are smaller, they require less bandwidth to move from VRAM to the compute cores. Since many LLM workloads are **memory-bandwidth bound** rather than compute-bound, moving 4-bit weights often results in significant increases in tokens-per-second.\n\n**The Scaling Law Trade-off** — The loss in intelligence is relative to the model's original size. A 70B model at 4-bit will almost always outperform a 7B model at FP16 in reasoning tasks, despite the precision loss. However, the \"quantization error\" becomes much more destructive on very small models (e.g., sub-7B), where the intelligence loss is highly noticeable.\n\nThe sweet spot for most deployments is **4-bit to 6-bit**. If you drop below 4-bit (to 3-bit or 2-bit), the model's ability to follow instructions or maintain coherence tends to collapse.",
+ "answer": "Quantization maps high-precision weights (usually **FP16** or **BF16**) to a smaller set of discrete integer values, effectively compressing the model's memory footprint so it can fit on consumer hardware.\n\nIn a standard 16-bit model, each weight uses 16 bits; moving to 4-bit reduces the memory requirement for weights by **75%**. The accuracy loss occurs because you are forcing a continuous range of values into just 16 possible \"buckets\" ($2^4$).\n\nTo mitigate this, modern techniques like **GPTQ**, **AWQ**, or **GGUF** use block-wise scaling. They group weights into blocks and apply a specific scale and zero-point to each group, ensuring the distribution of the original weights is approximated as closely as possible within the 4-bit constraints.\n\n## When It Matters\n\n**VRAM Constraints** — This is the primary driver. A 70B parameter model requires roughly **140GB** of VRAM at FP16. At 4-bit, that requirement drops to approximately **35-40GB**, allowing it to run on a single Mac Studio or a dual-GPU workstation.\n\n**Inference Latency** — Because the weights are smaller, they require less bandwidth to move from VRAM to the compute cores. Since many LLM workloads are **memory-bandwidth bound** rather than compute-bound, moving 4-bit weights often results in significant increases in tokens-per-second.\n\n**The Scaling Law Trade-off** — The loss in intelligence is relative to the model's original size. A 70B model at 4-bit will almost always outperform a 7B model at FP16 in reasoning tasks, despite the precision loss. However, the \"quantization error\" becomes much more destructive on very small models (e.g., sub-7B), where the intelligence loss is highly noticeable.\n\nThe sweet spot for most deployments is **4-bit to 6-bit**. If you drop below 4-bit (to 3-bit or 2-bit), the model's ability to follow instructions or maintain coherence tends to collapse.",
+ "chars": 1873,
+ "raw_bytes": 4881,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.17,
+ "rate_gen_tok_s": 22.13,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:47:37",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.2,\"ftok\":95,\"est\":false}",
+  "X-Hurry": "f59ecd3464e10114"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.55,
+ "elapsed_s": 24.41,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.62,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 16 passages"
+   }
+  },
+  {
+   "t": 10.62,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.62,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.62,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.41,
+   "tag": "RATE",
+   "data": {
+    "tps": 38.0,
+    "tok": 336,
+    "s": 8.9
+   }
+  },
+  {
+   "t": 24.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1347 chars"
+   }
+  },
+  {
+   "t": 24.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 16 passages",
+   "t_s": 10.62
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.62
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.62
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1347 chars",
+   "t_s": 24.41
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.41
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Boston to New York: Train, Bus or Plane? | The Boston Report",
+   "u": "https://thebostonreport.com/2026/10/25/boston-to-nyc-train-bus-flight-guide-2026/",
+   "d": "2026-10-25"
+  },
+  {
+   "t": "Amtrak rolls out $20 tickets between NYC and Boston for the summer",
+   "u": "https://secretnyc.co/heap-train-nyc-boston-amtrak-20/",
+   "d": "2026"
+  },
+  {
+   "t": "Boston To NYC Amtrak Stops: Essential Travel Guide, Schedule...",
+   "u": "https://travelpander.com/boston-to-nyc-amtrak-stops/",
+   "d": "2025-07-10"
+  },
+  {
+   "t": "New York to Boston: Train, Flight, Bus – Cost & Time",
+   "u": "https://observerireland.org/tech/new-york-boston-train-flight-bus/",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "New York to Boston Train — Schedules, Times & Fares",
+   "u": "https://newyorkbostontrains.com/",
+   "d": "2026-08-17"
+  },
+  {
+   "t": "How Long from New York to Boston? Flight, Drive, Train & More ...",
+   "u": "https://howlong.is/travel/new-york-to-boston/",
+   "d": ""
+  },
+  {
+   "t": "How Far is the Trip from New York to Boston?",
+   "u": "https://eathealthy365.com/travel-distance-from-new-york-to-boston/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.62,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 38.0,
+  "tok": 336,
+  "s": 8.9
+ },
+ "answer_raw": "The **train** is the better pick for this route because it offers a more efficient door-to-door time and significantly less friction than flying.\n\n**Door-to-door time**\nThe train typically takes between **3h 30m and 5h 15m** depending on the specific service and city access [1]. For example, the journey between New York Penn Station and Boston South Station/Back Bay typically runs from **3h 41m to 4h 30m** [6]. A flight's scheduled air time is roughly **1h 05m** [1], but the total door-to-door time after accounting for airport access and buffers is roughly **3h 45m to 5h 30m** [1].\n\n**Typical cost**\nTrain fares are demand-based and vary by booking time and class [4][6].\n- **Low end**: As low as **$20** for Amtrak Night Owl fares (perly reported in 2026) [3].\n- **Mid-range**: Typically between **$49 and $150** [4].\n- **High end**: Prices rise significantly for walk-up tickets on busy days like Friday evenings [6].\n\n**The Verdict**\nI would pick the **train**. While the total travel time is comparable to flying once you factor in airport transit and security, the train delivers you directly to city centers (Penn Station to South Station/Back Bay) with much lower \"route friction\" [1][6]. Additionally, the newer **NextGen Acela** trains, which can reach **160 mph**, provide a faster, more comfortable line-haul-capable service [2].",
+ "answer": "The **train** is the better pick for this route because it offers a more efficient door-to-door time and significantly less friction than flying.\n\n**Door-to-door time**\nThe train typically takes between **3h 30m and 5h 15m** depending on the specific service and city access [1]. For example, the journey between New York Penn Station and Boston South Station/Back Bay typically runs from **3h 41m to 4h 30m** [6]. A flight's scheduled air time is roughly **1h 05m** [1], but the total door-to-door time after accounting for airport access and buffers is roughly **3h 45m to 5h 30m** [1].\n\n**Typical cost**\nTrain fares are demand-based and vary by booking time and class [4][6].\n- **Low end**: As low as **$20** for Amtrak Night Owl fares (perly reported in 2026) [3].\n- **Mid-range**: Typically between **$49 and $150** [4].\n- **High end**: Prices rise significantly for walk-up tickets on busy days like Friday evenings [6].\n\n**The Verdict**\nI would pick the **train**. While the total travel time is comparable to flying once you factor in airport transit and security, the train delivers you directly to city centers (Penn Station to South Station/Back Bay) with much lower \"route friction\" [1][6]. Additionally, the newer **NextGen Acela** trains, which can reach **160 mph**, provide a faster, more comfortable line-haul-capable service [2].",
+ "chars": 1347,
+ "raw_bytes": 3338,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.8,
+ "rate_gen_tok_s": 38.01,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:04:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

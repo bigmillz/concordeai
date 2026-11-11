@@ -1,0 +1,327 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.9,\"ftok\":244,\"est\":false}",
+  "X-Hurry": "2f913099975c85b5"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 19.45,
+ "elapsed_s": 27.26,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.82,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.82,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.45,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.9,
+    "tok": 468,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 27.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1872 chars"
+   }
+  },
+  {
+   "t": 27.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 27.26,
+   "tag": "DONE",
+   "data": {
+    "f": 19.45,
+    "t": 27.26,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 13.82
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.82
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.82
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1872 chars",
+   "t_s": 27.26
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Global Liveability Index 2026 - Economist Intelligence Unit",
+   "u": "https://www.eiu.com/n/global-themes/report/global-liveability-index-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "EIU Global Liveability Index 2026",
+   "u": "https://www.eiu.com/n/wp-content/uploads/2026/07/EIU_Liveability-Index-2026.pdf",
+   "d": "2026-07"
+  },
+  {
+   "t": "The 20 Global Cities With the Best Quality of Life, Ranked ...",
+   "u": "https://www.businessinsider.com/global-cities-best-quality-of-life-ranked-2026",
+   "d": "2026-10-17"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "Quality of Life survey 2026: The 20 most liveable cities in ...",
+   "u": "https://monocle.com/affairs/urbanism/qol/quality-of-life-2026-most-liveable-cities/",
+   "d": "2026-07"
+  },
+  {
+   "t": "2026 Global Cities Index | Oxford Economics",
+   "u": "https://www.oxfordeconomics.com/global-cities-index/",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of life in Marbella: why the city is included in the 2026...",
+   "u": "https://abarzo.com/journal/discover-costa-del-sol/quality-of-life-in-marbella-why-the-city-is-included-in-the-2026-rankings-of-the-best-places-to-live",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of Life Index by City 2026 Mid-Year",
+   "u": "https://www.numbeo.com/quality-of-life/rankings.jsp",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.82,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 245,
+   "o": 31,
+   "d": 958
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5510,
+   "o": 452,
+   "d": 13383,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 59.9,
+  "tok": 468,
+  "s": 7.8
+ },
+ "app_first_s": 19.45,
+ "app_total_s": 27.26,
+ "answer_raw": "Top cities vary depending on whether you prioritize economic dominance or pure livability, with **New York** taking the top spot in the 2026 Global Cities Index while cities like **Perth** and **Canberra** lead in specific lifestyle metrics.\n\nThe rankings provided by different organizations use different methodologies to define \"top\" cities:\n\n*   **The 2026 Global Cities Index (Oxford Economics)** — This ranking evaluates 1,000 cities across four categories: economics, human capital, environment, and quality of life. As of October 2026, **New York** is the No. 1 ranked city overall [3]. While the index features eight US cities in its top 20, the US struggled in the specific quality of life category, which accounts for 25% of the total score [3]. **Canberra** is noted as a high performer for quality of life despite ranking 45th in the overall index [4].\n*   **The Global Liveability Index (EIU)** — This index evaluates 173 cities based on five categories: stability, healthcare, culture and environment, education, and infrastructure. As of July 2026, the average liveability score across all cities is **76.1 out of 100** [2]. While stability is declining in the Middle East due to the Iran war, Asian cities are seeing improvements due to healthcare investments [1].\n*   **Monocle's Quality of Life Survey** — This survey uses correspondents' views to assess factors like safety, connectivity, governance, and green space. As of July 2026, North American cities struggled with crime, inequality, and housing, making **Perth** an increasingly attractive option for its infrastructure and outdoor pursuits [5].\n*   **Numbeo's Quality of Life Index** — As of the 2026 Mid-Year report, **Sydney, Australia** is listed at the top of the index [8].\n\nFor the specific names of the top cities in the EIU index, you would need to consult the full 2026 report summary.",
+ "answer": "Top cities vary depending on whether you prioritize economic dominance or pure livability, with **New York** taking the top spot in the 2026 Global Cities Index while cities like **Perth** and **Canberra** lead in specific lifestyle metrics.\n\nThe rankings provided by different organizations use different methodologies to define \"top\" cities:\n\n*   **The 2026 Global Cities Index (Oxford Economics)** — This ranking evaluates 1,000 cities across four categories: economics, human capital, environment, and quality of life. As of October 2026, **New York** is the No. 1 ranked city overall [3]. While the index features eight US cities in its top 20, the US struggled in the specific quality of life category, which accounts for 25% of the total score [3]. **Canberra** is noted as a high performer for quality of life despite ranking 45th in the overall index [4].\n*   **The Global Liveability Index (EIU)** — This index evaluates 173 cities based on five categories: stability, healthcare, culture and environment, education, and infrastructure. As of July 2026, the average liveability score across all cities is **76.1 out of 100** [2]. While stability is declining in the Middle East due to the Iran war, Asian cities are seeing improvements due to healthcare investments [1].\n*   **Monocle's Quality of Life Survey** — This survey uses correspondents' views to assess factors like safety, connectivity, governance, and green space. As of July 2026, North American cities struggled with crime, inequality, and housing, making **Perth** an increasingly attractive option for its infrastructure and outdoor pursuits [5].\n*   **Numbeo's Quality of Life Index** — As of the 2026 Mid-Year report, **Sydney, Australia** is listed at the top of the index [8].\n\nFor the specific names of the top cities in the EIU index, you would need to consult the full 2026 report summary.",
+ "chars": 1872,
+ "raw_bytes": 4231,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.17,
+ "rate_gen_tok_s": 59.92,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:57:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

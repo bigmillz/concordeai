@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.8,\"ftok\":96,\"est\":false}",
+  "X-Hurry": "845da41c2cf47632"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.04,
+ "elapsed_s": 22.08,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.19,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 39 passages"
+   }
+  },
+  {
+   "t": 11.19,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.19,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.19,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.19,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.04,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.08,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.0,
+    "tok": 338,
+    "s": 6.0
+   }
+  },
+  {
+   "t": 22.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1353 chars"
+   }
+  },
+  {
+   "t": 22.08,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.08,
+   "tag": "DONE",
+   "data": {
+    "f": 16.03,
+    "t": 22.08,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 39 passages",
+   "t_s": 11.19
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.19
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.19
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1353 chars",
+   "t_s": 22.08
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.08
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "What's the typical cost of Door... - EcoTech Windows & Doors",
+   "u": "https://www.ecotechwindows.ca/faq/whats-the-typical-cost-of-door-replacement-in-ontario/",
+   "d": "2026-06-28"
+  },
+  {
+   "t": "NEW YORK to BOSTON train from £12 with Amtrak - Omio",
+   "u": "https://www.omio.co.uk/trains/new-york-city/boston-ma-inwqz",
+   "d": ""
+  },
+  {
+   "t": "Cost to Frame Door Opening - 2026 Cost Calculator (Customizable)",
+   "u": "https://homewyse.com/services/cost_to_frame_door_opening.html",
+   "d": "2026"
+  },
+  {
+   "t": "Cost to Install Prehung Door - 2026 Cost Calculator (Customizable)",
+   "u": "https://homewyse.com/services/cost_to_install_prehung_door.html",
+   "d": "2026"
+  },
+  {
+   "t": "Sliding Glass Door Cost 2026: $2,563 Average",
+   "u": "https://costguidehq.com/sliding-glass-door-cost",
+   "d": "2026"
+  },
+  {
+   "t": "How Much To Hang A Door | 2024 UK Cost By Region | Get 50% Off",
+   "u": "https://mdfskirtingworld.co.uk/blog/how-much-to-hang-a-door/",
+   "d": "2024"
+  },
+  {
+   "t": "Miami Florida To Atlanta Georgia Guide: Routes, Costs, Tips",
+   "u": "https://atlanta.com/articles/georgia/miami-florida-to-atlanta-georgia",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.19,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 26,
+   "d": 2136,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5413,
+   "o": 361,
+   "d": 10845,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 56.0,
+  "tok": 338,
+  "s": 6.0
+ },
+ "app_first_s": 16.03,
+ "app_total_s": 22.08,
+ "answer_raw": "The train is the superior choice for the NYC to Boston corridor.\n\nWhile flying might seem faster on paper, the \"friction\" of airport security, transit to hubs like Logan or JFK, and terminal buffers usually results in a door-to-door time of roughly **3h45–5h30** [1]. In contrast, a high-speed or efficient train departure can clock in between **3h30–5h15** depending on the specific route and city access [1].\n\n## Comparison\n\n| Feature | Train | Flight |\n| :--- | :--- | :--- |\n| **Door-to-Door Time** | **~3h30–5h15** [1] | **~3h45–5h30** [1] |\n| **Typical Cost** | **£141–£252** (undated, per Omio) [3] | Variable (not provided in evidence) |\n\n## The Verdict\nI would pick the **train**. \n\nThe cost of a last-minute ticket from New York to Boston is reportedly around **£252** if bought on the day, though you can find cheaper options for about **£141** [3]. Because train stations are typically more central to city cores than airports, you eliminate much of the transit-to-destination lag that plagues air travel. \n\nThe flight option suffers from \"airport friction\"—the time spent getting to the terminal and clearing security—which often makes the total travel time roughly equivalent to or slower than the rail journey [1]. For a trip of this distance, the simplicity and reliability of the train usually win on both cost and total time reclaimed.",
+ "answer": "The train is the superior choice for the NYC to Boston corridor.\n\nWhile flying might seem faster on paper, the \"friction\" of airport security, transit to hubs like Logan or JFK, and terminal buffers usually results in a door-to-door time of roughly **3h45–5h30** [1]. In contrast, a high-speed or efficient train departure can clock in between **3h30–5h15** depending on the specific route and city access [1].\n\n## Comparison\n\n| Feature | Train | Flight |\n| :--- | :--- | :--- |\n| **Door-to-Door Time** | **~3h30–5h15** [1] | **~3h45–5h30** [1] |\n| **Typical Cost** | **£141–£252** (undated, per Omio) [3] | Variable (not provided in evidence) |\n\n## The Verdict\nI would pick the **train**. \n\nThe cost of a last-minute ticket from New York to Boston is reportedly around **£252** if bought on the day, though you can find cheaper options for about **£141** [3]. Because train stations are typically more central to city cores than airports, you eliminate much of the transit-to-destination lag that plagues air travel. \n\nThe flight option suffers from \"airport friction\"—the time spent getting to the terminal and clearing security—which often makes the total travel time roughly equivalent to or slower than the rail journey [1]. For a trip of this distance, the simplicity and reliability of the train usually win on both cost and total time reclaimed.",
+ "chars": 1353,
+ "raw_bytes": 3616,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.32,
+ "rate_gen_tok_s": 56.0,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:17:25",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

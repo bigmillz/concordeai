@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":21.0,\"ftok\":292,\"est\":false}",
+  "X-Hurry": "b89dfdf718143ba3"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 19.76,
+ "elapsed_s": 26.83,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.09,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 34 passages"
+   }
+  },
+  {
+   "t": 13.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.09,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.76,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.83,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.6,
+    "tok": 478,
+    "s": 7.1
+   }
+  },
+  {
+   "t": 26.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1913 chars"
+   }
+  },
+  {
+   "t": 26.83,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 34 passages",
+   "t_s": 13.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.09
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.09
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1913 chars",
+   "t_s": 26.83
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.83
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom houses for rent in Florianópolis – two-bedroom home...",
+   "u": "https://rentola.com.br/en/for-rent/house/2-bedroom/florianopolis",
+   "d": ""
+  },
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Long term rentals in Berlin Germany (15,216), rent housing per month",
+   "u": "https://www.longtermlettings.com/rent/monthly/germany/berlin/",
+   "d": ""
+  },
+  {
+   "t": "Cobertura vista mar, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/cobertura-vista-mar-florianopolis7.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Airbnb | Vacation rentals, cabins, beach houses, & more",
+   "u": "https://www.airbnb.com/",
+   "d": ""
+  },
+  {
+   "t": "Ratings - Community Center - Airbnb",
+   "u": "https://communitycenter.airbnb.com/forum/2d51a5c2-16fb-4016-833b-8f987dae813c/post/bGVnYWN5X2Nj_2135078",
+   "d": "2025-07-24"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Vacation Rentals - Airbnb",
+   "u": "https://www.airbnb.com/florianopolis-brazil/stays",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.09,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 67.6,
+  "tok": 478,
+  "s": 7.1
+ },
+ "answer_raw": "Trust the **4.6-star rating** with 212 reviews. \n\nThe 4.6-star listing has a much larger sample size, which makes the score more statistically significant and resistant to individual outliers. A 4.9 rating from only 18 reviews is often \"honeymoon phase\" data; it's easier to maintain a near-perfect score with a small group of guests, but it lacks the historical depth to prove the host can handle different personalities or edge-case issues. \n\nThe 4.6 rating represents a more stable, \"battle-tested\" track record. In many rating systems, a 4.6 indicates a consistent level of quality, whereas a 4.9 with low volume can shift drastically once the listing hits a broader audience [6].\n\n## Pricing your 2-bedroom in Florianópolis\n\nThe provided rental data for Florianópolis does not list specific price points for 2-bedroom properties, so you should check local platforms like Rentola or Airbnb directly for real-time market rates [1][2].\n\nTo develop a pricing strategy for 30+ night stays, consider these factors:\n\n*   **The Monthly Discount:** For stays longer than 30 days, the industry standard is to offer a significant discount compared to nightly rates. This is often done to offset the lower turnover and higher utility costs of long-term guests.\n*   re-evaluate your target demographic. A 2-bedroom in a district like Ingleses or Agronômica might attract digital nomads or seasonal residents [1][2].\n*   **Location-based premiums:** Properties closer to the beach, such as in the Ingleses district, often command higher prices due to proximity to the coast [7].\n*   **Amenity parity:** Ensure your pricing reflects whether you offer high-speed internet, air conditioning, or parking, as these are standard expectations for longer stays in coastal areas [7].\n\nIf you want a more precise pricing model, you'll need to pull the current monthly rental averages for your specific neighborhood in Florianópolis.",
+ "answer": "Trust the **4.6-star rating** with 212 reviews. \n\nThe 4.6-star listing has a much larger sample size, which makes the score more statistically significant and resistant to individual outliers. A 4.9 rating from only 18 reviews is often \"honeymoon phase\" data; it's easier to maintain a near-perfect score with a small group of guests, but it lacks the historical depth to prove the host can handle different personalities or edge-case issues. \n\nThe 4.6 rating represents a more stable, \"battle-tested\" track record. In many rating systems, a 4.6 indicates a consistent level of quality, whereas a 4.9 with low volume can shift drastically once the listing hits a broader audience [6].\n\n## Pricing your 2-bedroom in Florianópolis\n\nThe provided rental data for Florianópolis does not list specific price points for 2-bedroom properties, so you should check local platforms like Rentola or Airbnb directly for real-time market rates [1][2].\n\nTo develop a pricing strategy for 30+ night stays, consider these factors:\n\n*   **The Monthly Discount:** For stays longer than 30 days, the industry standard is to offer a significant discount compared to nightly rates. This is often done to offset the lower turnover and higher utility costs of long-term guests.\n*   re-evaluate your target demographic. A 2-bedroom in a district like Ingleses or Agronômica might attract digital nomads or seasonal residents [1][2].\n*   **Location-based premiums:** Properties closer to the beach, such as in the Ingleses district, often command higher prices due to proximity to the coast [7].\n*   **Amenity parity:** Ensure your pricing reflects whether you offer high-speed internet, air conditioning, or parking, as these are standard expectations for longer stays in coastal areas [7].\n\nIf you want a more precise pricing model, you'll need to pull the current monthly rental averages for your specific neighborhood in Florianópolis.",
+ "chars": 1913,
+ "raw_bytes": 3911,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.83,
+ "rate_gen_tok_s": 67.64,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:23:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

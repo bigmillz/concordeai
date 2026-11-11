@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.2,\"ftok\":36,\"est\":false}",
+  "X-Hurry": "3cab1cbbd7eaeeb0"
+ },
+ "first_byte_s": 3.35,
+ "first_text_s": 24.35,
+ "elapsed_s": 32.88,
+ "events": [
+  {
+   "t": 3.35,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.35,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.32,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.32,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 16.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.78,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.78,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.35,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 32.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.3,
+    "tok": 480,
+    "s": 8.5
+   }
+  },
+  {
+   "t": 32.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1920 chars"
+   }
+  },
+  {
+   "t": 32.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.35,
+   "Searching the web…"
+  ],
+  [
+   14.32,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 3.35
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.32
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.32
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 16.78
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.78
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.78
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1920 chars",
+   "t_s": 32.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 32.88
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "[2026 Latest] Google's Proprietary 'TPU' Chip is Transforming the AI Semiconduct",
+   "u": "https://note.com/dote_taro/n/n2f85bdbb304a?hl=en",
+   "d": "2026-11-05"
+  },
+  {
+   "t": "NVIDIA’s New Ampere Data Center GPU in Full... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/news/nvidias-new-ampere-data-center-gpu-in-full-production",
+   "d": ""
+  },
+  {
+   "t": "TPU 8t and TPU 8i technical deep dive | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/tpu-8t-and-tpu-8i-technical-deep-dive",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "Best GPU for AI in 2026: 7 Picks From $310 to $4,900",
+   "u": "https://bestgpuforai.com/articles/best-gpu-for-ai/",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "Anthropic Introduces Model Hardware Standard to Bridge Claude ...",
+   "u": "https://techbytes.app/posts/anthropic-unveils-model-hardware-standard-robotics-2026/",
+   "d": "2026-08-28"
+  },
+  {
+   "t": "Google TPU Arrives on Oracle Cloud: New Split Architecture Transforms Enterprise",
+   "u": "https://www.msn.com/en-us/news/other/google-tpu-arrives-on-oracle-cloud-new-split-architecture-transforms-enterprise-ai-compute/ar-AA2gdpAx",
+   "d": "2026-10-28"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.78,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.3,
+  "tok": 480,
+  "s": 8.5
+ },
+ "answer_raw": "The answer depends on whether you are looking at massive data center clusters or individual consumer hardware.\n\n## Data Center and Enterprise Scale\nFor large-scale AI training and inference, the most powerful hardware involves specialized, proprietary accelerators like Google's **TPU (Tensor Processing Unit)**. \n\n*   **Google TPUs** — The eighth-generation TPUs consist of two specialized systems: the **TPig 8t** for AI training and the **TPU 8i** for enterprise inference [4, 7, undated]. \n*   **Nvidia GPUs** — While Nvidia's A100 was a massive leap for unifying training and inference [3, undate], the market is shifting as companies move toward specialized silicon to avoid Nvidia's allocation queues and complex CUDA stacks [1, 2].\n*   **Consumer/Workstation** — The **RTX 5090** with 32GB VRAM is the most powerful consumer AI GPU available as of September 2026, priced at approximately **$4,900** [5].\n\n## Who is using what?\nThe landscape is split between those building massive proprietary compute clouds and those managing massive-scale model training.\n\n**Anthropic (Claude)**\nAnthropic uses **Google Cloud** as its primary hosting partner [1]. In April 2026, they announced a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027 [1]. This move was strategic: being third in Nvidia's allocation queue was a competitive disadvantage, so they transitioned to being Google's largest external TPU customer to secure priority [1].\n\n**Other Major Players**\n*   **OpenAI, Meta, and Anthropic** — These major players are all moving toward adopting Google's TPU [2].\n*   **Oracle** — Starting in 2027, Oracle Cloud Infrastructure will become the first hyperscaler outside of Google to offer eighth-generation TPUs (the 8t and 8i models) [7].\n*   **Microsoft** — Historically, Nvidia's most advanced GPUs have been allocated to Microsoft (OpenAI) first [1].",
+ "answer": "The answer depends on whether you are looking at massive data center clusters or individual consumer hardware.\n\n## Data Center and Enterprise Scale\nFor large-scale AI training and inference, the most powerful hardware involves specialized, proprietary accelerators like Google's **TPU (Tensor Processing Unit)**. \n\n*   **Google TPUs** — The eighth-generation TPUs consist of two specialized systems: the **TPig 8t** for AI training and the **TPU 8i** for enterprise inference [4, 7, undated]. \n*   **Nvidia GPUs** — While Nvidia's A100 was a massive leap for unifying training and inference [3, undate], the market is shifting as companies move toward specialized silicon to avoid Nvidia's allocation queues and complex CUDA stacks [1, 2].\n*   **Consumer/Workstation** — The **RTX 5090** with 32GB VRAM is the most powerful consumer AI GPU available as of September 2026, priced at approximately **$4,900** [5].\n\n## Who is using what?\nThe landscape is split between those building massive proprietary compute clouds and those managing massive-scale model training.\n\n**Anthropic (Claude)**\nAnthropic uses **Google Cloud** as its primary hosting partner [1]. In April 2026, they announced a partnership with Google and Broadcom for approximately **3.5GW of next-generation TPU capacity** starting in 2027 [1]. This move was strategic: being third in Nvidia's allocation queue was a competitive disadvantage, so they transitioned to being Google's largest external TPU customer to secure priority [1].\n\n**Other Major Players**\n*   **OpenAI, Meta, and Anthropic** — These major players are all moving toward adopting Google's TPU [2].\n*   **Oracle** — Starting in 2027, Oracle Cloud Infrastructure will become the first hyperscaler outside of Google to offer eighth-generation TPUs (the 8t and 8i models) [7].\n*   **Microsoft** — Historically, Nvidia's most advanced GPUs have been allocated to Microsoft (OpenAI) first [1].",
+ "chars": 1920,
+ "raw_bytes": 4165,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.6,
+ "rate_gen_tok_s": 56.27,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:40:40",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

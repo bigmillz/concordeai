@@ -1,0 +1,353 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.0,\"ftok\":141,\"est\":false}",
+  "X-Hurry": "5dccc37b9f36fb18"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.76,
+ "elapsed_s": 20.26,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 8.43,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.43,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.43,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 19 passages"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.28,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.28,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.76,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.6,
+    "tok": 219,
+    "s": 4.5
+   }
+  },
+  {
+   "t": 20.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "876 chars"
+   }
+  },
+  {
+   "t": 20.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.26,
+   "tag": "DONE",
+   "data": {
+    "f": 15.76,
+    "t": 20.26,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.43,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.43
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.43
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 19 passages",
+   "t_s": 11.28
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.28
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.28
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.28
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "876 chars",
+   "t_s": 20.26
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Is Florianópolis Safe? 2026 Beaches & Tourist Tips",
+   "u": "https://brazilsafetravel.com/blog/is-florianopolis-safe",
+   "d": "2026-07-03"
+  },
+  {
+   "t": "Is Florianópolis, Brazil Safe? 2026 Tourist Safety Guide",
+   "u": "https://florianopolistours.com/is-florianopolis-safe/",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Da Nang Cost of Living 2026: The Foreigner Price Gap",
+   "u": "https://numbers.findawayabroad.com/p/da-nang-cost-of-living-preview-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Nov 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-11"
+  },
+  {
+   "t": "Cost of Living Estimator for Florianopolis, Brazil - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/city-estimator/in/Florianopolis",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.28,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 21,
+   "d": 778,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5170,
+   "o": 286,
+   "d": 8934,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 48.6,
+  "tok": 219,
+  "s": 4.5
+ },
+ "app_first_s": 15.76,
+ "app_total_s": 20.26,
+ "answer_raw": "For your criteria, the best pick is **Jurerê Internacional**.\n\nWhile the provided data does not give a specific price for a furnished one-bedroom in Jurerê Internacional, it notes that an average one-bedroom rent in the region is **R$ 3,000 - 5,000** per month (undated) [3]. \n\nBecause you are looking for a furnished rental in a premium, high-safety zone, you should expect to pay at the higher end of that range or more. Using the exchange rate of **1 USD = 5.5167 BRL** (as of November 9, 2026) [5]:\n\n*   **Low end (R$ 3,000)**: ~$544 USD [5]\n*   **High end (R$ 5,000)**: ~$907 USD [5]\n\nIf the \"foreigner premium\" seen in other coastal cities applies here—where English-language rental sites can double the local price [6]—you should budget for roughly **R$ 6,000 - 10,000** (~$1,088 - $1,814 USD) [6] to secure a high-quality, furnished unit in a prime beach location [6].",
+ "answer": "For your criteria, the best pick is **Jurerê Internacional**.\n\nWhile the provided data does not give a specific price for a furnished one-bedroom in Jurerê Internacional, it notes that an average one-bedroom rent in the region is **R$ 3,000 - 5,000** per month (undated) [3]. \n\nBecause you are looking for a furnished rental in a premium, high-safety zone, you should expect to pay at the higher end of that range or more. Using the exchange rate of **1 USD = 5.5167 BRL** (as of November 9, 2026) [5]:\n\n*   **Low end (R$ 3,000)**: ~$544 USD [5]\n*   **High end (R$ 5,000)**: ~$907 USD [5]\n\nIf the \"foreigner premium\" seen in other coastal cities applies here—where English-language rental sites can double the local price [6]—you should budget for roughly **R$ 6,000 - 10,000** (~$1,088 - $1,814 USD) [6] to secure a high-quality, furnished unit in a prime beach location [6].",
+ "chars": 876,
+ "raw_bytes": 3150,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.81,
+ "rate_gen_tok_s": 48.67,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:42:07",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "For a six-month stay that balances safety, walkability, and beach access, **Jurerê Internacional** is the best fit for your requirements, though it comes with a significant price premium.\n\n## Neighborhood Options\n\n**Jurerê Internacional**\nIf your priority is high safety and a resort-style atmosphere, this is the top choice. It has a safety score of **78/100** and reported **zero robberies in 2025** [7, as of May 2026]. However, it is expensive; a one-bedroom apartment can cost around **€1,200/month** [7, as of May 2026].\n\n**The North, East, and Central/South Zones**\nThe island's layout offers different lifestyles depending on which zone you choose:\n*   **North**: Known for resort-style beaches [3, undated].\n*   **East**: Offers a bohemian, surfing, and nature-focused vibe [3, undated].\n*   **Central/South**: Features the historic center and calm villages [3, undated].\n\n## Safety and Logistics\n\nFlorianópolis is generally considered a safe destination for tourists, especially in the main beach neighborhoods [2, 2026]. It was ranked as the safest state capital in Brazil in 2024, with a homicide rate of **9.7 per 100,000 residents** compared to the national average of 20.1 [1, as of July 2026].\n\nWhile the city is relatively safe, keep these factors in mind for a six-month stay:\n*   **Granular Safety**: Safety levels vary significantly by street; many security cameras in the city are concentrated in just three specific neighborhoods [7, as of May 2026].\n*   **Nighttime Precautions**: It is best to stay in busy tourist areas and avoid isolated streets or beaches after dark [2, 2026].\n*   **Internet/Work**: While the provided sources do not specify individual neighborhood WiFi speeds, the North/East zones are often preferred for remote work-friendly environments [8, 2026, perlyweg].\n\nThe provided evidence does not contain specific data on fiber optic availability or average WiFi speeds per neighborhood. You should verify local ISP coverage (such as Vivo or Claro) for your specific rental address before signing a lease."
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":10.6,\"ftok\":306,\"est\":false}",
+  "X-Hurry": "421efaaa5da94db9"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 3.23,
+ "elapsed_s": 25.76,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.23,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2293 chars"
+   }
+  },
+  {
+   "t": 11.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 11.89,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 11.89,
+   "tag": "RESET"
+  },
+  {
+   "t": 25.76,
+   "tag": "RATE",
+   "data": {
+    "tps": 64.9,
+    "tok": 568,
+    "s": 8.8
+   }
+  },
+  {
+   "t": 25.76,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2274 chars"
+   }
+  },
+  {
+   "t": 25.76,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.76,
+   "tag": "DONE",
+   "data": {
+    "f": 3.22,
+    "t": 25.75,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   11.89,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.05
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2293 chars",
+   "t_s": 11.89
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 11.89
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2274 chars",
+   "t_s": 25.76
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.76
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.05,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2227,
+   "o": 557,
+   "d": 11809
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4069,
+   "o": 537,
+   "d": 13822
+  }
+ ],
+ "rate_writer": {
+  "tps": 64.9,
+  "tok": 568,
+  "s": 8.8
+ },
+ "app_first_s": 3.22,
+ "app_total_s": 25.75,
+ "answer_raw": "4-bit quantization trades off mathematical precision to achieve a massive reduction in memory footprint, allowing much larger models to run on consumer hardware.\n\nIn a standard **FP16** (16-bit floating point) model, each weight occupies 2 bytes of VRAM. Moving to 4-bit quantization reduces each weight to roughly **0.5 bytes**. This **4x reduction** means a 70B parameter model, which requires ~140GB of VRAM in FP16, can fit into ~40GB of VRAM in 4-bit format.\n\n## The Mechanics: Mapping and Clipping\nQuantization maps a wide range of continuous floating-point values into a discrete set of 16 possible integer levels ($2^4$). This creates two primary issues:\n\n*   **Rounding Error:** The mathematical distance between the original high-precision weight and its new 4-bit \"bucket.\"\n*   **Outliers:** A single weight with a massive value can \"stretch\" the quantization scale, making the resolution for all other weights too coarse and destroying the model's logic.\n\nModern techniques like **GGUF** or **GPTQ/EXL2** mitigate this using **block-wise quantization**. Instead of one scale for the entire model, the algorithm calculates specific scales for small blocks of weights (e.g., every 32 or 64 weights), preserving local precision.\n\n## When It Matters\nThe decision to quantize is a trade-off between **model capacity** and **quantization error**.\n\n**It matters most when:**\n*   **Scaling up:** You want to run a \"smarter\" model on limited VRAM. A 70B model at 4-bit often outperforms a much smaller 13B model at FP16 because the sheer parameter density compensates for the precision loss.\n*   **Inference throughput:** Smaller weights mean less data movement between memory and the GPU cores. In many LLM workloads, memory bandwidth is the primary bottleneck, so 4-bit can significantly increase tokens-per-second.\n\n**It matters least when:**\n*   **Training/Fine-tuning:** You should generally avoid quantized weights during standard training, as gradient updates require high precision. However, **QLoRA** is a specific technique designed to allow efficient fine-tuning using 4-bit base models.\n*   **Small models:** The \"intelligence\" loss is much more noticeable in tiny models (e.g., <7B parameters) because they have less redundancy to absorb the rounding errors.",
+ "answer": "4-bit quantization trades off mathematical precision to achieve a massive reduction in memory footprint, allowing much larger models to run on consumer hardware.\n\nIn a standard **FP16** (16-bit floating point) model, each weight occupies 2 bytes of VRAM. Moving to 4-bit quantization reduces each weight to roughly **0.5 bytes**. This **4x reduction** means a 70B parameter model, which requires ~140GB of VRAM in FP16, can fit into ~40GB of VRAM in 4-bit format.\n\n## The Mechanics: Mapping and Clipping\nQuantization maps a wide range of continuous floating-point values into a discrete set of 16 possible integer levels ($2^4$). This creates two primary issues:\n\n*   **Rounding Error:** The mathematical distance between the original high-precision weight and its new 4-bit \"bucket.\"\n*   **Outliers:** A single weight with a massive value can \"stretch\" the quantization scale, making the resolution for all other weights too coarse and destroying the model's logic.\n\nModern techniques like **GGUF** or **GPTQ/EXL2** mitigate this using **block-wise quantization**. Instead of one scale for the entire model, the algorithm calculates specific scales for small blocks of weights (e.g., every 32 or 64 weights), preserving local precision.\n\n## When It Matters\nThe decision to quantize is a trade-off between **model capacity** and **quantization error**.\n\n**It matters most when:**\n*   **Scaling up:** You want to run a \"smarter\" model on limited VRAM. A 70B model at 4-bit often outperforms a much smaller 13B model at FP16 because the sheer parameter density compensates for the precision loss.\n*   **Inference throughput:** Smaller weights mean less data movement between memory and the GPU cores. In many LLM workloads, memory bandwidth is the primary bottleneck, so 4-bit can significantly increase tokens-per-second.\n\n**It matters least when:**\n*   **Training/Fine-tuning:** You should generally avoid quantized weights during standard training, as gradient updates require high precision. However, **QLoRA** is a specific technique designed to allow efficient fine-tuning using 4-bit base models.\n*   **Small models:** The \"intelligence\" loss is much more noticeable in tiny models (e.g., <7B parameters) because they have less redundancy to absorb the rounding errors.",
+ "chars": 2274,
+ "raw_bytes": 5287,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.07,
+ "rate_gen_tok_s": 25.23,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:29:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

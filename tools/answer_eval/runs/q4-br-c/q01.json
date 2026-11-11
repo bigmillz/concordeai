@@ -1,0 +1,327 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.4,\"ftok\":33,\"est\":false}",
+  "X-Hurry": "60b02031e6800722"
+ },
+ "first_byte_s": 3.66,
+ "first_text_s": 26.37,
+ "elapsed_s": 30.18,
+ "events": [
+  {
+   "t": 3.66,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 3.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 14.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.66,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 14.66,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 19.81,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 19.81,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 19.81,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 19.81,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 19.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 26.37,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 30.18,
+   "tag": "RATE",
+   "data": {
+    "tps": 46.4,
+    "tok": 176,
+    "s": 3.8
+   }
+  },
+  {
+   "t": 30.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "707 chars"
+   }
+  },
+  {
+   "t": 30.18,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 30.18,
+   "tag": "DONE",
+   "data": {
+    "f": 26.36,
+    "t": 30.17,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   3.66,
+   "Searching the web…"
+  ],
+  [
+   14.66,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 3.66
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.66
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 14.66
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 19.81
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 19.81
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 19.81
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "707 chars",
+   "t_s": 30.18
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 30.18
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Issue #70: Anthropic's Million TPU Google Deal, Crusoe Heads to...",
+   "u": "https://thegpu.ai/p/issue-70-anthropic-million-tpu-google-deal-neocloud-crusoe-heads-to-orbit-ai-browsers",
+   "d": "2025-10-25"
+  },
+  {
+   "t": "Trillium TPU is GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/trillium-tpu-is-ga",
+   "d": "2024-12-11"
+  },
+  {
+   "t": "Photo | The NVIDIA Tesla V100 data center GPU... | NVIDIA Newsroom",
+   "u": "https://nvidianews.nvidia.com/file?fid=59134e2fed6ae56721d47bbe",
+   "d": ""
+  },
+  {
+   "t": "Designing more efficient quantum circuits with Claude \\ Anthropic",
+   "u": "https://www.anthropic.com/research/designing-efficient-quantum-circuits",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "Google calls Gemma 3 the most powerful AI model you... | The Verge",
+   "u": "https://www.theverge.com/ai-artificial-intelligence/627968/google-gemma-3-open-ai-model",
+   "d": "2025-03-12"
+  },
+  {
+   "t": "Cloud TPU documentation | Google Cloud Documentation",
+   "u": "https://docs.cloud.google.com/tpu/docs",
+   "d": ""
+  },
+  {
+   "t": "Claude by Anthropic | The AI for problem solvers",
+   "u": "https://claude.com/",
+   "d": ""
+  },
+  {
+   "t": "GPU Benchmarks Hierarchy 2026 - Graphics Card... | Tom's Hardware",
+   "u": "https://www.tomshardware.com/reviews/gpu-hierarchy,4388.html",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   19.81,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 246,
+   "o": 23,
+   "d": 867,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4966,
+   "o": 240,
+   "d": 10320
+  }
+ ],
+ "rate_writer": {
+  "tps": 46.4,
+  "tok": 176,
+  "s": 3.8
+ },
+ "app_first_s": 26.36,
+ "app_total_s": 30.17,
+ "answer_raw": "The most powerful specialized AI hardware currently being deployed at scale is the **Google Trillium TPU** (as of 2024-12-11) [2].\n\n**Claude** is using Google's **TPU clusters** through a deal worth tens of billions of dollars to power future models [1].\n\nAs for other users:\n- **Google** used **Trillium TPUs** to train the **Gemini 2.0** model (as of 2024-12-11) [2].\n- **AI21** uses **TPUs** for their **Mamba** and **Jamba** language models (as of 2024-12-11) [2].\n- The **NVIDIA Tesla V100** is an older data center GPU used for AI training and inferencing (undated) [3].\n- **Gemma 3** is described as a model designed to be the most powerful one you can run on a **single GPU** (as of 2025-03-12) [5].",
+ "answer": "The most powerful specialized AI hardware currently being deployed at scale is the **Google Trillium TPU** (as of 2024-12-11) [2].\n\n**Claude** is using Google's **TPU clusters** through a deal worth tens of billions of dollars to power future models [1].\n\nAs for other users:\n- **Google** used **Trillium TPUs** to train the **Gemini 2.0** model (as of 2024-12-11) [2].\n- **AI21** uses **TPUs** for their **Mamba** and **Jamba** language models (as of 2024-12-11) [2].\n- The **NVIDIA Tesla V100** is an older data center GPU used for AI training and inferencing (undated) [3].\n- **Gemma 3** is described as a model designed to be the most powerful one you can run on a **single GPU** (as of 2025-03-12) [5].",
+ "chars": 707,
+ "raw_bytes": 2927,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.86,
+ "rate_gen_tok_s": 46.39,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:45:17",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.2,\"ftok\":246,\"est\":false}",
+  "X-Hurry": "5ea00b2cb30ade9d"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 21.47,
+ "elapsed_s": 26.23,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.05,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.05,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.47,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.23,
+   "tag": "RATE",
+   "data": {
+    "tps": 74.0,
+    "tok": 352,
+    "s": 4.8
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1408 chars"
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "DONE",
+   "data": {
+    "f": 21.47,
+    "t": 26.23,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 18.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.05
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.05
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1408 chars",
+   "t_s": 26.23
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.23
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How AI fits into the sysadmin workflow (without replacing it)",
+   "u": "https://www.pdq.com/blog/how-ai-fits-into-the-sysadmin-workflow-without-replacing-it/",
+   "d": "2026-03-11"
+  },
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Is AI taking white-collar jobs? Latest hiring report suggests not yet.",
+   "u": "https://www.washingtonpost.com/business/2026/11/07/white-collar-hiring-jumps-october-complicating-ai-story/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "AI Job Displacement Statistics (2026 Update) — Letaido Blog",
+   "u": "https://blog.letaido.com/ai-job-displacement-statistics",
+   "d": "2026-06-26"
+  },
+  {
+   "t": "AI Will Transform Role of System Administrators - Workflow®",
+   "u": "https://www.servicenow.com/workflow/ai/ai-transform-role-system-administrators.html",
+   "d": ""
+  },
+  {
+   "t": "Will AI Take My Job? What the 2026 US Data Shows",
+   "u": "https://techjournal.org/will-ai-take-my-job",
+   "d": "2026"
+  },
+  {
+   "t": "Qantas cuts 850 jobs in Australia and moves work to India under AI overhaul: Tak",
+   "u": "https://www.msn.com/en-in/money/other/qantas-cuts-850-jobs-in-australia-and-moves-work-to-india-under-ai-overhaul-take-a-look-at-the-roles-facing-changes/ar-AA2h64gx?ocid=BingNewsVerp",
+   "d": "2026-11-06"
+  },
+  {
+   "t": "AI Replacing Jobs Statistics [Nov 2026 Data] | JobZone Risk",
+   "u": "https://jobzonerisk.com/stats/ai-replacing-jobs-statistics",
+   "d": "2026-11"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.05,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 27,
+   "d": 817,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4315,
+   "o": 304,
+   "d": 8124,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 74.0,
+  "tok": 352,
+  "s": 4.8
+ },
+ "app_first_s": 21.47,
+ "app_total_s": 26.23,
+ "answer_raw": "Your job isn't being replaced by AI, but it is being redefined into a higher-level role where you act as the decision-maker rather than the task-executor.\n\nThe displacement risk for sysadmins is not a matter of total job loss, but a shift in responsibilities. AI works best as an input into decision-making rather than an authority over systems; it can analyze problems, summarize signals, and prepare options, but it cannot evaluate risk, understand organizational context, or own the outcome of a change [1]. While some sectors see job shifts—such as Qantas cutting 850 jobs to move work under an AI overhaul as of Nov 2026 [7]—the role of the sysadmin is moving toward higher-level work [5].\n\nTo mitigate risk over the next five years, you should focus on these three areas:\n\n**Strategic decision-making** — Since AI cannot own the risk of a change or understand the nuance of business context, lean into the responsiebilities that require human accountability [1].\n\n**Workflow integration** — Treat AI as a tool in your toolkit rather than a competitor; use it to automate the mundane tasks so you can focus on infrastructure reliability, security, and efficiency [1][5].\n\n**Upskilling in higher-level architecture** — As AI handles more of the repetitive operational tasks, your value will come from managing the systems that AI runs on and overseeing the organizational impact of technical changes [5].",
+ "answer": "Your job isn't being replaced by AI, but it is being redefined into a higher-level role where you act as the decision-maker rather than the task-executor.\n\nThe displacement risk for sysadmins is not a matter of total job loss, but a shift in responsibilities. AI works best as an input into decision-making rather than an authority over systems; it can analyze problems, summarize signals, and prepare options, but it cannot evaluate risk, understand organizational context, or own the outcome of a change [1]. While some sectors see job shifts—such as Qantas cutting 850 jobs to move work under an AI overhaul as of Nov 2026 [7]—the role of the sysadmin is moving toward higher-level work [5].\n\nTo mitigate risk over the next five years, you should focus on these three areas:\n\n**Strategic decision-making** — Since AI cannot own the risk of a change or understand the nuance of business context, lean into the responsiebilities that require human accountability [1].\n\n**Workflow integration** — Treat AI as a tool in your toolkit rather than a competitor; use it to automate the mundane tasks so you can focus on infrastructure reliability, security, and efficiency [1][5].\n\n**Upskilling in higher-level architecture** — As AI handles more of the repetitive operational tasks, your value will come from managing the systems that AI runs on and overseeing the organizational impact of technical changes [5].",
+ "chars": 1408,
+ "raw_bytes": 3899,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.42,
+ "rate_gen_tok_s": 73.95,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:15:49",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

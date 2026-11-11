@@ -1,0 +1,320 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.9,\"ftok\":97,\"est\":false}",
+  "X-Hurry": "57492fcc74680e92"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 0.92,
+ "elapsed_s": 22.9,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 0.92,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 7.41,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.41,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.41,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.88,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 27 passages"
+   }
+  },
+  {
+   "t": 13.88,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.88,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.88,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 22.9,
+   "tag": "RATE",
+   "data": {
+    "tps": 52.3,
+    "tok": 183,
+    "s": 3.5
+   }
+  },
+  {
+   "t": 22.9,
+   "tag": "RESET"
+  },
+  {
+   "t": 22.9,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 22.9,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "713 chars"
+   }
+  },
+  {
+   "t": 22.9,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   7.41,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.41
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.41
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 27 passages",
+   "t_s": 13.88
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.88
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 22.9
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "713 chars",
+   "t_s": 22.9
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.9
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone 14 review: Is it worth buying in 2026? - Back Market",
+   "u": "https://www.backmarket.com/en-us/c/iphone/iphone-14-test",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "Identify your iPhone model - Apple Support",
+   "u": "https://support.apple.com/en-us/108044",
+   "d": "2026-10-22"
+  },
+  {
+   "t": "iPhone 14: Why It Might Be Time to Rethink Your Next Upgrade",
+   "u": "https://applemagazine.com/iphone-14-upgrade/",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026? - Tech in Deep",
+   "u": "https://www.techindeep.com/is-iphone-14-worth-buying-in-2026-73659",
+   "d": "2026"
+  },
+  {
+   "t": "I tested the iPhone 18 Pro Max vs iPhone 14 Pro Max side by side: should you upg",
+   "u": "https://www.msn.com/en-us/technology/consumer-electronics/i-tested-the-iphone-18-pro-max-vs-iphone-14-pro-max-side-by-side-should-you-upgrade/ar-AA2eq0UG",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "iPhone 18: Rumors and Release Date",
+   "u": "https://www.macrumors.com/roundup/iphone-18/",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "How Much Is It to Upgrade Your iPhone? A 2026 Cost Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/how-much-to-upgrade-your-iphone-in-2026",
+   "d": "2026-08-05"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.88,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 52.3,
+  "tok": 183,
+  "s": 3.5
+ },
+ "answer_raw": "The newest lineup is the **iPhone Duo** (as of Oct 2026) [1].\n\nI didn't find the specific retail prices for the iPhone Duo (check the Apple Store for current pricing) [1].\n\nUpgrading from an iPhone 14 to the latest model is a significant jump that will yield noticeable improvements in performance and features. Since your current 14 is likely facing battery capacity degradation and may lack the hardware required for the latest on-device intelligence features [4][5], moving to the Duo is a clear path to modernizing your hardware.\n\n**The iPhone Duo** is the best option for a meaningful upgrade.\n\n**iPhone 14** — a solid budget option for basic tasks, but lacks the latest intelligence-focused hardware [2][5].",
+ "answer": "The newest lineup is the **iPhone Duo** (as of Oct 2026) [1].\n\nI didn't find the specific retail prices for the iPhone Duo (check the Apple Store for current pricing) [1].\n\nUpgrading from an iPhone 14 to the latest model is a significant jump that will yield noticeable improvements in performance and features. Since your current 14 is likely facing battery capacity degradation and may lack the hardware required for the latest on-device intelligence features [4][5], moving to the Duo is a clear path to modernizing your hardware.\n\n**The iPhone Duo** is the best option for a meaningful upgrade.\n\n**iPhone 14** — a solid budget option for basic tasks, but lacks the latest intelligence-focused hardware [2][5].",
+ "chars": 713,
+ "raw_bytes": 3775,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.35,
+ "rate_gen_tok_s": 8.7,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:03:11",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 19.4,
+ "app_total_s": 22.9,
+ "first_text_s_unreliable": true
+}

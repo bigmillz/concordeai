@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.7,\"ftok\":163,\"est\":false}",
+  "X-Hurry": "c8bc0f0402fcdc56"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 17.56,
+ "elapsed_s": 19.97,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.01,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.01,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.01,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 24 passages"
+   }
+  },
+  {
+   "t": 13.84,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.84,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.84,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.84,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.56,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.96,
+   "tag": "RATE",
+   "data": {
+    "tps": 87.8,
+    "tok": 211,
+    "s": 2.4
+   }
+  },
+  {
+   "t": 19.96,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "844 chars"
+   }
+  },
+  {
+   "t": 19.96,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 19.96,
+   "tag": "DONE",
+   "data": {
+    "f": 17.56,
+    "t": 19.96,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   10.01,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.01
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.01
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 24 passages",
+   "t_s": 13.83
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.84
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.84
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "844 chars",
+   "t_s": 19.96
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.96
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Amazon South America Tropical Rainforest | Prezi",
+   "u": "https://prezi.com/6hijhogn3zsk/the-amazon-south-america-tropical-rainforest/",
+   "d": ""
+  },
+  {
+   "t": "Amazon.com: South America",
+   "u": "https://www.amazon.com/south-america/s?k=south+america",
+   "d": ""
+  },
+  {
+   "t": "Amazon rainforest - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_rainforest",
+   "d": ""
+  },
+  {
+   "t": "Into the Amazon | South America",
+   "u": "https://www.heynadine.com/into-the-amazon/",
+   "d": "2012-12-22"
+  },
+  {
+   "t": "Latin America - Amazon Sustainability",
+   "u": "https://sustainability.aboutamazon.com/global-action/latin-america",
+   "d": ""
+  },
+  {
+   "t": "Amazon in Other Countries 2026 - World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-in-other-countries",
+   "d": "2026"
+  },
+  {
+   "t": "Amazon River - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_River",
+   "d": ""
+  },
+  {
+   "t": "Even if the Feds Let Them Fly, Amazon's Delivery Drones... | WIRED",
+   "u": "https://www.wired.com/2013/12/amazon-drone/",
+   "d": "2013-12"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.84,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 235,
+   "o": 20,
+   "d": 648,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4807,
+   "o": 155,
+   "d": 6078,
+   "c": 2235
+  }
+ ],
+ "rate_writer": {
+  "tps": 87.8,
+  "tok": 211,
+  "s": 2.4
+ },
+ "app_first_s": 17.56,
+ "app_total_s": 19.96,
+ "answer_raw": "Amazon does operate in South America, though its presence is concentrated in specific regions rather than being a universal service across the continent.\n\n**Localized Presence**\nThe company has established dedicated marketplaces in **Brazil** (undated) [6]. While it does not have localized storefronts in every country, many nations across South America can access Amazon through **international shipping** (undated) [6].\n\n**Alternative Options**\nBecause localized delivery is limited to certain economies, people in many South American countries rely on international shipping to receive orders from Amazon [6]. The evidence provided does not list specific local competitors used in lieu of Amazon, so you would need to check local e-commerce market share reports for nations like Colombia or Argentina to see which regional players dominate.",
+ "answer": "Amazon does operate in South America, though its presence is concentrated in specific regions rather than being a universal service across the continent.\n\n**Localized Presence**\nThe company has established dedicated marketplaces in **Brazil** (undated) [6]. While it does not have localized storefronts in every country, many nations across South America can access Amazon through **international shipping** (undated) [6].\n\n**Alternative Options**\nBecause localized delivery is limited to certain economies, people in many South American countries rely on international shipping to receive orders from Amazon [6]. The evidence provided does not list specific local competitors used in lieu of Amazon, so you would need to check local e-commerce market share reports for nations like Colombia or Argentina to see which regional players dominate.",
+ "chars": 844,
+ "raw_bytes": 2842,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.57,
+ "rate_gen_tok_s": 87.55,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:43:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

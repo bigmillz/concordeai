@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.1,\"ftok\":256,\"est\":false}",
+  "X-Hurry": "ecaedda61254c816"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 0.8,
+ "elapsed_s": 25.0,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.8,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.53,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 13.53,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.53,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.53,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.53,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.99,
+   "tag": "RATE",
+   "data": {
+    "tps": 44.6,
+    "tok": 276,
+    "s": 6.2
+   }
+  },
+  {
+   "t": 24.99,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1104 chars"
+   }
+  },
+  {
+   "t": 24.99,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 13.53
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.53
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.53
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1104 chars",
+   "t_s": 24.99
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.99
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Into the Amazon | South America",
+   "u": "https://www.heynadine.com/into-the-amazon/",
+   "d": "2012-12-22"
+  },
+  {
+   "t": "MercadoLibre Is the Amazon of Latin America ... or Is It?",
+   "u": "https://www.fool.com/investing/2025/09/26/mercadolibre-is-the-amazon-of-latin-america-or-is/",
+   "d": "2025-09-26"
+  },
+  {
+   "t": "Amazon’s Next-Day Delivery Has Brought Chaos And Carnage To...",
+   "u": "https://www.buzzfeednews.com/article/carolineodonovan/amazon-next-day-delivery-deaths",
+   "d": "2019-08-31"
+  },
+  {
+   "t": "time.com/6093371/amazon-drone-delivery-service",
+   "u": "https://time.com/6093371/amazon-drone-delivery-service/",
+   "d": "2021-11-02"
+  },
+  {
+   "t": "Amazon.com. Spend less. Smile more.",
+   "u": "https://www.amazon.com/",
+   "d": ""
+  },
+  {
+   "t": "Why Amazon isn’t the Amazon of Latin America - Rest of World",
+   "u": "https://restofworld.org/2023/exporter-amazon-mercadolibre/",
+   "d": "2023-08-31"
+  },
+  {
+   "t": "Our Team - Amazon Frontlines",
+   "u": "https://amazonfrontlines.org/who-we-are/our-team/",
+   "d": "2026-11-04"
+  },
+  {
+   "t": "Why is Mercado Libre the \"Amazon\" of Latin America?",
+   "u": "https://nocnocstore.com/resources/why-is-mercado-libre-the-amazon-of-latin-america",
+   "d": "2026-09-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.53,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 44.6,
+  "tok": 276,
+  "s": 6.2
+ },
+ "answer_raw": "Amazon does not have a dominant retail presence in South America, as the region's e-commerce is led by local competitors.\n\nWhile Amazon maintains a global presence, it does not function as the primary marketplace in South American countries; instead, **MercadoLibre** serves as the regional leader [8]. In 2024, MercadoLibre generated **$50 billion in revenue**, marking a record for the region [8].\n\n**MercadoLibre** is essentially the \"Amazon of Latin America\" due to its own logistics backbone and its role as the leading online marketplace [2]. It holds more than **55% of the region's digital retail media market**, compared to Amazon's **17.7%** as of September 2026 [8].\n\nPeople in the region use **MercadoLibre** as their primary shopping platform [2][8]. The company is a hybrid of e-commerce and fintech, utilizing its own payment service, **Mercado Pago**, which is a leading financial services app in markets like Mexico and Argentina [6]. This financial component is a key differentiator, as the platform helps users navigate economic volatility, such as the inflation seen in Argentina [6].",
+ "answer": "Amazon does not have a dominant retail presence in South America, as the region's e-commerce is led by local competitors.\n\nWhile Amazon maintains a global presence, it does not function as the primary marketplace in South American countries; instead, **MercadoLibre** serves as the regional leader [8]. In 2024, MercadoLibre generated **$50 billion in revenue**, marking a record for the region [8].\n\n**MercadoLibre** is essentially the \"Amazon of Latin America\" due to its own logistics backbone and its role as the leading online marketplace [2]. It holds more than **55% of the region's digital retail media market**, compared to Amazon's **17.7%** as of September 2026 [8].\n\nPeople in the region use **MercadoLibre** as their primary shopping platform [2][8]. The company is a hybrid of e-commerce and fintech, utilizing its own payment service, **Mercado Pago**, which is a leading financial services app in markets like Mexico and Argentina [6]. This financial component is a key differentiator, as the platform helps users navigate economic volatility, such as the inflation seen in Argentina [6].",
+ "chars": 1104,
+ "raw_bytes": 3254,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.22,
+ "rate_gen_tok_s": 13.66,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:14:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 18.8,
+ "app_total_s": 24.99,
+ "first_text_s_unreliable": true
+}

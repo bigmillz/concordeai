@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":106,\"est\":false}",
+  "X-Hurry": "d14ab4e6f38fc9bf"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 13.62,
+ "elapsed_s": 18.74,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 6.64,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.64,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.64,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.74,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.62,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 18.73,
+   "tag": "RATE",
+   "data": {
+    "tps": 49.3,
+    "tok": 252,
+    "s": 5.1
+   }
+  },
+  {
+   "t": 18.74,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1008 chars"
+   }
+  },
+  {
+   "t": 18.74,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.64,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.64
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.64
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 8.74
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.74
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.74
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1008 chars",
+   "t_s": 18.74
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 18.74
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Amtrak rolls out $20 tickets between NYC and Boston for the summer",
+   "u": "https://secretnyc.co/heap-train-nyc-boston-amtrak-20/",
+   "d": "2026"
+  },
+  {
+   "t": "NYC to Boston in 2026: Amtrak, Flight, Bus or Drive? Cost and ...",
+   "u": "https://www.shopback.com/blog/travel/nyc-to-boston-cheapest-way-2026",
+   "d": "2026-07-14"
+  },
+  {
+   "t": "New York (LGA) to Boston (BOS) Distance - 296 KM, Flight Distance...",
+   "u": "https://www.easemytrip.com/flights/distance-new-york-lga-to-boston-bos/",
+   "d": ""
+  },
+  {
+   "t": "Cost to Hang Interior Door - 2025 Cost Calculator (Customizable)",
+   "u": "https://homewyse.com/services/cost_to_hang_interior_door.html",
+   "d": "2025"
+  },
+  {
+   "t": "Go Buses NYC to Boston, Washington, D.C. and Virginia",
+   "u": "https://www.gobuses.com/",
+   "d": ""
+  },
+  {
+   "t": "£64 JetBlue Airways flights from New York City to Boston",
+   "u": "https://www.opodo.co.uk/airline/B6/jetblue-airways/NYC/new-york-city/BOS/boston/",
+   "d": ""
+  },
+  {
+   "t": "Boston To NYC Amtrak Stops: Essential Travel Guide, Schedule...",
+   "u": "https://travelpander.com/boston-to-nyc-amtrak-stops/",
+   "d": "2025-07-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.74,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 49.3,
+  "tok": 252,
+  "s": 5.1
+ },
+ "answer_raw": "The **train** is the superior choice for this route due to its city-center-to-city-center transit and more predictable door-to-door timing.\n\n**Door-to-door time**\nThe train typically takes between **3h30–5h15** depending on speed and city access, while flying takes roughly **3h45–5h30** once you account for airport buffers and transit [1]. On the rails, the Northeast Regional trip itself is scheduled between **4h05–4h30** [3]. A direct flight's air time is roughly **3h20** [4].\n\n**Typical cost**\n*   **Train**: Fares can be as low as **$20** via Amtrak Night Owl deals [2], with general tickets typically ranging from **$49–$150** [8].\n*   **Flight**: Low-cost options for this route have been seen around **£72** (~$95) [7] or **₹14083** (~$165) [4].\n\n**The Verdict**\nI would pick the **train** because it avoids the friction of airport security and terminal transit, landing you directly in the heart of the city [1]. The rail option is more efficient for a high-frequency corridor like NYC to Boston.",
+ "answer": "The **train** is the superior choice for this route due to its city-center-to-city-center transit and more predictable door-to-door timing.\n\n**Door-to-door time**\nThe train typically takes between **3h30–5h15** depending on speed and city access, while flying takes roughly **3h45–5h30** once you account for airport buffers and transit [1]. On the rails, the Northeast Regional trip itself is scheduled between **4h05–4h30** [3]. A direct flight's air time is roughly **3h20** [4].\n\n**Typical cost**\n*   **Train**: Fares can be as low as **$20** via Amtrak Night Owl deals [2], with general tickets typically ranging from **$49–$150** [8].\n*   **Flight**: Low-cost options for this route have been seen around **£72** (~$95) [7] or **₹14083** (~$165) [4].\n\n**The Verdict**\nI would pick the **train** because it avoids the friction of airport security and terminal transit, landing you directly in the heart of the city [1]. The rail option is more efficient for a high-frequency corridor like NYC to Boston.",
+ "chars": 1008,
+ "raw_bytes": 3037,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.45,
+ "rate_gen_tok_s": 49.22,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:39:55",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

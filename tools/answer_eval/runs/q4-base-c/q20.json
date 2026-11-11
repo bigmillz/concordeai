@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":142,\"est\":false}",
+  "X-Hurry": "e7ee903382897b75"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 17.75,
+ "elapsed_s": 26.69,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.1,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.1,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.68,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 18 passages"
+   }
+  },
+  {
+   "t": 13.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.68,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.68,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.69,
+   "tag": "RATE",
+   "data": {
+    "tps": 62.8,
+    "tok": 561,
+    "s": 8.9
+   }
+  },
+  {
+   "t": 26.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2244 chars"
+   }
+  },
+  {
+   "t": 26.69,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.69,
+   "tag": "DONE",
+   "data": {
+    "f": 17.75,
+    "t": 26.69,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   11.1,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.1
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.1
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 18 passages",
+   "t_s": 13.68
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.68
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.68
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2244 chars",
+   "t_s": 26.69
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.69
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "EIU Global Liveability Index 2026",
+   "u": "https://www.eiu.com/n/wp-content/uploads/2026/07/EIU_Liveability-Index-2026.pdf",
+   "d": "2026-07"
+  },
+  {
+   "t": "The Global Liveability Index 2026 - Economist Intelligence Unit",
+   "u": "https://www.eiu.com/n/global-themes/report/global-liveability-index-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "2026 Global Cities Index | Oxford Economics",
+   "u": "https://www.oxfordeconomics.com/global-cities-index/",
+   "d": "2026"
+  },
+  {
+   "t": "Ranked: The World’s Best Cities for Quality of Life in 2026",
+   "u": "https://www.visualcapitalist.com/ranked-the-worlds-best-cities-for-quality-of-life-in-2026/",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "Southeast Asian city ranks among world's top 3 for quality of life",
+   "u": "https://www.msn.com/en-xl/news/other/southeast-asian-city-ranks-among-world-s-top-3-for-quality-of-life/ar-AA2grk8C?ocid=BingNewsVerp",
+   "d": "2026-10-31"
+  },
+  {
+   "t": "Quality of life in Marbella: why the city is included in the 2026...",
+   "u": "https://abarzo.com/journal/discover-costa-del-sol/quality-of-life-in-marbella-why-the-city-is-included-in-the-2026-rankings-of-the-best-places-to-live",
+   "d": "2026"
+  },
+  {
+   "t": "Quality of Life Index by City 2026 Mid-Year",
+   "u": "https://www.numbeo.com/quality-of-life/rankings.jsp",
+   "d": "2026"
+  },
+  {
+   "t": "10 best places to live in Canada for affordability and quality of life",
+   "u": "https://dailyhive.com/vancouver/best-places-live-canada-2026",
+   "d": "2026-11-05"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.68,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 245,
+   "o": 31,
+   "d": 843,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4862,
+   "o": 568,
+   "d": 12950,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 62.8,
+  "tok": 561,
+  "s": 8.9
+ },
+ "app_first_s": 17.75,
+ "app_total_s": 26.69,
+ "answer_raw": "There is no single \"top\" city because different rankings measure different metrics, ranging from infrastructure and healthcare to economic dominance and lifestyle. For example, the **EIU** focuses on livability (stability and healthcare), while **Oxford Economics** focuses on the economic and social strength of global hubs.\n\n## The Primary Rankings\n\n**EIU Global Liveability Index (as of July 2026)**\nThe Economist Intelligence Unit (EIU) assesses 173 cities based on 3igory groups: stability, healthcare, culture/environment, education, and infrastructure [1][2]. In the May 2026 survey, the average liveability score across all cities was **76.1 out of 100** [1]. While global stability remained steady, regional trends diverged: the Middle East saw declining stability due to the Iran war, while Asian cities saw improvements due to healthcare investments [2].\n\n**Oxford Economics: Global Cities Index (as of October 2026)**\nThis index evaluates 1,000 cities to identify strengths, weaknesses, and future potential [3]. While New York, London, and Paris continue to dominate the top of the ranking, there is a significant shift in activity toward Asian megacities [3].\n\n**Quality of Life Specifics**\n*   **Singapore** — Ranked **third globally** for quality of life in the 2026 Global Cities Index by Oxford Economics [5].\n*   **The \"Quality of Life\" Category** — In the 2026 Oxford Economics/Visual Capitalist data, this specific category measures income equality, income per person, housing expenditure, life expectancy, crime, and access to recreation/culture [4].\n*   **Numbeo Mid-Year Index (as of 2026)** — Lists **Sydney, Australia** as the top-ranked city for its mid-year Quality of Life Index [7].\n\n## Summary Comparison\n\n| Ranking Provider | Primary Focus | Top/Key Trends (2026) |\n| :--- | :--- | :--- |\n| **EIU** [1] | Stability, healthcare, culture, education, infrastructure | Average score: **76.1/100**; regional shifts in Middle East vs. Asia [2]. |\n| **Oxford Economics** [3] | Economic strength, future potential, 1,000 largest cities | **New York, London, and Paris** lead; Asia's megacities are rising [3]. |\n| **Numbeo** [7] | Mid-year Quality of Life Index | **Sydney, Australia** leads the mid-year rankings [7]. |",
+ "answer": "There is no single \"top\" city because different rankings measure different metrics, ranging from infrastructure and healthcare to economic dominance and lifestyle. For example, the **EIU** focuses on livability (stability and healthcare), while **Oxford Economics** focuses on the economic and social strength of global hubs.\n\n## The Primary Rankings\n\n**EIU Global Liveability Index (as of July 2026)**\nThe Economist Intelligence Unit (EIU) assesses 173 cities based on 3igory groups: stability, healthcare, culture/environment, education, and infrastructure [1][2]. In the May 2026 survey, the average liveability score across all cities was **76.1 out of 100** [1]. While global stability remained steady, regional trends diverged: the Middle East saw declining stability due to the Iran war, while Asian cities saw improvements due to healthcare investments [2].\n\n**Oxford Economics: Global Cities Index (as of October 2026)**\nThis index evaluates 1,000 cities to identify strengths, weaknesses, and future potential [3]. While New York, London, and Paris continue to dominate the top of the ranking, there is a significant shift in activity toward Asian megacities [3].\n\n**Quality of Life Specifics**\n*   **Singapore** — Ranked **third globally** for quality of life in the 2026 Global Cities Index by Oxford Economics [5].\n*   **The \"Quality of Life\" Category** — In the 2026 Oxford Economics/Visual Capitalist data, this specific category measures income equality, income per person, housing expenditure, life expectancy, crime, and access to recreation/culture [4].\n*   **Numbeo Mid-Year Index (as of 2026)** — Lists **Sydney, Australia** as the top-ranked city for its mid-year Quality of Life Index [7].\n\n## Summary Comparison\n\n| Ranking Provider | Primary Focus | Top/Key Trends (2026) |\n| :--- | :--- | :--- |\n| **EIU** [1] | Stability, healthcare, culture, education, infrastructure | Average score: **76.1/100**; regional shifts in Middle East vs. Asia [2]. |\n| **Oxford Economics** [3] | Economic strength, future potential, 1,000 largest cities | **New York, London, and Paris** lead; Asia's megacities are rising [3]. |\n| **Numbeo** [7] | Mid-year Quality of Life Index | **Sydney, Australia** leads the mid-year rankings [7]. |",
+ "chars": 2244,
+ "raw_bytes": 4655,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.02,
+ "rate_gen_tok_s": 62.75,
+ "id": "q20",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Top global living cities",
+ "question": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:40:19",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What are the top cities in the world to live in right now by quality of life? Which rankings say what, and who's on top this year?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

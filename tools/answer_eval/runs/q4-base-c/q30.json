@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":4.4,\"ftok\":162,\"est\":false}",
+  "X-Hurry": "59855336fc99e2ca"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 3.2,
+ "elapsed_s": 22.27,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.2,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 10.42,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "1956 chars"
+   }
+  },
+  {
+   "t": 10.42,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 10.42,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 10.42,
+   "tag": "RESET"
+  },
+  {
+   "t": 22.27,
+   "tag": "RATE",
+   "data": {
+    "tps": 66.7,
+    "tok": 455,
+    "s": 6.8
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1823 chars"
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.27,
+   "tag": "DONE",
+   "data": {
+    "f": 3.2,
+    "t": 22.27,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   10.42,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.06
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "1956 chars",
+   "t_s": 10.42
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 10.42
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1823 chars",
+   "t_s": 22.27
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.27
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2231,
+   "o": 472,
+   "d": 10335
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 3992,
+   "o": 437,
+   "d": 11795
+  }
+ ],
+ "rate_writer": {
+  "tps": 66.7,
+  "tok": 455,
+  "s": 6.8
+ },
+ "app_first_s": 3.2,
+ "app_total_s": 22.27,
+ "answer_raw": "4-bit quantization compresses the model's weight precision from **16-bit floating point (FP16/BF16)** down to **4-bit integers** to shrink the memory footprint and increase inference speed.\n\nIn a 4-bit environment, you only have **16 possible values** to represent a weight. To prevent massive accuracy loss, modern techniques like **GPTQ** or **GGUF** use block-wise scaling: they divide weights into groups and apply a scaling factor to each group, allowing the 16 available values to map more effectively to the local distribution of weights.\n\n## When it matters\n\n**VRAM constraints** — This is the primary driver. An LLM with **70 billion parameters** requires roughly **140GB of VRAM** at FP16. At 4-bit, that same model fits into roughly **40GB**, allowing you to run it on consumer-grade hardware like a Mac Studio or dual workstation GPUs instead of an enterprise-grade server cluster.\n\n**Inference throughput** — Moving 4-bit weights from memory to the compute cores requires much less bandwidth than 16-bit weights. Since LLM inference is typically **memory-bandwidth bound** (the bottleneck is moving data, not the math itself), 4-bit quantization can lead to significantly higher **tokens-per-second** on compatible hardware.\n\n**The Perplexity trade-off** — The loss in intelligence (measured as perplexity) is usually negligible for **7B to 70B parameter models** when pushed to 4-bit. However, if you drop lower (e.g., 2-bit), the model's ability to reason collapses because the bins are too coarse to capture the necessary nuance.\n\nThe best option is to use 4-bit quantization when you need to **fit a larger model on smaller hardware** or want to **maximize tokens-per-second**. If you have enough VRAM to run the model at FP16, there is no reason to quantize unless you are looking for extreme speed gains.",
+ "answer": "4-bit quantization compresses the model's weight precision from **16-bit floating point (FP16/BF16)** down to **4-bit integers** to shrink the memory footprint and increase inference speed.\n\nIn a 4-bit environment, you only have **16 possible values** to represent a weight. To prevent massive accuracy loss, modern techniques like **GPTQ** or **GGUF** use block-wise scaling: they divide weights into groups and apply a scaling factor to each group, allowing the 16 available values to map more effectively to the local distribution of weights.\n\n## When it matters\n\n**VRAM constraints** — This is the primary driver. An LLM with **70 billion parameters** requires roughly **140GB of VRAM** at FP16. At 4-bit, that same model fits into roughly **40GB**, allowing you to run it on consumer-grade hardware like a Mac Studio or dual workstation GPUs instead of an enterprise-grade server cluster.\n\n**Inference throughput** — Moving 4-bit weights from memory to the compute cores requires much less bandwidth than 16-bit weights. Since LLM inference is typically **memory-bandwidth bound** (the bottleneck is moving data, not the math itself), 4-bit quantization can lead to significantly higher **tokens-per-second** on compatible hardware.\n\n**The Perplexity trade-off** — The loss in intelligence (measured as perplexity) is usually negligible for **7B to 70B parameter models** when pushed to 4-bit. However, if you drop lower (e.g., 2-bit), the model's ability to reason collapses because the bins are too coarse to capture the necessary nuance.\n\nThe best option is to use 4-bit quantization when you need to **fit a larger model on smaller hardware** or want to **maximize tokens-per-second**. If you have enough VRAM to run the model at FP16, there is no reason to quantize unless you are looking for extreme speed gains.",
+ "chars": 1823,
+ "raw_bytes": 4508,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 20.46,
+ "rate_gen_tok_s": 23.9,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:44:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

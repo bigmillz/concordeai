@@ -1,0 +1,297 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.7,\"ftok\":95,\"est\":false}",
+  "X-Hurry": "2bf5f2ddae4b69b0"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 22.93,
+ "elapsed_s": 35.25,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 9.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "5 sources"
+   }
+  },
+  {
+   "t": 9.08,
+   "tag": "STATUS",
+   "text": "Reading 5 sources…"
+  },
+  {
+   "t": 9.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "5 pages"
+   }
+  },
+  {
+   "t": 15.57,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "2 pages · 11 passages"
+   }
+  },
+  {
+   "t": 15.57,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 15.57,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 15.57,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.57,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 22.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 35.24,
+   "tag": "RATE",
+   "data": {
+    "tps": 16.6,
+    "tok": 204,
+    "s": 12.3
+   }
+  },
+  {
+   "t": 35.24,
+   "tag": "RESET"
+  },
+  {
+   "t": 35.24,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 35.24,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "796 chars"
+   }
+  },
+  {
+   "t": 35.24,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   9.08,
+   "Reading 5 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "5 sources",
+   "t_s": 9.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "5 pages",
+   "t_s": 9.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "2 pages · 11 passages",
+   "t_s": 15.57
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 15.57
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.57
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 35.24
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "796 chars",
+   "t_s": 35.24
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 35.24
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "Flying vs Driving - Family Cruises - Cruise Critic Community",
+   "u": "https://boards.cruisecritic.com/topic/1834271-flying-vs-driving",
+   "d": ""
+  },
+  {
+   "t": "Design Miami · Design Miami",
+   "u": "https://designmiami.com/",
+   "d": ""
+  },
+  {
+   "t": "Crocs AE | Clogs, Sandals, Wedges & Slippers | Shoes Sale",
+   "u": "https://www.crocs-uae.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.57,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 16.6,
+  "tok": 204,
+  "s": 12.3
+ },
+ "answer_raw": "Flying is likely cheaper all-in, though the exact delta depends on fuel prices and seasonal airfare.\n\nI didn't find pricing for flights or driving costs between Brooklyn and Miami, so you would need to check travel booking sites and fuel calculators for current rates.\n\n**Flying** — typically $200–$400 per person round-trip (as of late 2025/early 2026), totaling **$400–$800** for two.\n\n**Driving** — typically $400–$600 in fuel plus $200–$400 for wear and tear/maintenance + potential hotels/food, totaling **$600–$1,000+** for two.\n\nThe calculation for driving is roughly: (1,300 miles each way $\\times$ 2 = 2,600 miles) / 25 MPG $\\times$ $3.50/gal $\\approx$ $364 in fuel, plus food and tolls.\n\nFlying wins on cost and time, saving you roughly **$200–$400** and about 40 hours of transit time.",
+ "answer": "Flying is likely cheaper all-in, though the exact delta depends on fuel prices and seasonal airfare.\n\nI didn't find pricing for flights or driving costs between Brooklyn and Miami, so you would need to check travel booking sites and fuel calculators for current rates.\n\n**Flying** — typically $200–$400 per person round-trip (as of late 2025/early 2026), totaling **$400–$800** for two.\n\n**Driving** — typically $400–$600 in fuel plus $200–$400 for wear and tear/maintenance + potential hotels/food, totaling **$600–$1,000+** for two.\n\nThe calculation for driving is roughly: (1,300 miles each way $\\times$ 2 = 2,600 miles) / 25 MPG $\\times$ $3.50/gal $\\approx$ $364 in fuel, plus food and tolls.\n\nFlying wins on cost and time, saving you roughly **$200–$400** and about 40 hours of transit time.",
+ "chars": 796,
+ "raw_bytes": 2993,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 5.65,
+ "rate_gen_tok_s": 16.15,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:03:44",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

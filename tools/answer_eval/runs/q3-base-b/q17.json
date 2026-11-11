@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.4,\"ftok\":151,\"est\":false}",
+  "X-Hurry": "1c472004bd59e4ba"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 25.33,
+ "elapsed_s": 50.68,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 12.12,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.12,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 12.12,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.21,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 20 passages"
+   }
+  },
+  {
+   "t": 17.21,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.21,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.21,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 25.33,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 50.68,
+   "tag": "RATE",
+   "data": {
+    "tps": 15.1,
+    "tok": 383,
+    "s": 25.4
+   }
+  },
+  {
+   "t": 50.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1535 chars"
+   }
+  },
+  {
+   "t": 50.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   12.12,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.12
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 12.12
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 20 passages",
+   "t_s": 17.21
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.21
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.21
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1535 chars",
+   "t_s": 50.68
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 50.68
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhood Guide | Where to Live",
+   "u": "https://scbimoveis.com/en/articles/florianopolis-neighborhood-guide-where-to-live-by-lifestyle",
+   "d": "2026-06-07"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Chic Studio POOL/BBQ near BEACH walkable SAFE... - Airbnb",
+   "u": "https://www.airbnb.com/rooms/1677564342636941056",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "Buying and Renting Out in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-buy-rent-out",
+   "d": "2026"
+  },
+  {
+   "t": "Picky mom wants beach, safe walkable town, no cars... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g1-i9658-k11989472-o10-Picky_mom_wants_beach_safe_walkable_town_no_cars_food-Family_Travel.html",
+   "d": ""
+  },
+  {
+   "t": "Sunny Isles Beach, FL Homes For Sale & Real Estate - 1,155... | Trulia",
+   "u": "https://www.trulia.com/FL/Sunny_Isles_Beach/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.21,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 15.1,
+  "tok": 383,
+  "s": 25.4
+ },
+ "answer_raw": "For a six-month stay that balances beach access, walkability, and infrastructure, **Lagoa da Conceição** is your best bet.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — This is the heart of the island for an active lifestyle [3]. It is highly coveted because it offers full infrastructure, including supermarkets and services, while providing easy access to the lagoon for activities like windsurfing or stand-up paddle [3]. It features a lively nightlife and is central to the island's energy [3].\n\n**Centro / Beira-Mar Norte** — This is where most foreign residents land [4]. It offers the most robust infrastructure, but you would need to drive or transit to reach the beaches [1]. \n\n**Campeche or Inglesa** — These areas offer different price points for residential living [3]. For example, rents in areas like Inglesa or Campeche run around R$ 4,500/m² as of June 2026 [3].\n\n## Rental Strategy\n\nIf you are moving for a six-month window, do not sign a long-term lease immediately.\n\n*   **Initial landing:** Book 5–7 nights via platforms like Booking.com or Hotels.com to get your bearings [4].\n*   **Mid-term:** After your first week, look for 1–2 month furnished rentals before committing to a longer contract [4].\n*   **Legal note:** Foreigners can buy and rent urban apartments in their own name using just a CPF; no residency is required [6].\n\nThe provided sources do not specifically list WiFi speeds for these neighborhoods, so you should verify connection stability with individual landlords before signing.",
+ "answer": "For a six-month stay that balances beach access, walkability, and infrastructure, **Lagoa da Conceição** is your best bet.\n\n## Top Neighborhood Recommendations\n\n**Lagoa da Conceição** — This is the heart of the island for an active lifestyle [3]. It is highly coveted because it offers full infrastructure, including supermarkets and services, while providing easy access to the lagoon for activities like windsurfing or stand-up paddle [3]. It features a lively nightlife and is central to the island's energy [3].\n\n**Centro / Beira-Mar Norte** — This is where most foreign residents land [4]. It offers the most robust infrastructure, but you would need to drive or transit to reach the beaches [1]. \n\n**Campeche or Inglesa** — These areas offer different price points for residential living [3]. For example, rents in areas like Inglesa or Campeche run around R$ 4,500/m² as of June 2026 [3].\n\n## Rental Strategy\n\nIf you are moving for a six-month window, do not sign a long-term lease immediately.\n\n*   **Initial landing:** Book 5–7 nights via platforms like Booking.com or Hotels.com to get your bearings [4].\n*   **Mid-term:** After your first week, look for 1–2 month furnished rentals before committing to a longer contract [4].\n*   **Legal note:** Foreigners can buy and rent urban apartments in their own name using just a CPF; no residency is required [6].\n\nThe provided sources do not specifically list WiFi speeds for these neighborhoods, so you should verify connection stability with individual landlords before signing.",
+ "chars": 1535,
+ "raw_bytes": 3639,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 7.57,
+ "rate_gen_tok_s": 15.14,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:50:18",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

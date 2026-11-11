@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.2,\"ftok\":260,\"est\":false}",
+  "X-Hurry": "b100d4c222851dbf"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 21.39,
+ "elapsed_s": 24.58,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.37,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 16.37,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.37,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.37,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.58,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.5,
+    "tok": 224,
+    "s": 3.2
+   }
+  },
+  {
+   "t": 24.58,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 24.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "883 chars"
+   }
+  },
+  {
+   "t": 24.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 16.37
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.37
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.37
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 24.58
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "883 chars",
+   "t_s": 24.58
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.58
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Amazon (company) - Wikipedia",
+   "u": "https://en.wikipedia.org/wiki/Amazon_(company)",
+   "d": ""
+  },
+  {
+   "t": "Into the Amazon | South America",
+   "u": "https://www.heynadine.com/into-the-amazon/",
+   "d": "2012-12-22"
+  },
+  {
+   "t": "Amazon in Other Countries 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-in-other-countries",
+   "d": "2026"
+  },
+  {
+   "t": "Amazon’s Next-Day Delivery Has Brought Chaos And Carnage To...",
+   "u": "https://www.buzzfeednews.com/article/carolineodonovan/amazon-next-day-delivery-deaths",
+   "d": "2019-08-31"
+  },
+  {
+   "t": "Amazon Users by Country 2026 | World Population Review",
+   "u": "https://worldpopulationreview.com/country-rankings/amazon-users-by-country",
+   "d": "2026"
+  },
+  {
+   "t": "AmazonGlobal Export Countries and Regions - Amazon Customer ...",
+   "u": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GCBBSZMUXA6U2P8R",
+   "d": ""
+  },
+  {
+   "t": "Seller Export & Delivery (SEND) | Sell on Amazon",
+   "u": "https://sell.amazon.com/programs/seller-export-and-delivery",
+   "d": ""
+  },
+  {
+   "t": "7 Latin America Top Online Selling Sites for Ecommerce in 2026",
+   "u": "https://store.uniqbe.com/blog/latin-america-top-online-selling-sites/",
+   "d": "2026-04-02"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.37,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 70.5,
+  "tok": 224,
+  "s": 3.2
+ },
+ "answer_raw": "Amazon has a presence in South America, but it does not have the same level of infrastructure as it does in North America or Europe.\n\n**Brazil** is the only country in South America with a dedicated Amazon marketplace as of 2026 [3]. While Amazon is a global scale player with reach into Latin America, it does not have localized storefronts in other South American nations [8].\n\nFor countries without dedicated storefronts, people typically use **international shipping** to access Amazon products [3]. In much of Latin America, the primary competition and alternative involves a heavy reliance on mobile-first e-commerce, where 84% of purchases happen on smartphones [8]. Since I didn't find which local competitors dominate the non-Amazon market in South America, you would need to check local market share reports for names like Mercado Libre to confirm the leading alternatives.",
+ "answer": "Amazon has a presence in South America, but it does not have the same level of infrastructure as it does in North America or Europe.\n\n**Brazil** is the only country in South America with a dedicated Amazon marketplace as of 2026 [3]. While Amazon is a global scale player with reach into Latin America, it does not have localized storefronts in other South American nations [8].\n\nFor countries without dedicated storefronts, people typically use **international shipping** to access Amazon products [3]. In much of Latin America, the primary competition and alternative involves a heavy reliance on mobile-first e-commerce, where 84% of purchases happen on smartphones [8]. Since I didn't find which local competitors dominate the non-Amazon market in South America, you would need to check local market share reports for names like Mercado Libre to confirm the leading alternatives.",
+ "chars": 883,
+ "raw_bytes": 3835,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.98,
+ "rate_gen_tok_s": 69.2,
+ "id": "q26",
+ "turn": 1,
+ "category": "money",
+ "topic": "Amazon in South America",
+ "question": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:14:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Does Amazon actually operate in South America? Which countries have real Amazon delivery, and what do people use instead?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

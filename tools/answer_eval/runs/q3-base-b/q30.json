@@ -1,0 +1,208 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":8.2,\"ftok\":158,\"est\":false}",
+  "X-Hurry": "5e12d58c10a9160f"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 32.59,
+ "elapsed_s": 49.19,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 20.06,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 25.33,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2488 chars"
+   }
+  },
+  {
+   "t": 25.33,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.33,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 32.59,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 49.19,
+   "tag": "RATE",
+   "data": {
+    "tps": 27.4,
+    "tok": 454,
+    "s": 16.6
+   }
+  },
+  {
+   "t": 49.19,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1816 chars"
+   }
+  },
+  {
+   "t": 49.19,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   20.06,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   25.33,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2488 chars",
+   "t_s": 25.33
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 25.33
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1816 chars",
+   "t_s": 49.19
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 49.19
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 27.4,
+  "tok": 454,
+  "s": 16.6
+ },
+ "answer_raw": "4-bit quantization maps high-precision weights—typically **FP16** or **BF16**—to a 4-bit integer range, reducing the memory footprint of those weights by **75%**. This compression allows you to fit much larger models into much smaller VRAM envelopes.\n\nThe process uses a **scale factor** and a **zero-point** to map the original floating-point values into a 16-step range (e.g., 0 to 15). Because 4-bit is a coarse representation, modern techniques like **NF4** (NormalFloat4) are often used to distribute the quantization error more effectively across the distribution of weights.\n\nFor a **70B** parameter model, the VRAM requirements shift significantly:\n* **FP16**: ~**140GB** VRAM (requires multiple A100s/H100s).\n* **4-bit**: ~**40GB** VRAM (fits on a single A6000 or two consumer 3090/4090s).\n\nIt matters most when **VRAM capacity** is the bottleneck. If a model is too large to load in its native precision, 4-bit is the standard path to making it \"runnable\" on consumer or mid-range professional hardware. It also matters for **inference speed** in bandwidth-constrained environments, as moving 4-bit weights from memory to the compute cores is significantly faster than moving 16-bit weights.\n\nIt matters least when you have **massive VRAM headroom** or are running **very small models**. A 7B parameter model running on an H100 gains nothing from 4-bit quantization other than a slight speedup, while losing accuracy. Smaller models are also more sensitive to the \"intelligence drop\" caused by quantization error; larger models tend to be much more robust to the precision loss.\n\nThe **verdict** is that for models with **30B+ parameters**, 4-bit is the operational sweet spot where the loss in perplexity (accuracy) is often negligible in real-world tasks, but the hardware requirements become manageable.",
+ "answer": "4-bit quantization maps high-precision weights—typically **FP16** or **BF16**—to a 4-bit integer range, reducing the memory footprint of those weights by **75%**. This compression allows you to fit much larger models into much smaller VRAM envelopes.\n\nThe process uses a **scale factor** and a **zero-point** to map the original floating-point values into a 16-step range (e.g., 0 to 15). Because 4-bit is a coarse representation, modern techniques like **NF4** (NormalFloat4) are often used to distribute the quantization error more effectively across the distribution of weights.\n\nFor a **70B** parameter model, the VRAM requirements shift significantly:\n* **FP16**: ~**140GB** VRAM (requires multiple A100s/H100s).\n* **4-bit**: ~**40GB** VRAM (fits on a single A6000 or two consumer 3090/4090s).\n\nIt matters most when **VRAM capacity** is the bottleneck. If a model is too large to load in its native precision, 4-bit is the standard path to making it \"runnable\" on consumer or mid-range professional hardware. It also matters for **inference speed** in bandwidth-constrained environments, as moving 4-bit weights from memory to the compute cores is significantly faster than moving 16-bit weights.\n\nIt matters least when you have **massive VRAM headroom** or are running **very small models**. A 7B parameter model running on an H100 gains nothing from 4-bit quantization other than a slight speedup, while losing accuracy. Smaller models are also more sensitive to the \"intelligence drop\" caused by quantization error; larger models tend to be much more robust to the precision loss.\n\nThe **verdict** is that for models with **30B+ parameters**, 4-bit is the operational sweet spot where the loss in perplexity (accuracy) is often negligible in real-world tasks, but the hardware requirements become manageable.",
+ "chars": 1816,
+ "raw_bytes": 2391,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.23,
+ "rate_gen_tok_s": 27.35,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:59:20",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

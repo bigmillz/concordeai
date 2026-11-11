@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.9,\"ftok\":98,\"est\":false}",
+  "X-Hurry": "0831c22326bd11d4"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 15.62,
+ "elapsed_s": 20.75,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "6 queries"
+   }
+  },
+  {
+   "t": 8.88,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.88,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.88,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 24 passages"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.62,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.75,
+   "tag": "RATE",
+   "data": {
+    "tps": 50.1,
+    "tok": 257,
+    "s": 5.1
+   }
+  },
+  {
+   "t": 20.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1028 chars"
+   }
+  },
+  {
+   "t": 20.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.75,
+   "tag": "DONE",
+   "data": {
+    "f": 15.62,
+    "t": 20.75,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.88,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "6 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.88
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.88
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 24 passages",
+   "t_s": 11.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.04
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1028 chars",
+   "t_s": 20.75
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.75
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "45 Buzz Cut Styles (2026) + Length Guide & Face Shape Tips20 Best Shaved Sides H",
+   "u": "https://haircutinspiration.com/buzz-cut/",
+   "d": "2026-03-21"
+  },
+  {
+   "t": "20 Best Shaved Sides Haircuts for Men (2026 Guide)",
+   "u": "https://haircutinspiration.com/shaved-sides-haircuts-for-men/",
+   "d": "2026-05-27"
+  },
+  {
+   "t": "Pompadour Vs Undercut: Differences And How To Choose",
+   "u": "https://www.readysleek.com/pompadour-vs-undercut/",
+   "d": "2026-06-12"
+  },
+  {
+   "t": "Facial hair shaving behavior and skin problems of shaved ...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/34254359/",
+   "d": ""
+  },
+  {
+   "t": "After how much hair loss would you buzz/shave... | HairLossTalk Forums",
+   "u": "https://www.hairlosstalk.com/interact/threads/after-how-much-hair-loss-would-you-buzz-shave-your-head.38540/",
+   "d": ""
+  },
+  {
+   "t": "Bald vs Buzz Cut: Which Look Fits Your Face Better? — AIChangeHair",
+   "u": "https://aichangehair.com/blog/bald-vs-buzz-cut",
+   "d": "2026-07-01"
+  },
+  {
+   "t": "Fade vs Undercut: Which Haircut Should You... | Platinum Cutz & Style",
+   "u": "https://platinumcutz.sg/blog/fade-vs-undercut",
+   "d": "2025-04-05"
+  },
+  {
+   "t": "61 Shaved Sides Haircuts for Men in 2026 - experthairstylist.com",
+   "u": "https://experthairstylist.com/mens-hairstyles/shaved-sides-haircuts-for-men/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 241,
+   "o": 24,
+   "d": 1017,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5031,
+   "o": 236,
+   "d": 9651,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 50.1,
+  "tok": 257,
+  "s": 5.1
+ },
+ "app_first_s": 15.62,
+ "app_total_s": 20.75,
+ "answer_raw": "The **buzz cut** is your best balance of style and low maintenance.\n\n**Shaving it** is the lowest maintenance option and offers a sharp, decisive look, but it requires regular scalp maintenance and can be a much more radical change than a buzz [6]. If you have a patchy hairline, a bald look or a very close buzz can feel more controlled [6].\n\n**Buzz cutting** is a great first step because it leaves some texture to soften the transition [6]. You can use a #1 guard to leave about 1/8 inch of hair, which covers scars or bumps while still looking very short [8]. Choosing a #1 guard is also a good option if your scalp is sensitive [8].\n\n**Keeping the sides** while shaving the rest—commonly known as an undercut or shaved sides—creates a sharp contrast between the short sides and longer top [2][7]. An undercut can be striking with thick hair but often requires more styling (like gels or pomades) to manage the volume on top [7]. If you go this route, a skin fade provides a softer, more seamless blend than a hard line [8].",
+ "answer": "The **buzz cut** is your best balance of style and low maintenance.\n\n**Shaving it** is the lowest maintenance option and offers a sharp, decisive look, but it requires regular scalp maintenance and can be a much more radical change than a buzz [6]. If you have a patchy hairline, a bald look or a very close buzz can feel more controlled [6].\n\n**Buzz cutting** is a great first step because it leaves some texture to soften the transition [6]. You can use a #1 guard to leave about 1/8 inch of hair, which covers scars or bumps while still looking very short [8]. Choosing a #1 guard is also a good option if your scalp is sensitive [8].\n\n**Keeping the sides** while shaving the rest—commonly known as an undercut or shaved sides—creates a sharp contrast between the short sides and longer top [2][7]. An undercut can be striking with thick hair but often requires more styling (like gels or pomades) to manage the volume on top [7]. If you go this route, a skin fade provides a softer, more seamless blend than a hard line [8].",
+ "chars": 1028,
+ "raw_bytes": 3281,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.39,
+ "rate_gen_tok_s": 50.1,
+ "id": "q15",
+ "turn": 1,
+ "category": "health",
+ "topic": "Hairstyles for bald men",
+ "question": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:11:44",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

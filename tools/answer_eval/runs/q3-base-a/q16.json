@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.5,\"ftok\":151,\"est\":false}",
+  "X-Hurry": "d1b5b3304db4d449"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 24.08,
+ "elapsed_s": 35.88,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.68,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.68,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.68,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 17.73,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 22 passages"
+   }
+  },
+  {
+   "t": 17.73,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 17.73,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 17.73,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 17.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 35.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 49.4,
+    "tok": 583,
+    "s": 11.8
+   }
+  },
+  {
+   "t": 35.88,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2332 chars"
+   }
+  },
+  {
+   "t": 35.88,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.68,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.68
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.68
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 22 passages",
+   "t_s": 17.73
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 17.73
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 17.73
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2332 chars",
+   "t_s": 35.88
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 35.88
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Nicotine replacement therapy versus control for smoking cessation",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/29852054/",
+   "d": ""
+  },
+  {
+   "t": "How Do Family Triggers Relate To An Addiction? - Arista Recovery",
+   "u": "https://www.aristarecovery.com/blog/how-do-family-triggers-relate-to-an-addiction",
+   "d": ""
+  },
+  {
+   "t": "Smoking: Effects, Risks, Diseases, Quitting & Solutions",
+   "u": "https://my.clevelandclinic.org/health/articles/17488-smoking",
+   "d": "2017-09-06"
+  },
+  {
+   "t": "Tips For Quitting | Quit Smoking | Tips From Former Smokers | CDC",
+   "u": "https://www.cdc.gov/tobacco/campaign/tips/quit-smoking/tips-for-quitting/index.html",
+   "d": ""
+  },
+  {
+   "t": "Smoking cessation during pregnancy: the influence of partners...",
+   "u": "https://www.research.ed.ac.uk/en/publications/smoking-cessation-during-pregnancy-the-influence-of-partners-fami/",
+   "d": ""
+  },
+  {
+   "t": "A Parallel Recovery: Families Healing From AddictionThe Role of Family Systems i",
+   "u": "https://www.psychologytoday.com/us/blog/from-addiction-to-recovery/202308/a-parallel-recovery-families-healing-from-addiction",
+   "d": "2023-08-25"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   17.73,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 49.4,
+  "tok": 583,
+  "s": 11.8
+ },
+ "answer_raw": "The shift from nagging to support usually requires moving the conversation from \"how you are doing\" to a specific set of operational parameters. Most families default to nagging or checking up because they lack a clear protocol for how to help or how to handle the inevitable friction of withdrawal.\n\nTo get them on your side, you need to set the rules of engagement before the cravings hit.\n\n## Define the Support Protocol\nThe most effective way to handle this is to ask them exactly how they can help and then follow your own lead [1]. Because family dynamics can often act as triggers that mess with your recovery, you need to preemptively address these \"flashpoints\" [3].\n\n**Set specific boundaries for their involvement:**\n*   **Define the \"help\" role:** Tell them that support looks like listening without lecturing rather than coaching you [1].\n*   re-establish the home environment: Ensure they understand that a smoke-free home is a requirement for your success [1].\n*   **Manage the \"check-ins\":** If their constant questioning feels like nagging, give them a different way to help. For example, ask them to help with distractions or specific activities when you are feeling the urge, rather than asking \"do you want to smoke?\" [5][8].\n*   **Pre-authorize the \"slips\":** Tell them upfront that if you have a setback, it is a piece of information to be analyzed, not a failure to be lectured about [1].\n\n## Address the Triggers\nFamily members often trigger cravings through their own behaviors or through well-meaning but intrusive questioning.\n\n**Control the environment:**\n*   **Social boundaries:** If you have family members who smoke, they need to know they cannot smoke around you or offer you products [5].\n*   **The \"withdrawal window\":** Expect irritability during the first two to four weeks of withdrawal [1]. Explain to them that if you are short-tempered, it is a physiological symptom of the process, not a personal attack.\n\n## Why this works\nWhen you provide a clear structure, you remove the ambiguity that causes family members to hover or nag. They often act out of a desire to be \"involved,\" which can improve outcomes [7], but without guidance, that involvement becomes intrusive. By defining their role as \"listeners\" or \"distractors\" rather than \"supervisors,\" you turn them from monitors into allies.",
+ "answer": "The shift from nagging to support usually requires moving the conversation from \"how you are doing\" to a specific set of operational parameters. Most families default to nagging or checking up because they lack a clear protocol for how to help or how to handle the inevitable friction of withdrawal.\n\nTo get them on your side, you need to set the rules of engagement before the cravings hit.\n\n## Define the Support Protocol\nThe most effective way to handle this is to ask them exactly how they can help and then follow your own lead [1]. Because family dynamics can often act as triggers that mess with your recovery, you need to preemptively address these \"flashpoints\" [3].\n\n**Set specific boundaries for their involvement:**\n*   **Define the \"help\" role:** Tell them that support looks like listening without lecturing rather than coaching you [1].\n*   re-establish the home environment: Ensure they understand that a smoke-free home is a requirement for your success [1].\n*   **Manage the \"check-ins\":** If their constant questioning feels like nagging, give them a different way to help. For example, ask them to help with distractions or specific activities when you are feeling the urge, rather than asking \"do you want to smoke?\" [5][8].\n*   **Pre-authorize the \"slips\":** Tell them upfront that if you have a setback, it is a piece of information to be analyzed, not a failure to be lectured about [1].\n\n## Address the Triggers\nFamily members often trigger cravings through their own behaviors or through well-meaning but intrusive questioning.\n\n**Control the environment:**\n*   **Social boundaries:** If you have family members who smoke, they need to know they cannot smoke around you or offer you products [5].\n*   **The \"withdrawal window\":** Expect irritability during the first two to four weeks of withdrawal [1]. Explain to them that if you are short-tempered, it is a physiological symptom of the process, not a personal attack.\n\n## Why this works\nWhen you provide a clear structure, you remove the ambiguity that causes family members to hover or nag. They often act out of a desire to be \"involved,\" which can improve outcomes [7], but without guidance, that involvement becomes intrusive. By defining their role as \"listeners\" or \"distractors\" rather than \"supervisors,\" you turn them from monitors into allies.",
+ "chars": 2332,
+ "raw_bytes": 4601,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.25,
+ "rate_gen_tok_s": 49.41,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:15:51",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

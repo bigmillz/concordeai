@@ -12118,7 +12118,12 @@ _CRAFT_NAMES = {"ANSWER_BRIEF", "_BRIEF_MARK", "_brief_today", "answer_brief", "
                 "_NOTE_LABEL_RX", "_NOTE_QUOTE_RX", "_NOTE_NUM_RX", "_NOTE_WORD_STOP", "_num_key",
                 "_note_corpus", "_note_new_specifics", "critic_filter", "_evidence_has", "critic_corrections",
                 "_correction_backed", "corrections_block", "_squash", "corrections_stuck", "_RECAP_RX", "trim_recap",
-                "FINAL_THINK", "final_think_level"}
+                "FINAL_THINK", "final_think_level",
+                # quality-3 (6b523): the post-pass the council's final goes through
+                "_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
+                "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
+                "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
+                "answer_polish", "shown_answer", "quality_ablate"}
 _rc26["DEV_HOME"] = ""
 _exec_names(_rc26, {"run_council", "_DraftAbandoned", "SYNTH_INSTRUCTION",
                     "PEER_INSTRUCTION", "_srv_think", "server_think"} | _CRAFT_NAMES)
@@ -23615,7 +23620,13 @@ def _p2c_pins(src):
         < ch.index("                _run_lbl([lbl])\n"),
         "fallback call": "                    _seat_res[0] = server_first_answer(\n                        lbl, _seat_fb[lbl], full_messages, memit, emit,\n"
                          "                        status, step,\n                        first_s=30.0 if tier == \"Fast\" else 60.0,\n"
-                         "                        polish=_revise if _pol else None)\n                    hb_stop.set()\n                    return" in ch
+                         "                        polish=_revise if _pol else None)\n"
+                         "                    # the server's answer gets the same post-pass (6b560):\n"
+                         "                    # a mode with a paired server answers there first, so\n"
+                         "                    # the 6b523 fixes reached almost no answer without it\n"
+                         "                    if _seat_res[0] in (\"server\", \"fallback\"):\n"
+                         "                        _single_polish()\n"
+                         "                    hb_stop.set()\n                    return" in ch
         and "                    _pol = (effort_polish(user_prefs(user_base).get(\"polish\", True), _effort)\n                            and not images and (not query or bookish)\n"
             "                            and not _links\n"            # pasted pages write once (6b423)
             "                            and _is_substantive(prompt))" in ch
@@ -24529,7 +24540,7 @@ _P2_MUT = [
     ("no second pass on the server", '        if draft and not _looks_degenerate(draft):', '        if False:'),
     ("a failing second pass said loudly", '            except ServerError:\n                # the draft stands, and nothing alarming is said',
      '            except ZeroDivisionError:\n                # the draft stands, and nothing alarming is said'),
-    ("a failed second pass leaving its partial", '                if shown[0]:\n                    emit(Ctl(NUL + "RESET" + NUL))\n                memit(draft)', '                memit(draft)'),
+    ("a failed second pass leaving its partial", '                if shown[0]:\n                    emit(Ctl(NUL + "RESET" + NUL))\n                _m(draft)', '                _m(draft)'),
     ("a funnel not refreshing the servers", '        server_refresh_modes(bound_ctx())\n        srv = server_funnel_pick(bound_ctx(), effort)', '        srv = server_funnel_pick(bound_ctx(), effort)'),
     ("a funnel's server with no deadline", '            with server_first_deadline(30 if effort == "fast" else 60):\n                run_model(srv["label"]',
      '            if True:\n                run_model(srv["label"]'),
@@ -24933,7 +24944,7 @@ def _smc_pins(src):
         and not re.search(r"resolve_tier|run_council|cloud|MODEL_ROUTES|ensure_mlx|run_model|TIERS|MERGE_RANK", br),
         "still the server's": "        _srv_only = bool(_so_c0) and council == (_so_seats or [_so_c0])\n" in ch,
         "fast": '            elif (_srv_lbl and _srv_only and _so_mode == "Fast" and not _so_fail\n                  and not images):' in ch
-        and '                server_first_answer(\n                    _srv_lbl, "", full_messages, memit, emit, status, step,\n'
+        and '                _so_res = server_first_answer(\n                    _srv_lbl, "", full_messages, memit, emit, status, step,\n'
             "                    first_s=None," in ch
         and ch.index('_so_mode == "Fast" and not _so_fail') < ch.index("            elif _srv_lbl:\n                server_answer(")
         < ch.index("            elif len(council) > 1:"),
@@ -37871,7 +37882,9 @@ print("== quality-1: the grounded turn survives every cut (6b516) ==")
 _q16 = {"re": re, "time": time, "strftime_np": lambda f, t: time.strftime(f.replace("%-d", "%d"), t),
         # (6b520) the grounded turn's dating rules read these; a question with no stamp skips the stale note
         "fresh_ablate": lambda: set(), "_gq_stamp": lambda q, t: "", "_src_months_ago": lambda d, t: -1,
-        "FRESH_STALE_MONTHS": 12}
+        "FRESH_STALE_MONTHS": 12,
+        # (6b560) and the shape rule's knob (6b523), off in the shipped app
+        "quality_ablate": lambda: set()}
 exec(_MILLENAI_SRC[_MILLENAI_SRC.index("GROUND_RULES = ("):_MILLENAI_SRC.index("def _ground_key(")], _q16)
 _pack16 = "WEB EVIDENCE gathered today, 8 sources:\n" + "\n".join("[%d] page %d\n    %s" % (i, i, "x" * 1000) for i in range(1, 9))
 _turn16 = _q16["grounded_turn"]("most powerful GPU now", _pack16)
@@ -38068,7 +38081,7 @@ check("the earlier turn's evidence is found by the person's words and reused wit
 check("the handler carries a follow-up's evidence, searches only what it adds, and passes the notes",
       "_g_prior = ground_prior(messages)" in _hs14 and "prior=_g_prior, search=not _g_reuse" in _hs14
       and "turn_key=_ground_key(prompt)" in _hs14 and "_g_reuse = not _fu_new" in _hs14
-      and "grounded_turn(query, _gpack, note=_oai_note)" in _hs14
+      and "grounded_turn(query, _gpack, note=_oai_note or _fu_note)" in _hs14   # 6b523: the follow-up note
       and "SC_HINT if self_contained_reasoning(strip_greeting(prompt))" in _hs14, "")
 # the critic, the corrections
 _c18 = {"re": re, "json": json, "time": time, "threading": threading, "os": os, "DEV_HOME": "",
@@ -40539,7 +40552,7 @@ def _c520_all(src):
     gt_tl = g["grounded_turn"]("How does a heat pump work?", old, _T520)
     out["every current figure is dated from its own source; newer beats older; official beats an article"] = (
         "DATE EVERY CURRENT FIGURE" in gt_new and "taken from ITS OWN source's date" in gt_new
-        and "give the one with the later date" in gt_new and "OFFICIAL DATA or THE VENDOR'S OWN FEED" in gt_new
+        and "give the one with the later date" in gt_new and "OFFICIAL DATA, THE VENDOR'S OWN FEED or THE VENDOR'S OWN SITE" in gt_new
         and "SNIPPET ONLY" in gt_new
         and gt_new.index("DATE EVERY CURRENT FIGURE") < gt_new.index("PROMPT: What is the newest iPhone"))
     out["nothing from the last 12 months on a question about now: the answer is told to say so"] = (
@@ -40574,7 +40587,7 @@ def _c520_all(src):
         and nw and nw[0]["date"] == "2026-10-14" and nw[0]["href"] == "https://apnews.com/a")
     out["the shipped app never runs without the fixes (the knob is a dev copy's only)"] = (
         g["fresh_ablate"]() == set() and '"MILLENAI_FINAL_THINK", "MILLENAI_FRESH_OFF"' in src
-        and "    if not DEV_HOME:\n        return set()\n" in src)
+        and "    if not DEV_HOME:\n        return set()\n" in src[src.index("def fresh_ablate"):src.index("def fresh_ablate") + 500])
     return out
 
 
@@ -42046,6 +42059,447 @@ check("shell-polish: the shell runs millenai.py through its bytecode cache: __ma
 shutil.rmtree(_cb_dir, ignore_errors=True)
 # ==== native shell (6b532): end ====
 
+# ==== quality-3 (6b523) the writer's own slips, the shape, the vendor's page: begin ====
+# Round 3 of the answer push, measured on this Mac's Fast tier (one Gemma 4 26B writer, one pass, no critic
+# and no fact-check). The bench's judges kept finding the same failures: a sum or a reais-to-dollar conversion
+# stated wrong, the machinery showing ("the provided data does not list"), a figure the person asked for
+# refused ("check the listings"), one pick asked and five given, a listing's advert or a forum thread seated as
+# evidence, and a third party's price outranking the vendor's own. NOTES 6b523. The post-pass is deterministic
+# (no model): it re-computes the answer's own arithmetic from the figures the sentence states, checks each
+# dollar figure beside a reais figure against the one rate the answer or the evidence states, rewords the
+# leaks, drops a leading heading and a closing recap, and re-sends a changed answer after a RESET. The shape
+# and estimate rules ride the grounded turn; the vendor's own page is marked and seated; listing pages are
+# junk and forum threads and front pages rank down. Every rule has a mutant below that must break a check.
+print("== quality-3: the post-pass, the shape, the vendor's page (6b523) ==")
+
+
+def _names523(src, names, ns):
+    """Exec the named module-level nodes of `src` (any text, so a mutant works) into ns."""
+    tree = _ast.parse(src)
+    for n in tree.body:
+        nm = getattr(n, "name", None)
+        if nm is None and isinstance(n, _ast.Assign):
+            nm = next((getattr(t, "id", None) for t in n.targets), None)
+        if nm in names:
+            exec(_ast.get_source_segment(src, n), ns)
+    return ns
+
+
+_POLISH523 = {"_ANS_CUR", "_ANS_NUM", "_ANS_OP", "_ANS_OPS", "_ANS_SP", "_ANS_EXPR", "_ANS_EQ_RX", "_ANS_YEAR_RX",
+              "_ans_num", "_ans_fmt", "_ans_calc", "_ans_eval", "answer_arith_fixes", "_ANS_RATE_RXS",
+              "answer_fx_rate", "_ANS_PLAIN", "_ANS_FX_RXS", "answer_fx_fixes", "_ANS_LEAK_RXS", "answer_scrub",
+              "answer_polish", "shown_answer", "_RECAP_RX", "trim_recap", "quality_ablate",
+              "_ANS_FORM_ASK_RX", "_ANS_SUM_ASK_RX", "_ans_asked"}   # 6b560: what the person asked for stays
+
+
+class _Ctl523(str):
+    pass
+
+
+def _c523_all(src):
+    out = {}
+    try:
+        p = _names523(src, _POLISH523, {"re": re, "os": os, "DEV_HOME": "", "Ctl": _Ctl523, "NUL": "\0"})
+        g = _ns520(src)
+    except Exception as e_:
+        return {"the sections run: %r" % (e_,): False}
+    P = lambda t, pk="": p["answer_polish"](t, pk)
+    # --- the arithmetic
+    w, n = P("Fuel: 583 \u00d7 $3.40 = $1,883 a year.")
+    out["a product stated wrong is re-computed from its own figures"] = (
+        w == "Fuel: 583 \u00d7 $3.40 = $1,982 a year." and len(n) == 1 and "\u2192" in n[0])
+    w, n = P("New separate cost: $1,350 + 11\u202f\u00d7\u202f$106.40 = $1,350 + $1,169.40 = $2,519.40. Package $2,400.")
+    out["a chain is judged first against last, and the middle sum's one worked-out figure is re-derived"] = (
+        w == "New separate cost: $1,350 + 11\u202f\u00d7\u202f$106.40 = $1,350 + $1,170.40 = $2,520.40. Package $2,400."
+        and len(n) == 2)
+    right = ("Separate: $1,350 + $1,045 = $2,395, so the package costs $5 more. "
+             "Separate: $1,350 + 11 \u00d7 $95 = $1,350 + $1,045 = $2,395. "
+             "583 \u00d7 $3.40 = $1,983; 14,000 / 24 = 583.33; 14,000 \u00f7 48 \u2248 292 gallons; "
+             "$5,000 / $991.66 = 5.04 years; $4.47 \u00d7 730 = $3,263 a month; that totals $12,345 + $5 = $12,350.")
+    out["right arithmetic, rounded inputs and an approximation are left alone"] = P(right) == (right, [])
+    partial = "comes out **$2,395** (flight\u202f$1,350\u202f+\u202f11\u202f\u00d7\u202f$95\u202f=\u202f$1,045), so"
+    out["a partial equation (the head is context), a year, a share, a sign flip and fenced code are left alone"] = (
+        P(partial) == (partial, []) and P("2023 - 2019 = 6 years.") == ("2023 - 2019 = 6 years.", [])
+        and P("2.27 / 3.49 = 65% of last year's.") == ("2.27 / 3.49 = 65% of last year's.", [])
+        and P("Python 3.12 - 3.9 = 0.3 is not") == ("Python 3.12 - 3.9 = 0.3 is not", [])
+        and P("```\n2 + 2 = 5\n```\nfine") == ("```\n2 + 2 = 5\n```\nfine", []))
+    # --- the conversions
+    fx = ("Expect R$3,500\u2013R$5,500 ($1,700\u2013$2,700 USD \u2014 based on Oct 23 rates) per month. "
+          "The rate is R$5.05 per dollar.")
+    w, n = P(fx)
+    out["a reais range converted wrong is fixed at the rate the answer states, both ends"] = (
+        "($693\u2013$1,089 USD" in w and len(n) == 2)
+    pk = "[1] Exchange rates \u2014 frankfurter.app \u2014 2026-10-23\n    1 US dollar = 5.0465 BRL; 1 BRL = $0.1982 (ECB reference rate, 2026-10-23)."
+    out["the evidence's rate serves when the answer states none; a right conversion and a reversed pair are handled"] = (
+        P("Budget R$4,000 (about $1,900) a month.", pk) == ("Budget R$4,000 (about $792) a month.",
+                                                            ["R$4,000 at 5.05 \u2192 $792 (said $1,900)"])
+        and P("Budget R$4,000 (about $1,900) a month.") == ("Budget R$4,000 (about $1,900) a month.", [])
+        and P("About R$3,800 (roughly $750 at R$5.05 to the dollar).") == ("About R$3,800 (roughly $750 at R$5.05 to the dollar).", [])
+        and P("About $900 (R$2,000) covers rent, at 5.05 BRL per USD.")[0] == "About $396 (R$2,000) covers rent, at 5.05 BRL per USD."
+        and p["answer_fx_rate"]("at 5.05 per dollar and later 5.40 BRL per USD") == 0.0)
+    # --- the leaks
+    w, n = P("The provided sources do not list specific rental prices. The specific retail prices are not listed in "
+             "the available data. Based on the evidence, Lagoa wins. The available evidence supports a modest benefit. "
+             "The data center stays.")
+    out["the machinery's words are reworded in place, grammar and case kept, 'the data center' untouched"] = (
+        w == "I didn't find specific rental prices. The specific retail prices aren't in what I found. Based on what I "
+             "found, Lagoa wins. What I found supports a modest benefit. The data center stays." and n == ["4 leaks reworded"])
+    # --- heading, recap, the knob
+    w, n = P("# Eggs\nEggs cost $2.27 as of Sept 2026.\n\nA year ago $3.49.\n\nThe bird-flu spike unwound.\n\n**Bottom line:** cheaper.")
+    out["a leading heading and a closing recap go; a clean answer returns unchanged with no notes"] = (
+        w == "Eggs cost $2.27 as of Sept 2026.\n\nA year ago $3.49.\n\nThe bird-flu spike unwound."
+        and n == ["heading dropped", "recap trimmed"] and P("Eggs cost $2.27.") == ("Eggs cost $2.27.", []))
+    _qa = p["quality_ablate"]
+    p["quality_ablate"] = lambda: {"polish"}          # the functions read their own namespace
+    off = P("Fuel: 583 \u00d7 $3.40 = $1,883.")
+    p["quality_ablate"] = _qa
+    os.environ["MILLENAI_Q3_OFF"] = "polish,shape"
+    shipped = (p["quality_ablate"](), g["quality_ablate"]())        # DEV_HOME is "" here: the shipped app
+    del os.environ["MILLENAI_Q3_OFF"]
+    out["the knob turns the post-pass off in a dev copy, and the shipped app never runs without it"] = (
+        off == ("Fuel: 583 \u00d7 $3.40 = $1,883.", [])
+        and shipped == (set(), set())
+        and '"MILLENAI_Q3_OFF"' in src and "MILLENAI_Q3_OFF" in src[src.index("def quality_ablate"):src.index("def quality_ablate") + 600])
+    sh = p["shown_answer"](["old ", _Ctl523("\0RESET\0"), "new ", _Ctl523("\0STEP:{}\0"), "text"])
+    out["the text on screen is what follows the last RESET, frames left out"] = sh == "new text"
+    # --- the grounded turn
+    gt = g["grounded_turn"]("What's a furnished one-bedroom in Lagoa per month, in reais and dollars?",
+                            "[1] Rents \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    rent R$59 per square metre a month",
+                            note=g["GROUND_FOLLOWUP"])
+    out["the grounded turn carries the shape, after the dating rules and before the note; the estimate rule is gone (6b560)"] = (
+        "ESTIMATE WHEN ASKED" not in gt and "ANSWER SHAPE:" in gt and "name ONE pick" in gt
+        and "'The provided data'" in gt and "are banned" in gt
+        and gt.index("DATE EVERY CURRENT FIGURE") < gt.index("ANSWER SHAPE")
+        < gt.index("[This is a follow-up") < gt.index("PROMPT: What's a furnished")
+        and "Do not restate that answer" in gt)
+    _gqa = g["quality_ablate"]
+    g["quality_ablate"] = lambda: {"shape"}
+    gt2 = g["grounded_turn"]("rent in Lagoa?", "[1] R \u2014 a.com \u2014 2026-10-01\n    https://a.com\n    R$59")
+    g["quality_ablate"] = _gqa
+    out["the knob takes the shape out of a dev copy's turn"] = (
+        "ANSWER SHAPE" not in gt2 and "GROUNDING RULES" in gt2)
+    out["the dating rule puts the vendor's own site with official data, over a reseller's figure"] = (
+        "THE VENDOR'S OWN SITE is the agency's, the maker's or the seller's own record" in g["GROUND_DATING"]
+        and "beat any article's, listicle's or reseller's" in g["GROUND_DATING"])
+    # --- the ranking
+    rows = [{"title": "Picky mom wants beach town - Tripadvisor", "href": "https://www.tripadvisor.com/ShowTopic-g1-i2-Picky.html",
+             "body": "beach safe walkable Florian\u00f3polis neighborhoods", "_q": "a"},
+            {"title": "Chic Studio near BEACH walkable SAFE - Airbnb", "href": "https://www.airbnb.com/rooms/123",
+             "body": "Florian\u00f3polis beach walkable safe neighborhoods", "_q": "a"},
+            {"title": "Florian\u00f3polis Neighborhoods Guide: Where to Live", "href": "https://floripaguru.com/neighborhoods",
+             "body": "Florian\u00f3polis neighborhoods safe walkable beach Lagoa Campeche", "_q": "a"},
+            {"title": "Search, compare & book trains, buses, flights - Omio", "href": "https://www.omio.com/",
+             "body": "flights Florian\u00f3polis", "_q": "b"},
+            {"title": "Clear Bubble Glass Tumblers | Durable Design", "href": "https://www.target.com/p/clear-bubble-glass",
+             "body": "clear bubble glass", "_q": "c"},
+            {"title": "Budget-Friendly Cloud Server Pricing | DigitalOcean", "href": "https://www.digitalocean.com/pricing/droplets",
+             "body": "DigitalOcean droplet pricing GPU server monthly", "_q": "d"},
+            {"title": "DigitalOcean GPU at $2.50/hr - CheapGPU", "href": "https://cheapgpu.example.com/digitalocean-gpu-pricing-2026",
+             "body": "DigitalOcean GPU server pricing per hour monthly cheapest", "_q": "d"},
+            {"title": "DigitalOcean server pricing: GPU droplets, a clear bubble guide - Hostreview", "href": "https://hostreview.example.com/digitalocean-pricing",
+             "body": "DigitalOcean server pricing GPU droplet monthly hourly compared safe walkable beach 2026", "_q": "d"},
+            {"title": "DigitalOcean server pricing explained: clear bubble pricing - Cloudwatch", "href": "https://cloudwatch.example.com/digitalocean-server-pricing",
+             "body": "DigitalOcean server pricing GPU droplet monthly hourly compared safe walkable beach 2026", "_q": "d"}]
+    terms = ["Florian\u00f3polis", "neighborhoods", "safe", "walkable", "beach", "DigitalOcean", "pricing", "server", "clear", "bubble"]
+    rk = g["rank_sources"](rows, terms, ["Florian\u00f3polis", "DigitalOcean"], True)
+    hosts = [s["host"] for s in rk]
+    do = next((s for s in rk if s["host"] == "digitalocean.com"), None)
+    out["a listing's page is junk, a forum thread and a front page rank down, a far-off query seats nothing"] = (
+        "airbnb.com" not in hosts and g["_src_junk"]({"url": "https://www.airbnb.com/rooms/1", "title": "t", "body": "b"}) == "listing"
+        and g["_src_junk"]({"url": "https://www.bing.com/aclick?ld=e8x&u=a1", "title": "DigitalOcean Cloud - Affordable Pricing", "body": "b"}) == "ad"
+        and g["_src_quality"]("www.tripadvisor.com", "/ShowTopic-g1") == -2 and g["_src_quality"]("www.omio.com", "/") == -2
+        and g["_src_quality"]("stackoverflow.com", "/questions/1") == 2 and g["_src_quality"]("www.airbnb.com", "/rooms/1") == -2
+        and hosts.index("floripaguru.com") < hosts.index("tripadvisor.com")
+        and not next(s for s in rk if s["host"] == "target.com").get("seat"))
+    out["the vendor's own page on the question is flagged and seated ahead of the fill; a reseller's isn't"] = (
+        do is not None and do.get("vendor") is True and do.get("seat") is True
+        and next(s for s in rk if s["host"] == "cheapgpu.example.com").get("vendor") is False)
+    pack, _np = g["evidence_pack"]([dict(do, paras=["Droplets start at $4 a month; the H200 GPU Droplet is $4.47 an hour."]),
+                                    {"title": "CheapGPU", "host": "cheapgpu.example.com", "url": "https://cheapgpu.example.com/x",
+                                     "body": "$2.50/hr", "paras": [], "snippet_only": True}], terms, _T520)
+    out["the pack marks the vendor's own site, before the passages, and a reseller's snippet stays marked snippet-only"] = (
+        "(THE VENDOR'S OWN SITE: the maker's or seller's own page)" in pack
+        and pack.index("THE VENDOR'S OWN SITE") < pack.index("Droplets start at $4")
+        and pack.index("THE VENDOR'S OWN SITE") < pack.index("SNIPPET ONLY"))
+    g["quality_ablate"] = lambda: {"vendor"}
+    rk3 = g["rank_sources"](rows, terms, ["Florian\u00f3polis", "DigitalOcean"], True)
+    j3 = g["_src_junk"]({"url": "https://www.airbnb.com/rooms/1", "title": "t", "body": "b"})
+    g["quality_ablate"] = _gqa
+    out["the knob restores the old ranking in a dev copy (no vendor flag, listings kept)"] = (
+        j3 == "" and "airbnb.com" in [s["host"] for s in rk3] and not any(s.get("vendor") for s in rk3))
+    # --- the handler's wiring, from the text
+    hs = src[src.index("def _single_polish():"):src.index("        except (BrokenPipeError, ConnectionResetError):\n            pass  # user hit Stop")]
+    out["the single writer's answer goes through the post-pass on both paths, and a changed one is re-sent after a RESET"] = (
+        hs.count("\n                    _single_polish()\n") == 2 and "_shown = shown_answer(answer_buf)" in hs
+        and "_new, _notes = answer_polish(_shown, _pk, prompt)" in hs
+        and 'memit(Ctl(NUL + "RESET" + NUL))\n                    memit(_new)' in hs
+        and 'step("polish", "Sharpened", "done",' in hs
+        and hs.index("_stream_guarded(lbl, full_messages,\n                                    memit, status, None,") < hs.rindex("_single_polish()"))
+    rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
+    out["the council's final answer goes through the post-pass too, before the fact-check's re-send"] = (
+        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "",' in rc
+        and rc.index('report["polish"] = answer_polish') < rc.index('report["verify"] = verify_pass(')
+        and 'changed=_trim != _final)' in rc)
+    out["a follow-up with nothing new to look up tells the writer what a follow-up is for"] = (
+        '_fu_note = (GROUND_FOLLOWUP if (_g_reuse and not _oai_note\n' in src
+        and '"followup" not in quality_ablate()) else "")' in src
+        and "_gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)" in src)
+    return out
+
+
+for _n523, _o523 in _c523_all(_MILLENAI_SRC).items():
+    check("6b523 answers, round 3 \u2014 " + _n523, _o523, "")
+_C523_MUT = [
+    ("the arithmetic never re-computed", "    for m in _ANS_EQ_RX.finditer(t):\n        if any(a <= m.start() < b for a, b in code):",
+     "    for m in []:\n        if any(a <= m.start() < b for a, b in code):"),
+    ("a chain's middle figure left wrong", "            if len(odd) != 1:\n                continue\n            i = odd[0]",
+     "            if True:\n                continue\n            i = odd[0]"),
+    ("a partial equation 'corrected'", "        if any(_ans_calc(nums[k:], ops[k:]) is not None", "        if False and any(_ans_calc(nums[k:], ops[k:]) is not None"),
+    ("the figures' rounding not allowed for", "                slack += abs(v2 - v)       # what this figure's rounding moves the result", "                pass"),
+    ("a year taken for a figure", "        if v is None or _ANS_YEAR_RX.fullmatch(body):\n            return None, [], [], 0", "        if v is None:\n            return None, [], [], 0"),
+    ("a sign flip 'corrected'", "        if (comp < 0) != (rv < 0):\n            continue", "        pass"),
+    ("fenced code re-computed", "        if any(a <= m.start() < b for a, b in code):\n            continue\n        comp, nums, ops, slack", "        comp, nums, ops, slack"),
+    ("conversions never checked", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))", "    fixes = answer_arith_fixes(t)"),
+    ("the evidence's rate ignored", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t, pack))", "    fixes = answer_arith_fixes(t) + answer_fx_fixes(t, answer_fx_rate(t))"),
+    ("two differing rates taken as one", "    return rates.pop() if len(rates) == 1 else 0.0", "    return sorted(rates)[0] if rates else 0.0"),
+    ("the leaks kept", "    for rx, rep in _ANS_LEAK_RXS:\n        t, k = rx.subn(rep, t)\n        n += k", "    pass"),
+    ("a sentence left opening in lower case", '        t = re.sub(r"(^|[.!?]\\s+|\\n\\s*)what I found", r"\\1What I found", t)', "        pass"),
+    ("the heading kept", '    m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(r"\\s*#{1,4} [^\\n]{1,100}\\n+", t)\n    if m:',
+     '    m = None\n    if m:'),
+    ("the recap kept", "    t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)\n    if t2.rstrip() != t.rstrip():          # (6b560) trailing space alone is no recap\n        t = t2\n        notes.append(\"recap trimmed\")",
+     "    pass"),
+    ("the post-pass knob honoured in the shipped app", "    if not DEV_HOME:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\"",
+     "    if False:\n        return set()\n    return {w.strip().lower() for w in os.environ.get(\"MILLENAI_Q3_OFF\""),
+    ("the estimate rule back (6b560 dropped it)", '    q3 = quality_ablate()\n    if "shape" not in q3:',
+     '    q3 = quality_ablate()\n    rules += "- ESTIMATE WHEN ASKED: build it.\\n"\n    if "shape" not in q3:'),
+    ("no shape", '    if "shape" not in q3:\n        rules += GROUND_SHAPE', '    if False:\n        rules += GROUND_SHAPE'),
+    ("the shape before the dating rules", '    if "shape" not in q3:\n        rules += GROUND_SHAPE             # (6b523) the shape, read last\n',
+     '    if "shape" not in q3:\n        rules = GROUND_SHAPE + rules\n'),
+    ("the vendor's page not flagged", '        vendor = bool(own and topical and "vendor" not in quality_ablate() and (', "        vendor = bool(False and ("),
+    ("the vendor's page not seated", '        if s.get("vendor") and s["score"] > 0:\n            take(s, seat=True)              # the vendor\'s own page (6b523)', "        pass"),
+    ("the pack's vendor mark missing", '        if s.get("vendor"):\n            lines.append("    (THE VENDOR\'S OWN SITE: the maker\'s or seller\'s own page)")', "        pass"),
+    ("an engine's paid link kept as evidence", '        return "ad"               # an engine\'s paid link', '        pass                      # an engine\'s paid link'),
+    ("a listing's page kept as evidence", '        return "listing"          # one unit\'s advert (6b523): never evidence', '        pass'),
+    ("a forum thread ranked like a guide", "            or (q < 2 and _SRC_FORUM_RX.search(host + path))):", "            or False):"),
+    ("a front page ranked like a page", '    if not path.strip("/") and "vendor" not in quality_ablate():\n        q -= 2', "    pass"),
+    ("a far-off query still seats its best", '    floor = (max(s["score"] for s in out) * 0.5) if (out and "vendor" not in quality_ablate()) else 0', "    floor = 0"),
+    ("the post-pass not run after the one-pass stream", '                                    "kept the part before it wandered")\n                    _single_polish()\n        except (BrokenPipeError',
+     '                                    "kept the part before it wandered")\n        except (BrokenPipeError'),
+    ("the council's final not post-passed", '            _trim, report["polish"] = answer_polish(_trim, report.get("question") or "",\n'
+     '                                                    report.get("question") or "")',
+     '            report["polish"] = []'),
+    ("the follow-up note never passed", "            _gturn = grounded_turn(query, _gpack, note=_oai_note or _fu_note)", "            _gturn = grounded_turn(query, _gpack, note=_oai_note)"),
+]
+_c523_caught = []
+for _mn, _ma, _mb in _C523_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c523_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c523_all(_ms).values()):
+        _c523_caught.append((_mn, "not caught"))
+check("6b523's rules each break a check when broken (%d mutants)" % len(_C523_MUT), not _c523_caught,
+      "%r" % _c523_caught)
+# ==== quality-3 (6b523): end ====
+
+# ==== quality-4 (6b560) the post-pass on the server's answers, what was asked for stays, the scorecard: begin ====
+# quality-3 (6b523) ported onto 7.0 beta 2 (NOTES 6b560). A mode with a paired server answers there first
+# (6b339), and that path returned before the post-pass ran, so the 6b523 fixes reached almost none of the
+# owner's answers: the server seat's answer (and a fallback's) and Fast on one server alone now go through
+# it too. The post-pass drops a leading heading and a closing summary because the standing instructions
+# forbid them on a chat answer; asked for a README, a report or an outline, the heading is what was asked
+# for, and asked for a summary or a TL;DR, the summary is: the person's own words now decide. The Code lane's
+# answers are code and are left as written. The scorecard (tools/answer_eval/scorecard.py) is the per-build
+# measure: it runs only when SCORECARD=1 ./release.sh asks, never in this gauntlet.
+print("== quality-4: the server's answers post-passed, asked-for form kept, the scorecard (6b560) ==")
+
+
+def _c560_all(src):
+    out = {}
+    try:
+        p = _names523(src, _POLISH523 | {"_ANS_FORM_ASK_RX", "_ANS_SUM_ASK_RX", "_ans_asked"},
+                      {"re": re, "os": os, "DEV_HOME": "", "Ctl": _Ctl523, "NUL": "\0"})
+    except Exception as e_:
+        return {"the sections run: %r" % (e_,): False}
+    P = p["answer_polish"]
+    doc = "# tidyup\n\nTidyup clears old files out of Downloads so the folder stays small.\n"
+    out["a heading the person asked for stays; one they didn't goes"] = (
+        P(doc, "", "Write a README intro for tidyup: a title and one paragraph.") == (doc, [])
+        and P(doc + "\n\n", "", "What is tidyup?  ")[1] == ["heading dropped"]
+        and P(doc, "", "What does tidyup do?")[1] == ["heading dropped"]
+        and P(doc, "", "evidence\n\nPROMPT: write a short report on tidyup") == (doc, []))
+    rec = "Eggs cost $2.27.\n\nA year ago $3.49.\n\nThe spike unwound.\n\n**TL;DR:** cheaper now."
+    out["a summary the person asked for stays; an unasked recap goes"] = (
+        P(rec, "", "Why did eggs get cheaper? End with a TL;DR.") == (rec, [])
+        and P(rec, "", "Why did eggs get cheaper?")[1] == ["recap trimmed"])
+    out["the person's words are the grounded turn's last PROMPT line, or the whole message"] = (
+        p["_ans_asked"]("pages about a summary\n\nPROMPT: what costs less?") == "what costs less?"
+        and p["_ans_asked"]("give me the gist") == "give me the gist" and p["_ans_asked"](None) == "")
+    out["the leaks and the arithmetic are fixed whatever was asked"] = (
+        P("Fuel: 583 × $3.40 = $1,883.", "", "write a report on fuel")[0] == "Fuel: 583 × $3.40 = $1,982.")
+    fx = ("Expect between R$ 4,500 and R$ 7,500 per month (roughly $2,500\u2013$4,200 USD, using 1 USD = 5.5167 BRL).")
+    w, n = P(fx)
+    out["a reais range written with 'and', at a rate written '1 USD = 5.5167 BRL', is converted at that rate"] = (
+        "(roughly $815\u2013$1,359 USD" in w and len(n) == 2
+        and p["answer_fx_rate"]("1 USD = 5.5167 BRL") == 5.52
+        and P("R$4,500 to R$7,500 ($816 to $1,360) at 5.5167 BRL per USD.")[1] == [])
+    # the handler's wiring, from the text
+    try:
+        hd = src[src.index("        def _single_polish():\n"):
+                 src.index("        except (BrokenPipeError, ConnectionResetError):\n            pass  # user hit Stop")]
+        sp = hd[:hd.index("\n        try:\n")]
+    except ValueError:
+        return dict(out, **{"the handler's post-pass is where the dispatch can reach it": False})
+    out["the post-pass is defined once, before the dispatch, so every single-writer path can run it"] = (
+        src.count("def _single_polish():") == 1
+        and hd.index("def _single_polish():") < hd.index("            if images and _vis_cloud and _cloud_vision():"))
+    out["a mode's server seat answer (or its fallback's) goes through the post-pass"] = (
+        "                        polish=_revise if _pol else None)\n"
+        "                    # the server's answer gets the same post-pass (6b560):" in hd
+        and '                    if _seat_res[0] in ("server", "fallback"):\n                        _single_polish()\n'
+            "                    hb_stop.set()\n                    return\n" in hd)
+    out["Fast on one server alone goes through it too"] = (
+        '                _so_res = server_first_answer(\n                    _srv_lbl, "", full_messages,' in hd
+        and '                if _so_res == "server":\n                    _single_polish()' in hd)
+    out["the Code lane is left as written; the person's words ride along"] = (
+        '                if LANE_ROLE.get(agent_name, "") == "code":\n                    return' in sp
+        and "_new, _notes = answer_polish(_shown, _pk, prompt)" in sp
+        and sp.index('LANE_ROLE.get(agent_name, "") == "code"') < sp.index("answer_polish(_shown"))
+    ss = src[src.index("def server_stream("):src.index("def _srv_reads_pictures(")]
+    out["think:false on the server is a dev copy's pilot only; one that refuses it is asked without it"] = (
+        '    _off_box = [not _think and srv_nothink() and (e.get("id"), model) not in _srv_nothink_refused]' in ss
+        and 'return bool(globals().get("DEV_HOME")) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"' in src
+        and '        elif _off_box[0]:\n            d["think"] = False' in ss
+        and "            if _off_box[0] and resp.status == 400:" in ss
+        and '                _srv_nothink_refused.add((e.get("id"), model))\n                _off_box[0] = False' in ss
+        and '"_srv_nothink_refused",' in src[:src.index("_srv_nothink_refused = set()")])
+    sf = src[src.index("def server_first_answer("):src.index("# ---- what the pane does")]
+    out["a server answer with no text is a failure before the first word; an empty rewrite leaves the draft"] = (
+        '        if not shown[0]:\n            # AN EMPTY ANSWER IS A FAILURE BEFORE THE FIRST WORD (6b560)' in sf
+        and 'raise ServerError("server", "%s sent back an empty answer." % name)\n        return "server"' in sf
+        and "            if not shown[0]:\n                _m(draft)" in sf
+        and sf.index('raise ServerError("server", "%s sent back an empty answer."') < sf.index("    except ServerError as se:"))
+    rc = src[src.index("def run_council("):src.index("# ===================================== the answer craft (6b515")]
+    out["the council's final passes the question as the person's words"] = (
+        '_trim, report["polish"] = answer_polish(_trim, report.get("question") or "",\n'
+        '                                                    report.get("question") or "")' in rc)
+    return out
+
+
+for _n560, _o560 in _c560_all(_MILLENAI_SRC).items():
+    check("6b560 quality-4 — " + _n560, _o560, "")
+_C560_MUT = [
+    ("an asked-for heading dropped", "    m = None if _ANS_FORM_ASK_RX.search(asked) else re.match(",
+     "    m = None if False else re.match("),
+    ("an asked-for summary trimmed", "    t2 = t if _ANS_SUM_ASK_RX.search(asked) else trim_recap(t)", "    t2 = trim_recap(t)"),
+    ("the whole grounded turn read as the person's words", '    i = q.rfind("PROMPT: ")', "    i = -1"),
+    ("the server seat's answer not post-passed",
+     '                    if _seat_res[0] in ("server", "fallback"):\n                        _single_polish()\n',
+     '                    if _seat_res[0] in ("server", "fallback"):\n                        pass\n'),
+    ("Fast on one server alone not post-passed", '                if _so_res == "server":\n                    _single_polish()',
+     '                if _so_res == "server":\n                    pass'),
+    ("the Code lane post-passed", '                if LANE_ROLE.get(agent_name, "") == "code":\n                    return',
+     "                if False:\n                    return"),
+    ("the person's words not passed", "_new, _notes = answer_polish(_shown, _pk, prompt)",
+     "_new, _notes = answer_polish(_shown, _pk)"),
+    ("a reais range with 'and' not read as a range", r"(?:(?:\s?[–—-]\s?|\s(?:and|to)\s)(?:R\$)?",
+     r"(?:(?:\s?[–—-]\s?)(?:R\$)?"),
+    ("the pilot on in the shipped app", 'return bool(globals().get("DEV_HOME")) and os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"',
+     'return os.environ.get("MILLENAI_Q4_NOTHINK", "") == "1"'),
+    ("the pilot never sends think:false", '        elif _off_box[0]:\n            d["think"] = False', '        elif False:\n            d["think"] = False'),
+    ("a refusal of think:false never retried", "            if _off_box[0] and resp.status == 400:", "            if False:"),
+    ("an empty server answer passed off as one", '            raise ServerError("server", "%s sent back an empty answer." % name)',
+     "            pass"),
+    ("an empty rewrite leaves nothing", "            if not shown[0]:\n                _m(draft)", "            if False:\n                _m(draft)"),
+    ("'1 USD = 5.5 BRL' not read as a rate", r're.compile(r"\b1\s?(?:USD|', r're.compile(r"\bNEVER\s?(?:USD|'),
+]
+_c560_caught = []
+for _mn, _ma, _mb in _C560_MUT:
+    _ms = _MILLENAI_SRC.replace(_ma, _mb, 1)
+    if _ms == _MILLENAI_SRC:
+        _c560_caught.append((_mn, "anchor missing"))
+        continue
+    if all(_c560_all(_ms).values()):
+        _c560_caught.append((_mn, "not caught"))
+check("6b560's rules each break a check when broken (%d mutants)" % len(_C560_MUT), not _c560_caught,
+      "%r" % _c560_caught)
+
+# THE SCORECARD (6b560): a fixed small set, judged the same way every build, gated in the release only when
+# asked. Offline-safe means this gauntlet never runs it: it is only read here.
+_sc_dir = os.path.join("tools", "answer_eval")
+_sc_set = json.load(open(os.path.join(_sc_dir, "scorecard.json"), encoding="utf-8"))
+_sc_qs = _sc_set["questions"]
+_sc_cats = {q["category"] for q in _sc_qs}
+check("6b560 scorecard: 20 questions across facts, reasoning, code, writing and advice, one private-notes and one "
+      "server-only case, each with a reference sheet",
+      len(_sc_qs) == 20 and {"facts", "reasoning", "code", "writing", "advice"} <= _sc_cats
+      and sum(1 for q in _sc_qs if q.get("private")) == 1 and sum(1 for q in _sc_qs if q.get("server_only")) == 1
+      and all((q.get("reference") or {}).get("key_facts") for q in _sc_qs)
+      and len({q["id"] for q in _sc_qs}) == 20 and bool(_sc_set.get("notes_file", {}).get("text")),
+      "%r" % sorted(_sc_cats))
+_sc_bad = []
+for _q in _sc_qs:
+    for _rx in (_q.get("must") or []) + (_q.get("never") or []):
+        try:
+            re.compile(_rx)
+        except re.error as _e:
+            _sc_bad.append((_q["id"], _rx, str(_e)))
+check("6b560 scorecard: every facts-check pattern compiles", not _sc_bad, "%r" % _sc_bad)
+_rel = open("release.sh", encoding="utf-8").read()
+_gt = open("tests_smoketest.py", encoding="utf-8").read()
+check("6b560 scorecard: release.sh runs it only under SCORECARD=1, gated, before the version is written; "
+      "the plain gauntlet never runs it",
+      'if [[ "${SCORECARD:-0}" == 1 ]]; then' in _rel
+      and 'tools/answer_eval/scorecard.py run --label "build-$BUILD" --where local --gate' in _rel
+      and _rel.index('SCORECARD:-0}" == 1') < _rel.index("s = re.sub(r'APP_VERSION = \"[^\"]*\"'")
+      and not re.search(r"(subprocess\.\w+|Popen|os\.system)\([^)]*scorecard\.py", _gt), "")
+import importlib.util as _ilu560
+_sc_spec = _ilu560.spec_from_file_location("_scorecard560", os.path.join(_sc_dir, "scorecard.py"))
+_sc = _ilu560.module_from_spec(_sc_spec)
+sys.path.insert(0, _sc_dir)
+try:
+    _sc_spec.loader.exec_module(_sc)
+finally:
+    sys.path.remove(_sc_dir)
+
+
+def _sc_entry(label, overall, ttfw, errors=0):
+    recs = [{"id": "q%02d" % i, "category": "facts", "grade": {"overall": v, "correct": v, "complete": v,
+             "concise": v, "fit": v}, "first_text_s": t, "elapsed_s": t * 3, "error": "",
+             "facts": {"ok": 1, "of": 1}} for i, (v, t) in enumerate(zip(overall, ttfw))]
+    for r in recs[:errors]:
+        r["error"] = "error answer"
+    e = {"label": label, "records": recs}
+    _sc.entry_numbers(e)
+    return e
+
+
+_sc_old = _sc_entry("old", [7, 6, 8, 5, 7, 6, 8, 7], [2.0] * 8)
+_sc_same = _sc_entry("same", [7, 6, 8, 5, 7, 6, 8, 7], [2.2] * 8)
+_sc_drop = _sc_entry("drop", [6, 5, 7, 5, 6, 5, 7, 6], [2.0] * 8)
+_sc_noise = _sc_entry("noise", [8, 5, 8, 6, 6, 6, 7, 7], [2.0] * 8)
+_sc_slow = _sc_entry("slow", [7, 6, 8, 5, 7, 6, 8, 7], [2.4] * 8)
+_sc_err = _sc_entry("err", [7, 6, 8, 5, 7, 6, 8, 7], [2.0] * 8, errors=1)
+check("6b560 scorecard: the gate fails a quality drop beyond one standard error, a first-words median over 15% "
+      "slower and a new error answer; it passes noise and +10%",
+      not _sc.compare(_sc_same, _sc_old)[1] and _sc.compare(_sc_drop, _sc_old)[1]
+      and not _sc.compare(_sc_noise, _sc_old)[1] and _sc.compare(_sc_slow, _sc_old)[1]
+      and _sc.compare(_sc_err, _sc_old)[1] and _sc.TTFW_SLACK == 0.15
+      and _sc_old["summary"]["quality"] == 6.75 and _sc_old["summary"]["ttfw_median_s"] == 2.0,
+      "%r" % ([_sc.compare(x, _sc_old) for x in (_sc_same, _sc_drop, _sc_noise, _sc_slow, _sc_err)],))
+_sc_srv = _sc_entry("srv", [7, 6, 8, 5, 7, 6, 8, 1], [2.0] * 7 + [40.0])
+_sc_srv["records"][-1].update(tier="srv:abc:fast", error="error answer")
+check("6b560 scorecard: the question asked of the server alone is shown but never gated (its state is the server's)",
+      not _sc.compare(_sc_srv, _sc_old)[1] and _sc.compare(_sc_err, _sc_old)[1]
+      and any("server-only case (not gated)" in ln for ln in _sc.compare(_sc_srv, _sc_old)[0]),
+      "%r" % (_sc.compare(_sc_srv, _sc_old),))
+check("6b560 scorecard: the judge's reply is read as the last JSON object with an overall, scores clamped to 1-10",
+      _sc.parse_grade('<think>{"overall": 2}</think> ok {"correct": 12, "complete": 7, "concise": 7, "fit": 7, '
+                      '"overall": 8.4, "why": "x"}')
+      == {"correct": 10, "complete": 7, "concise": 7, "fit": 7, "overall": 8, "why": "x"}
+      and _sc.parse_grade("no json") is None, "")
+# ==== quality-4 (6b560): end ====
+
 # counted HERE, after every check: a count taken mid-file left the checks
 # written below it out of "passed" (1044/1050 with no FAIL line, exit 1)
 # ZITO REMOVED (6b525, per Patrick): holding Z+I+T+O opened a hidden board
@@ -42734,7 +43188,8 @@ def _c36_updater(f):
     out["feed: GitHub, or a dev copy's stand-in"] = (
         'UPDATE_API = ((os.environ.get("MILLENAI_UPDATE_API", "").strip().rstrip("/")\n'
         '               if DEV_HOME else "") or "https://api.github.com")' in s
-        and '"MILLENAI_UPDATE_API"))' in s and "https://api.github.com/repos" not in s
+        and '"MILLENAI_UPDATE_API",' in s[s.index("_KNOWN_ENV = frozenset(("):s.index("def _dev_home(")]   # (6b560: no longer the list's last)
+        and "https://api.github.com/repos" not in s
         and s.count('UPDATE_API + "/repos/%s/') == 3)
     out["one .0 falls away in the offer"] = (
         '        if num.count(".") >= 2 and num.endswith(".0"):\n            num = num[:-2]\n        shown = num + mnum.group(2)' in s

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":137,\"est\":false}",
+  "X-Hurry": "7eee2d9aad78a261"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.12,
+ "elapsed_s": 24.54,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.86,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.86,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.86,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.39,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 26 passages"
+   }
+  },
+  {
+   "t": 13.39,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.39,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.39,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.12,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.54,
+   "tag": "RATE",
+   "data": {
+    "tps": 77.5,
+    "tok": 574,
+    "s": 7.4
+   }
+  },
+  {
+   "t": 24.54,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2299 chars"
+   }
+  },
+  {
+   "t": 24.54,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.54,
+   "tag": "DONE",
+   "data": {
+    "f": 17.12,
+    "t": 24.54,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.86,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.86
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.86
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 26 passages",
+   "t_s": 13.39
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.39
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.39
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2299 chars",
+   "t_s": 24.54
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.54
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Set Healthy Family Boundaries in Addiction Recovery",
+   "u": "https://avedisrecovery.com/blog/addiction-recovery/setting-healthy-family-boundaries-in-addiction-recovery/",
+   "d": ""
+  },
+  {
+   "t": "How to Set Boundaries in Addiction Recovery | Family Program MI",
+   "u": "https://sanfordbehavioralhealth.com/2022/12/27/boundaries-family-addiction-recovery-beyond/",
+   "d": "2022-12-27"
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "3 important things to know about quitting nicotine during times of stress",
+   "u": "https://truthinitiative.org/research-resources/emerging-tobacco-products/3-important-things-know-about-quitting-nicotine-during",
+   "d": "2023-03-23"
+  },
+  {
+   "t": "Are Zyn Nicotine Pouches Safe? Health & Addiction Risks",
+   "u": "https://recovered.org/blog/are-zyns-bad-for-you",
+   "d": "2026-10-04"
+  },
+  {
+   "t": "Truth Initiative: freedom from nicotine addiction",
+   "u": "https://truthinitiative.org/",
+   "d": "2019-01-04"
+  },
+  {
+   "t": "Nicotine Dependence: Causes, Symptoms & Treatment",
+   "u": "https://my.clevelandclinic.org/health/diseases/24482-nicotine-dependence",
+   "d": "2022-12-02"
+  },
+  {
+   "t": "What to Say Instead of Nagging. Phrases That Build... — Palme School",
+   "u": "https://www.palmeschool.com/blog/what-to-say-instead-of-nagging/",
+   "d": "2026-09-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.39,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 18,
+   "d": 604,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4600,
+   "o": 470,
+   "d": 11095,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 77.5,
+  "tok": 574,
+  "s": 7.4
+ },
+ "app_first_s": 17.12,
+ "app_total_s": 24.54,
+ "answer_raw": "To move from nagging to support, you need to shift the dynamic from surveillance to boundaries.\n\nThe friction you're feeling often comes from a lack of clear lines between your autonomy and their concern. Nagging is often a repetitive cycle where a message loses its value every time it is repeated [8]. To stop this, you have to establish boundaries that define how much they can intervene in your process.\n\n## Establish boundaries\nIn addiction recovery, setting healthy boundaries is essential to ensure family members don't accidentally enable the addiction or interfere with the recovery process [1]. You should communicate clearly what \"support\" looks like to you and what constitutes \"nagging.\"\n\n*   **Define the terms:** Tell them exactly what you need. If you need space to process cravings without being questioned, state that clearly.\n*   **Set the limit:** If they repeat the same question or check-in multiple times, it becomes a \"pricing problem\" where the message loses its meaning [8]. Let them know that once a topic is discussed, you will not revisit it for a set period.\n*   **Differentiate support from surveillance:** Explain that while you value their help, constant checking-up can feel like a lack of trust rather than support.\n\n## Focus on the objective\nRemind them (and yourself) of the physiological and mental benefits of this transition to keep the focus on the goal rather than the friction.\n\n*   **The physical wins:** You will see improvements almost immediately, such as your heart rate and blood pressure returning to normal within the first 20 minutes of quitting [7].\n*   **The mental wins:** Quitting is linked to lower levels of stress, anxiety, and depression, as well as improved mood [4].\n*   **The reality of dependence:** Because the body doesn't distinguish between different types of nicotine (like pouches vs. cigarettes), the risk of dependence is equally high across products [5]. Reminding them that this is a serious physiological shift can help them treat your process with more respect and less trivializing \"check-ins\" [5].\n\nIf they struggle to transition from \"polite nagging\" to helpful support, you might suggest they look into formal family programs designed specifically for addiction recovery to learn how to maintain healthy boundaries [2].",
+ "answer": "To move from nagging to support, you need to shift the dynamic from surveillance to boundaries.\n\nThe friction you're feeling often comes from a lack of clear lines between your autonomy and their concern. Nagging is often a repetitive cycle where a message loses its value every time it is repeated [8]. To stop this, you have to establish boundaries that define how much they can intervene in your process.\n\n## Establish boundaries\nIn addiction recovery, setting healthy boundaries is essential to ensure family members don't accidentally enable the addiction or interfere with the recovery process [1]. You should communicate clearly what \"support\" looks like to you and what constitutes \"nagging.\"\n\n*   **Define the terms:** Tell them exactly what you need. If you need space to process cravings without being questioned, state that clearly.\n*   **Set the limit:** If they repeat the same question or check-in multiple times, it becomes a \"pricing problem\" where the message loses its meaning [8]. Let them know that once a topic is discussed, you will not revisit it for a set period.\n*   **Differentiate support from surveillance:** Explain that while you value their help, constant checking-up can feel like a lack of trust rather than support.\n\n## Focus on the objective\nRemind them (and yourself) of the physiological and mental benefits of this transition to keep the focus on the goal rather than the friction.\n\n*   **The physical wins:** You will see improvements almost immediately, such as your heart rate and blood pressure returning to normal within the first 20 minutes of quitting [7].\n*   **The mental wins:** Quitting is linked to lower levels of stress, anxiety, and depression, as well as improved mood [4].\n*   **The reality of dependence:** Because the body doesn't distinguish between different types of nicotine (like pouches vs. cigarettes), the risk of dependence is equally high across products [5]. Reminding them that this is a serious physiological shift can help them treat your process with more respect and less trivializing \"check-ins\" [5].\n\nIf they struggle to transition from \"polite nagging\" to helpful support, you might suggest they look into formal family programs designed specifically for addiction recovery to learn how to maintain healthy boundaries [2].",
+ "chars": 2299,
+ "raw_bytes": 4639,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 23.42,
+ "rate_gen_tok_s": 77.46,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:41:20",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

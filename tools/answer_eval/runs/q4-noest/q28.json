@@ -1,0 +1,235 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":7.3,\"ftok\":251,\"est\":false}",
+  "X-Hurry": "0859cc1cd6a0605f"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 0.59,
+ "elapsed_s": 10.72,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 0.59,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 5.91,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "716 chars"
+   }
+  },
+  {
+   "t": 5.91,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 5.91,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 5.91,
+   "tag": "RESET"
+  },
+  {
+   "t": 10.72,
+   "tag": "RATE",
+   "data": {
+    "tps": 44.3,
+    "tok": 152,
+    "s": 3.4
+   }
+  },
+  {
+   "t": 10.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "608 chars"
+   }
+  },
+  {
+   "t": 10.72,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 10.72,
+   "tag": "DONE",
+   "data": {
+    "f": 0.59,
+    "t": 10.72,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   5.91,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.07
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "716 chars",
+   "t_s": 5.91
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 5.91
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "608 chars",
+   "t_s": 10.72
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 10.72
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.07,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2298,
+   "o": 343,
+   "d": 5810,
+   "c": 2152
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 3882,
+   "o": 216,
+   "d": 4767,
+   "c": 2895
+  }
+ ],
+ "rate_writer": {
+  "tps": 44.3,
+  "tok": 152,
+  "s": 3.4
+ },
+ "app_first_s": 0.59,
+ "app_total_s": 10.72,
+ "answer_raw": "It will take **5.04 years** for Car B to break even on fuel costs.\n\nThe price difference between the two vehicles is **$5,000**. Since Car B is more efficient, you are essentially trying to recoup that $5,000 premium through fuel savings.\n\n**Annual Fuel Costs**\n*   **Car A**: (14,000 miles / 24 mpg) * $3.40 per gallon = **$1,983.33**\n*   **Car B**: (14,000 miles / 48 mpg) * $3.40 per gallon = **$991.67**\n\n**The Verdict**\nBy choosing the hybrid, you save **$991.66** per year in fuel. Dividing the **$5,000** price premium by the **$991.66** annual savings results in a break-even point of **5.04 years**.",
+ "answer": "It will take **5.04 years** for Car B to break even on fuel costs.\n\nThe price difference between the two vehicles is **$5,000**. Since Car B is more efficient, you are essentially trying to recoup that $5,000 premium through fuel savings.\n\n**Annual Fuel Costs**\n*   **Car A**: (14,000 miles / 24 mpg) * $3.40 per gallon = **$1,983.33**\n*   **Car B**: (14,000 miles / 48 mpg) * $3.40 per gallon = **$991.67**\n\n**The Verdict**\nBy choosing the hybrid, you save **$991.66** per year in fuel. Dividing the **$5,000** price premium by the **$991.66** annual savings results in a break-even point of **5.04 years**.",
+ "chars": 608,
+ "raw_bytes": 2056,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.18,
+ "rate_gen_tok_s": 15.0,
+ "id": "q28",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Hybrid break-even",
+ "question": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:17:39",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":120,\"est\":false}",
+  "X-Hurry": "8cfda62006f1d7e4"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 18.64,
+ "elapsed_s": 23.91,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "6 queries"
+   }
+  },
+  {
+   "t": 6.55,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.55,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.55,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.66,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 30 passages"
+   }
+  },
+  {
+   "t": 11.66,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.66,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.66,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.66,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.64,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.9,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.4,
+    "tok": 307,
+    "s": 5.3
+   }
+  },
+  {
+   "t": 23.9,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1231 chars"
+   }
+  },
+  {
+   "t": 23.9,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   6.55,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "6 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.55
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.55
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 30 passages",
+   "t_s": 11.66
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.66
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.66
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1231 chars",
+   "t_s": 23.9
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.9
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Best Haircuts for Balding Men: 56 Embrace or Hide Styles",
+   "u": "https://menhaircuts.net/haircuts/best-haircuts-for-balding-men/",
+   "d": "2026-10-09"
+  },
+  {
+   "t": "Bald on Top, Hair on Sides: The Complete Styling Guide",
+   "u": "https://hairstylecamp.com/bald-on-top-hair-on-sides/",
+   "d": "2026-06-08"
+  },
+  {
+   "t": "100 Best Haircuts for Balding Men by Hair Loss Pattern 2026",
+   "u": "https://www.newtimeshair.com/blog/100-haircuts-and-hairstyles-for-balding-men/",
+   "d": "2026-03-12"
+  },
+  {
+   "t": "26 Trendy Asian Men Hairstyles for 2025: Modern Styles to Elevate...",
+   "u": "https://gentsosprey.com/26-trendy-asian-men-hairstyles-for-2025-modern-styles-to-elevate-your-look",
+   "d": "2025"
+  },
+  {
+   "t": "27 Best Hairstyles and Haircuts for Balding Men - TheTrendSpotter",
+   "u": "https://www.thetrendspotter.net/hairstyles-for-balding-men/",
+   "d": "2023-05-03"
+  },
+  {
+   "t": "The Best Head Shavers In 2026: Tried, Tested & Reviewed...",
+   "u": "https://shavercheck.com/best-head-shaver/",
+   "d": "2026"
+  },
+  {
+   "t": "15 Cool Shaved Sides Hairstyles & Haircuts for Men in 2026",
+   "u": "https://www.thetrendspotter.net/cool-shaved-sides-hairstyles-haircuts-for-men/",
+   "d": "2026"
+  },
+  {
+   "t": "The 21 Best Buzz Cut Hairstyles for Men: The Lengths & Types",
+   "u": "https://www.thefashionisto.com/articles/buzz-cut/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.66,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 58.4,
+  "tok": 307,
+  "s": 5.3
+ },
+ "answer_raw": "A **full shave or a tight buzz cut** is the best choice for looking intentional and minimizing maintenance.\n\nFor advanced hair loss (Norwood 6-7), a buzz cut, full shave, or an SMP-style stubble effect typically looks cleaner than trying to maintain long side growth or sparse strands on top [2, as of June 2026]. Keeping hair short creates less contrast and makes the hair loss less visible [5, as of May 2023].\n\n**The Options**\n\n*   **Full Shave** — The lowest maintenance option; you can use a foil shaver every 1-3 days to maintain a smooth look [6, as of 2026].\n*   **Buzz Cut** — A sharp, easy-to-maintain option that can be combined with a crew cut to create a deliberate, masculine shape [3, as :- March 2026].\n*   **Faded Sides** — If you keep the sides, shaving them down to skin and blending them into the remaining top hair (e.g., a #0 to a #2) ensures the thinning doesn't create a visible, awkward line [1, as of October 2026].\n\nIf you choose to keep the sides, ensure they are controlled and blended into the beard to prevent the hair on the sides from overpowering the bald top [2, as of June 2026]. Use a fragrance-free moisturizer on your scalp after shaving to prevent itching or flaking [1, as of October 2026].",
+ "answer": "A **full shave or a tight buzz cut** is the best choice for looking intentional and minimizing maintenance.\n\nFor advanced hair loss (Norwood 6-7), a buzz cut, full shave, or an SMP-style stubble effect typically looks cleaner than trying to maintain long side growth or sparse strands on top [2, as of June 2026]. Keeping hair short creates less contrast and makes the hair loss less visible [5, as of May 2023].\n\n**The Options**\n\n*   **Full Shave** — The lowest maintenance option; you can use a foil shaver every 1-3 days to maintain a smooth look [6, as of 2026].\n*   **Buzz Cut** — A sharp, easy-to-maintain option that can be combined with a crew cut to create a deliberate, masculine shape [3, as :- March 2026].\n*   **Faded Sides** — If you keep the sides, shaving them down to skin and blending them into the remaining top hair (e.g., a #0 to a #2) ensures the thinning doesn't create a visible, awkward line [1, as of October 2026].\n\nIf you choose to keep the sides, ensure they are controlled and blended into the beard to prevent the hair on the sides from overpowering the bald top [2, as of June 2026]. Use a fragrance-free moisturizer on your scalp after shaving to prevent itching or flaking [1, as of October 2026].",
+ "chars": 1231,
+ "raw_bytes": 3280,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.87,
+ "rate_gen_tok_s": 58.4,
+ "id": "q15",
+ "turn": 1,
+ "category": "health",
+ "topic": "Hairstyles for bald men",
+ "question": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:43:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

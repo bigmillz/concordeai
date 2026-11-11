@@ -1,0 +1,235 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":7.7,\"ftok\":264,\"est\":false}",
+  "X-Hurry": "93ca6456a734b7b0"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 0.65,
+ "elapsed_s": 8.83,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 0.65,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 4.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "608 chars"
+   }
+  },
+  {
+   "t": 4.81,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 4.81,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 4.81,
+   "tag": "RESET"
+  },
+  {
+   "t": 8.83,
+   "tag": "RATE",
+   "data": {
+    "tps": 47.9,
+    "tok": 130,
+    "s": 2.7
+   }
+  },
+  {
+   "t": 8.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "521 chars"
+   }
+  },
+  {
+   "t": 8.83,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 8.83,
+   "tag": "DONE",
+   "data": {
+    "f": 0.65,
+    "t": 8.82,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   4.81,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.07
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "608 chars",
+   "t_s": 4.81
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 4.81
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "521 chars",
+   "t_s": 8.83
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 8.83
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.07,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2297,
+   "o": 268,
+   "d": 4716,
+   "c": 2151
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 3806,
+   "o": 174,
+   "d": 3964,
+   "c": 2894
+  }
+ ],
+ "rate_writer": {
+  "tps": 47.9,
+  "tok": 130,
+  "s": 2.7
+ },
+ "app_first_s": 0.65,
+ "app_total_s": 8.82,
+ "answer_raw": "It will take **5.04 years** to break even on the price difference through fuel savings alone.\n\nThe price delta between the two vehicles is **$5,000**.\n\nWith 14,000 miles driven annually at $3.40 per gallon:\n- Car A (24 mpg) costs **$1,983.33** per year in fuel.\n- Car B (48 mpg) costs **$991.67** per year in fuel.\n\nThis results in an annual fuel saving of **$991.66** with Car B. Dividing the **$5,000** upfront cost difference by the **$991.66** annual savings puts the break-even point at approximately **5.04 years**.",
+ "answer": "It will take **5.04 years** to break even on the price difference through fuel savings alone.\n\nThe price delta between the two vehicles is **$5,000**.\n\nWith 14,000 miles driven annually at $3.40 per gallon:\n- Car A (24 mpg) costs **$1,983.33** per year in fuel.\n- Car B (48 mpg) costs **$991.67** per year in fuel.\n\nThis results in an annual fuel saving of **$991.66** with Car B. Dividing the **$5,000** upfront cost difference by the **$991.66** annual savings puts the break-even point at approximately **5.04 years**.",
+ "chars": 521,
+ "raw_bytes": 1860,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.75,
+ "rate_gen_tok_s": 15.92,
+ "id": "q28",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Hybrid break-even",
+ "question": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:58:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I drive 14,000 miles a year. Car A gets 24 mpg and costs $22,000. Car B is a hybrid at 48 mpg for $27,000. Gas is $3.40. How many years until B breaks even on fuel alone?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

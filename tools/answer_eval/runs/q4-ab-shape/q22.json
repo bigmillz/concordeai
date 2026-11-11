@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":22.3,\"ftok\":273,\"est\":false}",
+  "X-Hurry": "3fa22d0217e000c1"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.74,
+ "elapsed_s": 26.41,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.56,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.56,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.39,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 27 passages"
+   }
+  },
+  {
+   "t": 12.39,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.39,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.39,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.74,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.4,
+   "tag": "RATE",
+   "data": {
+    "tps": 52.8,
+    "tok": 510,
+    "s": 9.7
+   }
+  },
+  {
+   "t": 26.4,
+   "tag": "RESET"
+  },
+  {
+   "t": 26.4,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "2 leaks reworded"
+   }
+  },
+  {
+   "t": 26.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2013 chars"
+   }
+  },
+  {
+   "t": 26.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.41,
+   "tag": "DONE",
+   "data": {
+    "f": 16.74,
+    "t": 26.4,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   9.56,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.56
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.56
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 27 passages",
+   "t_s": 12.39
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.39
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.39
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "2 leaks reworded",
+   "t_s": 26.4
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2013 chars",
+   "t_s": 26.41
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.41
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius11 Highest Paying",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-02-27"
+  },
+  {
+   "t": "11 Highest Paying Jobs Without a College Degree (2026-2027)",
+   "u": "https://coverlettersandresume.com/articles/highest-paying-jobs-without-a-college-degree/",
+   "d": "2026-11-07"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree in 2026 (Ranked)",
+   "u": "https://skillscouter.com/high-paying-jobs-without-a-degree/",
+   "d": "2026-07-16"
+  },
+  {
+   "t": "High-Pay Jobs No Degree (U.S. 2026): Pay, Training, Hiring",
+   "u": "https://jobnova.ai/blog/high-pay-jobs-no-degree-us-2026-pay-training-hiring",
+   "d": "2026-02-20"
+  },
+  {
+   "t": "Highest Paying Jobs With No Degree Requirement in (2026) - ENEBA",
+   "u": "https://www.eneba.com/hub/play-to-earn/highest-paying-jobs-with-no-degree/",
+   "d": "2026-10-08"
+  },
+  {
+   "t": "Field of degree: Biology : Occupational Outlook Handbook: : U ...",
+   "u": "https://www.bls.gov/ooh/field-of-degree/biology/biology-field-of-degree.htm",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "13 careers for easy-to-get jobs without a four-year degree (most pay over $75,00",
+   "u": "https://www.msn.com/en-us/money/general/13-careers-for-easy-to-get-jobs-without-a-four-year-degree-most-pay-over-75-000/ar-AA2gOBRO",
+   "d": "2026-11-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.39,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 26,
+   "d": 856,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5045,
+   "o": 589,
+   "d": 13965,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 52.8,
+  "tok": 510,
+  "s": 9.7
+ },
+ "app_first_s": 16.74,
+ "app_total_s": 26.4,
+ "answer_raw": "The most realistic high-paying paths without a degree involve specialized technical training, licenses, or apprenticeships rather than general labor.\n\nBecause I didn't find the exact time-to-entry for every role, I have focused on the top five roles identified as high-earning in what I found, noting their requirements and typical pay.\n\n| Job Role | Typical Pay (Median) | Entry Path |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220** (as of May 2025) [2] | Flight training/certification [2] |\n| **High-End Sales/Specialized Roles** | **$70,000–$130,000+** (approx. as of June 2026) [3] | Portfolio, license, or apprenticeship [3] |\n| **Technical/Specialized Trades** | **$60,000–$100,000+** (as of Oct 2026) [6] | Certifications or apprenticeships [8] |\n| **Data Analyst** | **Varies** (as of Oct 2026) [6] | **2–4 months** of self-study [6] |\n| **Freelance Web Developer** | **Varies** (as of Oct 2026) [6] | Immediate/within **10 days** (first contract) [6] |\n\n## The reality of these paths\n\n**Commercial Pilot** — This is the highest-earning option listed, with a median of **$123,220** as of May 2025 [2]. You typically need flight training rather than a degree, though you should verify specific airline requirements as some may prefer one [2].\n\n**Sales and Specialized Roles** — These roles can reach **$70,000–$30,000+** depending on your book of business or location [3]. The path involves building a portfolio, obtaining a license, or completing an apprenticeship [3].\n\n**Technical Trades and Data Roles** — Many roles can clear **$60,000 to $100,000** without a degree [6]. For instance, a **Data Analyst** role requires roughly **two to four months** of self-study to reach a first paid gig [6].\n\n**Digital Freelancing** — For those looking to start immediately, **Freelance Web Development** can lead to a first paid contract within a **10-day** window on platforms like Upwork [6]. However, reaching the six-figure ceiling usually requires significant time beyond the initial entry [6].",
+ "answer": "The most realistic high-paying paths without a degree involve specialized technical training, licenses, or apprenticeships rather than general labor.\n\nBecause I didn't find the exact time-to-entry for every role, I have focused on the top five roles identified as high-earning in what I found, noting their requirements and typical pay.\n\n| Job Role | Typical Pay (Median) | Entry Path |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220** (as of May 2025) [2] | Flight training/certification [2] |\n| **High-End Sales/Specialized Roles** | **$70,000–$130,000+** (approx. as of June 2026) [3] | Portfolio, license, or apprenticeship [3] |\n| **Technical/Specialized Trades** | **$60,000–$100,000+** (as of Oct 2026) [6] | Certifications or apprenticeships [8] |\n| **Data Analyst** | **Varies** (as of Oct 2026) [6] | **2–4 months** of self-study [6] |\n| **Freelance Web Developer** | **Varies** (as of Oct 2026) [6] | Immediate/within **10 days** (first contract) [6] |\n\n## The reality of these paths\n\n**Commercial Pilot** — This is the highest-earning option listed, with a median of **$123,220** as of May 2025 [2]. You typically need flight training rather than a degree, though you should verify specific airline requirements as some may prefer one [2].\n\n**Sales and Specialized Roles** — These roles can reach **$70,000–$30,000+** depending on your book of business or location [3]. The path involves building a portfolio, obtaining a license, or completing an apprenticeship [3].\n\n**Technical Trades and Data Roles** — Many roles can clear **$60,000 to $100,000** without a degree [6]. For instance, a **Data Analyst** role requires roughly **two to four months** of self-study to reach a first paid gig [6].\n\n**Digital Freelancing** — For those looking to start immediately, **Freelance Web Development** can lead to a first paid contract within a **10-day** window on platforms like Upwork [6]. However, reaching the six-figure ceiling usually requires significant time beyond the initial entry [6].",
+ "chars": 2013,
+ "raw_bytes": 6621,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.06,
+ "rate_gen_tok_s": 52.04,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:26:38",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

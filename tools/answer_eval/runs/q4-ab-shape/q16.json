@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.5,\"ftok\":132,\"est\":false}",
+  "X-Hurry": "6dbe411b5c8fb1c8"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 18.89,
+ "elapsed_s": 39.38,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.17,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.17,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.89,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 39.38,
+   "tag": "RATE",
+   "data": {
+    "tps": 27.1,
+    "tok": 556,
+    "s": 20.5
+   }
+  },
+  {
+   "t": 39.38,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2224 chars"
+   }
+  },
+  {
+   "t": 39.38,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 39.38,
+   "tag": "DONE",
+   "data": {
+    "f": 18.89,
+    "t": 39.38,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.61,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.61
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.61
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 15.17
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.17
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.17
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2224 chars",
+   "t_s": 39.38
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 39.38
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Set Boundaries with Family During the Holidays",
+   "u": "https://sagecounselingtherapyandwellness.com/how-to-set-boundaries-with-family-during-the-holidays/",
+   "d": "2022-12-05"
+  },
+  {
+   "t": "Quitting smoking: 10 ways to resist tobacco cravings - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/nicotine-dependence/in-depth/nicotine-craving/art-20045454",
+   "d": ""
+  },
+  {
+   "t": "Nicotine replacement therapy versus control for smoking cessation",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/29852054/",
+   "d": ""
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "Guide to Help A Friend or Family Quit Smoking | Way to Quit",
+   "u": "https://waytoquit.org/help-someone-quit-a-guide-for-friends-and-family/",
+   "d": "2025-08-14"
+  },
+  {
+   "t": "Boundaries with Family During Holidays... - Just Homemaking",
+   "u": "https://justhomemaking.com/how-to-set-boundaries-with-family/",
+   "d": "2020-11-22"
+  },
+  {
+   "t": "Smoking: Effects, Risks, Diseases, Quitting & Solutions",
+   "u": "https://my.clevelandclinic.org/health/articles/17488-smoking",
+   "d": "2017-09-06"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.17,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 238,
+   "o": 18,
+   "d": 707,
+   "c": 207
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4405,
+   "o": 449,
+   "d": 24155,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 27.1,
+  "tok": 556,
+  "s": 20.5
+ },
+ "app_first_s": 18.89,
+ "app_total_s": 39.38,
+ "answer_raw": "To get your family to shift from nagging to supporting, you have to take the lead on the engagement strategy by setting clear expectations before the withdrawal symptoms peak.\n\nThe most effective support happens when you tell them exactly how you want to be helped, rather than letting them guess—which usually leads to them defaulting to nagging or silence [4]. Because the first two to four weeks of withdrawal often involve significant irritability, you need to establish boundaries now to prevent their \"checking up\" from feeling like an interrogation [4].\n\n## Strategic Communication\n\n**Define the support role** — Instead of leaving the door open for them to manage your progress, tell them what you need. For some, support means listening without lecturing; for others, it might mean simply keeping the house smoke-free [4]. By defining these roles, you turn their \"help\" into a specific, actionable task that doesn't involve hovering.\n\n**Communicate boundaries clearly** — Use respectful communication to set boundaries regarding how they approach your recovery. This reduces the chance of building resentment and prevents the cycle of passive aggression or hostility that often occurs when family members overstep [1]. If they begin to nag, you can refer back to the boundaries you established during a calm moment.\n\n**Treat slips as data** — If you have a setback, frame it to them as \"information\" rather than a \"failure\" [4]. This helps prevent the \"check-up\" from becoming a judgmental lecture, keeping the focus on the process of cessation rather than a pass/fail grade on your character.\n\n## Managing the Environment\n\n**Account for irritability** — Be honest with them that the first few weeks may involve mood shifts due to withdrawal [4]. If they know that irritability is a physiological symptom of the process, they may be less likely to take it personally or use it as a reason to \"check in\" on your mental state.\n\n**Focus on the goal** — Remind them (and yourself) that while the process is difficult, the end goal is protecting the health of loved ones and reclaiming personal well-being [8]. If they understand that your boundaries are a tool to help you succeed, they are more likely to respect them.",
+ "answer": "To get your family to shift from nagging to supporting, you have to take the lead on the engagement strategy by setting clear expectations before the withdrawal symptoms peak.\n\nThe most effective support happens when you tell them exactly how you want to be helped, rather than letting them guess—which usually leads to them defaulting to nagging or silence [4]. Because the first two to four weeks of withdrawal often involve significant irritability, you need to establish boundaries now to prevent their \"checking up\" from feeling like an interrogation [4].\n\n## Strategic Communication\n\n**Define the support role** — Instead of leaving the door open for them to manage your progress, tell them what you need. For some, support means listening without lecturing; for others, it might mean simply keeping the house smoke-free [4]. By defining these roles, you turn their \"help\" into a specific, actionable task that doesn't involve hovering.\n\n**Communicate boundaries clearly** — Use respectful communication to set boundaries regarding how they approach your recovery. This reduces the chance of building resentment and prevents the cycle of passive aggression or hostility that often occurs when family members overstep [1]. If they begin to nag, you can refer back to the boundaries you established during a calm moment.\n\n**Treat slips as data** — If you have a setback, frame it to them as \"information\" rather than a \"failure\" [4]. This helps prevent the \"check-up\" from becoming a judgmental lecture, keeping the focus on the process of cessation rather than a pass/fail grade on your character.\n\n## Managing the Environment\n\n**Account for irritability** — Be honest with them that the first few weeks may involve mood shifts due to withdrawal [4]. If they know that irritability is a physiological symptom of the process, they may be less likely to take it personally or use it as a reason to \"check in\" on your mental state.\n\n**Focus on the goal** — Remind them (and yourself) that while the process is difficult, the end goal is protecting the health of loved ones and reclaiming personal well-being [8]. If they understand that your boundaries are a tool to help you succeed, they are more likely to respect them.",
+ "chars": 2224,
+ "raw_bytes": 4582,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.12,
+ "rate_gen_tok_s": 27.14,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:22:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

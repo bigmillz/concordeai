@@ -1,0 +1,327 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.3,\"ftok\":254,\"est\":false}",
+  "X-Hurry": "8cfcff103dbf4b16"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 23.08,
+ "elapsed_s": 29.65,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 10.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.78,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.0,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 30 passages"
+   }
+  },
+  {
+   "t": 15.0,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.0,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.0,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.0,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 29.65,
+   "tag": "RATE",
+   "data": {
+    "tps": 72.0,
+    "tok": 473,
+    "s": 6.6
+   }
+  },
+  {
+   "t": 29.65,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1893 chars"
+   }
+  },
+  {
+   "t": 29.65,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 29.65,
+   "tag": "DONE",
+   "data": {
+    "f": 23.08,
+    "t": 29.65,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.78,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.78
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.78
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 30 passages",
+   "t_s": 15.0
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.0
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.0
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1893 chars",
+   "t_s": 29.65
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 29.65
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "CPF for non-Brazilian citizens — Ministério das Relações ...",
+   "u": "https://www.gov.br/mre/pt-br/consulado-atlanta/english/consular-services/cpf-1/cpf-for-non-brazilians",
+   "d": "2026-02-14"
+  },
+  {
+   "t": "How US Citizens Can Move to Brazil in 2026",
+   "u": "https://visabrazilservices.com/en/how-us-citizens-can-move-to-brazil-in-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Retire in Brazil: visa, tax & cost of living guide for Americans",
+   "u": "https://www.taxesforexpats.com/country-guides/brazil/retire-in-brazil.html",
+   "d": "2026"
+  },
+  {
+   "t": "Brazil Retirement Visa for Foreigners | Oliveira Lawyers",
+   "u": "https://oliveiralawyers.com/services/immigration/retirement-visa/",
+   "d": "2026-10-12"
+  },
+  {
+   "t": "The Role of Brazil’s inheritance system in wealth inequality",
+   "u": "https://repositorio.ipea.gov.br/entities/publication/244f91b3-d398-48bb-a873-e8787d260568",
+   "d": ""
+  },
+  {
+   "t": "Brazil Retirement Visa: How VITEM XIV Works in 2026",
+   "u": "https://www.globalcitizensolutions.com/brazil-retirement-visa/",
+   "d": "2026"
+  },
+  {
+   "t": "Probate Attorney in Brazil | inheritance Lawyer | Sao Paulo",
+   "u": "https://mariosolimene.com/en/what-we-do/wills-and-probates/",
+   "d": "2026-01-13"
+  },
+  {
+   "t": "Estate tax for nonresidents not citizens of the United States",
+   "u": "https://www.irs.gov/businesses/small-businesses-self-employed/estate-tax-for-nonresidents-not-citizens-of-the-united-states",
+   "d": "2026-06-28"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.0,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 252,
+   "o": 24,
+   "d": 605,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5817,
+   "o": 393,
+   "d": 14596
+  }
+ ],
+ "rate_writer": {
+  "tps": 72.0,
+  "tok": 473,
+  "s": 6.6
+ },
+ "app_first_s": 23.08,
+ "app_total_s": 29.65,
+ "answer_raw": "Your US accounts generally remain subject to US law, while your Brazilian apartment and local assets will trigger Brazilian probate and inheritance rules.\n\nIf you die in Brazil, your assets held in Brazil—like a real estate property—are subject to the Brazilian legal system. Brazilian civil laws include rules regarding **forced heirs**, which can dictate how property is distributed to children or spouses [5]. Because the legal system is complex, any will signed outside of Brazil must be validated by a Brazilian authority, such as a judge, to ensure its formal regularity before it can be executed locally [7].\n\nYour US-based accounts are typically treated as U.S.-situated assets. For non-citizens or non-residents, the US imposes an estate tax on the transfer of such assets if they exceed certain thresholds — for example, if the value exceeds **$60,000**, an executor must file Form 706-NA [8].\n\nRegarding your heirs in the US:\n\n*   **Brazilian Assets**: Your heirs will likely need to navigate a local Brazilian probate process to transfer the apartment or other local assets to their names [7].\n*   **US Assets**: Your US accounts should remain under US jurisdiction, but if you were considered a Brazilian tax resident (which can happen after spending **184 days** in the country), your global estate might face complex cross-border tax scrutiny [6].\n\nTo manage the transition of assets, you will need a **CPF** (Individual Taxpayer Registry), which is required for non-Brazilian citizens to own real estate or maintain bank accounts [1]. You can apply for this in person at a Brazilian consulate [1]. Since the specifics of how US-based heirs are treated under Brazilian \"forced heir\" laws vary based on the exact nature of the assets and your residency status, you should consult a cross-border estate attorney to reconcile US tax obligations with Brazilian probate requirements.",
+ "answer": "Your US accounts generally remain subject to US law, while your Brazilian apartment and local assets will trigger Brazilian probate and inheritance rules.\n\nIf you die in Brazil, your assets held in Brazil—like a real estate property—are subject to the Brazilian legal system. Brazilian civil laws include rules regarding **forced heirs**, which can dictate how property is distributed to children or spouses [5]. Because the legal system is complex, any will signed outside of Brazil must be validated by a Brazilian authority, such as a judge, to ensure its formal regularity before it can be executed locally [7].\n\nYour US-based accounts are typically treated as U.S.-situated assets. For non-citizens or non-residents, the US imposes an estate tax on the transfer of such assets if they exceed certain thresholds — for example, if the value exceeds **$60,000**, an executor must file Form 706-NA [8].\n\nRegarding your heirs in the US:\n\n*   **Brazilian Assets**: Your heirs will likely need to navigate a local Brazilian probate process to transfer the apartment or other local assets to their names [7].\n*   **US Assets**: Your US accounts should remain under US jurisdiction, but if you were considered a Brazilian tax resident (which can happen after spending **184 days** in the country), your global estate might face complex cross-border tax scrutiny [6].\n\nTo manage the transition of assets, you will need a **CPF** (Individual Taxpayer Registry), which is required for non-Brazilian citizens to own real estate or maintain bank accounts [1]. You can apply for this in person at a Brazilian consulate [1]. Since the specifics of how US-based heirs are treated under Brazilian \"forced heir\" laws vary based on the exact nature of the assets and your residency status, you should consult a cross-border estate attorney to reconcile US tax obligations with Brazilian probate requirements.",
+ "chars": 1893,
+ "raw_bytes": 4283,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.96,
+ "rate_gen_tok_s": 72.03,
+ "id": "q24",
+ "turn": 1,
+ "category": "money",
+ "topic": "Retirement visa and inheritance",
+ "question": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:59:41",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "If I move to Brazil on a retirement visa and die there, what happens to my US accounts and a Brazilian apartment I bought? Do my heirs in the US get hit with Brazilian inheritance rules?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

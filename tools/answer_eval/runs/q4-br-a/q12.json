@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":102,\"est\":false}",
+  "X-Hurry": "36fc2f5fce33ed12"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 0.61,
+ "elapsed_s": 19.68,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 0.61,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 6.16,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.16,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.16,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 27 passages"
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 8.77,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 8.77,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.68,
+   "tag": "RATE",
+   "data": {
+    "tps": 65.9,
+    "tok": 391,
+    "s": 5.9
+   }
+  },
+  {
+   "t": 19.68,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1564 chars"
+   }
+  },
+  {
+   "t": 19.68,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   6.16,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.16
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.16
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 27 passages",
+   "t_s": 8.77
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.77
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 8.77
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1564 chars",
+   "t_s": 19.68
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.68
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "10 Reasons Your Sweat Smells Like Vinegar - HealthlineSweating and body odor - S",
+   "u": "https://www.healthline.com/health/sweat-smells-like-vinegar",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Body Odor: Causes, Changes, Underlying Diseases & Treatment",
+   "u": "https://my.clevelandclinic.org/health/symptoms/17865-body-odor",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "Sweating and body odor - Symptoms and causes - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/diseases-conditions/sweating-and-body-odor/symptoms-causes/syc-20353895",
+   "d": "2025-05-03"
+  },
+  {
+   "t": "Smelly Scalp: Causes, Shampoos & At-Home Treatments",
+   "u": "https://my.clevelandclinic.org/health/symptoms/24751-smelly-scalp",
+   "d": "2023-02-20"
+  },
+  {
+   "t": "Treatments for Changes in Body Odor | Menopause Now",
+   "u": "https://www.menopausenow.com/body-odor/treatments",
+   "d": "2016-08-26"
+  },
+  {
+   "t": "Why Stress Sweat Smells Worse: Science Behind the Odor",
+   "u": "https://secret.com/en-us/articles/why-stress-sweat-smells-worse-science-behind-the-odor",
+   "d": ""
+  },
+  {
+   "t": "Sudden Change in Men's Body Odor: Causes & Solutions | AXE",
+   "u": "https://www.axe.com/us/en/inspiration/grooming/sudden-changes-in-body-odor.html",
+   "d": ""
+  },
+  {
+   "t": "Stress Sweat: Why It Smells Worse and How to Stay Fresh Under...",
+   "u": "https://checkout.opositiv.com/blogs/blog/stress-sweat-why-it-smells-worse-and-how-to-stay-fresh-under-pressure",
+   "d": "2024-06-10"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   8.77,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 65.9,
+  "tok": 391,
+  "s": 5.9
+ },
+ "answer_raw": "Sudden changes in odor typically stem from a combination of **biological shifts**, **bacterial interaction**, or **dietary/lifestyle factors**.\n\nSweat itself is mostly water and is generally odorless; the smell occurs when sweat comes into contact with **bacteria on your skin** [2]. While your eccrine glands produce a thin, watery sweat mostly for thermoregulation [6], your **apocrine glands** (located in areas like the armpits and groin) produce a different type of sweat that can lead to more noticeable odors when mixed with bacteria [2].\n\nIf the smell has changed recently, consider these common causes:\n\n*   **Biological/Hormonal shifts**: Changes in hormone levels, such as during **menopause**, can alter body odor [5].\n*   **Stress**: Sweat produced during stressful situations can smell different than sweat from physical exercise [6].\n*   **Underlying health conditions**: A **vinegar-like scent** can sometimes indicate medical issues like diabetes or kidney disease [1].\n*   **Diet and Hygiene**: The foods you eat or changes in your hygiene routine can alter the scent profile of your perspiration [2].\n*   **Nutritional deficiencies**: A **zinc deficiency** is often associated with changes in perspiration and body odor [5].\n\nTo fix it, you should first look at **lifestyle changes** and hygiene practices, such as managing diet or improving skin cleanliness [2][5]. If the odor is persistent or accompanied by other symptoms, you should consult a healthcare provider to rule out medical conditions or to receive prescribed treatments [1][2][4].",
+ "answer": "Sudden changes in odor typically stem from a combination of **biological shifts**, **bacterial interaction**, or **dietary/lifestyle factors**.\n\nSweat itself is mostly water and is generally odorless; the smell occurs when sweat comes into contact with **bacteria on your skin** [2]. While your eccrine glands produce a thin, watery sweat mostly for thermoregulation [6], your **apocrine glands** (located in areas like the armpits and groin) produce a different type of sweat that can lead to more noticeable odors when mixed with bacteria [2].\n\nIf the smell has changed recently, consider these common causes:\n\n*   **Biological/Hormonal shifts**: Changes in hormone levels, such as during **menopause**, can alter body odor [5].\n*   **Stress**: Sweat produced during stressful situations can smell different than sweat from physical exercise [6].\n*   **Underlying health conditions**: A **vinegar-like scent** can sometimes indicate medical issues like diabetes or kidney disease [1].\n*   **Diet and Hygiene**: The foods you eat or changes in your hygiene routine can alter the scent profile of your perspiration [2].\n*   **Nutritional deficiencies**: A **zinc deficiency** is often associated with changes in perspiration and body odor [5].\n\nTo fix it, you should first look at **lifestyle changes** and hygiene practices, such as managing diet or improving skin cleanliness [2][5]. If the odor is persistent or accompanied by other symptoms, you should consult a healthcare provider to rule out medical conditions or to receive prescribed treatments [1][2][4].",
+ "chars": 1564,
+ "raw_bytes": 3921,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.65,
+ "rate_gen_tok_s": 23.37,
+ "id": "q12",
+ "turn": 1,
+ "category": "health",
+ "topic": "Sweat smell",
+ "question": "Why does my sweat smell worse than it used to and what actually fixes it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:07:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Why does my sweat smell worse than it used to and what actually fixes it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 13.74,
+ "app_total_s": 19.68,
+ "first_text_s_unreliable": true
+}

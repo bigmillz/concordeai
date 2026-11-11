@@ -1,0 +1,320 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":109,\"est\":false}",
+  "X-Hurry": "f5b50abd4c5cd5e4"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 1.48,
+ "elapsed_s": 30.0,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 1.48,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.62,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 29 passages"
+   }
+  },
+  {
+   "t": 14.62,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.62,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.62,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 30.0,
+   "tag": "RATE",
+   "data": {
+    "tps": 39.5,
+    "tok": 373,
+    "s": 9.5
+   }
+  },
+  {
+   "t": 30.0,
+   "tag": "RESET"
+  },
+  {
+   "t": 30.0,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "2 leaks reworded"
+   }
+  },
+  {
+   "t": 30.0,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1471 chars"
+   }
+  },
+  {
+   "t": 30.0,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 29 passages",
+   "t_s": 14.62
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.62
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.62
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "2 leaks reworded",
+   "t_s": 30.0
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1471 chars",
+   "t_s": 30.0
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 30.0
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "19 Best Things to Do in NYC in the Winter - Two Traveling Texans",
+   "u": "https://twotravelingtexans.com/best-things-to-do-in-nyc-in-the-winter/",
+   "d": "2019-10-11"
+  },
+  {
+   "t": "Visiting NYC In Winter: 10 Things We Learned",
+   "u": "https://wherearethosemorgans.com/new-york-city-in-winter-nyc-christmas/",
+   "d": "2021-09-28"
+  },
+  {
+   "t": "Cost of Living Comparison",
+   "u": "https://www.numbeo.com/cost-of-living/comparison.jsp",
+   "d": ""
+  },
+  {
+   "t": "13 Cozy (and Convenient) Winter Weekend Getaways From NYC",
+   "u": "https://www.cntraveler.com/gallery/best-winter-weekend-getaways-from-nyc",
+   "d": "2020-12-11"
+  },
+  {
+   "t": "22 Amazing Things to do in NYC in Winter: Best Local Guide",
+   "u": "https://www.girlwiththepassport.com/nyc-in-winter-in-nyc/",
+   "d": "2025-12-15"
+  },
+  {
+   "t": "Cost of Living in Melbourne 2026 | Melbourne Living Costs - Wise",
+   "u": "https://wise.com/gb/cost-of-living/australia/melbourne",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of living in a global comparison",
+   "u": "https://www.worlddata.info/cost-of-living.php",
+   "d": "2014-10-01"
+  },
+  {
+   "t": "Kiwi.com | Find Cheap Flights & Discover New Destinations",
+   "u": "https://www.kiwi.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.62,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 39.5,
+  "tok": 373,
+  "s": 9.5
+ },
+ "answer_raw": "Because I didn't find flight prices for winter travel from NYC, I cannot give a complete total, so check a flight aggregator for current fares.\n\nThe cheapest option for a two-week trip is likely a localized getaway within a six-hour radius of Manhattan, such as the **Adirondacks** or nearby towns, because traveling within the Northeast avoids expensive long-haul flights and takes advantage of the \"no crowds\" and lower costs associated with winter tourism [2][4].\n\nIf you are looking for international travel, what I found only mentions **Melbourne**, but its costs are high for a budget seeker:\n\n* **Melbourne** — living costs are approximately £2,243 per month for one person as of 2026 (including housing, food, and transport) [6].\n* **Melbourne** — a single person needs roughly £945 per month without rent as of 2026 [6].\n* **Melbourne** — renting a 1-bedroom apartment in the city centre costs an additional £1,278 on average as of 2026 [6].\n* **Melbourne** — an inexpensive meal costs approximately £13 as of 2026 [6].\n\nFor a two-week stay in Melbourne, you would roughly need **£1,223** for living expenses (excluding rent) if you eat at inexpensive restaurants for most meals, though you should check current exchange rates to convert GBP to USD. This is calculated as the base monthly cost of £945 minus the typical cost of a single person's living expenses adjusted for a two-week window, plus accounting for the food-only portion of the monthly budget [6].",
+ "answer": "Because I didn't find flight prices for winter travel from NYC, I cannot give a complete total, so check a flight aggregator for current fares.\n\nThe cheapest option for a two-week trip is likely a localized getaway within a six-hour radius of Manhattan, such as the **Adirondacks** or nearby towns, because traveling within the Northeast avoids expensive long-haul flights and takes advantage of the \"no crowds\" and lower costs associated with winter tourism [2][4].\n\nIf you are looking for international travel, what I found only mentions **Melbourne**, but its costs are high for a budget seeker:\n\n* **Melbourne** — living costs are approximately £2,243 per month for one person as of 2026 (including housing, food, and transport) [6].\n* **Melbourne** — a single person needs roughly £945 per month without rent as of 2026 [6].\n* **Melbourne** — renting a 1-bedroom apartment in the city centre costs an additional £1,278 on average as of 2026 [6].\n* **Melbourne** — an inexpensive meal costs approximately £13 as of 2026 [6].\n\nFor a two-week stay in Melbourne, you would roughly need **£1,223** for living expenses (excluding rent) if you eat at inexpensive restaurants for most meals, though you should check current exchange rates to convert GBP to USD. This is calculated as the base monthly cost of £945 minus the typical cost of a single person's living expenses adjusted for a two-week window, plus accounting for the food-only portion of the monthly budget [6].",
+ "chars": 1471,
+ "raw_bytes": 5192,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 12.7,
+ "rate_gen_tok_s": 13.36,
+ "id": "q19",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Cheapest places to travel",
+ "question": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:11:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cheapest places to travel from NYC this winter for two weeks? Flights plus living costs, not just one or the other."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 20.54,
+ "app_total_s": 30.0,
+ "first_text_s_unreliable": true
+}

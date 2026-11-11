@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":22.2,\"ftok\":281,\"est\":false}",
+  "X-Hurry": "33bc0ecb877eaf87"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 16.85,
+ "elapsed_s": 26.23,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 7.5,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.5,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.5,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.81,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 31 passages"
+   }
+  },
+  {
+   "t": 12.81,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.81,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.81,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.81,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.85,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.23,
+   "tag": "RATE",
+   "data": {
+    "tps": 70.6,
+    "tok": 662,
+    "s": 9.4
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2648 chars"
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 26.23,
+   "tag": "DONE",
+   "data": {
+    "f": 16.85,
+    "t": 26.23,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   7.5,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.5
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.5
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 31 passages",
+   "t_s": 12.81
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.81
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.81
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2648 chars",
+   "t_s": 26.23
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 26.23
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "AI Job Displacement Statistics 2026: Jobs at Risk &.",
+   "u": "https://aitoolreviews.co/stats/ai-job-displacement-statistics-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S ... - SHRM",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment/2026-full-report",
+   "d": ""
+  },
+  {
+   "t": "AI Job Displacement Statistics: 50% Would Trust AI With Autonomy",
+   "u": "https://learn.g2.com/ai-job-displacement-statistics",
+   "d": "2026"
+  },
+  {
+   "t": "AI Job Displacement Data Exposes a $1 Trillion Due Diligence ...",
+   "u": "https://developmentcorporate.com/saas/ai-job-displacement-data-exposes-a-1-trillion-due-diligence-blind-spot/",
+   "d": "2025-11-23"
+  },
+  {
+   "t": "Data Scientists : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/math/data-scientists.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Occupation Finder : Occupational Outlook Handbook: : U.S. Bureau of...",
+   "u": "https://www.bls.gov/ooh/occupation-finder.htm",
+   "d": "2025"
+  },
+  {
+   "t": "IT Ops Automation in 2026: What Enterprises Must Know",
+   "u": "https://www.molecularcloud.org/p/it-ops-automation-in-2026-what-enterprises-must-know",
+   "d": "2026-06-15"
+  },
+  {
+   "t": "PwC plans to certify workers in critical thinking as AI changes their jobs",
+   "u": "https://finance.yahoo.com/technology/ai/articles/pwc-plans-certify-workers-critical-131019483.html",
+   "d": "2026-11-09"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.81,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 23,
+   "d": 815,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4813,
+   "o": 573,
+   "d": 13375,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 70.6,
+  "tok": 662,
+  "s": 9.4
+ },
+ "app_first_s": 16.85,
+ "app_total_s": 26.23,
+ "answer_raw": "Your job won't likely vanish, but the tasks that occupy your 9-to-5 will change fundamentally.\n\nThe risk for IT ops/sysadmin work isn't total replacement; it's the shift from manual execution to managing automated systems. While roughly 44% of workers' core skills are expected to be disrupted by AI and automation over the next five years [1], the risk of outright displacement for experienced professionals is different from the risks facing entry-level roles.\n\n## The Displacement Reality\nThe most immediate pressure from AI-driven displacement is found in administrative, data entry, and customer support roles [3]. In your field, the risk is less about \"the bot taking the job\" and more about the \"efficiency gap\"—where one engineer managing an automated stack does the work of three manual admins [7].\n\nThe literature points to two distinct profiles of risk:\n*   **Low-wage/Entry-level roles:** Workers earning under $40,000 are most exposed to displacement relative to their compensation [1].\n*   **Knowledge workers:** For experienced professionals, the risk isn't being replaced by a machine, but rather that the \"foundational tasks\" (research, analysis, writing) that used to build expertise are being automated [8]. This can lead to a gap in junior-level skill development [8].\n\n## How to Pivot\nThe goal is to move from the person *doing* the task to the person *architecting* the automation.\n\n**1. Master the hybrid stack**\nEffective enterprise automation in 2026 uses a mix of rule-based automation for compliance-sensitive workflows and AI-driven automation for dynamic operational intelligence [7]. You should focus on being the person who integrates these two: building the deterministic guardrails that allow the AI-driven side to run safely.\n\n**2. Double down on judgment and critical thinking**\nAs foundational, repetitive tasks are automated, the value of human workers shifts toward high-level judgment [8]. Organizations are already seeing that entry-level roles now require more senior-level skills, such as leadership and complex decision-making, because the \"grunt work\" is gone [8].\n\n**3. Prepare for a \"complementary\" role**\nAbout 55% of workers say they would retrain to take on AI-complementary roles if their current job became automated [1]. In IT ops, this means moving toward roles in AI infrastructure, reliability engineering, or security-focused automation.\n\nThe \"optimism gap\" shows that while many fear widespread displacement, only 22% of workers believe they will be personally displaced within five years [1]. Use that breathing room to transition from a task-oriented mindset to a system-architect mindset.",
+ "answer": "Your job won't likely vanish, but the tasks that occupy your 9-to-5 will change fundamentally.\n\nThe risk for IT ops/sysadmin work isn't total replacement; it's the shift from manual execution to managing automated systems. While roughly 44% of workers' core skills are expected to be disrupted by AI and automation over the next five years [1], the risk of outright displacement for experienced professionals is different from the risks facing entry-level roles.\n\n## The Displacement Reality\nThe most immediate pressure from AI-driven displacement is found in administrative, data entry, and customer support roles [3]. In your field, the risk is less about \"the bot taking the job\" and more about the \"efficiency gap\"—where one engineer managing an automated stack does the work of three manual admins [7].\n\nThe literature points to two distinct profiles of risk:\n*   **Low-wage/Entry-level roles:** Workers earning under $40,000 are most exposed to displacement relative to their compensation [1].\n*   **Knowledge workers:** For experienced professionals, the risk isn't being replaced by a machine, but rather that the \"foundational tasks\" (research, analysis, writing) that used to build expertise are being automated [8]. This can lead to a gap in junior-level skill development [8].\n\n## How to Pivot\nThe goal is to move from the person *doing* the task to the person *architecting* the automation.\n\n**1. Master the hybrid stack**\nEffective enterprise automation in 2026 uses a mix of rule-based automation for compliance-sensitive workflows and AI-driven automation for dynamic operational intelligence [7]. You should focus on being the person who integrates these two: building the deterministic guardrails that allow the AI-driven side to run safely.\n\n**2. Double down on judgment and critical thinking**\nAs foundational, repetitive tasks are automated, the value of human workers shifts toward high-level judgment [8]. Organizations are already seeing that entry-level roles now require more senior-level skills, such as leadership and complex decision-making, because the \"grunt work\" is gone [8].\n\n**3. Prepare for a \"complementary\" role**\nAbout 55% of workers say they would retrain to take on AI-complementary roles if their current job became automated [1]. In IT ops, this means moving toward roles in AI infrastructure, reliability engineering, or security-focused automation.\n\nThe \"optimism gap\" shows that while many fear widespread displacement, only 22% of workers believe they will be personally displaced within five years [1]. Use that breathing room to transition from a task-oriented mindset to a system-architect mindset.",
+ "chars": 2648,
+ "raw_bytes": 5027,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 25.24,
+ "rate_gen_tok_s": 70.58,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:27:06",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

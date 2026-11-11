@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":21.5,\"ftok\":300,\"est\":false}",
+  "X-Hurry": "1078a9b5127b562b"
+ },
+ "first_byte_s": 0.07,
+ "first_text_s": 1.1,
+ "elapsed_s": 23.44,
+ "events": [
+  {
+   "t": 0.07,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 1.1,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 26 passages"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.61,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.61,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.44,
+   "tag": "RATE",
+   "data": {
+    "tps": 55.8,
+    "tok": 463,
+    "s": 8.3
+   }
+  },
+  {
+   "t": 23.44,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1855 chars"
+   }
+  },
+  {
+   "t": 23.44,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.07,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 26 passages",
+   "t_s": 10.61
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.61
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.61
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1855 chars",
+   "t_s": 23.44
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.44
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis, Brazil Holiday Rentals – Airbnb",
+   "u": "https://www.airbnb.co.uk/florianopolis-brazil/stays",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Aluguel por temporada em Florianópolis, Brasil - Airbnb",
+   "u": "https://www.airbnb.com.br/florianopolis-brazil/stays",
+   "d": "2026"
+  },
+  {
+   "t": "Tri Hotel Florianópolis, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/itaguacu.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "AS 15 MELHORES coisas para fazer em Florianópolis (2026)",
+   "u": "https://www.tripadvisor.com.br/Attractions-g303576-Activities-Florianopolis_State_of_Santa_Catarina.html",
+   "d": "2026"
+  },
+  {
+   "t": "floripaguru.com/blog/housing-guide-florianopolis-2026.md",
+   "u": "https://floripaguru.com/blog/housing-guide-florianopolis-2026.md",
+   "d": "2026"
+  },
+  {
+   "t": "Top apartments in Florianópolis on cozycozy.com",
+   "u": "https://www.cozycozy.com/us/florianopolis-apartments",
+   "d": ""
+  },
+  {
+   "t": "Valerim Florianópolis, Brazil - from 5,405 pyб - Travelated",
+   "u": "https://www.travelated.com/brazil/florianopolis/valerim-florianopolis",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.61,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 55.8,
+  "tok": 463,
+  "s": 8.3
+ },
+ "answer_raw": "Trust the **4.6-star rating** with 212 reviews.\n\nIn hospitality, a high volume of reviews is a more reliable indicator of consistency than a perfect score from a tiny sample size. A 4.9 rating from 18 reviews can be easily skewed by a few friends or family members, whereas 212 reviews represent a much broader spectrum of guest experiences, personalities, and edge cases. The 4.6 rating suggests the property has been \"vetted\" by the market and can maintain a high standard over a long period.\n\n## Pricing your 2-bedroom in Florianópolis\n\nThe provided evidence does not contain specific rental price ranges for 2-bedroom apartments in Florianópolis, so you should check local listings on sites like Rentola or Airbnb to establish a baseline.\n\nWhen pricing for 30+ night stays (monthly rentals), you should adjust your strategy based on two factors:\n\n**The Monthly Discount**\nTypically, hosts offering long-term stays provide a significant discount compared to nightly rates to ensure occupancy. You are trading the higher margin of short-term stays for the lower overhead and stability of a single guest.\n\n**The Seasonality of Florianópolis**\nPricing must account for the extreme shifts in Brazilian coastal demand. For example:\n*   **Peak Season (January/February):** Demand is at its highest. One listing notes a minimum stay requirement of 4 nights during these months [2]. You can likely command a premium here, but ensure your 30-night price doesn't undercut the massive seasonal surge.\n*   **Off-Peak:** You may need to lower your floor to attract digital nomads or long-term travelers looking for value.\n\nTo find your specific price, look at current listings for 2-bedroom units in areas like Ingleses or Agronômica [1][7] and calculate the monthly equivalent of their nightly rates, then apply a 20-40% discount to create your long-term offering.",
+ "answer": "Trust the **4.6-star rating** with 212 reviews.\n\nIn hospitality, a high volume of reviews is a more reliable indicator of consistency than a perfect score from a tiny sample size. A 4.9 rating from 18 reviews can be easily skewed by a few friends or family members, whereas 212 reviews represent a much broader spectrum of guest experiences, personalities, and edge cases. The 4.6 rating suggests the property has been \"vetted\" by the market and can maintain a high standard over a long period.\n\n## Pricing your 2-bedroom in Florianópolis\n\nThe provided evidence does not contain specific rental price ranges for 2-bedroom apartments in Florianópolis, so you should check local listings on sites like Rentola or Airbnb to establish a baseline.\n\nWhen pricing for 30+ night stays (monthly rentals), you should adjust your strategy based on two factors:\n\n**The Monthly Discount**\nTypically, hosts offering long-term stays provide a significant discount compared to nightly rates to ensure occupancy. You are trading the higher margin of short-term stays for the lower overhead and stability of a single guest.\n\n**The Seasonality of Florianópolis**\nPricing must account for the extreme shifts in Brazilian coastal demand. For example:\n*   **Peak Season (January/February):** Demand is at its highest. One listing notes a minimum stay requirement of 4 nights during these months [2]. You can likely command a premium here, but ensure your 30-night price doesn't undercut the massive seasonal surge.\n*   **Off-Peak:** You may need to lower your floor to attract digital nomads or long-term travelers looking for value.\n\nTo find your specific price, look at current listings for 2-bedroom units in areas like Ingleses or Agronômica [1][7] and calculate the monthly equivalent of their nightly rates, then apply a 20-40% discount to create your long-term offering.",
+ "chars": 1855,
+ "raw_bytes": 4123,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 22.11,
+ "rate_gen_tok_s": 23.2,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:32:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 15.12,
+ "app_total_s": 23.44,
+ "first_text_s_unreliable": true
+}

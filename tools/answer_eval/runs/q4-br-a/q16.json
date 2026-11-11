@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":103,\"est\":false}",
+  "X-Hurry": "7272be082b2b75d6"
+ },
+ "first_byte_s": 0.1,
+ "first_text_s": 0.87,
+ "elapsed_s": 24.57,
+ "events": [
+  {
+   "t": 0.1,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.1,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 0.87,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 6.81,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.81,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.81,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.11,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 26 passages"
+   }
+  },
+  {
+   "t": 10.11,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.11,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.11,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.11,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.57,
+   "tag": "RATE",
+   "data": {
+    "tps": 45.0,
+    "tok": 420,
+    "s": 9.3
+   }
+  },
+  {
+   "t": 24.57,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1681 chars"
+   }
+  },
+  {
+   "t": 24.57,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.1,
+   "Searching the web…"
+  ],
+  [
+   6.81,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.1
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.81
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.81
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 26 passages",
+   "t_s": 10.11
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.11
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.11
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1681 chars",
+   "t_s": 24.57
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.57
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "What are treatments for tobacco dependence? | National ...Behavioural interventi",
+   "u": "https://nida.nih.gov/publications/research-reports/tobacco-nicotine-e-cigarettes/what-are-treatments-tobacco-dependence",
+   "d": "2021-01-04"
+  },
+  {
+   "t": "How To Support A Loved One During Addiction Recovery: A ...",
+   "u": "https://safeharbortreatmentcenter.com/support-loved-one-addiction-recovery-family-guide/",
+   "d": "2026-02-28"
+  },
+  {
+   "t": "How to Set Boundaries with Family During the Holidays",
+   "u": "https://wellsanfrancisco.com/how-to-set-boundaries-with-family-during-the-holidays/",
+   "d": "2018-12-14"
+  },
+  {
+   "t": "The role of family support in addiction recovery",
+   "u": "https://www.goldstarrehab.com/parent-resources/the-role-of-family-support-in-addiction-recovery",
+   "d": ""
+  },
+  {
+   "t": "Experiences of nicotine users motivated to quit during the COVID-19...",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/37369394/",
+   "d": ""
+  },
+  {
+   "t": "How Do Family Triggers Relate To An Addiction? - Arista Recovery",
+   "u": "https://www.aristarecovery.com/blog/how-do-family-triggers-relate-to-an-addiction",
+   "d": ""
+  },
+  {
+   "t": "3 important things to know about quitting nicotine during times of stress",
+   "u": "https://truthinitiative.org/research-resources/emerging-tobacco-products/3-important-things-know-about-quitting-nicotine-during",
+   "d": "2023-03-23"
+  },
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.11,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 45.0,
+  "tok": 420,
+  "s": 9.3
+ },
+ "answer_raw": "The best way to stop the nagging is to **set clear boundaries** and tell them exactly how you want to be supported before the withdrawal symptoms hit own their role as a \"stable environment\" rather than a coach [8].\n\nYou should lead with a specific request: tell them that you need them to **listen without lecturing** and to refrain from checking up on your progress or asking constant questions [8]. If they feel the need to be involved, suggest they focus on being the stable environment where your cessation expertise—whether that's counseling or NRT—can take hold [8].\n\n**Set these specific boundaries to prevent friction:**\n\n*   **Define their role:** Explain that your role is to manage the recovery process and their role is to provide a smoke-free, stable home environment [8].\n*   **Address the \"check-up\" impulse:** Tell them that \"checking up\" feels like nagging; instead, ask them to wait for you to initiate conversations about your progress [8].\n*   **Manage irritability:** Warn them that you may be irritable during the first **two to four weeks** of withdrawal, and ask them to treat those moments as physiological symptoms rather than personal attacks [8].\n*   **Handle slips proactively:** If you have a setback, tell them beforehand that a slip is **information, not a failure**, and ask them to help you process the data without judgment [8].\n\nIf they struggle to move from \"nagging\" to \"supporting,\" it is likely because they are falling into an **enabling pattern** or don't know how to balance helping with intrusive behavior [2]. Remind them that effective support is about **setting healthy limits** to prevent interfering with your recovery process [4].",
+ "answer": "The best way to stop the nagging is to **set clear boundaries** and tell them exactly how you want to be supported before the withdrawal symptoms hit own their role as a \"stable environment\" rather than a coach [8].\n\nYou should lead with a specific request: tell them that you need them to **listen without lecturing** and to refrain from checking up on your progress or asking constant questions [8]. If they feel the need to be involved, suggest they focus on being the stable environment where your cessation expertise—whether that's counseling or NRT—can take hold [8].\n\n**Set these specific boundaries to prevent friction:**\n\n*   **Define their role:** Explain that your role is to manage the recovery process and their role is to provide a smoke-free, stable home environment [8].\n*   **Address the \"check-up\" impulse:** Tell them that \"checking up\" feels like nagging; instead, ask them to wait for you to initiate conversations about your progress [8].\n*   **Manage irritability:** Warn them that you may be irritable during the first **two to four weeks** of withdrawal, and ask them to treat those moments as physiological symptoms rather than personal attacks [8].\n*   **Handle slips proactively:** If you have a setback, tell them beforehand that a slip is **information, not a failure**, and ask them to help you process the data without judgment [8].\n\nIf they struggle to move from \"nagging\" to \"supporting,\" it is likely because they are falling into an **enabling pattern** or don't know how to balance helping with intrusive behavior [2]. Remind them that effective support is about **setting healthy limits** to prevent interfering with your recovery process [4].",
+ "chars": 1681,
+ "raw_bytes": 4206,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.33,
+ "rate_gen_tok_s": 20.04,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-a",
+ "asked_at": "2026-11-10T04:09:16",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 15.22,
+ "app_total_s": 24.57,
+ "first_text_s_unreliable": true
+}

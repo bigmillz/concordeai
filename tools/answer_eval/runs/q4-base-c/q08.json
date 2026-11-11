@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.3,\"ftok\":126,\"est\":false}",
+  "X-Hurry": "9e88397414db4016"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 15.84,
+ "elapsed_s": 22.92,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 17 passages"
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 11.78,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.84,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.92,
+   "tag": "RATE",
+   "data": {
+    "tps": 58.6,
+    "tok": 414,
+    "s": 7.1
+   }
+  },
+  {
+   "t": 22.92,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1658 chars"
+   }
+  },
+  {
+   "t": 22.92,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.92,
+   "tag": "DONE",
+   "data": {
+    "f": 15.84,
+    "t": 22.92,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 17 passages",
+   "t_s": 11.78
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.78
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.78
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1658 chars",
+   "t_s": 22.92
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.92
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Boston To NYC Amtrak Stops: Essential Travel Guide, Schedule...",
+   "u": "https://travelpander.com/boston-to-nyc-amtrak-stops/",
+   "d": "2025-07-10"
+  },
+  {
+   "t": "NYC to Boston: Distance, Time & Cost | Travel and Time",
+   "u": "https://travelandtime.com/distance-from-new-york-to-boston",
+   "d": "2025-01-15"
+  },
+  {
+   "t": "NYC to Boston in 2026: Amtrak, Flight, Bus or Drive? Cost and ...",
+   "u": "https://www.shopback.com/blog/travel/nyc-to-boston-cheapest-way-2026",
+   "d": "2026-07-14"
+  },
+  {
+   "t": "New York to Boston: Train, Flight, Bus – Cost & Time",
+   "u": "https://observerireland.org/tech/new-york-boston-train-flight-bus/",
+   "d": "2026-08-05"
+  },
+  {
+   "t": "Madrid Valencia — Train vs Flight (Door-to-Door Time, Cost & CO₂e)",
+   "u": "https://odysseydiscoveries.com/madrid-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "Barcelona Valencia — Train vs Flight (Door-to-Door Time, Cost...)",
+   "u": "https://odysseydiscoveries.com/barcelona-valencia-train-vs-flight/",
+   "d": "2026-07-07"
+  },
+  {
+   "t": "NYC to Boston: The Perfect Spring Weekend Bus Trip | OurBus",
+   "u": "https://www.ourbus.com/blog/nyc-to-boston-perfect-spring-weekend-bus-trip/",
+   "d": ""
+  },
+  {
+   "t": "NYC - Boston - Train Travel Forum - Tripadvisor",
+   "u": "https://www.tripadvisor.ca/ShowTopic-g1-i12483-k14898063-NYC_Boston-Train_Travel.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.78,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 236,
+   "o": 27,
+   "d": 754,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4837,
+   "o": 444,
+   "d": 11090,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 58.6,
+  "tok": 414,
+  "s": 7.1
+ },
+ "app_first_s": 15.84,
+ "app_total_s": 22.92,
+ "answer_raw": "Take the train; it is the more efficient choice for this specific corridor.\n\n| Mode | Door-to-Door Time | Typical Cost |\n| :--- | :--- | :--- |\n| **Train (Amtrak)** | **3.5 to 4 hours** [1] | **$49 to $150** [1] |\n| **Flight** | **~3h45–5h30** (including buffers) [6] | Variable [3] |\n| **Bus** | **4 to 4.5 hours** [7] | Variable [3] |\n\n## The Verdict\nFor the NYC to Boston route, the **train** is the superior option. While a flight covers a shorter distance in the air (~190 miles) [2], the time spent traveling to the airport, checking in, and clearing security effectively cancels out any time saved during the flight itself [2]. \n\nThe train provides a much lower-friction experience, offering better city-center access and easier handling of luggage [5][6]. Because the transit time is roughly 3.5 to 4 hours [1], it remains highly competitive with the door-to-door duration of flying [6].\n\n## Comparison Details\n*   **Time:** The train journey typically takes between 3.5 and 4 hours [1]. When compared to flying, which requires significant airport buffers, the total door-to-door time for air travel typically lands between 3h45 and 5h30 [6].\n*   **Cost:** Amtrak tickets generally range from **$49 to $150** [1]. While costs for flights and buses vary based on the carrier and booking time [3], the train offers a predictable and accessible price point for this corridor [1].\n*   **Convenience:** Flying is only a reasonable choice if you are already at the airport or if your final destination is near the airport terminal [5]. For most, the train is the better choice because it is direct, lower-friction, and connects useful city stations [5][6].",
+ "answer": "Take the train; it is the more efficient choice for this specific corridor.\n\n| Mode | Door-to-Door Time | Typical Cost |\n| :--- | :--- | :--- |\n| **Train (Amtrak)** | **3.5 to 4 hours** [1] | **$49 to $150** [1] |\n| **Flight** | **~3h45–5h30** (including buffers) [6] | Variable [3] |\n| **Bus** | **4 to 4.5 hours** [7] | Variable [3] |\n\n## The Verdict\nFor the NYC to Boston route, the **train** is the superior option. While a flight covers a shorter distance in the air (~190 miles) [2], the time spent traveling to the airport, checking in, and clearing security effectively cancels out any time saved during the flight itself [2]. \n\nThe train provides a much lower-friction experience, offering better city-center access and easier handling of luggage [5][6]. Because the transit time is roughly 3.5 to 4 hours [1], it remains highly competitive with the door-to-door duration of flying [6].\n\n## Comparison Details\n*   **Time:** The train journey typically takes between 3.5 and 4 hours [1]. When compared to flying, which requires significant airport buffers, the total door-to-door time for air travel typically lands between 3h45 and 5h30 [6].\n*   **Cost:** Amtrak tickets generally range from **$49 to $150** [1]. While costs for flights and buses vary based on the carrier and booking time [3], the train offers a predictable and accessible price point for this corridor [1].\n*   **Convenience:** Flying is only a reasonable choice if you are already at the airport or if your final destination is near the airport terminal [5]. For most, the train is the better choice because it is direct, lower-friction, and connects useful city stations [5][6].",
+ "chars": 1658,
+ "raw_bytes": 3956,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.08,
+ "rate_gen_tok_s": 58.55,
+ "id": "q08",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Train vs air NYC-Boston",
+ "question": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:33:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "NYC to Boston: train or fly? Door to door time, typical cost, and which would you actually pick?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

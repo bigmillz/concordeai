@@ -1,0 +1,353 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":127,\"est\":false}",
+  "X-Hurry": "00b05bbe2137798b"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 20.75,
+ "elapsed_s": 27.64,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.03,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 23 passages"
+   }
+  },
+  {
+   "t": 16.03,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.03,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 images found"
+   }
+  },
+  {
+   "t": 16.03,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.03,
+   "tag": "PHOTOS"
+  },
+  {
+   "t": 16.03,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.03,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.64,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.3,
+    "tok": 367,
+    "s": 6.9
+   }
+  },
+  {
+   "t": 27.64,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1470 chars"
+   }
+  },
+  {
+   "t": 27.64,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 27.64,
+   "tag": "DONE",
+   "data": {
+    "f": 20.75,
+    "t": 27.64,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 23 passages",
+   "t_s": 16.03
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.03
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 images found",
+   "t_s": 16.03
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.03
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1470 chars",
+   "t_s": 27.64
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.64
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Cost of Living in Florianópolis 2026: Rent, Budget & Prices",
+   "u": "https://expatlife.ai/brazil/cities/florianopolis/cost-of-living",
+   "d": "2026"
+  },
+  {
+   "t": "Where your salary stretches furthest in 2026 | CostLiving",
+   "u": "https://costliving.net/insights/where-your-salary-stretches-furthest/",
+   "d": "2026"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Sep 2026. Prices in Florianopolis",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-09"
+  },
+  {
+   "t": "Moving to Florianópolis — Cost of Living, Visas... | Globe Quest",
+   "u": "https://www.globequest.app/relocate/florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Cost of Living in Florianopolis - Prices & Expenses. Sep 2026",
+   "u": "https://citycost.org/florianopolis/",
+   "d": "2026-09-01"
+  },
+  {
+   "t": "Current Cost of Living Index on a Map",
+   "u": "https://www.numbeo.com/cost-of-living/gmaps.jsp",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis–Medellín kulkuneuvolla Lentokone, Bussi, Auto",
+   "u": "https://www.rome2rio.com/fi/s/Florianópolis/Medellín",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis til Medellín med Fly, Bus, Bil",
+   "u": "https://www.rome2rio.com/da/s/Florianópolis/Medellín",
+   "d": ""
+  }
+ ],
+ "photos": [
+  "https://costliving.net/images/og/where-your-salary-stretches-furthest-2026.jpg",
+  "https://expatlife.ai/countries/brazil.jpg",
+  "https://www.globequest.app/destinations/florianopolis.webp"
+ ],
+ "run_frames": [
+  [
+   16.03,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 249,
+   "o": 25,
+   "d": 623,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4933,
+   "o": 390,
+   "d": 11564,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 53.3,
+  "tok": 367,
+  "s": 6.9
+ },
+ "app_first_s": 20.75,
+ "app_total_s": 27.64,
+ "answer_raw": "The provided evidence contains specific data for Florianópolis but lacks cost-of-living or rent details for Medellín and Lisbon; I would need to search for current local price indices for those two cities to complete the comparison.\n\nBased on the available data for Florianópolis, your $4,000 monthly budget would allow for a comfortable lifestyle, though the \"stretch\" depends on how much you prioritize prime real estate.\n\n## Florianópolis Breakdown\n\nIn Florianópolis, your $4, best-case-scenario budget would likely result in a significant monthly surplus.\n\n**Rent costs** — For a one-bedroom apartment in a good area, you can expect to pay between R$2,500 and R$3,800 per month as of 2026 [1].\n\n**Living expenses** — Beyond rent, monthly costs for groceries are estimated between R$1,000 and R$1,800, with transport costing between R$200 and R$500 as of 2026 [1]. \n\n**Total budget impact** — An all-in monthly estimate for one person (including rent and utilities) is approximately R$6,375 as of September 2026 [5]. Since $4,000 USD converts to roughly R$22,000–R$23,000 (depending on the 2026 exchange rate), you would have a substantial surplus even with higher-end housing.\n\n**Comparison vs. other regions** — While $4,000 is a strong budget for Brazil, it is worth noting that in other regions like Chiang Mai, a moderate single-person life costs only $1,325 per month as of 2026 [2], making the budget stretch significantly further there than in coastal Brazil.",
+ "answer": "The provided evidence contains specific data for Florianópolis but lacks cost-of-living or rent details for Medellín and Lisbon; I would need to search for current local price indices for those two cities to complete the comparison.\n\nBased on the available data for Florianópolis, your $4,000 monthly budget would allow for a comfortable lifestyle, though the \"stretch\" depends on how much you prioritize prime real estate.\n\n## Florianópolis Breakdown\n\nIn Florianópolis, your $4, best-case-scenario budget would likely result in a significant monthly surplus.\n\n**Rent costs** — For a one-bedroom apartment in a good area, you can expect to pay between R$2,500 and R$3,800 per month as of 2026 [1].\n\n**Living expenses** — Beyond rent, monthly costs for groceries are estimated between R$1,000 and R$1,800, with transport costing between R$200 and R$500 as of 2026 [1]. \n\n**Total budget impact** — An all-in monthly estimate for one person (including rent and utilities) is approximately R$6,375 as of September 2026 [5]. Since $4,000 USD converts to roughly R$22,000–R$23,000 (depending on the 2026 exchange rate), you would have a substantial surplus even with higher-end housing.\n\n**Comparison vs. other regions** — While $4,000 is a strong budget for Brazil, it is worth noting that in other regions like Chiang Mai, a moderate single-person life costs only $1,325 per month as of 2026 [2], making the budget stretch significantly further there than in coastal Brazil.",
+ "chars": 1470,
+ "raw_bytes": 3929,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.3,
+ "rate_gen_tok_s": 53.34,
+ "id": "q09",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Cost of living comparison",
+ "question": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:37:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Cost of living for a single American on $4k a month: Florianópolis vs Medellín vs Lisbon. Where does the money stretch furthest and what does rent look like in each?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

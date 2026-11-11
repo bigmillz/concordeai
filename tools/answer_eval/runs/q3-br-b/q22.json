@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":122,\"est\":false}",
+  "X-Hurry": "fb41e11de992965c"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 12.87,
+ "elapsed_s": 18.66,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 6.49,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 6.49,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 6.49,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 7.7,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 23 passages"
+   }
+  },
+  {
+   "t": 7.7,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.7,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 7.7,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 7.7,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 12.87,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 18.66,
+   "tag": "RATE",
+   "data": {
+    "tps": 53.6,
+    "tok": 310,
+    "s": 5.8
+   }
+  },
+  {
+   "t": 18.66,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1240 chars"
+   }
+  },
+  {
+   "t": 18.66,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   6.49,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 6.49
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 6.49
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 23 passages",
+   "t_s": 7.7
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.7
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 7.7
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1240 chars",
+   "t_s": 18.66
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 18.66
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume GeniusHigh-Paying Jobs ",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-08-13"
+  },
+  {
+   "t": "50 Top High-Paying Jobs Without a Degree in 2026",
+   "u": "https://www.apollotechnical.com/top-high-paying-jobs-without-a-degree/",
+   "d": "2026-03-15"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "10 High-Paying Jobs No Degree Required in 2026: Salaries ...",
+   "u": "https://bestjobsearchapps.com/articles/en/10-highpaying-jobs-no-degree-required-in-2026-salaries-entry-paths",
+   "d": "2026-03-18"
+  },
+  {
+   "t": "high paying jobs for introverts without a degree",
+   "u": "https://soboly.com/high-paying-jobs-for-introverts-without-a-degree",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Occupations : Occupational Outlook Handbook...",
+   "u": "https://www.bls.gov/ooh/highest-paying.htm",
+   "d": "2026-08-27"
+  },
+  {
+   "t": "Highest Paying Jobs Without A Degree - photos and vectors",
+   "u": "https://dishcuss.com/explore/highest-paying-jobs-without-a-degree",
+   "d": ""
+  },
+  {
+   "t": "Highest-Paying Jobs in 2026: Realistic Salaries and Paths",
+   "u": "https://bestjobsearchapps.com/articles/en/highest-paying-jobs-in-2026-realistic-top-careers-from-ceos-to-surgeons-us-data",
+   "d": "2026-09-17"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   7.7,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 53.6,
+  "tok": 310,
+  "s": 5.8
+ },
+ "answer_raw": "The top five realistic, high-paying roles without a degree involve specialized technical training, certifications, or apprenticeships, with earnings ranging from roughly $53,000 to over $226,000 depending on the career path.\n\n**Airline Captain** — earns a median above **$226,600** as of September 2026 [8]. Entry requires accumulating significant flight hours, FAA certifications, and moving through union seniority rather than academic degrees [8].\n\n**Lineworker** — earns a median of **$82,000**, with top 10% earners reaching **$117,000** as of March 2026 [4]. Training typically involves technical school or on-the-job apprenticeships, requiring physical fitness and safety certifications [4].\n\n**Locomotive Engineer** — earns a median of **$75,680** as of March 2026 [2]. Entry requires on-the-job training and Federal Railroad Administration (FRA) certification [2].\n\n**Building Inspector** — earns a median of **$72,120** as of March 2026 [2]. Requirements typically include a high school diploma plus relevant certifications or construction experience [2].\n\n**Flight Attendant** — earns a median of **$67,130** as of March 2026 [2]. Entry requires a high school diploma and completion of an airline's in-house training program [2].",
+ "answer": "The top five realistic, high-paying roles without a degree involve specialized technical training, certifications, or apprenticeships, with earnings ranging from roughly $53,000 to over $226,000 depending on the career path.\n\n**Airline Captain** — earns a median above **$226,600** as of September 2026 [8]. Entry requires accumulating significant flight hours, FAA certifications, and moving through union seniority rather than academic degrees [8].\n\n**Lineworker** — earns a median of **$82,000**, with top 10% earners reaching **$117,000** as of March 2026 [4]. Training typically involves technical school or on-the-job apprenticeships, requiring physical fitness and safety certifications [4].\n\n**Locomotive Engineer** — earns a median of **$75,680** as of March 2026 [2]. Entry requires on-the-job training and Federal Railroad Administration (FRA) certification [2].\n\n**Building Inspector** — earns a median of **$72,120** as of March 2026 [2]. Requirements typically include a high school diploma plus relevant certifications or construction experience [2].\n\n**Flight Attendant** — earns a median of **$67,130** as of March 2026 [2]. Entry requires a high school diploma and completion of an airline's in-house training program [2].",
+ "chars": 1240,
+ "raw_bytes": 3390,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 16.61,
+ "rate_gen_tok_s": 53.54,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:46:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

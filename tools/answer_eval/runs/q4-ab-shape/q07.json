@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.5,\"ftok\":112,\"est\":false}",
+  "X-Hurry": "2d354c4d9e8bb344"
+ },
+ "first_byte_s": 0.08,
+ "first_text_s": 18.07,
+ "elapsed_s": 21.03,
+ "events": [
+  {
+   "t": 0.08,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 22 passages"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.18,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.07,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.02,
+   "tag": "RATE",
+   "data": {
+    "tps": 33.2,
+    "tok": 98,
+    "s": 3.0
+   }
+  },
+  {
+   "t": 21.02,
+   "tag": "RESET"
+  },
+  {
+   "t": 21.02,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 21.02,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "371 chars"
+   }
+  },
+  {
+   "t": 21.02,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.02,
+   "tag": "DONE",
+   "data": {
+    "f": 18.06,
+    "t": 21.02,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.08,
+   "Searching the web…"
+  ],
+  [
+   8.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 22 passages",
+   "t_s": 12.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.18
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.18
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 21.02
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "371 chars",
+   "t_s": 21.02
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.02
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "Flying vs driving between Arenal and Manuel Antonio... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g291982-i813-k10211377-Flying_vs_driving_between_Arenal_and_Manuel_Antonio-Costa_Rica.html",
+   "d": ""
+  },
+  {
+   "t": "Cheap Flights, Airline Tickets & Plane Tickets | Trip.com",
+   "u": "https://www.trip.com/flights/",
+   "d": ""
+  },
+  {
+   "t": "Flights - Airline Tickets | airtickets",
+   "u": "https://www.airtickets.com/",
+   "d": ""
+  },
+  {
+   "t": "AirHint Flight Price Predictor - when to book cheap flight tickets",
+   "u": "https://www.airhint.com/",
+   "d": ""
+  },
+  {
+   "t": "Booking.com | Official site | The best hotels, flights, car rentals...",
+   "u": "https://www.booking.com/index.en-gb.html",
+   "d": ""
+  },
+  {
+   "t": "Search Flights, Hotels & Rental Cars | KAYAK",
+   "u": "https://www.kayak.com/",
+   "d": ""
+  },
+  {
+   "t": "Find Cheap Flights Worldwide & Book Your Ticket - Google Flights",
+   "u": "https://www.google.com/travel/flights",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.18,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 27,
+   "d": 649,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4184,
+   "o": 85,
+   "d": 8769,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 33.2,
+  "tok": 98,
+  "s": 3.0
+ },
+ "app_first_s": 18.06,
+ "app_total_s": 21.02,
+ "answer_raw": "I didn't find pricing for flights or driving costs between Brooklyn and Miami, so I cannot calculate the all-in cost or the difference between the two.\n\nTo get this answer, you would need to check current flight-booking engines for round-trip fares for two people and compare that to the cost of a one-way rental, fuel, and tolls for a road trip from New York to Florida.",
+ "answer": "I didn't find pricing for flights or driving costs between Brooklyn and Miami, so I cannot calculate the all-in cost or the difference between the two.\n\nTo get this answer, you would need to check current flight-booking engines for round-trip fares for two people and compare that to the cost of a one-way rental, fuel, and tolls for a road trip from New York to Florida.",
+ "chars": 371,
+ "raw_bytes": 2893,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 4.41,
+ "rate_gen_tok_s": 31.33,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:17:01",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

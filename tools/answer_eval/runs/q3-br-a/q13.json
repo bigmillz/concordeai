@@ -1,0 +1,317 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.7,\"ftok\":109,\"est\":false}",
+  "X-Hurry": "68076ec292616972"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 21.85,
+ "elapsed_s": 24.67,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 18.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "0 pages · 8 passages"
+   }
+  },
+  {
+   "t": 18.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 18.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 18.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 18.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.85,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 24.67,
+   "tag": "RATE",
+   "data": {
+    "tps": 73.7,
+    "tok": 208,
+    "s": 2.8
+   }
+  },
+  {
+   "t": 24.67,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 24.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "812 chars"
+   }
+  },
+  {
+   "t": 24.67,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "0 pages · 8 passages",
+   "t_s": 18.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 18.07
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 18.09
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 24.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "812 chars",
+   "t_s": 24.67
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 24.67
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Pizza bomber",
+   "u": "https://en.wikipedia.org/wiki/Pizza_bomber",
+   "d": "2018"
+  },
+  {
+   "t": "Healthy Pizza: Scientists Nutritionally Balance America’s Favorite...",
+   "u": "https://www.medicaldaily.com/healthy-pizza-scientists-nutritionally-balance-americas-favorite-food-261705",
+   "d": "2013-11-01"
+  },
+  {
+   "t": "Food-Based Dietary Guidelines recommendations for potatoes",
+   "u": "https://knowledge-for-policy.ec.europa.eu/health-promotion-knowledge-gateway/food-based-dietary-guidelines-europe-table-2_en",
+   "d": ""
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "How Many Calories Are in Two Slices of Pizza? - Consensus: AI...",
+   "u": "https://consensus.app/home/blog/how-many-calories-are-in-two-slices-of-pizza/",
+   "d": ""
+  },
+  {
+   "t": "Plant-first food pyramid brings international dietary guidelines...",
+   "u": "https://medicalxpress.com/news/2026-10-food-pyramid-international-dietary-guidelines.html",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "How to Rescue a Pizza Disaster: Turning Bad Pizza into a ...",
+   "u": "https://liptouchfoods.com/how-do-you-make-bad-pizza-taste-good/",
+   "d": "2025-07-19"
+  },
+  {
+   "t": "20 Pizza Consumption Statistics To Make You Hungry (2026) - Soocial",
+   "u": "https://www.soocial.com/pizza-consumption-statistics/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   18.09,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 73.7,
+  "tok": 208,
+  "s": 2.8
+ },
+ "answer_raw": "Whether pizza is \"bad\" depends on the nutritional balance of the specific recipe, as it is possible to modify recipes to be more nutritionally balanced without losing flavor [2, undated]. Two slices of pizza contain approximately **380 calories** [5, undated].\n\nThe nutritional impact is largely determined by the ingredients; while no single pizza tested met all nutritional requirements, many met several, suggesting that \"health by stealth\" via recipe modification is a viable approach [2, undated]. Because pizza remains a significant source of daily calories for children and adolescents, managing portion sizes and ingredient quality is key [5, undated].\n\nI didn't find a recommended frequency for consumption, so you should consult a dietitian or current dietary guidelines for personalized health advice.",
+ "answer": "Whether pizza is \"bad\" depends on the nutritional balance of the specific recipe, as it is possible to modify recipes to be more nutritionally balanced without losing flavor [2, undated]. Two slices of pizza contain approximately **380 calories** [5, undated].\n\nThe nutritional impact is largely determined by the ingredients; while no single pizza tested met all nutritional requirements, many met several, suggesting that \"health by stealth\" via recipe modification is a viable approach [2, undated]. Because pizza remains a significant source of daily calories for children and adolescents, managing portion sizes and ingredient quality is key [5, undated].\n\nI didn't find a recommended frequency for consumption, so you should consult a dietitian or current dietary guidelines for personalized health advice.",
+ "chars": 812,
+ "raw_bytes": 3821,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.23,
+ "rate_gen_tok_s": 71.99,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:07:10",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

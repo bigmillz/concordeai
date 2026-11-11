@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.4,\"ftok\":261,\"est\":false}",
+  "X-Hurry": "49004b88528b5ffb"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 15.88,
+ "elapsed_s": 23.73,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 5.21,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 5.21,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 5.21,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 7.72,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 35 passages"
+   }
+  },
+  {
+   "t": 7.72,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.72,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 7.72,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 7.72,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.73,
+   "tag": "RATE",
+   "data": {
+    "tps": 56.6,
+    "tok": 444,
+    "s": 7.8
+   }
+  },
+  {
+   "t": 23.73,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1778 chars"
+   }
+  },
+  {
+   "t": 23.73,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   5.21,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 5.21
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 5.21
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 35 passages",
+   "t_s": 7.72
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.72
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 7.72
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1778 chars",
+   "t_s": 23.73
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.73
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "2-bedroom apartments for rent in Florianópolis – two-bedroom flat...",
+   "u": "https://rentola.com.br/en/for-rent/apartment/2-bedroom/florianopolis-florianopolis",
+   "d": ""
+  },
+  {
+   "t": "2-bedroom houses for rent in Florianópolis – two-bedroom home...",
+   "u": "https://rentola.com.br/en/for-rent/house/2-bedroom/florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Florianópolis Airbnb Data, Statistics & Market Analysis ...",
+   "u": "https://www.airroi.com/data-portal/markets/florianopolis-brazil",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Cobertura vista mar, Florianópolis (updated prices 2026)",
+   "u": "https://www.booking.com/hotel/br/cobertura-vista-mar-florianopolis7.en-gb.html",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Occupancy — September 2026",
+   "u": "https://www.guestfavorites.com/airbnb-occupancy-rates-in-florianopolis-santa-catarina-brazil",
+   "d": "2026-09"
+  },
+  {
+   "t": "Airbnb Occupancy Florianópolis 2026: Real Rate + Updated ADR",
+   "u": "https://www.listingok.com/en/airbnb-occupancy/brazil/florianopolis/",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Data 2026: Revenue & Occupancy",
+   "u": "https://www.airroi.com/airbnb-data/brazil/santa-catarina/florianópolis",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "7 airbnb românticos em Florianópolis - Todos os Caminhos",
+   "u": "https://todososcaminhos.com/7-airbnb-romanticos-em-florianopolis/",
+   "d": "2020-09-27"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   7.72,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 56.6,
+  "tok": 444,
+  "s": 7.8
+ },
+ "answer_raw": "Trust the **4.6-star** listing because the higher volume of reviews provides a much more statistically significant and reliable representation of the guest experience.\n\nA 4.6 rating from 212 reviews is a \"battle-tested\" score that accounts for various guest personalities, seasonal fluctuations, and edge cases, whereas a 4.9 from only 18 reviews is a small sample size that could easily shift with just a few bad stays.\n\nRegarding your 2-bedroom in Florianópolis, you should target a price based on the local market averages while adjusting for your long-term stay model.\n\n**Pricing Strategy**\n\n*   **Benchmark the market**: According to data from September 2026, the average daily rate (ADR) in the Florianópolis municipality is **R$486** [5]. Another source from the June 2025 to May 2026 period reported an ADR of approximately **61€ (about $55)** [6].\n*   **Calculate your monthly floor**: For 30+ night stays, you are essentially running a medium-term rental. If you use the September 2026 ADR of **R$486**, a 30-night stay would gross roughly **R$14,580** [5]. \n*   **Apply the long-stay discount**: Because you are looking for 30+ night stays, you should price your unit below the daily rate to attract stable, low-turnover tenants. A common strategy is to take the monthly equivalent of the daily rate and discount it by 10–20% to account for lower utility costs and reduced cleaning frequency.\n*   **Check local bylaws**: Before finalizing your pricing or listing, verify your building's rules, as the Superior Court (STJ) allows residential condominiums in Brazil to restrict or ban Airbnb-style short-term stays [6].\n\nTo get a more precise number, you should compare your specific neighborhood's current rental rates for 2-bedroom units against these daily averages.",
+ "answer": "Trust the **4.6-star** listing because the higher volume of reviews provides a much more statistically significant and reliable representation of the guest experience.\n\nA 4.6 rating from 212 reviews is a \"battle-tested\" score that accounts for various guest personalities, seasonal fluctuations, and edge cases, whereas a 4.9 from only 18 reviews is a small sample size that could easily shift with just a few bad stays.\n\nRegarding your 2-bedroom in Florianópolis, you should target a price based on the local market averages while adjusting for your long-term stay model.\n\n**Pricing Strategy**\n\n*   **Benchmark the market**: According to data from September 2026, the average daily rate (ADR) in the Florianópolis municipality is **R$486** [5]. Another source from the June 2025 to May 2026 period reported an ADR of approximately **61€ (about $55)** [6].\n*   **Calculate your monthly floor**: For 30+ night stays, you are essentially running a medium-term rental. If you use the September 2026 ADR of **R$486**, a 30-night stay would gross roughly **R$14,580** [5]. \n*   **Apply the long-stay discount**: Because you are looking for 30+ night stays, you should price your unit below the daily rate to attract stable, low-turnover tenants. A common strategy is to take the monthly equivalent of the daily rate and discount it by 10–20% to account for lower utility costs and reduced cleaning frequency.\n*   **Check local bylaws**: Before finalizing your pricing or listing, verify your building's rules, as the Superior Court (STJ) allows residential condominiums in Brazil to restrict or ban Airbnb-style short-term stays [6].\n\nTo get a more precise number, you should compare your specific neighborhood's current rental rates for 2-bedroom units against these daily averages.",
+ "chars": 1778,
+ "raw_bytes": 3945,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.73,
+ "rate_gen_tok_s": 56.62,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:16:48",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

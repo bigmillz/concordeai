@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":8.0,\"ftok\":257,\"est\":false}",
+  "X-Hurry": "b4481170551fa04b"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 3.07,
+ "elapsed_s": 30.22,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.07,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 14.39,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2872 chars"
+   }
+  },
+  {
+   "t": 14.39,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 14.39,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 14.39,
+   "tag": "RESET"
+  },
+  {
+   "t": 30.22,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.7,
+    "tok": 661,
+    "s": 10.4
+   }
+  },
+  {
+   "t": 30.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2645 chars"
+   }
+  },
+  {
+   "t": 30.22,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 30.22,
+   "tag": "DONE",
+   "data": {
+    "f": 3.07,
+    "t": 30.22,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   14.39,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2872 chars",
+   "t_s": 14.39
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 14.39
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2645 chars",
+   "t_s": 30.22
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 30.22
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2231,
+   "o": 670,
+   "d": 14322
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4189,
+   "o": 612,
+   "d": 15774
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.7,
+  "tok": 661,
+  "s": 10.4
+ },
+ "app_first_s": 3.07,
+ "app_total_s": 30.22,
+ "answer_raw": "4-bit quantization maps the model's weights from high-precision formats like **FP16** or **BF16** to a 4-bit integer-based representation to drastically reduce memory footprint and increase throughput.\n\nIn a standard transformer, weights are typically stored as 16-bit floating-point numbers. Moving to 4-bit involves mapping those wide-range values into a much narrower scale using a **scale factor** and a **zero-point** (or group-wise quantization) to fit the original distribution into the 16 possible values available in 4 bits.\n\nThe primary cost is **perplexity degradation**—the loss of mathematical nuance in the model's probability distributions. Forcing complex decimal values into a coarse 4-bit grid can slightly degrade the model's ability to predict the next token with high precision.\n\n**The trade-off: Perplexity vs. Throughput**\n\nThe benefits often outweigh the accuracy loss for several reasons:\n\n*   **VRAM capacity**: A 70B parameter model in FP16 requires **~140GB** of VRAM. At 4-bit, that same model fits into **~40GB**, allowing it to run on consumer-grade hardware like a Mac Studio or dual RTX 3090/4090 setups.\n*   **Memory Bandwidth**: LLM inference is frequently memory-bandwidth bound. Moving 4-bit weights from VRAM to the GPU cores is significantly faster than moving 16-bit weights, resulting in a massive increase in **tokens per second**.\n*   **Cache hits**: Smaller weights increase the likelihood of model parameters residing in higher-speed cache levels, reducing latency.\n\n**When it actually matters**\n\n**When it doesn't matter:**\nIf you are running a small model (e.g., **8B parameters** or smaller) for simple tasks like summarization, the 4-bit quantization loss is often negligible compared to the hardware savings.\n\n**When it matters:**\n*   **Large-scale models**: For massive models (e.g., **Llama-3 70B**), 4-bit is the \"sweet spot.\" The parameter scale provides enough redundancy that the model can tolerate the quantization error without losing significant reasoning capabilities.\n*   **Edge deployment**: For mobile devices or local workstations with limited VRAM, 4-bit is often the only way to make inference possible.\n*   **Strict latency requirements**: If you need real-time streaming, the throughput gains of 4-bit are essential to minimize \"time to first token\" and sustain high generation speeds.\n\nFor almost all local deployment and production inference, 4-bit is the industry standard. Unless you are performing highly sensitive scientific modeling or active fine-tuning where decimal precision is the primary requirement, 4-bit is the most efficient path for RAG and agentic workflows.",
+ "answer": "4-bit quantization maps the model's weights from high-precision formats like **FP16** or **BF16** to a 4-bit integer-based representation to drastically reduce memory footprint and increase throughput.\n\nIn a standard transformer, weights are typically stored as 16-bit floating-point numbers. Moving to 4-bit involves mapping those wide-range values into a much narrower scale using a **scale factor** and a **zero-point** (or group-wise quantization) to fit the original distribution into the 16 possible values available in 4 bits.\n\nThe primary cost is **perplexity degradation**—the loss of mathematical nuance in the model's probability distributions. Forcing complex decimal values into a coarse 4-bit grid can slightly degrade the model's ability to predict the next token with high precision.\n\n**The trade-off: Perplexity vs. Throughput**\n\nThe benefits often outweigh the accuracy loss for several reasons:\n\n*   **VRAM capacity**: A 70B parameter model in FP16 requires **~140GB** of VRAM. At 4-bit, that same model fits into **~40GB**, allowing it to run on consumer-grade hardware like a Mac Studio or dual RTX 3090/4090 setups.\n*   **Memory Bandwidth**: LLM inference is frequently memory-bandwidth bound. Moving 4-bit weights from VRAM to the GPU cores is significantly faster than moving 16-bit weights, resulting in a massive increase in **tokens per second**.\n*   **Cache hits**: Smaller weights increase the likelihood of model parameters residing in higher-speed cache levels, reducing latency.\n\n**When it actually matters**\n\n**When it doesn't matter:**\nIf you are running a small model (e.g., **8B parameters** or smaller) for simple tasks like summarization, the 4-bit quantization loss is often negligible compared to the hardware savings.\n\n**When it matters:**\n*   **Large-scale models**: For massive models (e.g., **Llama-3 70B**), 4-bit is the \"sweet spot.\" The parameter scale provides enough redundancy that the model can tolerate the quantization error without losing significant reasoning capabilities.\n*   **Edge deployment**: For mobile devices or local workstations with limited VRAM, 4-bit is often the only way to make inference possible.\n*   **Strict latency requirements**: If you need real-time streaming, the throughput gains of 4-bit are essential to minimize \"time to first token\" and sustain high generation speeds.\n\nFor almost all local deployment and production inference, 4-bit is the industry standard. Unless you are performing highly sensitive scientific modeling or active fine-tuning where decimal precision is the primary requirement, 4-bit is the most efficient path for RAG and agentic workflows.",
+ "chars": 2645,
+ "raw_bytes": 6240,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.88,
+ "rate_gen_tok_s": 24.36,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T05:01:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

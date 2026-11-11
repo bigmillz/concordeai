@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.5,\"ftok\":254,\"est\":false}",
+  "X-Hurry": "c3f31ce059be7acb"
+ },
+ "first_byte_s": 0.11,
+ "first_text_s": 20.49,
+ "elapsed_s": 27.43,
+ "events": [
+  {
+   "t": 0.11,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.11,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 9.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.94,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 9.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.32,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 35 passages"
+   }
+  },
+  {
+   "t": 15.32,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.32,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.32,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.32,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.49,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 27.43,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.0,
+    "tok": 436,
+    "s": 6.9
+   }
+  },
+  {
+   "t": 27.43,
+   "tag": "RESET"
+  },
+  {
+   "t": 27.43,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 27.43,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1739 chars"
+   }
+  },
+  {
+   "t": 27.43,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 27.43,
+   "tag": "DONE",
+   "data": {
+    "f": 20.49,
+    "t": 27.42,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.11,
+   "Searching the web…"
+  ],
+  [
+   9.94,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.11
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.94
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 9.94
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 35 passages",
+   "t_s": 15.32
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.32
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.32
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 27.43
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1739 chars",
+   "t_s": 27.43
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 27.43
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Highest-Paying Jobs Without a Degree in 2026 | Articuler",
+   "u": "https://www.articuler.ai/resources/compare/highest-paying-jobs-without-a-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "15 Highest-Paying Jobs Without a Degree in 2026 - Resume Genius11 Highest Paying",
+   "u": "https://resumegenius.com/blog/job-hunting/highest-paying-jobs-without-a-degree",
+   "d": "2026-05-26"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Bachelor's Degree in 2026",
+   "u": "https://www.trade-schools.net/articles/highest-paying-jobs-without-degree",
+   "d": "2026-10-06"
+  },
+  {
+   "t": "11 Highest Paying Jobs Without a College Degree (2026-2027)",
+   "u": "https://coverlettersandresume.com/articles/highest-paying-jobs-without-a-college-degree/",
+   "d": "2026-11-07"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree in 2026 (Ranked)",
+   "u": "https://skillscouter.com/high-paying-jobs-without-a-degree/",
+   "d": "2026-07-16"
+  },
+  {
+   "t": "The Highest-Paying Jobs You Can Get Without A Degree In 2026",
+   "u": "https://techround.co.uk/news/highest-paying-jobs-without-degree-2026/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest Paying Remote Jobs Without a Degree 2026",
+   "u": "https://thejobsup.com/highest-paying-remote-jobs-without-a-degree-2026/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.32,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 24,
+   "d": 798,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5659,
+   "o": 438,
+   "d": 12064,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.0,
+  "tok": 436,
+  "s": 6.9
+ },
+ "app_first_s": 20.49,
+ "app_total_s": 27.42,
+ "answer_raw": "The most realistic high-paying roles without a degree involve specialized technical training, flight hours, or professional certifications, with top-end earnings reaching **$190,000** [1].\n\nWhile the specific \"top five\" depends on whether you prioritize immediate entry or long-term ceiling, these five represent the most viable paths based on current data:\n\n*   **Commercial Pilot** — Median pay was **$123,220** as of May 2025 [4]. Getting in requires specialized flight training rather than a degree, and the timeline depends on your ability to accumulate flight hours [4].\n*   **Marketing Manager** — A high-end remote option with a salary around **$159,660** as of 2026 [8]. You enter this field via a professional portfolio or specific certifications, and the timeline is often much faster than traditional schooling [8].\n*   **Specialized Trades or Technical Roles** — These roles often have median wages between **$80,000 and $130,000+** as of 2026 [1][5]. You enter through vocational training, apprenticeships, or short certificate programs [2][5].\n*   **Public Safety or Utility Roles** — These roles offer pay well above the U.S. median (which was **$50,980** as of May 2025) and are projected to grow through 2034 [2]. They typically require state licenses or specific on-the-job training [2].\n*   **Sales-Based Roles** — These can reach the **$100,000+** range as of 2026, depending on the employer or book of business [5]. Entry is usually immediate through hiring processes that focus on performance over credentials [5].\n\nBecause what I found do not rank these five against each other in a single list, I cannot determine which of these is the absolute \"top\" without more specific criteria like your location or interests.",
+ "answer": "The most realistic high-paying roles without a degree involve specialized technical training, flight hours, or professional certifications, with top-end earnings reaching **$190,000** [1].\n\nWhile the specific \"top five\" depends on whether you prioritize immediate entry or long-term ceiling, these five represent the most viable paths based on current data:\n\n*   **Commercial Pilot** — Median pay was **$123,220** as of May 2025 [4]. Getting in requires specialized flight training rather than a degree, and the timeline depends on your ability to accumulate flight hours [4].\n*   **Marketing Manager** — A high-end remote option with a salary around **$159,660** as of 2026 [8]. You enter this field via a professional portfolio or specific certifications, and the timeline is often much faster than traditional schooling [8].\n*   **Specialized Trades or Technical Roles** — These roles often have median wages between **$80,000 and $130,000+** as of 2026 [1][5]. You enter through vocational training, apprenticeships, or short certificate programs [2][5].\n*   **Public Safety or Utility Roles** — These roles offer pay well above the U.S. median (which was **$50,980** as of May 2025) and are projected to grow through 2034 [2]. They typically require state licenses or specific on-the-job training [2].\n*   **Sales-Based Roles** — These can reach the **$100,000+** range as of 2026, depending on the employer or book of business [5]. Entry is usually immediate through hiring processes that focus on performance over credentials [5].\n\nBecause what I found do not rank these five against each other in a single list, I cannot determine which of these is the absolute \"top\" without more specific criteria like your location or interests.",
+ "chars": 1739,
+ "raw_bytes": 5914,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.85,
+ "rate_gen_tok_s": 62.64,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:55:51",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

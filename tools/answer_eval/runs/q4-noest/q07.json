@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":14.8,\"ftok\":77,\"est\":false}",
+  "X-Hurry": "5255bac7279a56c1"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.76,
+ "elapsed_s": 20.71,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 31 passages"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.13,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.13,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.76,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.71,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.2,
+    "tok": 250,
+    "s": 4.0
+   }
+  },
+  {
+   "t": 20.71,
+   "tag": "RESET"
+  },
+  {
+   "t": 20.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 20.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "979 chars"
+   }
+  },
+  {
+   "t": 20.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.71,
+   "tag": "DONE",
+   "data": {
+    "f": 16.75,
+    "t": 20.71,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 31 passages",
+   "t_s": 13.13
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.13
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.13
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 20.71
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "979 chars",
+   "t_s": 20.71
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.71
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "Flying vs driving between Arenal and Manuel Antonio... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g291982-i813-k10211377-Flying_vs_driving_between_Arenal_and_Manuel_Antonio-Costa_Rica.html",
+   "d": ""
+  },
+  {
+   "t": "Design Miami · Design Miami",
+   "u": "https://designmiami.com/",
+   "d": ""
+  },
+  {
+   "t": "Cheap Flights, Airline Tickets & Airfare Deals | KAYAK",
+   "u": "https://www.kayak.com/flights",
+   "d": ""
+  },
+  {
+   "t": "Cheap Flights, Airline Tickets & Airfares - Find Deals on Flights at...",
+   "u": "https://www.cheapflights.com/",
+   "d": ""
+  },
+  {
+   "t": "Book Cheap Flights, Hotels & Car Rentals Online | CheapOair",
+   "u": "https://www.cheapoair.com/",
+   "d": "2026-10-31"
+  },
+  {
+   "t": "Aviasales — Compare Cheap Flights from 728+ Airlines | Save up to...",
+   "u": "https://aviasales.us.com/",
+   "d": ""
+  },
+  {
+   "t": "Crocs AE | Clogs, Sandals, Wedges & Slippers | Shoes Sale",
+   "u": "https://www.crocs-uae.com/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.13,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 23,
+   "d": 706,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4555,
+   "o": 251,
+   "d": 7531,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.2,
+  "tok": 250,
+  "s": 4.0
+ },
+ "app_first_s": 16.75,
+ "app_total_s": 20.71,
+ "answer_raw": "Flying is the cheaper option, likely saving you around **$600–$800** compared to driving.\n\nFor two people traveling from New York to Miami, round-trip flights are approximately **$199+ per person** according to KAYAK as of undated [4], totaling roughly **$398** for the pair. While some sources mention flights to Miami as low as **$34 rt** per el cheapflights.com as of undated [5], the $199 rate is a more realistic baseline for a standard booking.\n\nDriving from Brooklyn to Miami involves approximately **1,300 miles** each way. Factoring in fuel for a modern vehicle (typically **$300–$450** round-trip depending on MPG and gas prices), plus potential tolls, maintenance, and the cost of food/lodging during a 20+ hour transit, the total cost would likely exceed **$1,000**. \n\nBecause I didn't find specific fuel prices or vehicle-specific costs for a driving itinerary, you would need to calculate the exact delta based on your own car's fuel economy and current gas prices.",
+ "answer": "Flying is the cheaper option, likely saving you around **$600–$800** compared to driving.\n\nFor two people traveling from New York to Miami, round-trip flights are approximately **$199+ per person** according to KAYAK as of undated [4], totaling roughly **$398** for the pair. While some sources mention flights to Miami as low as **$34 rt** per el cheapflights.com as of undated [5], the $199 rate is a more realistic baseline for a standard booking.\n\nDriving from Brooklyn to Miami involves approximately **1,300 miles** each way. Factoring in fuel for a modern vehicle (typically **$300–$450** round-trip depending on MPG and gas prices), plus potential tolls, maintenance, and the cost of food/lodging during a 20+ hour transit, the total cost would likely exceed **$1,000**. \n\nBecause I didn't find specific fuel prices or vehicle-specific costs for a driving itinerary, you would need to calculate the exact delta based on your own car's fuel economy and current gas prices.",
+ "chars": 979,
+ "raw_bytes": 4115,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.82,
+ "rate_gen_tok_s": 61.96,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:07:58",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

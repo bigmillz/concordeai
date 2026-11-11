@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.1,\"ftok\":108,\"est\":false}",
+  "X-Hurry": "49731733430a31c2"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 20.19,
+ "elapsed_s": 23.59,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "6 queries"
+   }
+  },
+  {
+   "t": 8.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.67,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.62,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 26 passages"
+   }
+  },
+  {
+   "t": 15.62,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.62,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.62,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.62,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.19,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.59,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.6,
+    "tok": 165,
+    "s": 3.4
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "660 chars"
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "DONE",
+   "data": {
+    "f": 20.19,
+    "t": 23.59,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.67,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "6 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.67
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.67
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 26 passages",
+   "t_s": 15.62
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.62
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.62
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "660 chars",
+   "t_s": 23.59
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.59
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "45 Buzz Cut Styles (2026) + Length Guide & Face Shape Tips20 Best Shaved Sides H",
+   "u": "https://haircutinspiration.com/buzz-cut/",
+   "d": "2026-03-21"
+  },
+  {
+   "t": "100 Best Haircuts for Balding Men by Hair Loss Pattern 2026Hairstyles for Baldin",
+   "u": "https://www.newtimeshair.com/blog/100-haircuts-and-hairstyles-for-balding-men/",
+   "d": "2026-05-15"
+  },
+  {
+   "t": "20 Best Shaved Sides Haircuts for Men (2026 Guide)",
+   "u": "https://haircutinspiration.com/shaved-sides-haircuts-for-men/",
+   "d": "2026-05-27"
+  },
+  {
+   "t": "Bald on Top, Hair on Sides: The Complete Styling Guide",
+   "u": "https://hairstylecamp.com/bald-on-top-hair-on-sides/",
+   "d": "2026-06-08"
+  },
+  {
+   "t": "Hair Transplant for Male Pattern Baldness: 2026 Guide | MyHair",
+   "u": "https://www.myhair.ai/blog/hair-transplant-for-male-pattern-baldness",
+   "d": "2026"
+  },
+  {
+   "t": "Male Pattern Baldness (Androgenic Alopecia): Stages, Treatment",
+   "u": "https://my.clevelandclinic.org/health/diseases/24515-male-pattern-baldness-androgenic-alopecia",
+   "d": "2023-08-30"
+  },
+  {
+   "t": "Buzz Cut vs Shaved Head 2026: Balding Transition, Maintenance ...",
+   "u": "https://righthair.ai/hairstyles/buzz-cut/compare/shaved-head/",
+   "d": "2026"
+  },
+  {
+   "t": "Male pattern baldness and its association with coronary heart disease...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3641488/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.62,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 241,
+   "o": 27,
+   "d": 856,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5245,
+   "o": 156,
+   "d": 7903,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 48.6,
+  "tok": 165,
+  "s": 3.4
+ },
+ "app_first_s": 20.19,
+ "app_total_s": 23.59,
+ "answer_raw": "A **full shave** is the best option for both looking intentional and achieving the lowest maintenance.\n\nIf you have advanced hair loss (Norwood 6-7), a **buzz cut** or **full shave** looks cleaner than trying to maintain long hair on the sides or sparse strands on top [4]. A full shave is the ultimate hair loss solution and is considered a confident, intentional statement [7].\n\nThe other options break down as follows:\n\n*   **Buzz cut** — A forgiving, low-maintenance option, particularly with #0–#4 stubble [7].\n*   **Keeping the sides** — This can look less intentional; if hair loss is advanced, a shaved head or buzz cut is often the cleaner choice [4].",
+ "answer": "A **full shave** is the best option for both looking intentional and achieving the lowest maintenance.\n\nIf you have advanced hair loss (Norwood 6-7), a **buzz cut** or **full shave** looks cleaner than trying to maintain long hair on the sides or sparse strands on top [4]. A full shave is the ultimate hair loss solution and is considered a confident, intentional statement [7].\n\nThe other options break down as follows:\n\n*   **Buzz cut** — A forgiving, low-maintenance option, particularly with #0–#4 stubble [7].\n*   **Keeping the sides** — This can look less intentional; if hair loss is advanced, a shaved head or buzz cut is often the cleaner choice [4].",
+ "chars": 660,
+ "raw_bytes": 2963,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 6.99,
+ "rate_gen_tok_s": 48.53,
+ "id": "q15",
+ "turn": 1,
+ "category": "health",
+ "topic": "Hairstyles for bald men",
+ "question": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:51:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

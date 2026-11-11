@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":22.2,\"ftok\":292,\"est\":false}",
+  "X-Hurry": "b7e14898ed23b00b"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 13.9,
+ "elapsed_s": 23.59,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "3 pages · 15 passages"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 10.18,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.18,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.9,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.59,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.4,
+    "tok": 614,
+    "s": 9.7
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2459 chars"
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.59,
+   "tag": "DONE",
+   "data": {
+    "f": 13.9,
+    "t": 23.59,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "3 pages · 15 passages",
+   "t_s": 10.18
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.18
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.18
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2459 chars",
+   "t_s": 23.59
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.59
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Housing Market Predictions For 2026 – Forbes Advisor2026 Housing Market Trends: ",
+   "u": "https://www.forbes.com/advisor/mortgages/real-estate/housing-market-predictions/",
+   "d": "2026-08-04"
+  },
+  {
+   "t": "Escondido real estate market trends (February 2026)",
+   "u": "https://grokipedia.com/page/Escondido_real_estate_market_trends_February_2026",
+   "d": "2026-02"
+  },
+  {
+   "t": "Real Estate Market 2026: Trends, Predictions, Housing Prices ...",
+   "u": "https://www.coradvisors.net/2026/06/real-estate-market-2026.html",
+   "d": "2026-06"
+  },
+  {
+   "t": "United States Housing Market: 2026 Home Prices & Trends | Zillow",
+   "u": "https://www.zillow.com/home-values/102001/united-states/",
+   "d": "2026"
+  },
+  {
+   "t": "U.S. Real Estate Market Outlook 2026 - CBRE",
+   "u": "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026",
+   "d": "2026-01-14"
+  },
+  {
+   "t": "Real Estate Listings in Canada: houses, condos, land... | REALTOR.ca",
+   "u": "https://www.realtor.ca/",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "2026 Housing Market Trends: What Buyers and Sellers Should ...",
+   "u": "https://realestatean.com/guides/housing-market-trends",
+   "d": "2026"
+  },
+  {
+   "t": "Neburo | International Real Estate",
+   "u": "https://neburo.estate/",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.18,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 22,
+   "d": 759,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4769,
+   "o": 592,
+   "d": 13361,
+   "c": 2235
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.4,
+  "tok": 614,
+  "s": 9.7
+ },
+ "app_first_s": 13.9,
+ "app_total_s": 23.59,
+ "answer_raw": "If you are moving internationally in 12 to 24 months, **renting is likely the superior option** to avoid the friction of a forced liquidation.\n\nBuying a home with a short-term horizon introduces significant transaction costs and market risks that could erode your capital before you even leave for Latin America.\n\n## The friction of selling\nSelling a home is not a liquid event. You will face closing costs, agent commissions, and potential capital gains taxes that can eat 6% to 10% of the asset's value. \n\nIf you buy now, you are essentially betting that the equity you build over two years will exceed those transaction costs and the cost of your mortgage interest. Given that the average U.S. home value is **$366,157 as of September 2026** [4], a single sale could cost you $20,000 or more in fees alone.\n\n## Market volatility and liquidity\nThe current market environment suggests that while a crash is unlikely, the \"new normal\" involves higher borrowing costs [3]. \n\n*   **Liquidity risk:** Depending on your location, selling a house can take time. As of September 2026, homes were going to a pending status in roughly **27 days** [4], but if your specific market slows down, you might be forced to sell at a discount to meet your relocation deadline.\n*   **Inventory shifts:** While listings were running about **15% above year-ago levels by late 2025** [7], the market remains sensitive to interest rate shifts [1].\n\n## The \"Rent vs. Buy\" math\nWhen you own, you are locking your capital into a single, illiquid asset. When you rent, your capital remains liquid, allowing you to move it into higher-yield investments or hold it in cash to fund your relocation.\n\n| Factor | Buying (1-2 year horizon) | Renting (1-2 year horizon) |\n| :--- | :--- | :--- |\n| **Liquidity** | **Low**: Hard to pull cash out quickly. | **High**: Capital stays in your accounts. |\n| **Transaction Costs** | **High**: Commissions and closing fees. | **Low**: Security deposits and moving costs. |\n| **Maintenance** | **Variable**: You own the repairs. | **Fixed**: Landlord handles major issues. |\n| **Flexibility** | **Low**: You are tied to a physical location. | **High**: Easy to pivot if your plans change. |\n\nIf your current housing market is seeing significant price appreciation, you might consider buying only if you can own the property as a long-term rental after you move. Otherwise, the math of a two-year ownership stint rarely beats the flexibility of renting.",
+ "answer": "If you are moving internationally in 12 to 24 months, **renting is likely the superior option** to avoid the friction of a forced liquidation.\n\nBuying a home with a short-term horizon introduces significant transaction costs and market risks that could erode your capital before you even leave for Latin America.\n\n## The friction of selling\nSelling a home is not a liquid event. You will face closing costs, agent commissions, and potential capital gains taxes that can eat 6% to 10% of the asset's value. \n\nIf you buy now, you are essentially betting that the equity you build over two years will exceed those transaction costs and the cost of your mortgage interest. Given that the average U.S. home value is **$366,157 as of September 2026** [4], a single sale could cost you $20,000 or more in fees alone.\n\n## Market volatility and liquidity\nThe current market environment suggests that while a crash is unlikely, the \"new normal\" involves higher borrowing costs [3]. \n\n*   **Liquidity risk:** Depending on your location, selling a house can take time. As of September 2026, homes were going to a pending status in roughly **27 days** [4], but if your specific market slows down, you might be forced to sell at a discount to meet your relocation deadline.\n*   **Inventory shifts:** While listings were running about **15% above year-ago levels by late 2025** [7], the market remains sensitive to interest rate shifts [1].\n\n## The \"Rent vs. Buy\" math\nWhen you own, you are locking your capital into a single, illiquid asset. When you rent, your capital remains liquid, allowing you to move it into higher-yield investments or hold it in cash to fund your relocation.\n\n| Factor | Buying (1-2 year horizon) | Renting (1-2 year horizon) |\n| :--- | :--- | :--- |\n| **Liquidity** | **Low**: Hard to pull cash out quickly. | **High**: Capital stays in your accounts. |\n| **Transaction Costs** | **High**: Commissions and closing fees. | **Low**: Security deposits and moving costs. |\n| **Maintenance** | **Variable**: You own the repairs. | **Fixed**: Landlord handles major issues. |\n| **Flexibility** | **Low**: You are tied to a physical location. | **High**: Easy to pivot if your plans change. |\n\nIf your current housing market is seeing significant price appreciation, you might consider buying only if you can own the property as a long-term rental after you move. Otherwise, the math of a two-year ownership stint rarely beats the flexibility of renting.",
+ "chars": 2459,
+ "raw_bytes": 4643,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 26.06,
+ "rate_gen_tok_s": 63.44,
+ "id": "q25",
+ "turn": 1,
+ "category": "money",
+ "topic": "Rent or buy before relocating",
+ "question": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:28:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm planning to relocate to Latin America in a year or two. Should I rent or buy where I am now until then?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

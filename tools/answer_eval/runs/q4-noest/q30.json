@@ -1,0 +1,233 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":7.0,\"ftok\":255,\"est\":false}",
+  "X-Hurry": "4a1566fb3799adfa"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 3.2,
+ "elapsed_s": 24.25,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is writing a first draft"
+  },
+  {
+   "t": 3.2,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 11.54,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2299 chars"
+   }
+  },
+  {
+   "t": 11.54,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polishing",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 11.54,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is polishing"
+  },
+  {
+   "t": 11.54,
+   "tag": "RESET"
+  },
+  {
+   "t": 24.25,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.5,
+    "tok": 514,
+    "s": 7.6
+   }
+  },
+  {
+   "t": 24.25,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2058 chars"
+   }
+  },
+  {
+   "t": 24.25,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 24.25,
+   "tag": "DONE",
+   "data": {
+    "f": 3.2,
+    "t": 24.24,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Gemma 4 26B is writing a first draft"
+  ],
+  [
+   11.54,
+   "Gemma 4 26B is polishing"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.06
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2299 chars",
+   "t_s": 11.54
+  },
+  {
+   "id": "polish",
+   "l": "Polishing",
+   "s": "run",
+   "d": "",
+   "t_s": 11.54
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2058 chars",
+   "t_s": 24.25
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 24.25
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.06,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "usage": [
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 2231,
+   "o": 537,
+   "d": 11449
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4057,
+   "o": 487,
+   "d": 12662
+  }
+ ],
+ "rate_writer": {
+  "tps": 67.5,
+  "tok": 514,
+  "s": 7.6
+ },
+ "app_first_s": 3.2,
+ "app_total_s": 24.24,
+ "answer_raw": "4-bit quantization maps the high-precision weights of a model (typically **FP16** or **BF16**) onto a much smaller, 4-bit integer grid, reducing the memory footprint by roughly **4x**.\n\nIn a standard 16-bit setup, each parameter occupies 2 bytes. Moving to 4-bit reduces this to roughly **0.5 bytes** per parameter (plus a small overhead for scaling factors and metadata). This allows a 70B parameter model, which would normally require ~140GB of VRAM, to fit into roughly **40GB** of VRAM.\n\nThe trade-off is **quantization error**: rounding the original weights to the nearest representable 4-bit value introduces noise, which increases **perplexity** (the model's uncertainty). \n\nModern quantization-aware techniques like **GPTQ** or **GGUF** (used in `llama.cpp`) mitigate this by using calibration datasets to minimize the error during the mapping process.\n\nIt matters most when deciding between model size and precision:\n\n*   **Scaling vs. Precision:** A larger model at 4-bit often outperforms a much smaller model at 16-bit. For example, a **70B model at 4-bit** will generally be more capable than a **7B model at FP16**, even with the precision loss.\n*   **Small Models (<10B):** Precision loss is much more visible here. Because these models have less \"parameter redundancy,\" 4-bit quantization can lead to significant degradation in logic and coherence.\n*   **Large Models (>70B):** These models are much more resilient to quantization. The \"intelligence\" lost to rounding is often negligible compared to the benefit of running a massive model on consumer-grade hardware.\n*   **Reasoning-heavy tasks:** In complex tasks like mathematical proofs or strict code generation, the \"quantization tax\" might manifest as increased hallucinations or logical lapses.\n\n**The verdict:** 4-bit is the best option when your goal is to maximize parameter count within a fixed VRAM budget. If you have the headroom, 8-bit or 16-bit is mathematically superior, but for most production and local inference, 4-bit is the optimal balance of efficiency and capability.",
+ "answer": "4-bit quantization maps the high-precision weights of a model (typically **FP16** or **BF16**) onto a much smaller, 4-bit integer grid, reducing the memory footprint by roughly **4x**.\n\nIn a standard 16-bit setup, each parameter occupies 2 bytes. Moving to 4-bit reduces this to roughly **0.5 bytes** per parameter (plus a small overhead for scaling factors and metadata). This allows a 70B parameter model, which would normally require ~140GB of VRAM, to fit into roughly **40GB** of VRAM.\n\nThe trade-off is **quantization error**: rounding the original weights to the nearest representable 4-bit value introduces noise, which increases **perplexity** (the model's uncertainty). \n\nModern quantization-aware techniques like **GPTQ** or **GGUF** (used in `llama.cpp`) mitigate this by using calibration datasets to minimize the error during the mapping process.\n\nIt matters most when deciding between model size and precision:\n\n*   **Scaling vs. Precision:** A larger model at 4-bit often outperforms a much smaller model at 16-bit. For example, a **70B model at 4-bit** will generally be more capable than a **7B model at FP16**, even with the precision loss.\n*   **Small Models (<10B):** Precision loss is much more visible here. Because these models have less \"parameter redundancy,\" 4-bit quantization can lead to significant degradation in logic and coherence.\n*   **Large Models (>70B):** These models are much more resilient to quantization. The \"intelligence\" lost to rounding is often negligible compared to the benefit of running a massive model on consumer-grade hardware.\n*   **Reasoning-heavy tasks:** In complex tasks like mathematical proofs or strict code generation, the \"quantization tax\" might manifest as increased hallucinations or logical lapses.\n\n**The verdict:** 4-bit is the best option when your goal is to maximize parameter count within a fixed VRAM budget. If you have the headroom, 8-bit or 16-bit is mathematically superior, but for most production and local inference, 4-bit is the optimal balance of efficiency and capability.",
+ "chars": 2058,
+ "raw_bytes": 5076,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 21.22,
+ "rate_gen_tok_s": 24.44,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:18:28",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

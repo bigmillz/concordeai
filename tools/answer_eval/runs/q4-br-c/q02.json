@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.5,\"ftok\":91,\"est\":false}",
+  "X-Hurry": "8c77a3e293ad4624"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 20.08,
+ "elapsed_s": 23.41,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.14,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 29 passages"
+   }
+  },
+  {
+   "t": 15.14,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.14,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.14,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.14,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.08,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.41,
+   "tag": "RATE",
+   "data": {
+    "tps": 67.6,
+    "tok": 224,
+    "s": 3.3
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "RESET"
+  },
+  {
+   "t": 23.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "880 chars"
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 23.41,
+   "tag": "DONE",
+   "data": {
+    "f": 20.08,
+    "t": 23.41,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 29 passages",
+   "t_s": 15.14
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.14
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.14
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 23.41
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "880 chars",
+   "t_s": 23.41
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 23.41
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "iPhone 14 review: Is it worth buying in 2026? - Back MarketHow Much Does Upgradi",
+   "u": "https://www.backmarket.com/en-us/c/iphone/iphone-14-test",
+   "d": "2026-07-05"
+  },
+  {
+   "t": "iPhone 18 Pro vs. iPhone 14 Pro: Is a four-year upgrade worth ...",
+   "u": "https://www.cultofmac.com/top-stories/iphone-18-pro-vs-iphone-14-pro-comparison-upgrade",
+   "d": "2026-09-25"
+  },
+  {
+   "t": "iPhone 14 Pro vs. iPhone 18 Pro Buyer's Guide: Should You ...",
+   "u": "https://www.macrumors.com/guide/iphone-14-pro-vs-18-pro/",
+   "d": "2026-09-21"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026 - uptradeit.com",
+   "u": "https://uptradeit.com/blog/is-iphone-14-worth-buying",
+   "d": "2026-05-06"
+  },
+  {
+   "t": "iPhone 18 Pro Max vs. iPhone 17 Pro Max: Is Apple’s Latest Flagship Actually Wor",
+   "u": "https://www.geeky-gadgets.com/iphone-18-pro-max-vs-17-pro-max-2/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "iPhone 14: Why It Might Be Time to Rethink Your Next Upgrade",
+   "u": "https://applemagazine.com/iphone-14-upgrade/",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "How Much Is It to Upgrade Your iPhone? A 2026 Cost Guide",
+   "u": "https://electronics.alibaba.com/buyingguides/how-much-to-upgrade-your-iphone-in-2026",
+   "d": "2026-08-05"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.14,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 239,
+   "o": 29,
+   "d": 965,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5507,
+   "o": 209,
+   "d": 8218,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 67.6,
+  "tok": 224,
+  "s": 3.3
+ },
+ "app_first_s": 20.08,
+ "app_total_s": 23.41,
+ "answer_raw": "The newest lineup is the **iPhone Duo** (as of Oct 2026) [1].\n\nI didn't find the specific retail prices for the iPhone Duo, so you would need to check the Apple Store for the exact cost [1].\n\nUpgrading from an iPhone 14 to the newest model is a **significant leap** that is likely worth it if you want modern features. Moving from the 14 to the 18 Pro offers improvements across the display, every camera, battery life, charging, connectivity, and sustained performance [4]. \n\nIf you are using an iPhone 14 Pro, the **iPhone 18 Pro** is considered a worthwhile upgrade [4]. For standard iPhone 14 users, the jump will be even more noticeable due to the four generations of hardware changes [4]. Since the iPhone 14 is already seeing aging batteries and may struggle with newer iOS features, the hardware delta between your current phone and the newest flagship is substantial [7].",
+ "answer": "The newest lineup is the **iPhone Duo** (as of Oct 2026) [1].\n\nI didn't find the specific retail prices for the iPhone Duo, so you would need to check the Apple Store for the exact cost [1].\n\nUpgrading from an iPhone 14 to the newest model is a **significant leap** that is likely worth it if you want modern features. Moving from the 14 to the 18 Pro offers improvements across the display, every camera, battery life, charging, connectivity, and sustained performance [4]. \n\nIf you are using an iPhone 14 Pro, the **iPhone 18 Pro** is considered a worthwhile upgrade [4]. For standard iPhone 14 users, the jump will be even more noticeable due to the four generations of hardware changes [4]. Since the iPhone 14 is already seeing aging batteries and may struggle with newer iOS features, the hardware delta between your current phone and the newest flagship is substantial [7].",
+ "chars": 880,
+ "raw_bytes": 4147,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.4,
+ "rate_gen_tok_s": 66.07,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:45:55",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.1,\"ftok\":113,\"est\":false}",
+  "X-Hurry": "2600713c93742dce"
+ },
+ "first_byte_s": 0.09,
+ "first_text_s": 17.39,
+ "elapsed_s": 19.95,
+ "events": [
+  {
+   "t": 0.09,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.09,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.67,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 19.94,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.6,
+    "tok": 162,
+    "s": 2.6
+   }
+  },
+  {
+   "t": 19.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "651 chars"
+   }
+  },
+  {
+   "t": 19.95,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 19.95,
+   "tag": "DONE",
+   "data": {
+    "f": 17.38,
+    "t": 19.94,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.09,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.09
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 12.67
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.67
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "651 chars",
+   "t_s": 19.94
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 19.95
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Apple newsroom: its latest posts on this (the vendor's own feed)",
+   "u": "https://www.apple.com/newsroom/",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "Is iPhone 14 Worth Buying in 2026? - Tech in Deep",
+   "u": "https://www.techindeep.com/is-iphone-14-worth-buying-in-2026-73659",
+   "d": "2026"
+  },
+  {
+   "t": "iPhone 14: Why It Might Be Time to Rethink Your Next Upgrade",
+   "u": "https://applemagazine.com/iphone-14-upgrade/",
+   "d": "2026-01-15"
+  },
+  {
+   "t": "Is the iPhone Duo worth $1,999? I used it for a week, and it’s complicated",
+   "u": "https://www.cnn.com/cnn-underscored/reviews/iphone-duo",
+   "d": "2026-10-21"
+  },
+  {
+   "t": "Buy iPhone - Apple",
+   "u": "https://www.apple.com/shop/buy-iphone",
+   "d": ""
+  },
+  {
+   "t": "iPhone 16 price drops on Amazon: Is it still worth buying after the iPhone 17 la",
+   "u": "https://www.msn.com/en-in/technology/consumer-electronics/iphone-16-price-drops-on-amazon-is-it-still-worth-buying-after-the-iphone-17-launch/ar-AA2elcDu?ocid=BingNewsVerp",
+   "d": "2026-10-16"
+  },
+  {
+   "t": "iPhone - Apple",
+   "u": "https://www.apple.com/iphone/",
+   "d": ""
+  },
+  {
+   "t": "iPhone 14 Pro Max Colors: Which One Suits Your Style? – Fonezone.ae",
+   "u": "https://www.fonezone.ae/blogs/news/iphone-14-pro-max-colors",
+   "d": "2026-02-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.67,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 239,
+   "o": 25,
+   "d": 865,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5315,
+   "o": 141,
+   "d": 7229,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 63.6,
+  "tok": 162,
+  "s": 2.6
+ },
+ "app_first_s": 17.38,
+ "app_total_s": 19.94,
+ "answer_raw": "The newest lineup is the **iPhone Duo**, which arrived at Apple Stores worldwide in October 2026 [1].\n\nSpecific pricing for the Duo is not listed in the available reports, so you would need to check the Apple Store directly for the current MSRP [1].\n\nUpgrading from an iPhone 14 is likely worth it if you want access to Apple's newest on-device intelligence and better battery life [2]. While the iPhone 14 is still functional for basic tasks, its battery capacity is often significantly degraded by own age [2][3]. Moving to a newer model addresses the hardware limitations and the performance gaps that occur when running modern system features [3].",
+ "answer": "The newest lineup is the **iPhone Duo**, which arrived at Apple Stores worldwide in October 2026 [1].\n\nSpecific pricing for the Duo is not listed in the available reports, so you would need to check the Apple Store directly for the current MSRP [1].\n\nUpgrading from an iPhone 14 is likely worth it if you want access to Apple's newest on-device intelligence and better battery life [2]. While the iPhone 14 is still functional for basic tasks, its battery capacity is often significantly degraded by own age [2][3]. Moving to a newer model addresses the hardware limitations and the performance gaps that occur when running modern system features [3].",
+ "chars": 651,
+ "raw_bytes": 2841,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.16,
+ "rate_gen_tok_s": 63.57,
+ "id": "q02",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "Latest iPhone and upgrade value",
+ "question": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:48:57",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What's the newest iPhone right now, what does it cost, and is it worth upgrading from an iPhone 14?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

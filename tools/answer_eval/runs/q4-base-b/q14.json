@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.8,\"ftok\":135,\"est\":false}",
+  "X-Hurry": "b0d821a82996c40f"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 17.55,
+ "elapsed_s": 22.71,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 19 passages"
+   }
+  },
+  {
+   "t": 14.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.08,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.55,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.71,
+   "tag": "RATE",
+   "data": {
+    "tps": 79.6,
+    "tok": 410,
+    "s": 5.2
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1643 chars"
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.71,
+   "tag": "DONE",
+   "data": {
+    "f": 17.55,
+    "t": 22.71,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 19 passages",
+   "t_s": 14.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.08
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.08
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1643 chars",
+   "t_s": 22.71
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.71
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Morning people are happier than night owls, study suggestsStudy after study find",
+   "u": "https://www.today.com/health/morning-people-are-happier-night-owls-study-suggests-1C9381787",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "Are morning people happier than night people?",
+   "u": "https://www.thehealthyjournal.com/q-and-a/are-morning-people-happier-than-night-people/",
+   "d": ""
+  },
+  {
+   "t": "Morning People Are Actually Happier Than Night Owls | Live Science",
+   "u": "https://www.livescience.com/20880-morning-people-happier.html",
+   "d": "2012-06-11"
+  },
+  {
+   "t": "Morning People vs Night Owls: Is One Better Than the Other?",
+   "u": "https://bedthreads.com/blogs/journal/morning-people-vs-night-people",
+   "d": ""
+  },
+  {
+   "t": "Are You a Morning Person or Night Owl? Take Our Sleep Quiz.",
+   "u": "https://www.nytimes.com/2026/06/15/well/chronotype-quiz.html",
+   "d": "2026-06-15"
+  },
+  {
+   "t": "Light and Life at Night as Circadian Rhythm Disruptors",
+   "u": "https://www.chronobiologyinmedicine.org/journal/view.php?number=19",
+   "d": ""
+  },
+  {
+   "t": "Morningness/Eveningness and Menstrual Symptoms in Adolescent...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC4067163/",
+   "d": ""
+  },
+  {
+   "t": "16-Port eNVR and APEX Expansion Switch – Night Owl SP, LLC",
+   "u": "https://nightowlsp.com/products/16-port-envr-expansion-switch",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.08,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 232,
+   "o": 26,
+   "d": 863,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4343,
+   "o": 316,
+   "d": 8581,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 79.6,
+  "tok": 410,
+  "s": 5.2
+ },
+ "app_first_s": 17.55,
+ "app_total_s": 22.71,
+ "answer_raw": "Research suggests that morning people report higher levels of happiness and life satisfaction than night owls [1]. This correlation appears to be linked to better sleep quality, as morning-type individuals often align more naturally with their circadian rhythms [2].\n\n## The Happiness Gap\nThe difference in well-being often comes down to how sleep interacts with daily obligations. Night owls frequently struggle with \"switching on\" in the morning and may face sleep inertia [4]. Because they often have to wake up for work or school during hours that conflict with their natural rhythm, they may experience more stress or dissatisfaction [1].\n\nConversely, morning-type people tend to report feeling healthier, likely because their natural sleep-wake cycle allows for more consistent rest [2].\n\n## Can a Night Owl Switch?\nWhile the biological circadian rhythm—a roughly 24.1-hour cycle—is a driving factor in chronotype, there is evidence of a natural shift over time. For example, the tendency toward being a night owl often fades as people age, which may explain why older adults often report higher happiness levels than younger ones [1].\n\nHowever, forced shifts in schedule can carry risks. For those in professions requiring night shifts or irregular hours, the disruption of the circadian rhythm can lead to health risks, including obesity, diabetes, and cardiovascular disease [6]. \n\nThe evidence does not provide specific clinical protocols for an individual to manually \"switch\" their chronotype, so you would need to consult a sleep specialist or chronobiologist to see if behavioral interventions can override biological tendencies.",
+ "answer": "Research suggests that morning people report higher levels of happiness and life satisfaction than night owls [1]. This correlation appears to be linked to better sleep quality, as morning-type individuals often align more naturally with their circadian rhythms [2].\n\n## The Happiness Gap\nThe difference in well-being often comes down to how sleep interacts with daily obligations. Night owls frequently struggle with \"switching on\" in the morning and may face sleep inertia [4]. Because they often have to wake up for work or school during hours that conflict with their natural rhythm, they may experience more stress or dissatisfaction [1].\n\nConversely, morning-type people tend to report feeling healthier, likely because their natural sleep-wake cycle allows for more consistent rest [2].\n\n## Can a Night Owl Switch?\nWhile the biological circadian rhythm—a roughly 24.1-hour cycle—is a driving factor in chronotype, there is evidence of a natural shift over time. For example, the tendency toward being a night owl often fades as people age, which may explain why older adults often report higher happiness levels than younger ones [1].\n\nHowever, forced shifts in schedule can carry risks. For those in professions requiring night shifts or irregular hours, the disruption of the circadian rhythm can lead to health risks, including obesity, diabetes, and cardiovascular disease [6]. \n\nThe evidence does not provide specific clinical protocols for an individual to manually \"switch\" their chronotype, so you would need to consult a sleep specialist or chronobiologist to see if behavioral interventions can override biological tendencies.",
+ "chars": 1643,
+ "raw_bytes": 3920,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.09,
+ "rate_gen_tok_s": 79.6,
+ "id": "q14",
+ "turn": 1,
+ "category": "health",
+ "topic": "Morning people and happiness",
+ "question": "Are morning people really happier, or is that a myth? Can a night owl actually switch?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-b",
+ "asked_at": "2026-11-10T04:40:23",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Are morning people really happier, or is that a myth? Can a night owl actually switch?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":16.0,\"ftok\":120,\"est\":false}",
+  "X-Hurry": "bb7ec79b68ce81bd"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 17.25,
+ "elapsed_s": 22.26,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.74,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.74,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 13.0,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 21 passages"
+   }
+  },
+  {
+   "t": 13.0,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 13.0,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 13.0,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 13.0,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 17.25,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.26,
+   "tag": "RATE",
+   "data": {
+    "tps": 75.9,
+    "tok": 380,
+    "s": 5.0
+   }
+  },
+  {
+   "t": 22.26,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1520 chars"
+   }
+  },
+  {
+   "t": 22.26,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   8.74,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.07
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.74
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.74
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 21 passages",
+   "t_s": 13.0
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 13.0
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 13.0
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1520 chars",
+   "t_s": 22.26
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 22.26
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "How to Support Someone Quitting Smoking Without Nagging",
+   "u": "https://acibademinternational.com/blog/how-family-can-support-someone-through-a-smoking-cessation-program-without-nagging/",
+   "d": "2026-10-14"
+  },
+  {
+   "t": "Quitlines and Other Cessation Support Resources",
+   "u": "https://www.cdc.gov/tobacco/hcp/patient-care/quitlines-and-other-resources.html",
+   "d": "2025-01-31"
+  },
+  {
+   "t": "Nicotine replacement therapy versus control for smoking cessation",
+   "u": "https://pubmed.ncbi.nlm.nih.gov/29852054/",
+   "d": ""
+  },
+  {
+   "t": "A Parallel Recovery: Families Healing From AddictionThe Role of Family Systems i",
+   "u": "https://www.psychologytoday.com/us/blog/from-addiction-to-recovery/202308/a-parallel-recovery-families-healing-from-addiction",
+   "d": "2023-08-25"
+  },
+  {
+   "t": "Setting Boundaries With Family | Still Waters Recovery",
+   "u": "https://stillwatersrecovery.org/family-boundaries/",
+   "d": "2021-11-19"
+  },
+  {
+   "t": "Examining pathways between family or peer factors and smoking ...",
+   "u": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9382825/",
+   "d": ""
+  },
+  {
+   "t": "How to Set Boundaries With a Difficult Family Member - The New...",
+   "u": "https://www.nytimes.com/2023/03/08/well/family/boundaries-family-nedra-glover-tawwab.html",
+   "d": "2023-03-08"
+  },
+  {
+   "t": "Are Zyn Nicotine Pouches Safe? Health & Addiction Risks",
+   "u": "https://recovered.org/blog/are-zyns-bad-for-you",
+   "d": "2026-10-04"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   13.0,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 75.9,
+  "tok": 380,
+  "s": 5.0
+ },
+ "answer_raw": "The best way to manage family support is to **set clear boundaries** and define exactly how you want (or don't want) them to help before the withdrawal symptoms hit.\n\nYou should lead with their specific needs by asking how they want to be involved, then instruct them to follow your lead—which might mean listening without lecturing or simply maintaining a smoke-free environment [1]. Because the first **two to four weeks** of withdrawal often involve irritability, you should pre-emptively communicate that your moods might shift and that you need space rather than \"checking up\" on your progress [1].\n\nIf they struggle to stay in their lane, you can use these strategies:\n\n*   **Define the role**: Explain that while they can be a powerful force for change, their role is to provide a stable environment, while the expertise for the actual cessation comes from professionals or structured programs [1][4].\n*   **Establish boundaries**: If they attempt to force a return to \"normal\" habits that originally fueled your substance use, you must clearly state that your recovery requires new patterns, not old ones [5].\n*   **Address the \"policing\" instinct**: If they use nagging as a form of support, tell them that nagging is counterproductive and that you'd prefer they focus on being a consistent, encouraging presence instead [1][4].\n\nIf family members refuse to respect these boundaries or if the household environment becomes toxic, you may need to consider moving out or cutting ties to protect your recovery [5].",
+ "answer": "The best way to manage family support is to **set clear boundaries** and define exactly how you want (or don't want) them to help before the withdrawal symptoms hit.\n\nYou should lead with their specific needs by asking how they want to be involved, then instruct them to follow your lead—which might mean listening without lecturing or simply maintaining a smoke-free environment [1]. Because the first **two to four weeks** of withdrawal often involve irritability, you should pre-emptively communicate that your moods might shift and that you need space rather than \"checking up\" on your progress [1].\n\nIf they struggle to stay in their lane, you can use these strategies:\n\n*   **Define the role**: Explain that while they can be a powerful force for change, their role is to provide a stable environment, while the expertise for the actual cessation comes from professionals or structured programs [1][4].\n*   **Establish boundaries**: If they attempt to force a return to \"normal\" habits that originally fueled your substance use, you must clearly state that your recovery requires new patterns, not old ones [5].\n*   **Address the \"policing\" instinct**: If they use nagging as a form of support, tell them that nagging is counterproductive and that you'd prefer they focus on being a consistent, encouraging presence instead [1][4].\n\nIf family members refuse to respect these boundaries or if the household environment becomes toxic, you may need to consider moving out or cutting ties to protect your recovery [5].",
+ "chars": 1520,
+ "raw_bytes": 3665,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 17.07,
+ "rate_gen_tok_s": 75.85,
+ "id": "q16",
+ "turn": 1,
+ "category": "health",
+ "topic": "Family support for quitting",
+ "question": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-b",
+ "asked_at": "2026-11-08T02:43:50",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm quitting nicotine. How do I get my family to actually support me instead of nagging or checking up on me?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,308 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.6,\"ftok\":130,\"est\":false}",
+  "X-Hurry": "9e49c0a0f5840494"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 13.88,
+ "elapsed_s": 18.01,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 4 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "4 pages"
+   }
+  },
+  {
+   "t": 11.75,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "1 page · 9 passages"
+   }
+  },
+  {
+   "t": 11.75,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "4 sources"
+   }
+  },
+  {
+   "t": 11.75,
+   "tag": "SOURCES",
+   "n": 4
+  },
+  {
+   "t": 11.75,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 11.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 13.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 18.01,
+   "tag": "RATE",
+   "data": {
+    "tps": 61.4,
+    "tok": 253,
+    "s": 4.1
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1015 chars"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "DONE",
+   "data": {
+    "f": 13.88,
+    "t": 18.01,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 4 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "4 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "1 page · 9 passages",
+   "t_s": 11.75
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "4 sources",
+   "t_s": 11.75
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 11.75
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1015 chars",
+   "t_s": 18.01
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 18.01
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Flying vs Driving to Serengeti: Which Is Better?",
+   "u": "https://maratrianglesafaris.co.ke/flying-vs-driving-to-serengeti/",
+   "d": "2026-09-23"
+  },
+  {
+   "t": "Flying vs driving between Arenal and Manuel Antonio... - Tripadvisor",
+   "u": "https://www.tripadvisor.com/ShowTopic-g291982-i813-k10211377-Flying_vs_driving_between_Arenal_and_Manuel_Antonio-Costa_Rica.html",
+   "d": ""
+  },
+  {
+   "t": "Crocs AE | Clogs, Sandals, Wedges & Slippers | Shoes Sale",
+   "u": "https://www.crocs-uae.com/",
+   "d": ""
+  },
+  {
+   "t": "Link to reddit.com",
+   "u": "https://www.reddit.com/r/climatechange/comments/uu0ql3/driving_vs_flying/",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   11.75,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 240,
+   "o": 28,
+   "d": 772,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 3397,
+   "o": 263,
+   "d": 6214,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 61.4,
+  "tok": 253,
+  "s": 4.1
+ },
+ "app_first_s": 13.88,
+ "app_total_s": 18.01,
+ "answer_raw": "The provided evidence does not contain pricing or logistical data for traveling from Brooklyn to Miami, so I cannot determine which option is cheaper.\n\nTo calculate the all-in cost for your specific trip, you would need to compare the following:\n\n**Flying**\n*   **Round-trip airfare** for two people.\n*   **Ubers/Lyfts** to and from airports (JFK/LGA/EWR and MIA/FLL).\n*   **Airport transit/parking** fees.\n\n**Driving**\n*   **Fuel costs** for the ~1,300-mile trip (roughly 50 gallons of gas per person, depending on MPG).\n*   **Maintenance/wear** on the vehicle for a 2,600-mile round trip.\n*   **Hotel stays** during the transit (likely 2 nights each way).\n*   **Parking fees** at your Miami destination.\n\nTypically, flying is cheaper for a one-week trip because the cost of two nights of hotels and significant fuel for a single vehicle often exceeds the cost of two round-trip economy tickets. However, if you own a fuel-efficient vehicle and have a place to park for free in Miami, driving might narrow the gap.",
+ "answer": "The provided evidence does not contain pricing or logistical data for traveling from Brooklyn to Miami, so I cannot determine which option is cheaper.\n\nTo calculate the all-in cost for your specific trip, you would need to compare the following:\n\n**Flying**\n*   **Round-trip airfare** for two people.\n*   **Ubers/Lyfts** to and from airports (JFK/LGA/EWR and MIA/FLL).\n*   **Airport transit/parking** fees.\n\n**Driving**\n*   **Fuel costs** for the ~1,300-mile trip (roughly 50 gallons of gas per person, depending on MPG).\n*   **Maintenance/wear** on the vehicle for a 2,600-mile round trip.\n*   **Hotel stays** during the transit (likely 2 nights each way).\n*   **Parking fees** at your Miami destination.\n\nTypically, flying is cheaper for a one-week trip because the cost of two nights of hotels and significant fuel for a single vehicle often exceeds the cost of two round-trip economy tickets. However, if you own a fuel-efficient vehicle and have a place to park for free in Miami, driving might narrow the gap.",
+ "chars": 1015,
+ "raw_bytes": 2600,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 14.09,
+ "rate_gen_tok_s": 61.44,
+ "id": "q07",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Flying vs driving",
+ "question": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-c",
+ "asked_at": "2026-11-10T05:33:30",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Flying vs driving from Brooklyn to Miami for two people, one week trip. Which is cheaper all-in and by roughly how much?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.4,\"ftok\":259,\"est\":false}",
+  "X-Hurry": "3d0eb4c80c287a8a"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.41,
+ "elapsed_s": 20.22,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 9.78,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 32 passages"
+   }
+  },
+  {
+   "t": 9.78,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 9.78,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 9.78,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 9.78,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.41,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.22,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.8,
+    "tok": 277,
+    "s": 4.8
+   }
+  },
+  {
+   "t": 20.22,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1111 chars"
+   }
+  },
+  {
+   "t": 20.22,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 20.22,
+   "tag": "DONE",
+   "data": {
+    "f": 15.41,
+    "t": 20.22,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 32 passages",
+   "t_s": 9.78
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 9.78
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 9.78
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1111 chars",
+   "t_s": 20.22
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 20.22
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Florianópolis, Brazil Airbnb Data 2026: Revenue & Occupancy",
+   "u": "https://www.airroi.com/airbnb-data/brazil/santa-catarina/florianópolis",
+   "d": "2026-10-01"
+  },
+  {
+   "t": "Florianópolis Airbnb Data, Statistics & Market Analysis ...",
+   "u": "https://www.airroi.com/data-portal/markets/florianopolis-brazil",
+   "d": "2026-07-30"
+  },
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "Airbnb Pricing Decoded: Strategies to Win Over Guests",
+   "u": "https://www.igms.com/airbnb-pricing/",
+   "d": "2025-03-28"
+  },
+  {
+   "t": "Florianópolis, Brazil Airbnb Occupancy — September 2026",
+   "u": "https://www.guestfavorites.com/airbnb-occupancy-rates-in-florianopolis-santa-catarina-brazil",
+   "d": "2026-09"
+  },
+  {
+   "t": "Are Airbnb rentals in Florianópolis a good idea? – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-airbnb",
+   "d": "2026-10-22"
+  },
+  {
+   "t": "Florianopolis Airbnb Market Data Dashboard: 14.5K Listings ...",
+   "u": "https://www.bnbcalc.com/markets/br/florianopolis",
+   "d": "2026-09"
+  },
+  {
+   "t": "Florianópolis Airbnb Yield 2026: The Real Numbers",
+   "u": "https://www.internationalre.org/tips/florianopolis-airbnb-yield-brazil.html",
+   "d": "2026-04-28"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   9.78,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 279,
+   "o": 26,
+   "d": 830,
+   "c": 4
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 6035,
+   "o": 275,
+   "d": 10377,
+   "c": 2236
+  }
+ ],
+ "rate_writer": {
+  "tps": 57.8,
+  "tok": 277,
+  "s": 4.8
+ },
+ "app_first_s": 15.41,
+ "app_total_s": 20.22,
+ "answer_raw": "Trust the **4.6-star** rating because it represents a much larger, more statistically significant sample size of guest experiences. While 4.9 is impressive, 18 reviews can be easily skewed by a few friends or a honeymooner, whereas 212 reviews indicate a consistent level of service over a longer period of time.\n\nFor your 2-bedroom in Florianópolis, you should target a nightly rate around **R$584** as of October 2026 to align with the market average for two-bedroom properties [6]. Since you are looking at 30+ night stays, you should apply a monthly discount, which typically ranges up to **30%** for stays of  28 nights or longer [4]. \n\nIf you want to capture higher-tier revenue, you could push your base rate higher, noting that top 10% listings in the city can exceed **R$1,155** per night [1]. However, keep in mind that most two-bedroom listings in the area gross around **R$43,000** annually before fees and taxes [6]. Because your stay is long-term, you should also confirm with potential guests if the advertised price includes utilities or if they expect a different rate during holiday peaks [3].",
+ "answer": "Trust the **4.6-star** rating because it represents a much larger, more statistically significant sample size of guest experiences. While 4.9 is impressive, 18 reviews can be easily skewed by a few friends or a honeymooner, whereas 212 reviews indicate a consistent level of service over a longer period of time.\n\nFor your 2-bedroom in Florianópolis, you should target a nightly rate around **R$584** as of October 2026 to align with the market average for two-bedroom properties [6]. Since you are looking at 30+ night stays, you should apply a monthly discount, which typically ranges up to **30%** for stays of  28 nights or longer [4]. \n\nIf you want to capture higher-tier revenue, you could push your base rate higher, noting that top 10% listings in the city can exceed **R$1,155** per night [1]. However, keep in mind that most two-bedroom listings in the area gross around **R$43,000** annually before fees and taxes [6]. Because your stay is long-term, you should also confirm with potential guests if the advertised price includes utilities or if they expect a different rate during holiday peaks [3].",
+ "chars": 1111,
+ "raw_bytes": 3401,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.74,
+ "rate_gen_tok_s": 57.74,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T05:01:22",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

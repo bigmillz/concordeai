@@ -17547,6 +17547,118 @@ adjusted). The doc block alone also ran 30/30 with `SMOKE_LONG_DOC` on the priva
 sees is the Greek names since 6b534 (Alpha, Gamma, Sigma, Omega). The keys are untouched; the words were updated on
 merge where they reach the page.
 
+## 6b523 — quality-3: the writer's own slips fixed without a model, the shape of a grounded answer, the vendor's own page (per Patrick)
+
+Round 3 of the answer push, on `quality-3` from `fresh-1` (686e70a = main 672d6f1 + the free fresh-facts fixes).
+The owner's server is down, so everything was measured on this Mac's Fast tier: one Gemma 4 26B writer (MLX),
+one pass on a searched question, no critic and no fact-check (the craft machinery of 6b515/6b518 is Thinking's).
+Round 3's candidates came from the earlier rounds' judges; each was measured and kept or dropped on the bench
+(`tools/answer_eval/RESULTS-quality-3.md` has every number). Two of the six candidates don't apply to this
+config at all, measured: **the query plan lands 26 of 28 times here** (0.5–1.6 s; the local engine is up and
+idle after the warm-up, so the 8 s deadline never bites), and the critic's corrections never run (no critic).
+
+**1. The deterministic post-pass** (`answer_polish`, `_single_polish` in the handler; `answer_arith_fixes`,
+`answer_fx_fixes`, `answer_fx_rate`, `answer_scrub`, `shown_answer`). The judges' three recurring writer slips
+are strings the finished answer itself holds, so they are fixed without a model, in under a millisecond, and a
+changed answer is re-sent after a RESET as the fact-check's is (6b515); the step card says "Sharpened · fixed n
+figures". Nothing here invents:
+- **Arithmetic**: every `A op B [op C] = D` the answer states (×, x, ·, +, −, ÷, /, with `=`, `≈`, `~`,
+  "equals", "comes to", "totals") is re-computed from its own figures. The result is replaced only when it
+  is off by more than the figures' own rounding (`_ans_eval`: each figure was rounded to its last written digit,
+  an integer under 100 is a count and exact, and what each rounding moves the result by is summed; "583 gallons
+  × $3.40 = $1,983" stands, from 583.33) plus 5% for an approximation. A chain ("$1,350 + 11 × $106.40 = $1,350
+  + $1,169.40 = $2,519.40", gpt-oss's q27 in round 2) is judged first against last, and the middle sum's one
+  figure the first expression doesn't state is re-derived ($1,170.40). Left alone: a year, a percentage
+  result (too many readings), fenced code, a sign flip (a version number), a result ten times off (a unit
+  misread), and a **partial equation** whose tail or head alone gives the stated result ("(flight $1,350 + 11
+  × $95 = $1,045)" states the hotel's product with the flight as context: the first draft of this rule
+  "corrected" it to $2,395).
+- **Conversions**: each dollar figure beside a reais figure (a single or a range, either order) is checked
+  against the ONE rate the answer states, or failing that the evidence's FX block ("1 US dollar = 5.0465 BRL",
+  6b520), and replaced by the quotient when more than 6% off. Round 2's q17.t2 had "R$3,500–5,500
+  ($1,700–$2,700)" at a stated 5.05: 2.5× off; it becomes $693–$1,089. Two differing rates in one text mean no
+  rate, and nothing is checked.
+- **The leaks**: "the provided data does not list", "are not listed in the available data", "based on the
+  evidence", "the sources above", "I can't pull live data" are reworded in place with the sentence's grammar
+  kept ("I didn't find", "aren't in what I found", "based on what I found"); a sentence that now opens with
+  "what I found" is capitalised. "The data center" is untouched. Over the recorded bench answers of every
+  round, 54 of 33×16 answers carried one.
+- A leading markdown heading goes; a closing recap goes (`trim_recap`, 6b518, which only the craft path ran).
+- Measured over every recorded bench answer of rounds 0–3 (16 runs): the arithmetic rule fires on 2 (both
+  real errors, gpt-oss's), the conversion rule on 2 (q17.t2, both real), never on a right figure. On this
+  config Gemma's sums were right in every base answer, so only the leak rewrite fired: 12, 7 and 9 answers
+  re-sent in the three branch runs. The judges' "garbled" lines ("R$ 4,400–$800", "With sceanrio 2 tax") are in
+  answers the post-pass never touched (0 RESETs): the writer's own.
+- The council's final (Thinking, Pro, Max) goes through the same pass before the fact-check's re-send
+  (`run_council._done`), unmeasured here: this config never runs a council.
+
+**2. The shape and the estimate rule ride the grounded turn** (`GROUND_SHAPE`, `GROUND_ESTIMATE`, after the
+dating rules, before the note and the question). On this config the single writer never saw the answer brief
+(it rides the revise and final passes, 6b515), so the grounded turn carries the shape: the first sentence
+settles the question; every part answered, with the evidence's specifics in full (every price, not one); one
+pick when asked which; a list written out when asked (what to pack); prose, bold, no headings or tables on a
+chat answer, no recap; the leak phrases banned. And ESTIMATE WHEN ASKED: a figure the person asked for and no
+source states is built from the evidence's rate or unit price and known typical ranges, shown in one line,
+dated, with where to confirm; "I cannot give an exact figure" alone is never acceptable (q17.t2 refused a rent
+with the rate and the price per m² in hand, three runs of four).
+
+**3. A follow-up with nothing new to look up** (`GROUND_FOLLOWUP`): 6b518 reuses the earlier evidence; the
+turn now says not to restate the earlier answer but to add what it lacked and correct what was wrong (q01.t2
+restated turn 1 in two runs of four).
+
+**4. The vendor's own page, and the junk around it** (`rank_sources`, `_src_quality`, `_src_junk`,
+`evidence_pack`, `GROUND_DATING`):
+- The maker's or seller's own page on the question is flagged `vendor` when the host's own label is the
+  asked-about name (digitalocean.com, apple.com) or the name sits in a primary host the hints named
+  (voegol.com.br for GOL); a name merely inside a label (llm-stats.com for "LLM", spanish-fluency-club.com for
+  "Spanish") is not, which the first cut got wrong. It takes a seat ahead of the fill, the pack marks it
+  "(THE VENDOR'S OWN SITE: the maker's or seller's own page)", and the dating rule puts it with official data:
+  its price beats any reseller's "$2.50/hr" (q03).
+- A listing's page (airbnb., vrbo., cozycozy., hostelworld.) is junk, like a video: one unit's advert chose
+  the neighbourhood in q17. An engine's paid link (`/aclick`, `/aclk`, `/pagead`) is junk. Booking and price
+  aggregators (`_SRC_LISTING_HOSTS`), a forum thread (`_SRC_FORUM_RX`, not on a good host: stackoverflow's
+  /questions/ stays) and a site's front page (Delta's, Kayak's, Omio's) rank down 2, as a content farm does.
+- A query's seat goes only to a hit worth half the best: "clear accents cheap classes tourist bubble" had
+  seated an accent-reduction school and a glass tumbler (9 and 6 against 22).
+- In `plan_queries`, the lead's names always ride a nameless part, however long: "safe walkable near beach
+  fast internet" (six words, no name) searched the world and seated a Da Nang listing and a speed test; it now
+  carries Florianópolis.
+- Measured at the evidence level (no models, the harness in the session scratchpad: the grounded search on
+  q01–q03, q17–q21): the junk is gone from the packs (no listing, thread, front page, tumbler, speed test,
+  Da Nang) and the vendor flag lands only on the vendor (digitalocean.com; not llm-router, numbeo,
+  spanish-fluency-club, threeweektraveller). Key facts found in the pack: 8–9 of 90–102 both before and after;
+  the engines decide that, not the ranking.
+
+**Measured** (33 turns, local Fast, blind Opus judges by turn; `RESULTS-quality-3.md`): two base runs against three
+branch runs, paired, **+0.15 (se 0.14)**; wave 1 alone (two against two in one grading) **+0.23 (se 0.14)**: one
+standard error, **not clearly beyond noise**. The two base runs differ by 0.54 (3.64, 4.18), the three branch runs
+sit at 4.18, 4.09, 3.91. What moved on every run: structure 5.4 → 5.9, concise 5.4 → 6.3, fit 4.4 → 4.8; markdown
+headings 52 → 4 per run, tables 10 → 3 answers, the pipeline's words 6–9 → 0; high-severity flags 38 → 30 over
+66 answers in wave 1 (br-c carried 21 in wave 2a). Travel +0.5, money +0.6, reasoning +0.7, follow-ups +0.5;
+fresh −0.3, where q04 and q05 are a date artefact (the sheets are dated 2026-10-24 and the live search now returns
+the 28 October FOMC statement and a 26 October OpenAI model, which the rubric scores as wrong); health flat. First
+visible text median 20–21 s base, 15–21 s branch; no error answer in 165 turns. Verdict: merge as a step, not a
+quality release; q01–q03 are still 2–3 and that is the engines' results, not the writing. A third base run, one ablation per kept fix and the thinking pilot were queued and stopped for the 7.0 beta's
+gauntlet; they run when the round is requeued.
+
+**The knob.** `MILLENAI_Q3_OFF` (shape, estimate, followup, vendor, polish), a dev copy's only
+(`quality_ablate`), in `_KNOWN_ENV`; `run_bench.py --env` passes it.
+
+**Gauntlet.** 20 checks + a 28-mutant check (`# ==== quality-3 (6b523)`): the arithmetic (a wrong product, a
+chain's two fixes, right and rounded and approximate figures untouched, a partial equation, a year, a share, a
+sign flip, fenced code), the conversions (a range at the answer's rate, the evidence's rate, a reversed pair,
+two rates = none), the leaks (grammar and case, "the data center" untouched), the heading and the recap, the
+knob in a dev copy and the shipped app, the text after the last RESET, the grounded turn's rules in order and
+the knob taking them out, the dating rule, the ranking (listing junk, the paid link, the forum thread, the front
+page, the seat floor, the vendor flagged and seated and a reseller's not), the pack's mark, the handler's wiring
+on both single-writer paths and the follow-up note. The 6b518 pin of the grounded turn's call follows the code.
+**A dev copy's pilot knob** (`MILLENAI_Q3_THINK=hard|all`, `quality_think`; left out of quality-4, 6b560): the model's own reasoning mode,
+which the app keeps off, on a question with three or more figures and an arithmetic or judgement ask; the stream
+parser and `strip_think` keep the thinking text out of the answer. Unmeasured yet (the pilot run was stopped).
+The council's final (`run_council._done`) goes through `answer_polish` before the fact-check's re-send.
+The 6b523 block ran green standalone against the branch source (22 of 22, with the 30 mutants); the full
+gauntlet was queued behind the beta's and is pending the requeue.
+
 ## 6b524 — The server kit brings itself back: a watchdog doctor, panic-reboot with a boot-loop guard, and a network watch (per Patrick)
 
 - Why: the server (Ubuntu 26.04, Ryzen 5950X, RTX 5070 Ti, AMD chipset, Wi-Fi only at home, owner abroad for months,
@@ -20358,6 +20470,119 @@ fetch behind them). Recent chats stay in the sidebar. Horizon already hid Classi
 composer's centre measures -0.2 px off the golden point at 1440 and 390. Gauntlet: the 6b542 balance check re-pinned
 (at rest and grown); the header check now also requires, with chats saved, no recent-chat rows or suggestion chips on the
 home and the golden point within 0.5 px, and its second mutant puts the old list back.
+
+## 6b560 — quality-4: quality-3 on 7.0 beta 2, measured against main, the estimate rule dropped; the per-build scorecard (per Patrick)
+
+**What it is.** The back-end phase's first branch: quality-3 (6b523, never gauntleted or merged) ported onto
+`hotfix-drip` (7.0 beta 2 + 6b554), re-measured against main with the repo's own bench, kept only where it held,
+and a small scorecard that every release can run so quality and speed only go up. Server-side only (the
+post-pass, the grounded turn's rules, the ranking, the bench tools); nothing of the page changed.
+
+**The port.** 6b523's two code commits cherry-picked (conflicts: `_KNOWN_ENV` beside 6b537's `MILLENAI_UPDATE_API`,
+the gauntlet block beside 6b522/6b532's). Its **thinking pilot knob (`MILLENAI_Q3_THINK`) is left out**: unmeasured,
+and since 6b539 the first draft streams live, so the model's reasoning would stream with it. What main gained since
+fresh-1 needed four changes:
+- **The server's answers get the post-pass.** A mode with a paired server answers there first (6b339), and that
+  path returned before `_single_polish` ran, so on the owner's setup the 6b523 fixes reached almost no answer. The
+  closure now sits before the dispatch and runs after a server seat's answer (or its fallback's) and after Fast on
+  one server alone. The council's final already had it (6b523).
+- **What the person asked for stays.** The post-pass drops a leading heading and trims a closing summary because
+  the standing instructions forbid them on a chat answer; asked for a README, a report, an outline or a title, the
+  heading is the thing asked for, and asked for a summary or a TL;DR, the summary is (`_ANS_FORM_ASK_RX`,
+  `_ANS_SUM_ASK_RX`, read from the grounded turn's last `PROMPT:` line or the whole message, `_ans_asked`).
+- **The Code lane is left as written** (`LANE_ROLE[agent] == "code"`): its answers are code.
+- A trailing newline alone no longer counts as a trimmed recap (it re-sent an unchanged answer after a RESET).
+
+**Measured** (`tools/answer_eval/RESULTS-quality-4.md`; this Mac's Fast tier, Gemma 4 26B on all 264 turns, the
+owner's server off when the runs began; blind Opus judges by turn in three waves). Three samples a side, every
+grading pooled: **quality-3's five changes on beta 2 score −0.08 (se 0.16) against main**: not better. What holds
+on every sample is the shape: **concise 5.4 → 6.3 (+0.87, se 0.16), fit +0.31 (se 0.20)**, headings on 22–26
+answers a run → 0–2, tables 9–14 → 2–5, the pipeline's words 8–12 → 0–1, answers ~30 % shorter, total time
+−1.2 s (se 0.5), **first words unchanged** (17.6 → 17.9 s median, +0.13 s se 0.29). Against that, **high-severity
+invented figures rose from 0.17 to 0.28 an answer** (grounded −0.16, se 0.13). Two ablations, each graded beside
+the others: without the shape, estimate and follow-up rules the style goes back (concise 5.0, headings on 24
+answers) and nothing else moves; **without the estimate rule alone the build scores +0.26 (se 0.23) over the build
+with it and +0.17 (se 0.24) over main, with main's rate of high flags** (7 against 10 and 12 in the same grading).
+The flags the rule invited are its own instructions at work: a euro rent relabelled as dollars, a two-week budget
+above the source's monthly one, Medellín's rent in reais, trade wages $20k above the BLS medians. **So
+GROUND_ESTIMATE is gone** (it also contradicted the older "never invent or estimate a price" rule); the shape, the
+follow-up note, the vendor's page and the post-pass stay. One more post-pass gap the judges found: "R$ 4,500 and
+R$ 7,500 per month (roughly $2,500–$4,200 USD, using 1 USD = 5.5167 BRL)", three times off, was missed because
+neither the range's "and" nor the rate's "1 USD =" order was read. Both are now. Verdict: a style step the owner's
+own preferences ask for, at no measured cost; **not a quality release** (overall +0.17, se 0.24, is under one
+standard error), and the low scores are search and model knowledge (q01–q03, q07, q19 at 2–3 of 10).
+
+**A bench fix found on the way.** `run_bench.py` didn't know the USAGE, DONE and RUBIN frames (6b519, 6b528): the
+recorded answers carried them as text and `first_text_s` fired on the first USAGE frame, about 1 s in, before any
+word, so every "first visible text" since 6b528 read ~1 s. The tags follow the page's `FRAME_TAGS`; the app's own
+clock (DONE's `f` and `t`) is recorded as `app_first_s`/`app_total_s`; `refix_frames.py` cleans older runs.
+
+**The server's answers: hidden reasoning, cut and empty answers** (found by the scorecard's first run of
+quality-4, on main too). The owner's server writes Fast with gemma4:12b, which Ollama runs with its hidden
+reasoning on unless `think` says otherwise: 1,200–3,900 output tokens for a one-line answer (USAGE "o" against
+30–80 visible), so the first word comes 25–35 s in, and the 8,192 context can run out mid-answer: "This zone
+dominates" was where one answer stopped, and 5 of 20 scorecard answers had no text at all, shown as nothing,
+with no word of why. **An answer that ends with no text is now a failure before the first word**
+(`server_first_answer`: the server is marked down for a minute and this computer's copy answers, as for a server
+that never started; an empty rewrite leaves the draft). **`think: false` was tried and is a dev copy's pilot
+only** (`srv_nothink`, `MILLENAI_Q4_NOTHINK=1`; a server or model that refuses the field is asked again without
+it, `_srv_nothink_refused`): on the same four questions it cut output to 28–260 tokens, made the answers whole
+and brought first words to 14–18 s; over the scorecard, on the 12 questions gemma4:12b answered in both runs of
+the same build, **first words 31.8 → 10.4 s median, and the local judge's grade 8.2 → 5.9** (the 2^30 question
+led with the wrong answer, a time-zone count was "not found"). Three times quicker and clearly worse is the
+owner's call, not a default. The gateway passes `think` through (ollama1 PROTOCOL.md); the llama.cpp bridge
+(6b531) ignores it.
+
+**Found, not changed (delivery belongs to another branch):** on a server seat, Fast's two-pass writes the draft
+silently and streams only the rewrite (`server_first_answer`), so with polish on, the server's first words wait
+for a whole draft; 6b539's live draft only changed this Mac's path.
+
+**The per-build scorecard** (`tools/answer_eval/scorecard.py`, `scorecard.json`, `SCORECARD.md`). 20 fixed, mostly
+timeless questions: facts 4 (one live exchange rate), reasoning 4, code 4, writing 4 (one asks for a README
+heading, so the 6b560 rule is in it), advice 2, one question about the person's own notes (a small `apartment.md`
+the run adds under Your stuff) and one asked of the paired server alone. A run starts a dev copy of the
+checkout, asks them, stops it, then loads a fixed local judge (`mlx-community/Qwen3.6-35B-A3B-4bit`, mlx_lm on
+9917, temperature 0, thinking off) and appends quality (mean and se), the four parts, first words, total time,
+errors (an empty answer is one) and a regex facts check to `scorecard/history.json`. It compares with the last run
+of the same set version, `where` and judge: **it fails on a quality drop beyond one standard error of the paired
+per-question differences, a median first-words time more than 15 % slower (over questions the same model answered
+in both runs), or more error answers.** The server-only question is shown, never gated: in three runs of main it
+was a busy error, a wrong answer and an empty one, which is the server's state, not the build's.
+`SCORECARD=1 ./release.sh beta` runs it with `--where local --gate` before the version is written and stops the
+cut on a FAIL; the plain gauntlet only reads its files. **Why local:** this Mac's median first words held within
+about 5 % over six bench runs (16.4–18.3 s), while the server's moved by a third between two runs of main an hour
+apart (37.5 and 25.7 s over the 7 questions gemma4:12b answered in both) and it falls back to this Mac for a minute after a missed deadline, so
+a gate on it would flap; `--where server` still measures the owner's setup. `judge <label>` grades a recorded run
+again; `--judge packets` / `ingest` take a Claude judge's grades instead (a separate history line). The judge is
+lenient (most answers 8–10), so the gate catches a real fall, not a tenth.
+
+**The baselines** (2026-11-10, `SCORECARD.md` has the table): **7.0 beta 2 locally (`build-279-local`): quality
+8.15 (se 0.58), first words median 12.6 s, total 14.4 s, 0 errors, facts 38/39**, in 369 s. quality-4 locally
+(`quality-4-local`, 16eab7b): 8.25 (se 0.58), 12.9 s, 15.1 s; against beta 2 **+0.16 (se 0.55) over 19 questions,
+first words +1 %, errors 0 against 0: passes**. On the server: beta 2 8.6 (se 0.47) with 9 of 20 on the server
+and 1 error, then 6.85 (se 0.74) with 20 of 20 and 3 empty answers an hour later; quality-4 8.75 (se 0.48), 0
+errors (its empty-answer fallback at work), first words 26.3 s (the server's own reasoning time, unchanged by
+this branch).
+
+**Gauntlet.** The 6b560 block (19 checks, 14 mutants): the asked-for heading and summary kept, an unasked one
+dropped, the person's words from the last PROMPT line, the FX range with "and" and the "1 USD =" rate, the
+post-pass defined before the dispatch and run after the server seat and Fast on one server alone, the Code lane
+skipped, the council's final passing the question, think:false only under the dev copy's pilot (and a refusal
+asked again without it), an empty server answer failing over and an empty rewrite leaving the draft; the
+scorecard's set (20 questions, the categories, one private, one server-only, every pattern compiling), release.sh
+running it only under SCORECARD=1 with `--where local --gate` before the version is written and the gauntlet never
+running it, the gate's three failures and its passes on noise and +10 %, the server-only case shown and never
+gated, and the judge's reply parsed and clamped. Re-pinned at the same strength: the 6b339 seat call and the 6b426
+server-alone call (the post-pass lines between), the 6b520 dating rule (the vendor's own site joins it) and its
+shipped-knob check (now read inside `fresh_ablate`, where `quality_ablate`'s same lines had hidden its mutant), the
+6b523 handler slice and mutant anchors, the estimate checks turned into "it is gone", the 6b516 slice's namespace
+(the shape knob), and 6b537's known-env pin (UPDATE_API is no longer the list's last). The full gauntlet ran green, **1537/1537**
+(2026-11-10, 10:35–12:22), with one change made outside the repo: another helper's orphaned dev copy (pid 89757,
+from worktree agent-aa067e096e1ca3de4) held 9903 for over three hours, so the run was a copy of
+tests_smoketest.py with 9903 shifted to 9913, from the repo root, nothing else changed. The run before it,
+1530/1537, found the seven reds fixed here: `srv_nothink` outside the servers section (three server slices raised
+NameError), the 6b339 second-pass mutant's anchor, and the 6b516 clip of a grounded turn whose rules the shape had
+grown past half the cap (`ground_clip` now keeps them whole up to three quarters).
 
 ## 6b570 — fluent-1: no dead ends, no cut answers, a greeting in a second, one quiet working line (7.0 beta 3, per Patrick)
 

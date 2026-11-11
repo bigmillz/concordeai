@@ -1,0 +1,287 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.2,\"ftok\":259,\"est\":false}",
+  "X-Hurry": "29cc429764918fe4"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 16.0,
+ "elapsed_s": 20.08,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "1 query"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "2 sources"
+   }
+  },
+  {
+   "t": 8.04,
+   "tag": "STATUS",
+   "text": "Reading 2 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "2 pages"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "1 page · 6 passages"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "2 sources"
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "SOURCES",
+   "n": 2
+  },
+  {
+   "t": 10.35,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 10.35,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.0,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 20.08,
+   "tag": "RATE",
+   "data": {
+    "tps": 68.7,
+    "tok": 280,
+    "s": 4.1
+   }
+  },
+  {
+   "t": 20.08,
+   "tag": "RESET"
+  },
+  {
+   "t": 20.08,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 20.08,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1098 chars"
+   }
+  },
+  {
+   "t": 20.08,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Searching the web…"
+  ],
+  [
+   8.04,
+   "Reading 2 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "1 query",
+   "t_s": 0.04
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "2 sources",
+   "t_s": 8.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "2 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "1 page · 6 passages",
+   "t_s": 10.35
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "2 sources",
+   "t_s": 10.35
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 10.35
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 20.08
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1098 chars",
+   "t_s": 20.08
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 20.08
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Where to Stay in Florianópolis: Rental Guide - MyLatinLife",
+   "u": "https://mylatinlife.com/where-to-stay-florianopolis-brazil/",
+   "d": "2026-06-30"
+  },
+  {
+   "t": "The 10 best places to stay in Florianópolis, Brazil | Booking.com",
+   "u": "https://www.booking.com/placestostay/city/br/florianopolis.html",
+   "d": "2026-11-01"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   10.35,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 68.7,
+  "tok": 280,
+  "s": 4.1
+ },
+ "answer_raw": "Trust the **4.6-star** listing because the sample size is significantly larger and more representative of a consistent experience. While 4.9 is a higher score, 18 reviews is a small enough pool that a single bad guest or a single \"perfect\" stay can skew the average, whereas 212 reviews provides a much more reliable statistical baseline for the property's actual quality.\n\nFor your 2-bedroom in Florianópolis, you should price it for **mid-term stays** rather than nightly rates. Because you are targeting 30+ night stays, you should look for local furnished rental rates to set your baseline; typically, you would take a standard nightly rate and apply a 30-50% discount to account for the lower turnover and higher occupancy stability. \n\nSince I didn't find specific rental prices for Florianópolis, you should check platforms like **QuintoAndar, Zap Imóveis, or Facebook groups** to see what similar 2-bedroom properties are fetching for monthly leases [1]. You might also consider starting with a 1–2 month furnished rental model to test the market before committing to an annual contract [1].",
+ "answer": "Trust the **4.6-star** listing because the sample size is significantly larger and more representative of a consistent experience. While 4.9 is a higher score, 18 reviews is a small enough pool that a single bad guest or a single \"perfect\" stay can skew the average, whereas 212 reviews provides a much more reliable statistical baseline for the property's actual quality.\n\nFor your 2-bedroom in Florianópolis, you should price it for **mid-term stays** rather than nightly rates. Because you are targeting 30+ night stays, you should look for local furnished rental rates to set your baseline; typically, you would take a standard nightly rate and apply a 30-50% discount to account for the lower turnover and higher occupancy stability. \n\nSince I didn't find specific rental prices for Florianópolis, you should check platforms like **QuintoAndar, Zap Imóveis, or Facebook groups** to see what similar 2-bedroom properties are fetching for monthly leases [1]. You might also consider starting with a 1–2 month furnished rental model to test the market before committing to an annual contract [1].",
+ "chars": 1098,
+ "raw_bytes": 3408,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 13.67,
+ "rate_gen_tok_s": 67.28,
+ "id": "q29",
+ "turn": 1,
+ "category": "reasoning",
+ "topic": "Airbnb review and pricing analysis",
+ "question": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:15:17",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Two Airbnbs: one is 4.6 stars from 212 reviews, the other 4.9 from 18. Which rating should I trust more and why? And if I list my own 2-bedroom in Florianópolis for 30+ night stays, how should I price it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

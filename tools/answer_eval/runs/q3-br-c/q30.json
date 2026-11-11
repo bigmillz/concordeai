@@ -1,0 +1,199 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "0",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":0.0,\"models\":[],\"final\":9.1,\"ftok\":262,\"est\":false}",
+  "X-Hurry": "0fe3fa9d2d2c620e"
+ },
+ "first_byte_s": 0.04,
+ "first_text_s": 18.32,
+ "elapsed_s": 26.59,
+ "events": [
+  {
+   "t": 0.04,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafting the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 0.04,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is thinking it through"
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Drafted the answer",
+    "s": "done",
+    "d": "2099 chars"
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpening it",
+    "s": "run",
+    "d": ""
+   }
+  },
+  {
+   "t": 12.75,
+   "tag": "STATUS",
+   "text": "Gemma 4 26B is sharpening the answer"
+  },
+  {
+   "t": 18.32,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 26.59,
+   "tag": "RATE",
+   "data": {
+    "tps": 59.0,
+    "tok": 488,
+    "s": 8.3
+   }
+  },
+  {
+   "t": 26.59,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1952 chars"
+   }
+  },
+  {
+   "t": 26.59,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.04,
+   "Gemma 4 26B is thinking it through"
+  ],
+  [
+   12.75,
+   "Gemma 4 26B is sharpening the answer"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "draft",
+   "l": "Drafting the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 0.04
+  },
+  {
+   "id": "draft",
+   "l": "Drafted the answer",
+   "s": "done",
+   "d": "2099 chars",
+   "t_s": 12.75
+  },
+  {
+   "id": "polish",
+   "l": "Sharpening it",
+   "s": "run",
+   "d": "",
+   "t_s": 12.75
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1952 chars",
+   "t_s": 26.59
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 26.59
+  }
+ ],
+ "drafts": [],
+ "sources": null,
+ "photos": null,
+ "run_frames": [
+  [
+   0.04,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": false,
+ "rate_writer": {
+  "tps": 59.0,
+  "tok": 488,
+  "s": 8.3
+ },
+ "answer_raw": "4-bit quantization compresses the model's weights from high-precision formats like **FP16** or **BF16** to a 4-bit integer representation to drastically reduce the memory footprint.\n\nIn a high-precision model, weights are stored as floating-point numbers with wide dynamic ranges. Quantization maps these values into one of **16 discrete levels** (2^4). Because 16 levels cannot represent the original distribution of weights, the process uses a **scaling factor**—a multiplier applied to the quantized values to map them back to the approximate original range during inference.\n\nThe primary driver is **VRAM capacity**. A 70B parameter model in FP16 (16-bit) requires ~140GB of VRAM, which exceeds most single-GPU setups. In 4-bit, that same model requires ~40GB, allowing it to run on a single **A6000** or two consumer **RTX 3090/4090** cards.\n\n**Perplexity** measures the loss in model \"intelligence\" or predictive accuracy caused by quantization noise. Modern techniques like **GPTQ**, **GGUF**, or **AWQ** minimize this error by using group-wise scaling or calibration datasets to ensure the most important weight ranges are preserved.\n\nIt matters in these specific scenarios:\n\n*   **Hardware constraints:** 4-bit is often the **best option** for local execution because it enables much larger, more capable models to fit on consumer-grade hardware.\n*   **Inference speed:** Moving 4-bit weights from VRAM to the GPU cores requires less bandwidth than 16-bit weights, often resulting in higher **tokens per second**.\n*   **Deployment economics:** In production, 4-bit quantization significantly lowers the cost-per-query by allowing higher-density packing on existing hardware.\n\nGoing below 4-bit (to 2-bit or 3-bit) typically hits a \"quantization cliff\" where the model's reasoning capabilities collapse. For most use cases, **4-bit to 6-bit** is the optimal sweet spot where you maximize memory savings while maintaining near-original accuracy.",
+ "answer": "4-bit quantization compresses the model's weights from high-precision formats like **FP16** or **BF16** to a 4-bit integer representation to drastically reduce the memory footprint.\n\nIn a high-precision model, weights are stored as floating-point numbers with wide dynamic ranges. Quantization maps these values into one of **16 discrete levels** (2^4). Because 16 levels cannot represent the original distribution of weights, the process uses a **scaling factor**—a multiplier applied to the quantized values to map them back to the approximate original range during inference.\n\nThe primary driver is **VRAM capacity**. A 70B parameter model in FP16 (16-bit) requires ~140GB of VRAM, which exceeds most single-GPU setups. In 4-bit, that same model requires ~40GB, allowing it to run on a single **A6000** or two consumer **RTX 3090/4090** cards.\n\n**Perplexity** measures the loss in model \"intelligence\" or predictive accuracy caused by quantization noise. Modern techniques like **GPTQ**, **GGUF**, or **AWQ** minimize this error by using group-wise scaling or calibration datasets to ensure the most important weight ranges are preserved.\n\nIt matters in these specific scenarios:\n\n*   **Hardware constraints:** 4-bit is often the **best option** for local execution because it enables much larger, more capable models to fit on consumer-grade hardware.\n*   **Inference speed:** Moving 4-bit weights from VRAM to the GPU cores requires less bandwidth than 16-bit weights, often resulting in higher **tokens per second**.\n*   **Deployment economics:** In production, 4-bit quantization significantly lowers the cost-per-query by allowing higher-density packing on existing hardware.\n\nGoing below 4-bit (to 2-bit or 3-bit) typically hits a \"quantization cliff\" where the model's reasoning capabilities collapse. For most use cases, **4-bit to 6-bit** is the optimal sweet spot where you maximize memory savings while maintaining near-original accuracy.",
+ "chars": 1952,
+ "raw_bytes": 2481,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 18.35,
+ "rate_gen_tok_s": 59.01,
+ "id": "q30",
+ "turn": 1,
+ "category": "technical",
+ "topic": "Quantization explained",
+ "question": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-c",
+ "asked_at": "2026-11-08T03:17:17",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Explain what 4-bit quantization does to an LLM and when it actually matters. Keep it short and technical."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

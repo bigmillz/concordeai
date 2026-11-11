@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.1,\"ftok\":104,\"est\":false}",
+  "X-Hurry": "7c7c5f5a1f0c4758"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 19.18,
+ "elapsed_s": 25.21,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "6 queries"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.07,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.07,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.69,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 24 passages"
+   }
+  },
+  {
+   "t": 14.69,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.69,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.69,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.69,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 19.18,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.21,
+   "tag": "RATE",
+   "data": {
+    "tps": 45.3,
+    "tok": 273,
+    "s": 6.0
+   }
+  },
+  {
+   "t": 25.21,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1093 chars"
+   }
+  },
+  {
+   "t": 25.21,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.21,
+   "tag": "DONE",
+   "data": {
+    "f": 19.18,
+    "t": 25.21,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.07,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "6 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.07
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 24 passages",
+   "t_s": 14.69
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.69
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.69
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1093 chars",
+   "t_s": 25.21
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.21
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Bald vs Buzz Cut: Which Look Fits Your Face Better? — AIChangeHair",
+   "u": "https://aichangehair.com/blog/bald-vs-buzz-cut",
+   "d": "2026-07-01"
+  },
+  {
+   "t": "Hairstyles for Balding Men by Hair Loss Stage in 2026 | BaldLooks",
+   "u": "https://baldlooks.com/blog/hairstyles-balding-men",
+   "d": "2026"
+  },
+  {
+   "t": "The 21 Best Buzz Cut Hairstyles for Men: The Lengths & Types",
+   "u": "https://www.thefashionisto.com/articles/buzz-cut/",
+   "d": ""
+  },
+  {
+   "t": "26 Trendy Asian Men Hairstyles for 2025: Modern Styles to Elevate...",
+   "u": "https://gentsosprey.com/26-trendy-asian-men-hairstyles-for-2025-modern-styles-to-elevate-your-look",
+   "d": "2025"
+  },
+  {
+   "t": "27 Best Hairstyles and Haircuts for Balding Men - TheTrendSpotter",
+   "u": "https://www.thetrendspotter.net/hairstyles-for-balding-men/",
+   "d": "2023-05-03"
+  },
+  {
+   "t": "Bald On Top With Hair On The Sides: Name, Pictures, More",
+   "u": "https://www.readysleek.com/bald-on-top-hair-on-sides/",
+   "d": "2023-08-12"
+  },
+  {
+   "t": "Bald Haircut for Men: Guide, Styles and How to... - Men's Haircut Style",
+   "u": "https://menshaircutstyle.com/bald-haircut-for-men-guide-styles-and-how-to-get-the-look/",
+   "d": ""
+  },
+  {
+   "t": "Forget Your Razor—These Head Shavers Will Give You a Buzzcut in...",
+   "u": "https://www.yahoo.com/lifestyle/articles/experts-head-shaver-buzzcut-minutes-194800807.html?fr=sycsrp_catchall",
+   "d": "2025-09-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.69,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 241,
+   "o": 32,
+   "d": 1020,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4990,
+   "o": 260,
+   "d": 10460,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 45.3,
+  "tok": 273,
+  "s": 6.0
+ },
+ "app_first_s": 19.18,
+ "app_total_s": 25.21,
+ "answer_raw": "A **buzz cut** is your best first move for a balance of style and low maintenance.\n\nIf you are at the Stage 3 (Norwood 3) level of hair loss, a **#1 or #2 buzz cut** is often the cleanest transition because it lowers the contrast between your hair and scalp while maintaining some texture and softness [2]. \n\n**The options breakdown:**\n\n*   **Buzz cut** — The lowest friction transition; it reduces the visual impact of thinning and can be done every one to two weeks [6].\n*   **Shaved head** — A more decisive, sharper look that can ooze maturity but requires maintenance every 2 to 3 days [1][6].\n*   **Keeping the sides** — This is an option, but it often leaves a \"horseshoe\" look; buzzing the sides can make a bald top look more sophisticated and intentional [6].\n\nIf you want the absolute lowest maintenance, **shaving it** is mathematically the winner, but it requires the most frequent upkeep to keep the look clean [6]. If you want to test the waters without committing to a smooth scalp, start with a **buzz cut** to see how your head shape and beard balance look with less hair [1].",
+ "answer": "A **buzz cut** is your best first move for a balance of style and low maintenance.\n\nIf you are at the Stage 3 (Norwood 3) level of hair loss, a **#1 or #2 buzz cut** is often the cleanest transition because it lowers the contrast between your hair and scalp while maintaining some texture and softness [2]. \n\n**The options breakdown:**\n\n*   **Buzz cut** — The lowest friction transition; it reduces the visual impact of thinning and can be done every one to two weeks [6].\n*   **Shaved head** — A more decisive, sharper look that can ooze maturity but requires maintenance every 2 to 3 days [1][6].\n*   **Keeping the sides** — This is an option, but it often leaves a \"horseshoe\" look; buzzing the sides can make a bald top look more sophisticated and intentional [6].\n\nIf you want the absolute lowest maintenance, **shaving it** is mathematically the winner, but it requires the most frequent upkeep to keep the look clean [6]. If you want to test the waters without committing to a smooth scalp, start with a **buzz cut** to see how your head shape and beard balance look with less hair [1].",
+ "chars": 1093,
+ "raw_bytes": 3439,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 10.84,
+ "rate_gen_tok_s": 45.32,
+ "id": "q15",
+ "turn": 1,
+ "category": "health",
+ "topic": "Hairstyles for bald men",
+ "question": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:54:43",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "I'm going bald on top. Shave it, buzz it, or keep the sides? What looks best and is lowest maintenance?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

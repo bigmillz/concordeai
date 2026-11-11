@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":18.4,\"ftok\":149,\"est\":false}",
+  "X-Hurry": "23e0baba6474d606"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 23.39,
+ "elapsed_s": 41.38,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.04,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.04,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 15.63,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 33 passages"
+   }
+  },
+  {
+   "t": 15.63,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 15.63,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 15.63,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 15.63,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 23.39,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 41.37,
+   "tag": "RATE",
+   "data": {
+    "tps": 27.5,
+    "tok": 495,
+    "s": 18.0
+   }
+  },
+  {
+   "t": 41.37,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1981 chars"
+   }
+  },
+  {
+   "t": 41.37,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.04,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.04
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 33 passages",
+   "t_s": 15.63
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 15.63
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 15.63
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1981 chars",
+   "t_s": 41.37
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 41.37
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Top 10 Highest Paying Jobs in 2026 Without a Degree",
+   "u": "https://articleify.com/highest-paying-jobs-no-degree/",
+   "d": "2026"
+  },
+  {
+   "t": "Highest-Paying Jobs Without a Degree (2026 Salaries + Paths)",
+   "u": "https://www.resumly.ai/highest-paying-jobs/without-a-degree",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "226 Jobs That Pay Over $50K Without a Degree (2026 BLS Data)",
+   "u": "https://www.apollotechnical.com/jobs-that-pay-over-50k-without-a-degree/",
+   "d": "2026-08"
+  },
+  {
+   "t": "highest paying construction jobs without a degree",
+   "u": "https://soboly.com/highest-paying-construction-jobs-without-a-degree",
+   "d": "2026-06-05"
+  },
+  {
+   "t": "Sarkari Job - Latest Sarkari Result & Online Forms 2026",
+   "u": "https://www.sarkarijob.com/",
+   "d": "2026"
+  },
+  {
+   "t": "Yang Viral 2026 on Social Media Top 10 Most Viral Terbaru... - Viral Ibu",
+   "u": "https://viralibu.forum/yang-viral-2026-on-social-media-top-10-most-viral-terbaru-fyp-tiktok-the-last-tale-videos-for-2025-21-andhini-permata-updated/",
+   "d": "2026"
+  },
+  {
+   "t": "15 In-Demand Skills for 2026 Jobs and How to Show Them",
+   "u": "https://bestjobsearchapps.com/articles/en/top-15-skills-in-demand-for-2026-jobs-futureproof-your-career-with-highpaying-indemand-expertise",
+   "d": "2026"
+  },
+  {
+   "t": "How to Get High-Income Jobs Without a Degree | Gerald",
+   "u": "https://joingerald.com/learn/work--income/high-income-jobs-without-degree-2026",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   15.63,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 27.5,
+  "tok": 495,
+  "s": 18.0
+ },
+ "answer_raw": "Finding a high-paying career without a degree often requires trading a four-year diploma for a specific license, apprenticeship, or a portfolio of proven work [2].\n\nBased on the available data, here are five realistic paths for high earnings.\n\n## Top Career Paths\n\n| Job Title | Typical Pay | Time to Entry |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220 median** (per [3] as of 2026-08) | Requires flight training and an FAA certificate [3] |\n| **Construction Supervisor** | High (varies by project) | Typically 5+ years of front-line experience [3] |\n| **Transportation Manager** | High (varies by industry) | Typically 5+ years of front-line experience [3] |\n| **Police Supervisor** | High (varies by jurisdiction) | Typically 5+ years of front-line experience [3] |\n| **Firefighting Supervisor** | High (varies by jurisdiction) | Typically 5+ years of front-line experience [3] |\n\n## Path Details\n\n**Commercial Pilot** — This is the highest-paying role available without a degree, with a median wage of **$123,220** as of August 2026 [3]. You will need a postsecondary nondegree award, specialized flight training, and an FAA commercial pilot certificate [3]. Because of the equipment and training costs, the entry barrier is higher than most other roles [3].\n\n**Supervisory Roles** — Roles such as **Transportation Manager**, **Police Supervisor**, **Firefighting Supervisor**, and **Construction Supervisor** represent a \"work your way up\" model [3]. These paths typically involve starting in a front-line position and gaining five or more years of experience before moving into management [3].\n\n**The Portfolio Approach** — For many high-income roles, you can bypass traditional gatekeepers by building a portfolio of real-world projects [1]. A candidate who demonstrates practical ability can often outrank those with theoretical degrees but zero experience [1]. In many cases, a professional certificate or apprenticeship serves as the primary credential [2].",
+ "answer": "Finding a high-paying career without a degree often requires trading a four-year diploma for a specific license, apprenticeship, or a portfolio of proven work [2].\n\nBased on the available data, here are five realistic paths for high earnings.\n\n## Top Career Paths\n\n| Job Title | Typical Pay | Time to Entry |\n| :--- | :--- | :--- |\n| **Commercial Pilot** | **$123,220 median** (per [3] as of 2026-08) | Requires flight training and an FAA certificate [3] |\n| **Construction Supervisor** | High (varies by project) | Typically 5+ years of front-line experience [3] |\n| **Transportation Manager** | High (varies by industry) | Typically 5+ years of front-line experience [3] |\n| **Police Supervisor** | High (varies by jurisdiction) | Typically 5+ years of front-line experience [3] |\n| **Firefighting Supervisor** | High (varies by jurisdiction) | Typically 5+ years of front-line experience [3] |\n\n## Path Details\n\n**Commercial Pilot** — This is the highest-paying role available without a degree, with a median wage of **$123,220** as of August 2026 [3]. You will need a postsecondary nondegree award, specialized flight training, and an FAA commercial pilot certificate [3]. Because of the equipment and training costs, the entry barrier is higher than most other roles [3].\n\n**Supervisory Roles** — Roles such as **Transportation Manager**, **Police Supervisor**, **Firefighting Supervisor**, and **Construction Supervisor** represent a \"work your way up\" model [3]. These paths typically involve starting in a front-line position and gaining five or more years of experience before moving into management [3].\n\n**The Portfolio Approach** — For many high-income roles, you can bypass traditional gatekeepers by building a portfolio of real-world projects [1]. A candidate who demonstrates practical ability can often outrank those with theoretical degrees but zero experience [1]. In many cases, a professional certificate or apprenticeship serves as the primary credential [2].",
+ "chars": 1981,
+ "raw_bytes": 4124,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.97,
+ "rate_gen_tok_s": 27.53,
+ "id": "q22",
+ "turn": 1,
+ "category": "money",
+ "topic": "Jobs without a degree",
+ "question": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-b",
+ "asked_at": "2026-11-08T01:54:26",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What jobs pay well without a degree these days? Give me the top five realistic ones with typical pay and how long it takes to get in."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.7,\"ftok\":253,\"est\":false}",
+  "X-Hurry": "b77ffa237fee8337"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 24.56,
+ "elapsed_s": 32.48,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 30 passages"
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.83,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.83,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 24.56,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 32.48,
+   "tag": "RATE",
+   "data": {
+    "tps": 63.7,
+    "tok": 504,
+    "s": 7.9
+   }
+  },
+  {
+   "t": 32.48,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2018 chars"
+   }
+  },
+  {
+   "t": 32.48,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 30 passages",
+   "t_s": 16.83
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.83
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.83
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2018 chars",
+   "t_s": 32.48
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 32.48
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Will AI Take My Job in 2026? 50 Careers Most at Risk (Full ...",
+   "u": "https://shawnkanungo.com/blog/will-ai-take-my-job-2026-reality-check-50-careers-at-risk",
+   "d": "2026-04-21"
+  },
+  {
+   "t": "Automation, AI, and Job Displacement Risk in U.S. Employment",
+   "u": "https://www.shrm.org/topics-tools/research/automation-ai-and-job-displacement-risk-in-us-employment",
+   "d": "2026-06-16"
+  },
+  {
+   "t": "AI Job Market Trends in 2026: Automation’s Impact on Jobs",
+   "u": "https://www.timesofai.com/industry-insights/ai-job-market-trends-in-2026/",
+   "d": "2026-04-03"
+  },
+  {
+   "t": "Will AI take away consultant jobs? Isn't the real issue that some people can't d",
+   "u": "https://note.com/calm_clover8115/n/na64ea20e22df?hl=en",
+   "d": "2026-11-02"
+  },
+  {
+   "t": "AI Job Risk Database 2026 - GitHub",
+   "u": "https://github.com/manduks/ai-job-risk-database",
+   "d": "2026-03-30"
+  },
+  {
+   "t": "Will AI Take My Job? How to Know If You're at Risk in 2026",
+   "u": "https://aiproofme.ai/blog/will-ai-take-my-job",
+   "d": "2026-04-27"
+  },
+  {
+   "t": "Women Bear 86% of AI Job Displacement... — NodeFeeds",
+   "u": "https://nodefeeds.com/article/women-bear-86percent-of-ai-job-displacement-riskheres-why-no-442753",
+   "d": "2026-02-24"
+  },
+  {
+   "t": "Computer Programmers : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/computer-and-information-technology/computer-programmers.htm",
+   "d": "2026-10-29"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.83,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 63.7,
+  "tok": 504,
+  "s": 7.9
+ },
+ "answer_raw": "Your job is unlikely to disappear entirely, but the specific tasks you perform will be heavily disrupted as AI shifts from replacing roles to replacing individual tasks within those roles [1].\n\nThe displacement risk for your field over the next five years is characterized by a shift in workload rather than total elimination. While roughly **22% of jobs globally** are projected to face disruption by 2030, this often results in a net gain of positions once displacement is subtracted from new roles created by the technology [1]. For an IT ops professional, the risk is often front-loaded toward \"junior\" or repetitive tasks—such as basic data entry, manual provisioning, or simple analysis—which are increasingly being automated [3][4].\n\nTo protect your career, you should pivot from being a \"doer\" of manual tasks to an architect of the systems that run them.\n\n**The Strategy for IT Ops/Sysadmins**\n\n*   **Master the automation layer**: Since AI is being used to perform basic analysis and operational tasks [3], you should focus on becoming the person who builds, manages, and secures the automation pipelines themselves.\n*   re-skill toward **AI-specific roles**: The market is actively opening new roles for **automation architects**, AI engineers, and AI product managers [3]. Moving toward these specialized niches moves you from the \"at-risk\" pool to the \"creator\" pool.\n*   **Focus on high-level oversight**: As AI handles more routine maintenance, your value will lie in managing the complex, non-linear problem-solving that AI cannot yet replicate—such as complex infrastructure design, security response, and cross-system integration.\n*   **Audit your own task list**: Use the same logic found in risk databases that categorize jobs by \"at-risk tasks\" to identify which of your current daily duties are most vulnerable to automation [5]. If a task is highly predictable, it is a candidate for replacement; you should focus on mastering the tasks that require human judgment or physical-world interaction.",
+ "answer": "Your job is unlikely to disappear entirely, but the specific tasks you perform will be heavily disrupted as AI shifts from replacing roles to replacing individual tasks within those roles [1].\n\nThe displacement risk for your field over the next five years is characterized by a shift in workload rather than total elimination. While roughly **22% of jobs globally** are projected to face disruption by 2030, this often results in a net gain of positions once displacement is subtracted from new roles created by the technology [1]. For an IT ops professional, the risk is often front-loaded toward \"junior\" or repetitive tasks—such as basic data entry, manual provisioning, or simple analysis—which are increasingly being automated [3][4].\n\nTo protect your career, you should pivot from being a \"doer\" of manual tasks to an architect of the systems that run them.\n\n**The Strategy for IT Ops/Sysadmins**\n\n*   **Master the automation layer**: Since AI is being used to perform basic analysis and operational tasks [3], you should focus on becoming the person who builds, manages, and secures the automation pipelines themselves.\n*   re-skill toward **AI-specific roles**: The market is actively opening new roles for **automation architects**, AI engineers, and AI product managers [3]. Moving toward these specialized niches moves you from the \"at-risk\" pool to the \"creator\" pool.\n*   **Focus on high-level oversight**: As AI handles more routine maintenance, your value will lie in managing the complex, non-linear problem-solving that AI cannot yet replicate—such as complex infrastructure design, security response, and cross-system integration.\n*   **Audit your own task list**: Use the same logic found in risk databases that categorize jobs by \"at-risk tasks\" to identify which of your current daily duties are most vulnerable to automation [5]. If a task is highly predictable, it is a candidate for replacement; you should focus on mastering the tasks that require human judgment or physical-world interaction.",
+ "chars": 2018,
+ "raw_bytes": 4161,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.53,
+ "rate_gen_tok_s": 63.7,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-br-a",
+ "asked_at": "2026-11-08T02:12:54",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

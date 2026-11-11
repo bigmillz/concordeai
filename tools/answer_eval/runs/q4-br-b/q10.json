@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.2,\"ftok\":102,\"est\":false}",
+  "X-Hurry": "0ee168b0e774b5d1"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 18.75,
+ "elapsed_s": 22.58,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.08,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "8 pages · 32 passages"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.94,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.94,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.75,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 22.58,
+   "tag": "RATE",
+   "data": {
+    "tps": 57.7,
+    "tok": 220,
+    "s": 3.8
+   }
+  },
+  {
+   "t": 22.58,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "883 chars"
+   }
+  },
+  {
+   "t": 22.58,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 22.58,
+   "tag": "DONE",
+   "data": {
+    "f": 18.75,
+    "t": 22.58,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   11.08,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.08
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "8 pages · 32 passages",
+   "t_s": 12.94
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.94
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.94
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "883 chars",
+   "t_s": 22.58
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 22.58
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Ollama vs MLX: Which Local Model Stack for Claude Code? (M4 Mac...)",
+   "u": "https://macstripe.com/en/blog/articles/mlx-vs-ollama-apple-silicon-ai/mlx-vs-ollama-apple-silicon-ai.html",
+   "d": "2026-06-02"
+  },
+  {
+   "t": "Best Way to Run Qwen 3.5 on Mac: MLX vs Ollama Speed Test",
+   "u": "https://insiderllm.com/guides/qwen35-mac-mlx-vs-ollama/",
+   "d": "2026-04"
+  },
+  {
+   "t": "Ollama vs MLX on Apple Silicon: Benchmarking Qwen3.6-35B and...",
+   "u": "https://dalenguyen.me/blog/2026-06-13-ollama-vs-mlx-apple-silicon-turboquant",
+   "d": ""
+  },
+  {
+   "t": "Mac Local LLM Benchmarks: M3 Max vs M4 Pro on Llama 70B",
+   "u": "https://www.heyuan110.com/posts/ai/2026-04-14-mac-apple-silicon-ai-workstation/",
+   "d": "2026-04-14"
+  },
+  {
+   "t": "Mac Studio M4 Max vs Mac Mini M4 Pro for Local... - DEV Community",
+   "u": "https://dev.to/jovan_chan_9500711396d4e6/mac-studio-m4-max-vs-mac-mini-m4-pro-for-local-ai-in-2026-is-the-600-upgrade-to-546-gbs-worth-it-1mi2",
+   "d": "2026-06-12"
+  },
+  {
+   "t": "Mac AI Performance Guide 2026: M4 Pro vs M4 Max vs M4 Ultra ...",
+   "u": "https://mljourney.com/mac-ai-performance-guide-2026-m4-pro-vs-m4-max-vs-m4-ultra-for-local-llms/",
+   "d": "2026-08-26"
+  },
+  {
+   "t": "oMLX vs Ollama vs LM Studio: I Tested All Three on a 48 GB Mac",
+   "u": "https://servenomaster.com/omlx-vs-ollama-vs-lm-studio-i-tested-all-three-on-a-48-gb-mac/",
+   "d": "2026-10-05"
+  },
+  {
+   "t": "maternion/ling-3.0-tiny - ollama.com",
+   "u": "https://ollama.com/maternion/ling-3.0-tiny",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.94,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 250,
+   "o": 31,
+   "d": 674,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 6066,
+   "o": 243,
+   "d": 9586,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 57.7,
+  "tok": 220,
+  "s": 3.8
+ },
+ "app_first_s": 18.75,
+ "app_total_s": 22.58,
+ "answer_raw": "MLX is faster for pure inference, but Ollama is the practical choice for agentic workflows.\n\n**MLX** runs at roughly twice the speed of Ollama on similar hardware, with benchmarks showing 60-70+ tok/s compared to ~35 tok/s via Ollama on an M4 Max (as of April 2026) [2]. However, MLX is often used for benchmarks and model validation rather than as a primary runtime for agents, whereas **Ollama** is the standard for agentic paths like Claude Code [1].\n\nFor a 48 GB M4 Pro, the biggest model you can realistically run is a **30B-class** model. While a 48 GB Mac is comfortable with models up to roughly 30 GB on disk, pushing beyond that requires heavy quantization or swapping to the SSD, which impacts performance [7]. You can run a 70B model at a usable but slow speed of roughly 14 tok/s if using Q4_K_M quantization, which occupies about 43 GB of memory (as of April 2026) [5].",
+ "answer": "MLX is faster for pure inference, but Ollama is the practical choice for agentic workflows.\n\n**MLX** runs at roughly twice the speed of Ollama on similar hardware, with benchmarks showing 60-70+ tok/s compared to ~35 tok/s via Ollama on an M4 Max (as of April 2026) [2]. However, MLX is often used for benchmarks and model validation rather than as a primary runtime for agents, whereas **Ollama** is the standard for agentic paths like Claude Code [1].\n\nFor a 48 GB M4 Pro, the biggest model you can realistically run is a **30B-class** model. While a 48 GB Mac is comfortable with models up to roughly 30 GB on disk, pushing beyond that requires heavy quantization or swapping to the SSD, which impacts performance [7]. You can run a 70B model at a usable but slow speed of roughly 14 tok/s if using Q4_K_M quantization, which occupies about 43 GB of memory (as of April 2026) [5].",
+ "chars": 883,
+ "raw_bytes": 3302,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 9.78,
+ "rate_gen_tok_s": 57.64,
+ "id": "q10",
+ "turn": 1,
+ "category": "compare",
+ "topic": "Ollama vs MLX on an M4 Pro",
+ "question": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-b",
+ "asked_at": "2026-11-10T04:52:12",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "On an M4 Pro Mac with 48 GB, is Ollama or MLX faster for running local LLMs, and what's the biggest model I can realistically run?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

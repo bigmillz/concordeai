@@ -1,0 +1,296 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":20.5,\"ftok\":290,\"est\":false}",
+  "X-Hurry": "92423c608405f517"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 14.99,
+ "elapsed_s": 23.89,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "5 queries"
+   }
+  },
+  {
+   "t": 7.76,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.76,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 7.76,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.08,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 15 passages"
+   }
+  },
+  {
+   "t": 12.08,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.08,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.09,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.09,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 14.99,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 23.88,
+   "tag": "RATE",
+   "data": {
+    "tps": 69.5,
+    "tok": 618,
+    "s": 8.9
+   }
+  },
+  {
+   "t": 23.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "2472 chars"
+   }
+  },
+  {
+   "t": 23.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   7.76,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "5 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.76
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 7.76
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 15 passages",
+   "t_s": 12.08
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.08
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.09
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "2472 chars",
+   "t_s": 23.89
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "",
+   "t_s": 23.89
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "200+ AI Job Displacement Statistics (2026 Trends) - DesignRush",
+   "u": "https://www.designrush.com/agency/ai-companies/trends/ai-job-displacement-statistics",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "AI Workforce Displacement in 2026 | Impact, Trends & Job Loss ...",
+   "u": "https://knowitol.com/ai-workforce-impact/thematic/ai-workforce-displacement-2026",
+   "d": "2026"
+  },
+  {
+   "t": "Computer Programmers : Occupational Outlook Handbook: : U.S ...",
+   "u": "https://www.bls.gov/ooh/computer-and-information-technology/computer-programmers.htm",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "AI Job Displacement Tracker — 2026 Layoffs & Risk Data",
+   "u": "https://techjacksolutions.com/job-displacement-trends/",
+   "d": "2026"
+  },
+  {
+   "t": "Will AI take my job? Ask an economist! : The Indicator from Planet Money",
+   "u": "https://www.npr.org/2026/10/18/nx-s1-6006805/will-ai-take-my-job-ask-an-economist",
+   "d": "2026-10-18"
+  },
+  {
+   "t": "Will AI Replace System Administrators? 2026 Risk Analysis",
+   "u": "https://www.replacedbai.com/blog/will-ai-replace-system-administrators",
+   "d": "2026-05-18"
+  },
+  {
+   "t": "Sysadmin Job Description: Tasks, Skills & Role Overview",
+   "u": "https://www.diontraining.com/blogs/news/sysadmin-job-description",
+   "d": "2026-02-19"
+  },
+  {
+   "t": "Anthropic CEO Dario Amodei warns AI may see ‘painful’ jobs disruption",
+   "u": "https://www.cnbc.com/2026/01/27/dario-amodei-warns-ai-cause-unusually-painful-disruption-jobs.html",
+   "d": "2026-01-27"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.09,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 69.5,
+  "tok": 618,
+  "s": 8.9
+ },
+ "answer_raw": "Your displacement risk is moderate, but your role will likely undergo a significant functional shift rather than a total disappearance.\n\nThe risk for sysadmins is rated at **34/100** (as of May 2026) [6]. This score reflects a position that is higher risk than specialized infrastructure architects but lower risk than routine administrative roles. The reasoning is that while many sysadmin tasks are structured and repeatable, the physical and logical systems you protect remain messy, business-specific, and prone to failure [6].\n\n## The Displacement Reality\n\nOver the next five years, the \"traditional\" sysadmin role—defined by manual ticket handling and repetitive maintenance—will shrink [6]. You aren't facing a sudden vacancy of the profession, but rather a tightening of the job scope. \n\nThe disruption will likely follow these patterns:\n*   **Task Automation:** Routine maintenance and repetitive manual tasks will be increasingly handled by AI [6].\n*   **Role Evolution:** The job will shift away from manual intervention toward designing reliable, secure, and automated environments [6].\n*   **Labor Dynamics:** While some roles will be disrupted, others may be reshaped or created, with leaders like Nvidia's CEO arguing that AI will reshape existing roles and create new ones [5].\n\n## Your Strategy\n\nTo remain indispensable, you must move away from being the person who *executes* tasks to the person who *architects* the systems that automate those tasks.\n\n**Pivot to Engineering and Architecture**\nIf your current value is tied to manual tickets, you are in the high-risk zone. Focus on shifting your skill set toward scripting, infrastructure-as-code (IaC), and advanced security architecture. The goal is to move toward the \"specialized infrastructure architect\" tier, which carries lower displacement risk [6].\n\n**Master the Automation Layer**\nSince the future favors those who design automated environments, you should become an expert in the tools that manage them. If you aren't already, focus on CI/CD pipelines, orchestration (like Kubernetes), and automated provisioning. Your job is to own the automation that replaces the manual work.\n\n**Focus on the \"Messy\" Variables**\nAI struggles with environments that are highly custom, hardware-dependent, or require complex human-business context. Lean into the troubleshooting of complex, non-standard environments and the integration of disparate systems where \"clean\" data or standard APIs don't exist.",
+ "answer": "Your displacement risk is moderate, but your role will likely undergo a significant functional shift rather than a total disappearance.\n\nThe risk for sysadmins is rated at **34/100** (as of May 2026) [6]. This score reflects a position that is higher risk than specialized infrastructure architects but lower risk than routine administrative roles. The reasoning is that while many sysadmin tasks are structured and repeatable, the physical and logical systems you protect remain messy, business-specific, and prone to failure [6].\n\n## The Displacement Reality\n\nOver the next five years, the \"traditional\" sysadmin role—defined by manual ticket handling and repetitive maintenance—will shrink [6]. You aren't facing a sudden vacancy of the profession, but rather a tightening of the job scope. \n\nThe disruption will likely follow these patterns:\n*   **Task Automation:** Routine maintenance and repetitive manual tasks will be increasingly handled by AI [6].\n*   **Role Evolution:** The job will shift away from manual intervention toward designing reliable, secure, and automated environments [6].\n*   **Labor Dynamics:** While some roles will be disrupted, others may be reshaped or created, with leaders like Nvidia's CEO arguing that AI will reshape existing roles and create new ones [5].\n\n## Your Strategy\n\nTo remain indispensable, you must move away from being the person who *executes* tasks to the person who *architects* the systems that automate those tasks.\n\n**Pivot to Engineering and Architecture**\nIf your current value is tied to manual tickets, you are in the high-risk zone. Focus on shifting your skill set toward scripting, infrastructure-as-code (IaC), and advanced security architecture. The goal is to move toward the \"specialized infrastructure architect\" tier, which carries lower displacement risk [6].\n\n**Master the Automation Layer**\nSince the future favors those who design automated environments, you should become an expert in the tools that manage them. If you aren't already, focus on CI/CD pipelines, orchestration (like Kubernetes), and automated provisioning. Your job is to own the automation that replaces the manual work.\n\n**Focus on the \"Messy\" Variables**\nAI struggles with environments that are highly custom, hardware-dependent, or require complex human-business context. Lean into the troubleshooting of complex, non-standard environments and the integration of disparate systems where \"clean\" data or standard APIs don't exist.",
+ "chars": 2472,
+ "raw_bytes": 4666,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 25.87,
+ "rate_gen_tok_s": 69.44,
+ "id": "q23",
+ "turn": 1,
+ "category": "money",
+ "topic": "AI job displacement",
+ "question": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q3-base-a",
+ "asked_at": "2026-11-08T01:20:15",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Will AI take my job? I'm in IT ops / sysadmin work. What's the real displacement risk over the next five years and what should I do about it?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

@@ -1,0 +1,299 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":34.0,\"ftok\":450,\"est\":true}",
+  "X-Hurry": "1146b443de271665"
+ },
+ "first_byte_s": 1.24,
+ "first_text_s": 21.81,
+ "elapsed_s": 30.93,
+ "events": [
+  {
+   "t": 1.24,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 1.24,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "7 queries"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.97,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.97,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 14.02,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 28 passages"
+   }
+  },
+  {
+   "t": 14.02,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 14.02,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 14.02,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 14.02,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 21.81,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 30.93,
+   "tag": "RATE",
+   "data": {
+    "tps": 48.0,
+    "tok": 438,
+    "s": 9.1
+   }
+  },
+  {
+   "t": 30.93,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1753 chars"
+   }
+  },
+  {
+   "t": 30.93,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   1.24,
+   "Searching the web…"
+  ],
+  [
+   11.97,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "7 queries",
+   "t_s": 1.24
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.97
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.97
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 28 passages",
+   "t_s": 14.02
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 14.02
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 14.02
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1753 chars",
+   "t_s": 30.93
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 30.93
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Google TPU vs NVIDIA GPU: Compared 2026 - CloudMinister",
+   "u": "https://cloudminister.com/blog/google-tpu-vs-nvidia-gpu-2026/",
+   "d": "2026-09-02"
+  },
+  {
+   "t": "Anthropic 3.5GW TPU Deal: Why Claude Bet on Google Not Nvidia ...",
+   "u": "https://tokenmix.ai/blog/anthropic-google-broadcom-tpu-deal-2026",
+   "d": "2026-04-22"
+  },
+  {
+   "t": "AI Inference Hardware Battle 2026: Google TPU vs Nvidia GPU ...",
+   "u": "https://www.evoart.ai/blog/the-great-ai-inference-race-google-tpu-vs-nvidia-gpu-in-2026",
+   "d": "2026-05-02"
+  },
+  {
+   "t": "Cloud TPU documentation | Google Cloud Documentation",
+   "u": "https://docs.cloud.google.com/tpu/docs",
+   "d": "2026-10-26"
+  },
+  {
+   "t": "Anthropic-Google TPU deal - AI Wiki",
+   "u": "https://aiwiki.ai/wiki/anthropic_google_tpu_deal",
+   "d": "2026-10-29"
+  },
+  {
+   "t": "Best GPU for AI in 2026: 7 Picks From $310 to $4,900",
+   "u": "https://bestgpuforai.com/articles/best-gpu-for-ai/",
+   "d": "2026-09-13"
+  },
+  {
+   "t": "Announcing Cloud TPU v5e and A3 GPUs in GA | Google Cloud Blog",
+   "u": "https://cloud.google.com/blog/products/compute/announcing-cloud-tpu-v5e-and-a3-gpus-in-ga",
+   "d": ""
+  },
+  {
+   "t": "Nebius AI GPU Cloud Platform - Latest NVIDIA® GPUs available",
+   "u": "https://www.bing.com/aclick?ld=e8oH_YGWTTyvlJif9-nvzEyjVUCUyb2NdJkALaFR8lJU7mqttE5kgSUzoJFSgn6j8cihSGQLbEjX-qDXzXt4mlgozucSqtHLCGBJfOYxGkiND8WP24K1uKkh2EszNKJin2-WiyDkTAjo_s5_94pWTuA2cI6ApA8SfUvSmXSrXsbim3i_2IiJK2hL7eRKWEk0Vq_P_JXg&u=aHR0cHMlM2ElMmYlMmZuZWJpdXMuY29tJTJmY29tcHV0ZSUzZnV0bV90ZXJtJTNkZ3B1JTI1MjBmb3IlMjUyMGFpJTI2dXRtX2NhbXBhaWduJTNkRlkyNl9ETV9OQl9QU0VfUFVSX0JJX05BX2dwdS1jbG91ZCUyNnV0bV9zb3VyY2UlM2RiaW5nJTI2dXRtX21lZGl1bSUzZGNwYyUyNnV0bV9jb250ZW50JTNkODI3Mzg2ODAzOTAyMDYlMjZ1dG1fYWRncm91cCUzZDEzMjM4MTQ0NTY3NzExOTQlMjZ1dG1faWQlM2Q1MjE4OTEwMTclMjZtc2Nsa2lkJTNkYThjOWVhODIxNTAzMTFjZDNlOTQ4MDcwZDFlYzdjOGYlMjZoc2FfY2FtJTNkNTIxODkxMDE3JTI2aHNhX2dycCUzZDEzMjM4MTQ0NTY3NzExOTQlMjZoc2FfYWQlM2Q4MjczODY4MDM5MDIwNiUyNmhzYV9zcmMlM2RvJTI2aHNhX3RndCUzZGt3ZC04MjczOTYxNjgxNDg0NyUzYWxvYy0yMCUyNmhzYV9rdyUzZGdwdSUyNTIwZm9yJTI1MjBhaSUyNmhzYV9tdCUzZHAlMjZoc2FfbmV0JTNkYmluZyUyNmhzYV92ZXIlM2Qz&rlid=a8c9ea82150311cd3e948070d1ec7c8f",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   14.02,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 48.0,
+  "tok": 438,
+  "s": 9.1
+ },
+ "answer_raw": "The hardware landscape is divided between consumer-grade power and massive, liquid-cooled data center clusters.\n\n## The Leading Hardware\n\nFor the highest level of scale-out compute, the **NVIDIA GB300 NVL72** is a leading system, featuring 72 NVIDIA Blackwell Ultra GPUs and 36 NVIDIA Grace CPUs in a fully liquid-cooled, rack-scale architecture designed for frontier model training and agentic AI (undated) [8].\n\nIn the consumer market, the **RTX 5090** with 32GB VRAM is the most powerful AI GPU available, priced at approximately $4,900 as of September 2026 [6].\n\nFor enterprise-level inference, Google's **Cloud TPU v5e** is noted as a highly cost-efficient and scalable option, while the **A3 Supercomputer** is available for large-scale models (undated) [7].\n\n## Who is using what?\n\nThe answer for \"what Claude is using\" is specific to its partnership with Google.\n\n**Anthropic (Claude)** — Anthropic is running Claude on Google's **Tensor Processing Units (TPUs)** [5]. Through an agreement with Google and Broadcom, Anthropic has secured approximately 3.5GW of next-generation TPU capacity starting in 2027, adding to the ~1GW of compute already committed for 2026 [2]. This TPU-centric strategy allows Anthropic to run workloads natively on Google's infrastructure without managing NVIDIA's CUDA stacks, while also bypassing the competitive disadvantage of being third in NVIDIA's allocation queue [2].\n\n**Other Major Players** — NVIDIA's most advanced hardware has historically seen priority allocation to **Microsoft (OpenAI)** and then Google [2]. For large-scale, stable performance, platforms like **Nebius** provide access to NVIDIA-based clusters using Quantum-2 InfiniBand fabric, ranging from single nodes to thousand-GPU clusters [8].",
+ "answer": "The hardware landscape is divided between consumer-grade power and massive, liquid-cooled data center clusters.\n\n## The Leading Hardware\n\nFor the highest level of scale-out compute, the **NVIDIA GB300 NVL72** is a leading system, featuring 72 NVIDIA Blackwell Ultra GPUs and 36 NVIDIA Grace CPUs in a fully liquid-cooled, rack-scale architecture designed for frontier model training and agentic AI (undated) [8].\n\nIn the consumer market, the **RTX 5090** with 32GB VRAM is the most powerful AI GPU available, priced at approximately $4,900 as of September 2026 [6].\n\nFor enterprise-level inference, Google's **Cloud TPU v5e** is noted as a highly cost-efficient and scalable option, while the **A3 Supercomputer** is available for large-scale models (undated) [7].\n\n## Who is using what?\n\nThe answer for \"what Claude is using\" is specific to its partnership with Google.\n\n**Anthropic (Claude)** — Anthropic is running Claude on Google's **Tensor Processing Units (TPUs)** [5]. Through an agreement with Google and Broadcom, Anthropic has secured approximately 3.5GW of next-generation TPU capacity starting in 2027, adding to the ~1GW of compute already committed for 2026 [2]. This TPU-centric strategy allows Anthropic to run workloads natively on Google's infrastructure without managing NVIDIA's CUDA stacks, while also bypassing the competitive disadvantage of being third in NVIDIA's allocation queue [2].\n\n**Other Major Players** — NVIDIA's most advanced hardware has historically seen priority allocation to **Microsoft (OpenAI)** and then Google [2]. For large-scale, stable performance, platforms like **Nebius** provide access to NVIDIA-based clusters using Quantum-2 InfiniBand fabric, ranging from single nodes to thousand-GPU clusters [8].",
+ "chars": 1753,
+ "raw_bytes": 4751,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 15.19,
+ "rate_gen_tok_s": 51.51,
+ "id": "q01",
+ "turn": 1,
+ "category": "fresh",
+ "topic": "AI hardware leaders",
+ "question": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:17:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "What is the most powerful GPU in the world right now, or TPU, or anything being used for AI? What is Claude using, and what are others using?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 21.8,
+ "app_total_s": 30.92,
+ "first_text_s_unreliable": true
+}

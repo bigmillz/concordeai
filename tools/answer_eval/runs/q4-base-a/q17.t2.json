@@ -1,0 +1,324 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":19.6,\"ftok\":162,\"est\":false}",
+  "X-Hurry": "3983c18fb0b410c1"
+ },
+ "first_byte_s": 0.06,
+ "first_text_s": 1.42,
+ "elapsed_s": 18.01,
+ "events": [
+  {
+   "t": 0.06,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "2 queries"
+   }
+  },
+  {
+   "t": 1.42,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 4.65,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 4.65,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 4.65,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 7.67,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "6 pages · 25 passages"
+   }
+  },
+  {
+   "t": 7.67,
+   "tag": "STEP",
+   "step": {
+    "id": "prior",
+    "l": "Kept the earlier sources",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.67,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 7.67,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 7.67,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 7.67,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "RATE",
+   "data": {
+    "tps": 34.6,
+    "tok": 152,
+    "s": 4.4
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "611 chars"
+   }
+  },
+  {
+   "t": 18.01,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.06,
+   "Searching the web…"
+  ],
+  [
+   4.65,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "2 queries",
+   "t_s": 0.06
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 4.65
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 4.65
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "6 pages · 25 passages",
+   "t_s": 7.67
+  },
+  {
+   "id": "prior",
+   "l": "Kept the earlier sources",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.67
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 7.67
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 7.67
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "611 chars",
+   "t_s": 18.01
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 18.01
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Best Areas to Buy Property in Florianópolis (2026) – TheLatinvestor",
+   "u": "https://thelatinvestor.com/blogs/news/florianopolis-which-area",
+   "d": "2026"
+  },
+  {
+   "t": "Exchange rates: ECB reference rates (via Frankfurter)",
+   "u": "https://www.frankfurter.app/",
+   "d": "2026-11-09"
+  },
+  {
+   "t": "Cost of Living in Florianopolis. Nov 2026. Prices in ... - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/in/Florianopolis",
+   "d": "2026-11"
+  },
+  {
+   "t": "Cost of Living Estimator for Florianopolis, Brazil - Numbeo",
+   "u": "https://www.numbeo.com/cost-of-living/city-estimator/in/Florianopolis",
+   "d": ""
+  },
+  {
+   "t": "Da Nang Cost of Living 2026: The Foreigner Price Gap",
+   "u": "https://numbers.findawayabroad.com/p/da-nang-cost-of-living-preview-2026",
+   "d": "2026"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   7.67,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "rate_writer": {
+  "tps": 34.6,
+  "tok": 152,
+  "s": 4.4
+ },
+ "answer_raw": "Pick **Lagoa da Conceição**; it aligns best with your need for a walkable, tech-capable hub while remaining close to the coast.\n\nA one-bedroom apartment in that area typically runs between **R$ 3,000 and R$ 5,000 per month** (undated) [2]. Based on the exchange rate from November 9, 2026, that converts to approximately **$544 to $907 per month** [5].\n\nKeep in mind that these figures represent average rental ranges for a one-bedroom; finding a fully furnished unit specifically through English-language sites may trigger a \"foreigner premium\" where prices end up significantly higher than local listings [8].",
+ "answer": "Pick **Lagoa da Conceição**; it aligns best with your need for a walkable, tech-capable hub while remaining close to the coast.\n\nA one-bedroom apartment in that area typically runs between **R$ 3,000 and R$ 5,000 per month** (undated) [2]. Based on the exchange rate from November 9, 2026, that converts to approximately **$544 to $907 per month** [5].\n\nKeep in mind that these figures represent average rental ranges for a one-bedroom; finding a fully furnished unit specifically through English-language sites may trigger a \"foreigner premium\" where prices end up significantly higher than local listings [8].",
+ "chars": 611,
+ "raw_bytes": 2923,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.54,
+ "rate_gen_tok_s": 12.52,
+ "id": "q17",
+ "turn": 2,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-base-a",
+ "asked_at": "2026-11-10T04:26:31",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   },
+   {
+    "role": "assistant",
+    "content": "\u0000USAGE:{\"r\":\"search\",\"m\":\"Gemma 4 26B\",\"w\":\"local\",\"i\":242,\"o\":30,\"d\":1565,\"c\":204}\u0000For a six-month stay that balances beach access, walkability, and remote-work infrastructure, **Lagoa da Conceição** and **Campeche** are your best bets.\n\nWhile the city's north and south zones offer different vibes, the following breakdown targets your specific requirements for lifestyle and connectivity:\n\n## Top Neighborhood Picks\n\n**Lagoa da Conceição** — This is the primary choice for remote workers and couples [4]. It offers a bohemian vibe with easy access to nature and surfing, though you'll need to drive or take a short transit ride to reach the actual ocean beaches like Joaquina or Mole [2]. It is a central hub for connectivity and lifestyle.\n\n**Campeche** — This is the go-to area for surfers and those looking for a more laid-back, coastal atmosphere [4]. It offers a different beach-centric lifestyle compared to the central/east zones.\n\n**Jurerê Internacional** — If you prefer a high-end, \"resort-style\" environment, this is the top-tier option for luxury and upscale amenities [4].\n\n## Comparison for Remote Workers\n\n| Neighborhood | Primary Vibe | Best For... |\n| :--- | :--- | :--- |\n| **Lagoa da Conceição** | Bohemian / Hub | Remote workers, couples, and easy access to diverse activities [4] |\n| **Campeche** | Surf / Coastal | Surfers and those wanting a beach-first lifestyle [4] |\n| **Jurerê Internacional** | Upscale / Resort | High-end living and luxury amenities [4] |\n| **Canasvieiras / Ingleses** | High-Volume | Budget-conscious travelers or those looking for high density [4] |\n\n## Planning Considerations\n\n**Connectivity and Internet** — While the provided data identifies these areas as suitable for remote work, it does not provide specific ISP speed ratings or fiber-to-the-home availability. You should verify specific WiFi stability with individual landlords before signing a six-month lease.\n\n**Rent Trends** — Be prepared for rising costs; asking rents increased by 9.13% in the 12 months leading to September 2026 [6]. Finding a one-bedroom unit may be your most efficient path, as they historically perform well in the rental market [6].\n\n**Logistics** — For those looking for urban stability, the stretch between **Trindade, Itacorubi, Centro**, and the **Continente** side (Estreito, Coqueiros) is considered a strong area for foreign residency/buying, with prices ranging from R$ 11,800 to R$ 14,500 per square meter as of 2026 [4]. However, these areas generally lack direct oceanfront access.\u0000USAGE:{\"r\":\"\",\"m\":\"Gemma 4 26B\",\"w\":\"local\",\"i\":4380,\"o\":589,\"d\":21495,\"c\":2007}\u0000\u0000DONE:{\"f\":13.99,\"t\":31.15,\"mode\":\"Fast\",\"effort\":\"\"}\u0000"
+   },
+   {
+    "role": "user",
+    "content": "Pick one for me and tell me what a furnished one-bedroom there runs per month, in reais and dollars."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ },
+ "app_first_s": 13.59,
+ "app_total_s": 18.01,
+ "first_text_s_unreliable": true
+}

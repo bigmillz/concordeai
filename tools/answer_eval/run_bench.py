@@ -62,7 +62,9 @@ CONFIGS = {
 }
 
 # the wire protocol, as the page reads it (FRAME_TAGS in millenai.py)
-FRAME_TAGS = "RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE"  # RATE: 6b515
+# RATE: 6b515; USAGE, DONE, RUBIN (6b528, 6b519): missing here, they were read as answer text, so first_text_s
+# fired on the first USAGE frame (about 1 s, before any word) and the answers carried the frames (6b560)
+FRAME_TAGS = "RUN|STATUS|DRAFT|SOURCES|PHOTOS|MAP|CTX|PLACEHINT|PLACES2|STEP|APPROVE|RATE|USAGE|DONE|RUBIN"
 FRAME_RX = re.compile("\0(" + FRAME_TAGS + "):(.*?)\0", re.S)
 FRAME_PART = re.compile("\0(?:" + FRAME_TAGS + "):[^\0]*$")
 RESET = "\0RESET\0"
@@ -361,6 +363,14 @@ def chat(copy, body, max_wait, idle):
                 elif tag == "RATE":
                     rec["rate_writer"] = d       # the final writer's own pace (6b515)
                     ev["data"] = d
+                elif tag == "DONE":
+                    # the app's own clock (6b528): f = its first visible word, t = the whole run
+                    rec["app_first_s"] = d.get("f") if isinstance(d, dict) else None
+                    rec["app_total_s"] = d.get("t") if isinstance(d, dict) else None
+                    ev["data"] = d
+                elif tag == "USAGE":
+                    rec.setdefault("usage", []).append(d)
+                    continue
                 else:
                     ev["data"] = d
             rec["events"].append(ev)

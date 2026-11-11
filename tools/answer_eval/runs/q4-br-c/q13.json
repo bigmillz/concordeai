@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":107,\"est\":false}",
+  "X-Hurry": "42740861ea4fb8a7"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 20.93,
+ "elapsed_s": 25.9,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 10.55,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 10.56,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 10.56,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 16.56,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "7 pages · 28 passages"
+   }
+  },
+  {
+   "t": 16.56,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 16.56,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 16.56,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 16.56,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 20.93,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 25.9,
+   "tag": "RATE",
+   "data": {
+    "tps": 60.6,
+    "tok": 301,
+    "s": 5.0
+   }
+  },
+  {
+   "t": 25.9,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1206 chars"
+   }
+  },
+  {
+   "t": 25.9,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 25.9,
+   "tag": "DONE",
+   "data": {
+    "f": 20.93,
+    "t": 25.9,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   10.56,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 10.55
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 10.56
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "7 pages · 28 passages",
+   "t_s": 16.56
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 16.56
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 16.56
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1206 chars",
+   "t_s": 25.9
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 25.9
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "รูปภาพBad Pizza... | Adobe Stock",
+   "u": "https://stock.adobe.com/th/search?k=bad+pizza",
+   "d": ""
+  },
+  {
+   "t": "A Healthy Showdown: Who Wins - Pizza or Pasta? • Edel Alon",
+   "u": "https://www.edelalon.com/blog/a-healthy-showdown-who-wins-pizza-or-pasta/",
+   "d": "2022-12-30"
+  },
+  {
+   "t": "Italian Researchers Find Possible Health Benefits to Eating Pizza",
+   "u": "https://www.mensjournal.com/news/pizza-health-benefits-italian-researchers",
+   "d": ""
+  },
+  {
+   "t": "Underweight? See how to add pounds healthfully - Mayo Clinic",
+   "u": "https://www.mayoclinic.org/healthy-lifestyle/nutrition-and-healthy-eating/expert-answers/underweight/faq-20058429",
+   "d": ""
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  },
+  {
+   "t": "8 Worst Pizza Chains in America, According to Customers",
+   "u": "https://www.cheapism.com/worst-pizza-chains-america/",
+   "d": "2025-09-15"
+  },
+  {
+   "t": "15 Pizza Places (And Brands) To Avoid + 5 That Are Shockingly Bad",
+   "u": "https://chefstandards.com/shockingly-bad-pizza-places/",
+   "d": "2025-05-25"
+  },
+  {
+   "t": "Neapolitan Pizza Calories: A Deliciously Light Choice",
+   "u": "https://familyslice.com/neapolitan-pizza-calories/",
+   "d": "2023-12-29"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   16.56,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 21,
+   "d": 569,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 5054,
+   "o": 307,
+   "d": 9295,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 60.6,
+  "tok": 301,
+  "s": 5.0
+ },
+ "app_first_s": 20.93,
+ "app_total_s": 25.9,
+ "answer_raw": "Pizza is not inherently bad for you, but its nutritional profile depends entirely on the ingredients and portion sizes used.\n\nThe health impact of a pizza varies by style; for example, Neapolitan pizza can provide a balanced mix of nutrients with dough for carbohydrates, cheese for protein, and toppings for vitamins and minerals [8, undated]. Pizza can also be more nutritious than pasta if it includes a higher volume of vegetable toppings [2, 2022-12-30]. Conversely, some styles like Detroit-style can result in dense crusts and greasy cheese, while buffet-style pizzas often feature processed, frozen, or rehydrated toppings [7, 2025-05-25].\n\nRegarding frequency, there is no universal rule, but the average American consumes roughly **180 slices per year** [6, 2025-09-15]. For those managing health or weight, the \"badness\" of pizza is often a matter of avoiding highly processed chains or managing caloric density.\n\nSafety is the most immediate concern when eating pizza. It is **100% not recommended** to eat 2-day-old pizza that has not been refrigerated [5, 2023-05-25]. To stay safe, pizza must be kept below **40 degrees** and should not sit out for longer than **two hours** [5, 2023-05-25].",
+ "answer": "Pizza is not inherently bad for you, but its nutritional profile depends entirely on the ingredients and portion sizes used.\n\nThe health impact of a pizza varies by style; for example, Neapolitan pizza can provide a balanced mix of nutrients with dough for carbohydrates, cheese for protein, and toppings for vitamins and minerals [8, undated]. Pizza can also be more nutritious than pasta if it includes a higher volume of vegetable toppings [2, 2022-12-30]. Conversely, some styles like Detroit-style can result in dense crusts and greasy cheese, while buffet-style pizzas often feature processed, frozen, or rehydrated toppings [7, 2025-05-25].\n\nRegarding frequency, there is no universal rule, but the average American consumes roughly **180 slices per year** [6, 2025-09-15]. For those managing health or weight, the \"badness\" of pizza is often a matter of avoiding highly processed chains or managing caloric density.\n\nSafety is the most immediate concern when eating pizza. It is **100% not recommended** to eat 2-day-old pizza that has not been refrigerated [5, 2023-05-25]. To stay safe, pizza must be kept below **40 degrees** and should not sit out for longer than **two hours** [5, 2023-05-25].",
+ "chars": 1206,
+ "raw_bytes": 3446,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 11.64,
+ "rate_gen_tok_s": 60.66,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-br-c",
+ "asked_at": "2026-11-10T05:51:04",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

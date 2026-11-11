@@ -1,0 +1,349 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":15.0,\"ftok\":100,\"est\":false}",
+  "X-Hurry": "50431ba74c4a43af"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 15.88,
+ "elapsed_s": 18.89,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "3 queries"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 8.05,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 8.05,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.3,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "4 pages · 16 passages"
+   }
+  },
+  {
+   "t": 12.3,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.3,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.3,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.3,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 15.88,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 18.89,
+   "tag": "RATE",
+   "data": {
+    "tps": 52.8,
+    "tok": 159,
+    "s": 3.0
+   }
+  },
+  {
+   "t": 18.89,
+   "tag": "RESET"
+  },
+  {
+   "t": 18.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Sharpened",
+    "s": "done",
+    "d": "1 leak reworded"
+   }
+  },
+  {
+   "t": 18.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "614 chars"
+   }
+  },
+  {
+   "t": 18.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 18.89,
+   "tag": "DONE",
+   "data": {
+    "f": 15.88,
+    "t": 18.89,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   8.05,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "3 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 8.05
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "4 pages · 16 passages",
+   "t_s": 12.3
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.3
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.3
+  },
+  {
+   "id": "polish",
+   "l": "Sharpened",
+   "s": "done",
+   "d": "1 leak reworded",
+   "t_s": 18.89
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "614 chars",
+   "t_s": 18.89
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 18.89
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "Where to Stay in Florianópolis (2026) — Best Neighborhoods Ranked",
+   "u": "https://geronimo-ai.com/best-neighborhoods/florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Florianópolis Neighborhoods Guide: Where to Live... | FloripaGuru",
+   "u": "https://floripaguru.com/areas",
+   "d": ""
+  },
+  {
+   "t": "Discover the best neighborhoods in Florianópolis to live",
+   "u": "https://www.vivefloripa.com.br/en/post/discover-the-best-neighborhoods-in-florianópolis-to-live",
+   "d": ""
+  },
+  {
+   "t": "Beach Nearby - Discover the best beaches near you",
+   "u": "https://beachnearby.com/",
+   "d": ""
+  },
+  {
+   "t": "Best Neighborhoods Florianopolis: 2026 Nomad Map for Nomads",
+   "u": "https://digitalnomadsbrasil.com/stories/best-neighborhoods-florianopolis",
+   "d": "2026"
+  },
+  {
+   "t": "Frontiers | Walkability and Its Relationships With Health, Sustainability...",
+   "u": "https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2021.721218/full",
+   "d": "2017"
+  },
+  {
+   "t": "THE BEST Florianopolis Neighborhoods to Visit (2026) - Tripadvisor",
+   "u": "https://www.tripadvisor.com/Attractions-g303576-Activities-c47-t34-Florianopolis_State_of_Santa_Catarina.html",
+   "d": "2026"
+  },
+  {
+   "t": "Lavaca Neighborhood - safety, walkability? - Tripadvisor",
+   "u": "https://www.tripadvisor.com.sg/ShowTopic-g60956-i76-k14148740-Lavaca_Neighborhood_safety_walkability-San_Antonio_Texas.html",
+   "d": ""
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.3,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 1,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 242,
+   "o": 26,
+   "d": 781,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4236,
+   "o": 139,
+   "d": 6532,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 52.8,
+  "tok": 159,
+  "s": 3.0
+ },
+ "app_first_s": 15.88,
+ "app_total_s": 18.89,
+ "answer_raw": "The **North** and **East** zones offer the best balance for your requirements, depending on whether you prioritize resort-style amenities or a bohemian vibe [2].\n\n**North** — best for resort-style living and infrastructure [2].\n**East** — best for a bohemian, nature-focused, and surfing vibe [2].\n**Central/South** — offers historic centers and calm villages, but lacks direct ocean beach access in some areas [2].\n\nI didn't find specific rent prices, walkability scores, or internet speed metrics for individual neighborhoods, so you should check local rental platforms and ISP coverage maps for the 2026 market.",
+ "answer": "The **North** and **East** zones offer the best balance for your requirements, depending on whether you prioritize resort-style amenities or a bohemian vibe [2].\n\n**North** — best for resort-style living and infrastructure [2].\n**East** — best for a bohemian, nature-focused, and surfing vibe [2].\n**Central/South** — offers historic centers and calm villages, but lacks direct ocean beach access in some areas [2].\n\nI didn't find specific rent prices, walkability scores, or internet speed metrics for individual neighborhoods, so you should check local rental platforms and ISP coverage maps for the 2026 market.",
+ "chars": 614,
+ "raw_bytes": 3693,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 8.13,
+ "rate_gen_tok_s": 51.0,
+ "id": "q17",
+ "turn": 1,
+ "category": "travel",
+ "topic": "Florianópolis neighborhoods",
+ "question": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet.",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-noest",
+ "asked_at": "2026-11-10T06:12:33",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Which neighborhoods in Florianópolis are best for a foreigner renting for six months? I want safe, walkable, near a beach, with fast internet."
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}

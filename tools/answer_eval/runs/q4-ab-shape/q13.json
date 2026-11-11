@@ -1,0 +1,328 @@
+{
+ "status_code": 200,
+ "headers": {
+  "X-Accel-Buffering": "no",
+  "X-Web-Search": "1",
+  "X-Models": "Gemma 4 26B",
+  "X-Eta": "{\"search\":14.0,\"models\":[],\"final\":17.1,\"ftok\":125,\"est\":false}",
+  "X-Hurry": "d794f5fdb12400d9"
+ },
+ "first_byte_s": 0.05,
+ "first_text_s": 16.38,
+ "elapsed_s": 21.89,
+ "events": [
+  {
+   "t": 0.05,
+   "tag": "STATUS",
+   "text": "Searching the web…"
+  },
+  {
+   "t": 0.05,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searching the web",
+    "s": "run",
+    "d": "4 queries"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 11.06,
+   "tag": "STATUS",
+   "text": "Reading 8 sources…"
+  },
+  {
+   "t": 11.06,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Reading the pages",
+    "s": "run",
+    "d": "8 pages"
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "STEP",
+   "step": {
+    "id": "read",
+    "l": "Read the pages",
+    "s": "done",
+    "d": "5 pages · 19 passages"
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "STEP",
+   "step": {
+    "id": "search",
+    "l": "Searched the web",
+    "s": "done",
+    "d": "8 sources"
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "SOURCES",
+   "n": 8
+  },
+  {
+   "t": 12.95,
+   "tag": "RUN",
+   "run": {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  },
+  {
+   "t": 12.95,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Writing the answer",
+    "s": "run",
+    "d": "Gemma 4 26B"
+   }
+  },
+  {
+   "t": 16.38,
+   "tag": "FIRST_TEXT"
+  },
+  {
+   "t": 21.89,
+   "tag": "RATE",
+   "data": {
+    "tps": 78.8,
+    "tok": 434,
+    "s": 5.5
+   }
+  },
+  {
+   "t": 21.89,
+   "tag": "STEP",
+   "step": {
+    "id": "draft",
+    "l": "Answer written",
+    "s": "done",
+    "d": "1736 chars"
+   }
+  },
+  {
+   "t": 21.89,
+   "tag": "STEP",
+   "step": {
+    "id": "polish",
+    "l": "Polished",
+    "s": "done",
+    "d": ""
+   }
+  },
+  {
+   "t": 21.89,
+   "tag": "DONE",
+   "data": {
+    "f": 16.38,
+    "t": 21.89,
+    "mode": "Fast",
+    "effort": ""
+   }
+  }
+ ],
+ "statuses": [
+  [
+   0.05,
+   "Searching the web…"
+  ],
+  [
+   11.06,
+   "Reading 8 sources…"
+  ]
+ ],
+ "steps": [
+  {
+   "id": "search",
+   "l": "Searching the web",
+   "s": "run",
+   "d": "4 queries",
+   "t_s": 0.05
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Reading the pages",
+   "s": "run",
+   "d": "8 pages",
+   "t_s": 11.06
+  },
+  {
+   "id": "read",
+   "l": "Read the pages",
+   "s": "done",
+   "d": "5 pages · 19 passages",
+   "t_s": 12.95
+  },
+  {
+   "id": "search",
+   "l": "Searched the web",
+   "s": "done",
+   "d": "8 sources",
+   "t_s": 12.95
+  },
+  {
+   "id": "draft",
+   "l": "Writing the answer",
+   "s": "run",
+   "d": "Gemma 4 26B",
+   "t_s": 12.95
+  },
+  {
+   "id": "draft",
+   "l": "Answer written",
+   "s": "done",
+   "d": "1736 chars",
+   "t_s": 21.89
+  },
+  {
+   "id": "polish",
+   "l": "Polished",
+   "s": "done",
+   "d": "",
+   "t_s": 21.89
+  }
+ ],
+ "drafts": [],
+ "sources": [
+  {
+   "t": "The Nutritional Value Of Pizza: Key Nutrients, Healthier Options, And...",
+   "u": "https://thisnutrition.com/the-nutritional-value-of-pizza-key-nutrients-healthier-options-and-recipes",
+   "d": ""
+  },
+  {
+   "t": "RFK Jr.’s new dietary guidelines end 'the war on saturated fats... : NPR",
+   "u": "https://www.npr.org/2026/01/07/nx-s1-5667021/dietary-guidelines-rfk-jr-nutrition",
+   "d": "2026-01-07"
+  },
+  {
+   "t": "Italian Researchers Find Possible Health Benefits to Eating Pizza",
+   "u": "https://www.mensjournal.com/news/pizza-health-benefits-italian-researchers",
+   "d": ""
+  },
+  {
+   "t": "Plant-first food pyramid brings international dietary guidelines...",
+   "u": "https://medicalxpress.com/news/2026-10-food-pyramid-international-dietary-guidelines.html",
+   "d": "2026-10-23"
+  },
+  {
+   "t": "The picture of health: Pizza is good for you, no matter... - PMQ Pizza",
+   "u": "https://www.pmq.com/why-pizza-is-good-for-you/",
+   "d": "2015-05-01"
+  },
+  {
+   "t": "A Healthy Showdown: Who Wins - Pizza or Pasta? • Edel Alon",
+   "u": "https://www.edelalon.com/blog/a-healthy-showdown-who-wins-pizza-or-pasta/",
+   "d": "2022-12-30"
+  },
+  {
+   "t": "Neapolitan Pizza Calories: A Deliciously Light Choice",
+   "u": "https://familyslice.com/neapolitan-pizza-calories/",
+   "d": "2023-12-29"
+  },
+  {
+   "t": "How to Tell if Pizza is Bad (5 Signs That You Should Know)",
+   "u": "https://bakinghow.com/pizza-went-bad/",
+   "d": "2023-05-25"
+  }
+ ],
+ "photos": null,
+ "run_frames": [
+  [
+   12.95,
+   {
+    "r": [
+     "Gemma 4 26B"
+    ]
+   }
+  ]
+ ],
+ "resets": 0,
+ "truncated": false,
+ "error": "",
+ "x_models": "Gemma 4 26B",
+ "searched": true,
+ "usage": [
+  {
+   "r": "search",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 225,
+   "o": 19,
+   "d": 736,
+   "c": 204
+  },
+  {
+   "r": "",
+   "m": "Gemma 4 26B",
+   "w": "local",
+   "i": 4253,
+   "o": 347,
+   "d": 8891,
+   "c": 2007
+  }
+ ],
+ "rate_writer": {
+  "tps": 78.8,
+  "tok": 434,
+  "s": 5.5
+ },
+ "app_first_s": 16.38,
+ "app_total_s": 21.89,
+ "answer_raw": "Pizza is not inherently bad for you; its health impact depends entirely on ingredients, portion control, and how it fits into your overall diet.\n\n## Nutritional Profile\nPizza can be a balanced meal containing carbohydrates from dough, proteins from cheese, and vitamins and minerals from sauces and toppings [7]. Because pizzas often feature vegetable toppings, they can offer more vitamins and minerals than pasta [6].\n\nHowever, the nutritional value varies heavily based on the specific style:\n*   **Neapolitan-style** — typically uses high-quality, fresh ingredients like dough, cheese, and sauce to provide a balanced mix of nutrients [7].\n*   **Processed/Fast Food** — can be high in calories or specific fats; managing portion size is essential to prevent overconsumption [1].\n\nThere is also research into specific health benefits, such as potential links to arthritis relief, though more in-depth studies are required to confirm these findings [3].\n\n## Frequency and Diet\nHow often it is \"fine\" depends on your personal dietary goals and the composition of the pizza. \n\n**The \"Pizza Diet\" approach** — some individuals have used specific pizza-based regimens to support fitness and bodybuilding [5].\n\n**The Balanced Approach** — a more standard health recommendation is to treat pizza as parts of a balanced diet, pairing it with sides like fruit or salad to increase nutritional value [1].\n\nThe current consensus on dietary guidelines can shift; for instance, recent international guidelines have moved toward a plant-first food pyramid [4], while other recent guidelines have shifted focus toward meat and dairy [2]. Because these guidelines vary, the \"fine\" frequency is personal to your caloric needs and health requirements.",
+ "answer": "Pizza is not inherently bad for you; its health impact depends entirely on ingredients, portion control, and how it fits into your overall diet.\n\n## Nutritional Profile\nPizza can be a balanced meal containing carbohydrates from dough, proteins from cheese, and vitamins and minerals from sauces and toppings [7]. Because pizzas often feature vegetable toppings, they can offer more vitamins and minerals than pasta [6].\n\nHowever, the nutritional value varies heavily based on the specific style:\n*   **Neapolitan-style** — typically uses high-quality, fresh ingredients like dough, cheese, and sauce to provide a balanced mix of nutrients [7].\n*   **Processed/Fast Food** — can be high in calories or specific fats; managing portion size is essential to prevent overconsumption [1].\n\nThere is also research into specific health benefits, such as potential links to arthritis relief, though more in-depth studies are required to confirm these findings [3].\n\n## Frequency and Diet\nHow often it is \"fine\" depends on your personal dietary goals and the composition of the pizza. \n\n**The \"Pizza Diet\" approach** — some individuals have used specific pizza-based regimens to support fitness and bodybuilding [5].\n\n**The Balanced Approach** — a more standard health recommendation is to treat pizza as parts of a balanced diet, pairing it with sides like fruit or salad to increase nutritional value [1].\n\nThe current consensus on dietary guidelines can shift; for instance, recent international guidelines have moved toward a plant-first food pyramid [4], while other recent guidelines have shifted focus toward meat and dairy [2]. Because these guidelines vary, the \"fine\" frequency is personal to your caloric needs and health requirements.",
+ "chars": 1736,
+ "raw_bytes": 4090,
+ "is_error_answer": false,
+ "rate_ui_tok_s": 19.83,
+ "rate_gen_tok_s": 78.77,
+ "id": "q13",
+ "turn": 1,
+ "category": "health",
+ "topic": "Pizza and health",
+ "question": "Is pizza actually bad for you? How often is fine?",
+ "tier": "Fast",
+ "config": "local-fast",
+ "run": "q4-ab-shape",
+ "asked_at": "2026-11-10T05:20:37",
+ "request": {
+  "model": "",
+  "models": [],
+  "tier": "Fast",
+  "messages": [
+   {
+    "role": "user",
+    "content": "Is pizza actually bad for you? How often is fine?"
+   }
+  ],
+  "auto_web": true,
+  "images": [],
+  "docs": [],
+  "agent": "",
+  "mode_comp": ""
+ }
+}
