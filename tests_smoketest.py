@@ -45183,6 +45183,358 @@ for d_, m_, caught_ in _b4_mw:
 check("6b580 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _b4_mr2),
       all(ok_ for _, ok_, _ in _b4_mr2), json.dumps(_b4_mr2)[:900])
 # ==== 6b580 flow: end ====
+# ==== 6b590 the chat: begin ====
+print("== the chat: opening, switching, the edit in place, the keys, the actions, errors, a big paste, motion (6b590) ==")
+# THE CHAT (6b590, per Patrick: "as far as how the actual chat part behaves, let's make that equally perfect, top-notch,
+# beautiful"; "Claude-sharp chrome plus GPT-grade motion"). Two halves. The source: the flat, sharp surfaces (no blur,
+# glow or text shadow in the block; the composer #151517 and 14 round; your words in a #1f1f22 bubble; hairlines a device
+# pixel), the IME guard, the drawn send and stop keys, one pin for a whole chat, the reveal of the actions; each with a
+# mutant. The behaviour: headless Chromium over the DevTools protocol (node's own WebSocket, no packages) drives the copy's
+# own page with a stand-in /api/chat and two chats made on the page (220 turns with a long question; 4 turns): a long chat
+# opens at its end before its first frame (no glide), a chat left scrolled up reopens there, the title and the focus
+# follow, no layout shift; the edit in place (Esc puts it back, Enter re-asks from there, the box's draft comes back), ↑
+# opens the last question; an input method's Enter never sends; the keys are drawn; Esc stops; the jump key shows while an
+# answer streams out of sight and stays for one that landed there; one announcement per answer; the actions fade in on
+# hover with nothing moving; the copy's check; kind error lines with Try again; a big paste becomes "Pasted text.txt"; a
+# long question folds; a new turn rises 6 px in 200 ms; the box's height eases. Eleven mutants, served in place of the
+# page, each caught by the steps it breaks.
+_c590_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE CHAT (6b590,"):_MILLENAI_SRC.index("/* ==== the chat (6b590): end ==== */")]
+_c590_js = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== THE CHAT (6b590): script begin ==== */"):_MILLENAI_SRC.index("/* ==== the chat (6b590): script end ==== */")]
+
+
+def _c590_static(css, js, pg):
+    rules = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    return {
+        "flat and sharp: no blur, glow or text shadow in the chat's rules": not re.search(r"text-shadow:(?!none)|blur\(|glow|drop-shadow", rules)
+        and ".hz #composer{background:var(--chat-surface);border:var(--chat-hw) solid var(--chat-line);border-radius:14px;" in rules
+        and "-webkit-backdrop-filter:none;backdrop-filter:none" in rules and "--chat-surface:#151517;" in rules and "--chat-bubble:#1f1f22;" in rules
+        and "@media (min-resolution:2dppx){.hz{--chat-hw:.5px}}" in rules,
+        "the IME guard": 'if(e.key==="Enter"&&!e.shiftKey){if(e.isComposing||e.keyCode===229)return;e.preventDefault();sendSafe();}' in pg,
+        "drawn keys, never a glyph": 'sendBtn.textContent="' not in pg and '$("#send").textContent=' not in pg
+        and pg.count("chatSendKey(true)") >= 2 and "chatSendKey(false);" in pg,
+        "a whole chat pins once": "chatBulk++;\n  try{messages.forEach(m=>addMsg(" in pg and "function chatPin(smooth){chatPinned=true;chatUnseen=false;if(chatBulk)return;" in pg
+        and "  chatArrive(id);" in pg,
+        "the actions reveal": ".hz:not(.hz-full) .msg .ans-foot .mact{opacity:0}" in rules and ".hz .msg .mact{opacity:0;" in rules,
+        "one easing family, motions 150 to 240 ms": all(0.15 <= (float(v_) / (1000 if u_ == "ms" else 1)) <= 0.24
+                                                        for v_, u_ in re.findall(r"(?<![\w.-])(\d*\.?\d+)(ms|s)\b", rules) if float(v_) > 0)
+        and re.findall(r"(?<![\w.-])(\d*\.?\d+)(ms|s)\b", rules) and "cubic-bezier" not in rules and not re.search(r"\b(?:ease|linear|ease-in|ease-out|ease-in-out)\b(?!-)", rules.replace("--hz-ease-out", "").replace("--hz-ease-in-out", "")),
+        "no TDZ: the block declares with function and var only": not re.search(r"^(?:const|let) ", js, re.M),
+    }
+
+
+_c590_s = _c590_static(_c590_css, _c590_js, page)
+_c590_sm = [
+    _c590_static(_c590_css.replace("-webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 1px 2px", "-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);box-shadow:0 1px 2px", 1), _c590_js, page),
+    _c590_static(_c590_css.replace(".hz .chat-err-t{font:450", ".hz .chat-err-t{text-shadow:0 0 8px #fff;font:450", 1), _c590_js, page),
+    _c590_static(_c590_css, _c590_js, page.replace("if(e.isComposing||e.keyCode===229)return;e.preventDefault();sendSafe();", "e.preventDefault();sendSafe();", 1)),
+    _c590_static(_c590_css, _c590_js, page.replace("chatSendKey(true);   // the stop key", 'sendBtn.textContent="■";   // the stop key', 1)),
+    _c590_static(_c590_css.replace("animation:chatTurnIn .2s", "animation:chatTurnIn .9s", 1), _c590_js, page),
+    _c590_static(_c590_css, _c590_js + "\nlet chatLate=1;\n", page),
+]
+check("6b590 the chat (source): flat and sharp surfaces, no blur, glow or text shadow; the IME guard; drawn send and stop keys; "
+      "one pin for a whole chat; the actions' reveal; one easing family at 150 to 240 ms; no let or const in the block; "
+      "six mutants caught",
+      all(_c590_s.values()) and all(not all(m_.values()) for m_ in _c590_sm),
+      "%r" % [[k for k, v in _c590_s.items() if not v], [[k for k, v in m_.items() if not v] for m_ in _c590_sm]])
+
+_C590_CDP = r'''// THE CHAT, DRIVEN (6b590): headless Chromium over the DevTools protocol (node's own WebSocket, no packages), the copy's
+// own page, /api/chat a stand-in stream; two chats made on the page (one of 220 turns with a long question, one of 4).
+// Prints {steps: {...}, errs, mutated}. argv: <chromium> <base> <cookie name> <key> <token> <groups,comma> [mutation.json]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, groups, mutf] = process.argv.slice(2);
+const G = new Set(String(groups || "open,edit,keys,actions,err,paste,motion").split(","));
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "smk-c590-"));
+const ch = spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "--window-size=1320,900", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { steps: {}, errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 170000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails).slice(0, 300));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Network.enable"); await send("Page.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  await send("Browser.grantPermissions", { origin: base, permissions: ["clipboardReadWrite", "clipboardSanitizedWrite"] });
+  await send("Emulation.setDeviceMetricsOverride", { width: 1320, height: 900, deviceScaleFactor: 1, mobile: false });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel","calm");localStorage.removeItem("millen.sbhide");}catch(e){}
+    (function(){const real=window.fetch.bind(window);window.__sent=[];
+      window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){let q="";try{const b=JSON.parse(o.body);q=String((b.messages||[]).slice(-1)[0].content||"");}catch(e){}
+        window.__sent.push(q);
+        if(/fail 590/.test(q))return Promise.resolve(new Response(JSON.stringify({err:"RuntimeError: mlx_lm.server exited with code -9"}),{status:500,headers:{"Content-Type":"application/json"}}));
+        if(/net 590/.test(q))return Promise.reject(new TypeError("Failed to fetch"));
+        const slow=/slow 590/.test(q),enc=new TextEncoder(),sig=o&&o.signal;
+        const w=Array.from({length:slow?70:16},(_,i)=>"word"+i+" ");w.push("Stand-in done.");
+        const body=new ReadableStream({start(c){let i=0;const tick=()=>{if(sig&&sig.aborted)return;if(i>=w.length){c.close();return;}c.enqueue(enc.encode(w[i++]));setTimeout(tick,slow?60:12);};
+          setTimeout(tick,120);if(sig)sig.addEventListener("abort",()=>{try{c.error(new DOMException("aborted","AbortError"));}catch(e){}});}});
+        return Promise.resolve(new Response(body,{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","X-Models":"stand-in","X-Web-Search":"0"}}));}
+        return real(u,o);};})();` });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); if (r && r.exceptionDetails) out.errs.push("eval: " + JSON.stringify(r.exceptionDetails).slice(0, 200)); return r && r.result ? r.result.value : undefined; };
+  const mouse = async (x, y) => { await send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y }); };
+  const wheel = async (x, y, dy) => { await send("Input.dispatchMouseEvent", { type: "mouseWheel", x, y, deltaX: 0, deltaY: dy }); };
+  const landed = async (n, ms) => { for (let i = 0; i < (ms || 20000) / 100; i++) { const ok = await ev(`(()=>{const a=[...document.querySelectorAll("#chat-inner>.msg.ai")];return a.length>=${n}&&!a.some(x=>x.classList.contains("live"))&&!generating;})()`); if (ok) return true; await sleep(100); } return false; };
+  const press = (k, extra, sel) => ev(`(()=>{const t=${sel ? `document.querySelector(${JSON.stringify(sel)})` : "document.activeElement||document.body"};t.dispatchEvent(new KeyboardEvent("keydown",Object.assign({key:${JSON.stringify(k)},bubbles:true,cancelable:true},${JSON.stringify(extra || {})})));return 1;})()`);
+  const gap = () => ev(`(s=>Math.round(s.scrollHeight-s.scrollTop-s.clientHeight))(document.querySelector("#chat-scroll"))`);
+  await send("Page.navigate", { url: base + "/" });
+  let ready = false; for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#input")&&typeof loadChat==="function"&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(); }
+  await sleep(800);
+  await ev(`(()=>{const mk=(n,long)=>{const m=[];for(let i=0;i<n;i++){m.push({role:"user",content:long&&i===1?Array.from({length:30},(_,j)=>"Line "+j+" of a long question that goes on for a while").join("\\n"):"Question "+i+" 590"});
+      m.push({role:"assistant",content:"Answer "+i+".\\n\\n"+"Some words in a paragraph that wraps. ".repeat(14)});}return m;};
+    chats.unshift({id:"c590big",title:"Big 590",ts:Date.now()-1000,lane:"ai",named:true,messages:mk(110,true)});
+    chats.unshift({id:"c590small",title:"Small 590",ts:Date.now(),lane:"ai",named:true,messages:mk(2)});
+    renderChats();return 1;})()`);
+  const S = out.steps;
+  try {
+    if (G.has("open")) {
+      S.open = await ev(`new Promise(res=>{const s=document.querySelector("#chat-scroll"),t0=performance.now();loadChat("c590big");const t1=performance.now();
+        const g0=Math.round(s.scrollHeight-s.scrollTop-s.clientHeight);requestAnimationFrame(()=>{const g1=Math.round(s.scrollHeight-s.scrollTop-s.clientHeight);
+        setTimeout(()=>res({sync:+(t1-t0).toFixed(1),paint:+(performance.now()-t0).toFixed(1),g0,g1,n:document.querySelectorAll("#chat-inner>.msg").length}),0);});})`);
+      await sleep(700);
+      S.open.g700 = await gap();
+      S.open.focus = await ev(`document.activeElement&&document.activeElement.id`);
+      S.open.title = await ev(`(document.querySelector("#hz-title")||{}).textContent`);
+      await ev(`(()=>{const s=document.querySelector("#chat-scroll");s.style.scrollBehavior="auto";s.scrollTop=3000;s.style.scrollBehavior="";return 1;})()`);
+      await sleep(300);
+      await ev(`(()=>{window.__cls=0;try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)window.__cls+=e.value;}).observe({type:"layout-shift"});}catch(e){}return 1;})()`);
+      await ev(`loadChat("c590small")`); await sleep(500);
+      S.open.small = await ev(`({title:document.querySelector("#hz-title").textContent,focus:document.activeElement.id,n:document.querySelectorAll("#chat-inner>.msg").length,gap:(s=>Math.round(s.scrollHeight-s.scrollTop-s.clientHeight))(document.querySelector("#chat-scroll"))})`);
+      await ev(`loadChat("c590big")`); await sleep(500);
+      S.open.back = await ev(`({top:Math.round(document.querySelector("#chat-scroll").scrollTop),title:document.querySelector("#hz-title").textContent,cls:+window.__cls.toFixed(4)})`);
+    }
+    if (G.has("edit")) {
+      await ev(`loadChat("c590small")`); await sleep(400);
+      await ev(`document.querySelector("#chat-inner>.msg.user .mab[data-act=edit]").click()`); await sleep(200);
+      S.edit = { open: await ev(`({box:!!document.querySelector("#chat-inner>.msg.user:first-child .uedit-in"),val:(document.querySelector(".uedit-in")||{}).value,n:document.querySelectorAll("#chat-inner>.msg").length,focus:document.activeElement.className})`) };
+      await press("Escape", {}, ".uedit-in"); await sleep(200);
+      S.edit.esc = await ev(`({box:!!document.querySelector(".uedit"),n:document.querySelectorAll("#chat-inner>.msg").length,focus:document.activeElement.id,live:!!document.querySelector(".msg.ai.live")})`);
+      await ev(`(()=>{document.querySelector("#input").value="a draft 590";document.querySelector("#chat-inner>.msg.user .mab[data-act=edit]").click();const t=document.querySelector(".uedit-in");t.value="Edited 590 question";t.dispatchEvent(new Event("input"));return 1;})()`);
+      await press("Enter", {}, ".uedit-in");
+      await sleep(300); await landed(1, 8000); await sleep(300);
+      S.edit.sent = await ev(`({last:window.__sent[window.__sent.length-1],users:[...document.querySelectorAll("#chat-inner>.msg.user .body")].map(b=>b.textContent),n:document.querySelectorAll("#chat-inner>.msg").length,draft:document.querySelector("#input").value,msgs:messages.length})`);
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="";i.focus();return 1;})()`);
+      await press("ArrowUp", {}, "#input"); await sleep(200);
+      S.edit.up = await ev(`(()=>{const u=[...document.querySelectorAll("#chat-inner>.msg.user")];return {last:u.length&&u[u.length-1].classList.contains("editing"),focus:document.activeElement.className};})()`);
+      await press("Escape", {}, ".uedit-in"); await sleep(150);
+    }
+    if (G.has("keys")) {
+      await ev(`loadChat("c590big")`); await sleep(400);
+      const n0 = await ev(`window.__sent.length`);
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="ime 590";i.dispatchEvent(new Event("input"));i.focus();return 1;})()`);
+      await press("Enter", { isComposing: true, keyCode: 229 }, "#input"); await sleep(300);
+      S.keys = { ime: await ev(`({sent:window.__sent.length-${n0},val:document.querySelector("#input").value})`) };
+      S.keys.idleKey = await ev(`(b=>({svg:!!b.querySelector("svg path"),text:b.textContent.trim(),label:b.getAttribute("aria-label")}))(document.querySelector("#send"))`);
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="slow 590 one";i.dispatchEvent(new Event("input"));document.querySelector("#send").click();return 1;})()`);
+      await sleep(900);
+      S.keys.liveKey = await ev(`(b=>({stop:b.classList.contains("stop"),rect:!!b.querySelector("svg rect"),text:b.textContent.trim(),label:b.getAttribute("aria-label")}))(document.querySelector("#send"))`);
+      await press("Escape", {}, "#input"); await sleep(400); await landed(1, 5000);
+      S.keys.esc = await ev(`({live:!!document.querySelector(".msg.ai.live"),focus:document.activeElement.id,stopped:!!document.querySelector("#chat-inner>.msg.ai:last-child .liveline.stopped"),
+        key:(b=>({svg:!!b.querySelector("svg path"),text:b.textContent.trim()}))(document.querySelector("#send")),said:(document.querySelector("#chat-live")||{}).textContent||""})`);
+      await sleep(300);
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="slow 590 two";i.dispatchEvent(new Event("input"));document.querySelector("#send").click();return 1;})()`);
+      await sleep(700);
+      await mouse(640, 400); await wheel(640, 400, -1600); await sleep(400);
+      S.keys.jumpLive = await ev(`(b=>({hidden:b.hidden,vis:getComputedStyle(b).visibility}))(document.querySelector("#jumpdown"))`);
+      await landed(1, 12000); await sleep(400);
+      S.keys.jumpAfter = await ev(`(b=>({hidden:b.hidden,gap:(s=>Math.round(s.scrollHeight-s.scrollTop-s.clientHeight))(document.querySelector("#chat-scroll"))}))(document.querySelector("#jumpdown"))`);
+      S.keys.said = await ev(`(document.querySelector("#chat-live")||{}).textContent||""`);
+      S.keys.liveAttr = await ev(`(r=>r?r.getAttribute("aria-live"):"")(document.querySelector("#chat-live"))`);
+      await ev(`document.querySelector("#jumpdown").click()`); await sleep(900);
+      S.keys.jumped = await ev(`({hidden:document.querySelector("#jumpdown").hidden,gap:(s=>Math.round(s.scrollHeight-s.scrollTop-s.clientHeight))(document.querySelector("#chat-scroll"))})`);
+    }
+    if (G.has("actions")) {
+      await ev(`loadChat("c590small")`); await sleep(400);
+      await mouse(1310, 890); await sleep(350);
+      const tops = `[...document.querySelectorAll("#chat-inner>.msg")].map(m=>Math.round(m.getBoundingClientRect().top))`;
+      S.actions = { rest: await ev(`[...document.querySelectorAll("#chat-inner>.msg")].map(m=>{const b=m.querySelector(".mact");return b?+getComputedStyle(b).opacity:null;})`), tops0: await ev(tops) };
+      const box = await ev(`(r=>({x:r.left+40,y:r.top+30}))(document.querySelector("#chat-inner>.msg.ai:last-child .body").getBoundingClientRect())`);
+      await mouse(box.x, box.y); await sleep(350);
+      S.actions.hover = await ev(`+getComputedStyle(document.querySelector("#chat-inner>.msg.ai:last-child .mact")).opacity`);
+      S.actions.tops1 = await ev(tops);
+      await ev(`document.querySelector("#chat-inner>.msg.user").scrollIntoView({block:"center",behavior:"instant"})`); await sleep(200);
+      const ub = await ev(`(r=>({x:r.left+10,y:r.top+10}))(document.querySelector("#chat-inner>.msg.user .body").getBoundingClientRect())`);
+      await mouse(ub.x, ub.y); await sleep(350);
+      S.actions.hoverUser = await ev(`+getComputedStyle(document.querySelector("#chat-inner>.msg.user .mact")).opacity`);
+      await ev(`document.querySelector("#chat-inner>.msg.ai:last-child .mab[data-act=copy]").click()`); await sleep(250);
+      S.actions.copied = await ev(`(b=>({label:b.getAttribute("aria-label"),check:b.innerHTML.indexOf("M5 12.5")>=0,done:b.classList.contains("done")}))(document.querySelector("#chat-inner>.msg.ai:last-child .mab[data-act=copy]"))`);
+      await sleep(1600);
+      S.actions.after = await ev(`(b=>({label:b.getAttribute("aria-label"),check:b.innerHTML.indexOf("M5 12.5")>=0}))(document.querySelector("#chat-inner>.msg.ai:last-child .mab[data-act=copy]"))`);
+    }
+    if (G.has("err")) {
+      await ev(`document.querySelector("#newchat").click()`); await sleep(300);
+      const one = async q => { await ev(`(()=>{const i=document.querySelector("#input");i.value=${JSON.stringify(q)};i.dispatchEvent(new Event("input"));document.querySelector("#send").click();return 1;})()`);
+        await sleep(400); await landed(1, 6000); await sleep(200);
+        return ev(`(a=>({text:a.innerText,line:(a.querySelector(".chat-err-t")||{}).textContent||"",tip:(a.querySelector(".chat-err-t")||{}).title||"",go:!!a.querySelector(".chat-err-go"),alert:!!a.querySelector("[role=alert]")}))([...document.querySelectorAll("#chat-inner>.msg.ai")].pop())`); };
+      S.err = { fail: await one("fail 590"), net: await one("net 590") };
+      const n1 = await ev(`window.__sent.length`);
+      await ev(`[...document.querySelectorAll(".chat-err-go")].pop().click()`); await sleep(600);
+      S.err.retried = await ev(`window.__sent.length-${n1}`);
+    }
+    if (G.has("paste")) {
+      await ev(`document.querySelector("#newchat").click()`); await sleep(300);
+      S.paste = await ev(`(()=>{const i=document.querySelector("#input");i.focus();const dt=new DataTransfer();dt.setData("text/plain",Array.from({length:120},(_,k)=>"pasted line "+k+" with some words").join("\\n"));
+        i.dispatchEvent(new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true}));
+        const r={docs:pendingDocs.map(d=>d.name),val:i.value,chips:!document.querySelector("#imgchips").hidden};pendingDocs=[];paintChips();return r;})()`);
+      const small = await ev(`(()=>{const i=document.querySelector("#input");const dt=new DataTransfer();dt.setData("text/plain","a short paste");const e=new ClipboardEvent("paste",{clipboardData:dt,bubbles:true,cancelable:true});i.dispatchEvent(e);return {prevented:e.defaultPrevented,docs:pendingDocs.length};})()`);
+      S.paste.small = small;
+      await ev(`loadChat("c590big")`); await sleep(400);
+      S.paste.fold = await ev(`(()=>{const b=[...document.querySelectorAll("#chat-inner>.msg.user .body")].find(x=>x.textContent.length>1000);if(!b)return null;const m=b.nextElementSibling;
+        const h0=Math.round(b.getBoundingClientRect().height);m.click();const h1=Math.round(b.getBoundingClientRect().height);return {h0,h1,key:m.className,label:m.textContent,exp:m.getAttribute("aria-expanded")};})()`);
+    }
+    if (G.has("motion")) {
+      await ev(`loadChat("c590small")`); await sleep(300);
+      S.motion = await ev(`(()=>{const i=document.querySelector("#input");i.value="Line one\\nLine two\\nLine three\\nLine four";const h=i.style.height;
+        const c=getComputedStyle(i),comp=document.querySelector("#composer"),cc=getComputedStyle(comp),cr=comp.getBoundingClientRect();
+        i.value="";i.dispatchEvent(new Event("input"));
+        const ub=document.querySelector("#chat-inner>.msg.user .body"),ubc=getComputedStyle(ub),ubr=ub.getBoundingClientRect(),ab=document.querySelector("#chat-inner>.msg.ai .body").getBoundingClientRect();
+        return {h,trans:c.transitionProperty+" "+c.transitionDuration,compBg:cc.backgroundColor,compR:cc.borderTopLeftRadius,compBlur:cc.backdropFilter,
+          bubBg:ubc.backgroundColor,bubR:ubc.borderTopLeftRadius,bubFont:ubc.fontSize,bubShadow:ubc.textShadow,inFont:c.fontSize,
+          right:Math.round(ubr.right-cr.right),left:Math.round(ab.left-cr.left)};})()`);
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="a new turn 590";i.dispatchEvent(new Event("input"));document.querySelector("#send").click();return 1;})()`);
+      await sleep(60);
+      S.motion.turn = await ev(`(m=>{const c=getComputedStyle(m);return {name:c.animationName,dur:c.animationDuration};})([...document.querySelectorAll("#chat-inner>.msg.user")].pop())`);
+      await landed(1, 6000);
+    }
+  } catch (e) { out.errs.push("driver: " + String(e).slice(0, 200)); }
+  done();
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
+'''
+
+
+def _c590_run(groups="open,edit,keys,actions,err,paste,motion", mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="c590-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "c590.js"), "w").write(_C590_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "c590.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, groups]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+        args.append(os.path.join(d_, "mut.json"))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=200)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+
+
+def _c590_ok(r):
+    S = r.get("steps") or {}
+    o, e, k, a, er, p, mo = (S.get(x) or {} for x in ("open", "edit", "keys", "actions", "err", "paste", "motion"))
+    ok = {}
+    if o:
+        ok["a long chat opens at its end before its first frame, in time"] = (o.get("n") == 220 and o.get("g0", 99) <= 4 and o.get("g1", 99) <= 4
+                                                                         and o.get("g700", 99) <= 4 and o.get("paint", 999) < 400)
+        ok["the title and the focus follow; no layout shift"] = (o.get("title") == "Big 590" and o.get("focus") == "input"
+                                                                  and (o.get("small") or {}).get("title") == "Small 590" and (o.get("small") or {}).get("focus") == "input"
+                                                                  and (o.get("back") or {}).get("cls", 1) <= 0.001)
+        ok["a chat left scrolled up reopens there"] = abs((o.get("back") or {}).get("top", 0) - 3000) <= 2
+    if e:
+        ok["the edit opens in place, Esc puts it back"] = ((e.get("open") or {}).get("box") is True and (e.get("open") or {}).get("n") == 4
+                                                           and (e.get("open") or {}).get("val") == "Question 0 590" and (e.get("esc") or {}).get("box") is False
+                                                           and (e.get("esc") or {}).get("n") == 4 and (e.get("esc") or {}).get("focus") == "input")
+        ok["Enter re-asks from there; the box's draft comes back"] = ((e.get("sent") or {}).get("last") == "Edited 590 question"
+                                                                       and (e.get("sent") or {}).get("users") == ["Edited 590 question"]
+                                                                       and (e.get("sent") or {}).get("draft") == "a draft 590" and (e.get("sent") or {}).get("msgs") == 2)
+        ok["↑ opens the last question"] = (e.get("up") or {}).get("last") is True
+    if k:
+        ok["an input method's Enter never sends"] = (k.get("ime") or {}).get("sent") == 0 and (k.get("ime") or {}).get("val") == "ime 590"
+        ok["the keys are drawn, never a glyph"] = ((k.get("idleKey") or {}).get("svg") is True and (k.get("idleKey") or {}).get("text") == ""
+                                                   and (k.get("liveKey") or {}).get("rect") is True and (k.get("liveKey") or {}).get("text") == ""
+                                                   and (k.get("liveKey") or {}).get("label") == "Stop" and ((k.get("esc") or {}).get("key") or {}).get("text") == "")
+        ok["Esc stops, the focus stays in the box"] = ((k.get("esc") or {}).get("live") is False and (k.get("esc") or {}).get("focus") == "input"
+                                                       and (k.get("esc") or {}).get("stopped") is True)
+        ok["the jump key: while it streams out of sight, and for one that landed there"] = ((k.get("jumpLive") or {}).get("hidden") is False
+                                                                                            and (k.get("jumpAfter") or {}).get("hidden") is False
+                                                                                            and (k.get("jumpAfter") or {}).get("gap", 0) > 40
+                                                                                            and (k.get("jumped") or {}).get("hidden") is True)
+        ok["one announcement per answer"] = (k.get("liveAttr") == "polite" and "word69 Stand-in done." in (k.get("said") or "")
+                                             and str((k.get("esc") or {}).get("said") or "").startswith("Stopped."))
+    if a:
+        ok["the actions fade in on hover, nothing moves"] = (a.get("rest") and all(x == 0 for x in a.get("rest") if x is not None)
+                                                              and a.get("hover") == 1 and a.get("hoverUser") == 1 and a.get("tops0") == a.get("tops1"))
+        ok["the copy's check, then back"] = ((a.get("copied") or {}).get("label") == "Copied" and (a.get("copied") or {}).get("check") is True
+                                              and (a.get("after") or {}).get("label") == "Copy" and (a.get("after") or {}).get("check") is False)
+    if er:
+        ok["kind error lines with Try again, the raw text only in the tooltip"] = (
+            (er.get("fail") or {}).get("go") is True and (er.get("fail") or {}).get("alert") is True
+            and "RuntimeError" not in (er.get("fail") or {}).get("text", "x RuntimeError") and "⚠" not in (er.get("fail") or {}).get("text", "⚠")
+            and "RuntimeError" in (er.get("fail") or {}).get("tip", "")
+            and (er.get("net") or {}).get("line") == "The connection dropped before the answer finished." and er.get("retried") == 1)
+    if p:
+        ok["a big paste is a file; a short one is text"] = (p.get("docs") == ["Pasted text.txt"] and p.get("val") == "" and p.get("chips") is True
+                                                            and (p.get("small") or {}).get("prevented") is False)
+        ok["a long question folds behind Show more"] = ((p.get("fold") or {}).get("h0", 999) <= 230 and (p.get("fold") or {}).get("h1", 0) > 400
+                                                         and (p.get("fold") or {}).get("label") == "Show less")
+    if mo:
+        ok["flat surfaces, one edge, a turn rises in 200 ms, the box's height eases"] = (
+            mo.get("compBg") == "rgb(21, 21, 23)" and mo.get("compR") == "14px" and mo.get("compBlur") == "none"
+            and mo.get("bubBg") == "rgb(31, 31, 34)" and mo.get("bubR") == "14px" and mo.get("bubShadow") == "none" and mo.get("inFont") == "15px"
+            and abs(mo.get("right", 9)) <= 1 and abs(mo.get("left", 9)) <= 1 and str(mo.get("h", "")).endswith("px")
+            and "height 0.15s" in mo.get("trans", "") and (mo.get("turn") or {}).get("name") == "chatTurnIn" and (mo.get("turn") or {}).get("dur") == "0.2s")
+    ok["no page errors"] = not r.get("err") and not r.get("errs")
+    return ok
+
+
+_c590 = _c590_run()
+_c590k = _c590_ok(_c590)
+check("6b590 the chat (page): a 220-turn chat opens at its end before its first frame; a chat left scrolled up reopens there; the "
+      "title and focus follow; the edit in place (Esc, Enter re-asks, the draft back), ↑; no send on an input method's Enter; drawn keys; "
+      "Esc stops; the jump key; one announcement; the actions' fade with nothing moving; the copy's check; kind errors with Try again; "
+      "a big paste as a file; a folded long question; a 6 px rise; the box's eased height",
+      len(_c590k) == 18 and all(_c590k.values()),
+      "%r" % [[k_ for k_, v_ in _c590k.items() if not v_], _c590.get("err"), (_c590.get("errs") or [])[:4],
+              {k_: v_ for k_, v_ in (_c590.get("steps") or {}).items() if k_ in ("paste", "motion")}])
+_C590_M = [
+    ("an input method's Enter sends", "keys", [["if(e.isComposing||e.keyCode===229)return;e.preventDefault();sendSafe();", "e.preventDefault();sendSafe();"]],
+     "an input method's Enter never sends"),
+    ("a chat glides down from the top", "open", [["else{chatPinned=true;chatToBottom(false);}\n  chatJumpPaint();", "else{chatPinned=true;chatToBottom(true);}\n  chatJumpPaint();"]],
+     "a long chat opens at its end before its first frame, in time"),
+    ("the place forgotten", "open", [["  chatPlaceSave();                 // where the chat being left was read to (6b590)\n", ""]],
+     "a chat left scrolled up reopens there"),
+    ("the old edit (the chat wiped, the words in the composer)", "edit", [['else if(act==="edit"){if(!chatEditOpen(msg))editResend(text);}', 'else if(act==="edit")editResend(text);']],
+     "the edit opens in place, Esc puts it back"),
+    ("a glyph on the stop key", "keys", [["chatSendKey(true);   // the stop key", 'sendBtn.textContent="■";sendBtn.classList.add("stop");   // the stop key']],
+     "the keys are drawn, never a glyph"),
+    ("the actions always on", "actions", [[".hz:not(.hz-full) .msg .ans-foot .mact{opacity:0}\n", ""], [".hz .msg .mact{opacity:0;", ".hz .msg .mact{opacity:1;"]],
+     "the actions fade in on hover, nothing moves"),
+    ("the raw error", "err", [["  if(isErr&&!wasAborted)chatErrPaint(aiDiv,full);", ""]], "kind error lines with Try again, the raw text only in the tooltip"),
+    ("a big paste as text", "paste", [["  input.addEventListener(\"paste\",chatPaste);", ""]], "a big paste is a file; a short one is text"),
+    ("the jump key gone when it lands", "keys", [["(generating||chatUnseen)&&!chatPinned", "(generating)&&!chatPinned"]],
+     "the jump key: while it streams out of sight, and for one that landed there"),
+    ("no announcement", "keys", [["  chatSay(stopped?", "  void(stopped?"]], "one announcement per answer"),
+    ("the old 10 px, 900 ms rise", "motion", [["animation:chatTurnIn .2s var(--hz-ease-out) both}", "animation:hzRise .9s var(--hz-ease-out) both}"]],
+     "flat surfaces, one edge, a turn rises in 200 ms, the box's height eases"),
+]
+_c590m = []
+for _d590, _g590, _mu590, _want590 in _C590_M:
+    _r590 = _c590_run(_g590, _mu590)
+    _k590 = _c590_ok(_r590)
+    _c590m.append((_d590, _r590.get("mutated", 0) >= 1 and _k590.get(_want590) is False,
+                   [x_ for x_, v_ in _k590.items() if not v_][:2]))
+check("6b590 the chat (page): %d mutants served in place of the page, each caught by the step it breaks" % len(_C590_M),
+      all(x_[1] for x_ in _c590m), "%r" % [x_ for x_ in _c590m if not x_[1]])
+# (the 6b425 follow rule's own node check, earlier in the run, drives the block with chatBulk and chatUnseen in it)
+# ==== 6b590 the chat: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

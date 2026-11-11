@@ -53535,11 +53535,8 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
 .hz .msg.ai .body sup.cite{font:500 9.5px/1 var(--hz-font-mono);color:rgba(214,220,232,.7);background:none;border:0;border-radius:0;padding:0 1px;margin:0 0 0 2px;vertical-align:.5em}
 .hz .msg.ai .body sup.cite:hover{color:var(--hz-ink);background:none}
 /* the question: a quiet right-aligned bubble (#1f1f22, radius 14), 85 % ink; 24 px to the answer */
-.hz .msg.user{display:flex;justify-content:flex-end;margin:0 0 24px}
-.hz .msg.user .body{font-family:var(--hz-font-read);font-size:15px;line-height:1.5;letter-spacing:-.01em;color:rgba(255,255,255,.85);background:#1f1f22;border:0;border-radius:14px;
-  padding:9px 14px;max-width:min(560px,85%);width:fit-content}
-.hz .msg.user .ans-foot{position:absolute;right:0;bottom:-30px}
-.hz .msg.user{position:relative}
+/* (beta 4: the bubble's box, its keys row and its rhythm are the chat's, 6b590, further down; only the edge is kept here) */
+.hz .msg.user .body{border:0;width:fit-content}
 /* the byline: tiny, metadata ink (12 px at 55 %), 12 px to the words; its dot flat silver */
 .hz .msg.ai .who{border-top:0;padding-top:0;font-family:var(--hz-font-ui);font-size:12px;letter-spacing:-.005em;color:rgba(255,255,255,.55);margin:0 0 12px}
 .hz .msg.ai .who b{color:rgba(255,255,255,.62);font-weight:500}
@@ -53703,6 +53700,130 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner{padding-top:104px}
 @media (max-width:860px){.hz #main:not(:has(#hero)) #chat-inner{max-width:none;--hz-col-side:24px}}
 @media (prefers-reduced-motion:reduce){.hz .hz-card,.hz .pf-steps li{animation:none}}
 .hz.hz-calm .hz-card,.hz.hz-calm .pf-steps li{animation:none}
+/* ==== THE CHAT (6b590, per Patrick: "how the actual chat part behaves ... equally perfect, top-notch, beautiful";
+   "Claude-sharp chrome plus GPT-grade motion, somewhere in the middle"; "super GPT smooth and beautiful, but Claude
+   very tight and to the point") ==== */
+/* Flat, sharp surfaces over the sky: the composer #151517, your words in a quiet #1f1f22 bubble on the right, the
+   sidebar a flat #141416 panel, no blur or glow on any of them, hairlines one device pixel. Inter for the UI and your
+   words (the font file is beta-4's; until it is there, the system's sans), antialiased, 450 for UI, softer ink by
+   colour not opacity. One easing family (--hz-ease-out in, --hz-ease-in-out out), 150 to 240 ms. Horizon only. */
+.hz{--hz-font-chat:var(--hz-font-ui);   /* one face token (beta 4): the UI's Inter, else the system's sans */
+  --chat-hw:1px;--chat-surface:#151517;--chat-bubble:#1f1f22;--chat-panel:#141416;--chat-sel:#1f1f22;
+  --chat-line:rgba(255,255,255,.1);--chat-line-2:rgba(255,255,255,.18);
+  --chat-ink:#ececf1;--chat-ink-2:#c5c6cd;--chat-ink-3:#8d8f97;--chat-ink-4:#7c7e86}
+@media (min-resolution:2dppx){.hz{--chat-hw:.5px}}
+/* ---- the composer: flat dark, a hairline, 14 round, small icons; its height eases as it grows (fitInput measures on
+   a hidden twin, so the height never passes through "auto"); a drop target lights its edge */
+.hz #composer{background:var(--chat-surface);border:var(--chat-hw) solid var(--chat-line);border-radius:14px;
+  -webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 1px 2px rgba(0,0,0,.28),0 12px 32px -16px rgba(0,0,0,.7)}
+.hz #composer:focus-within,.hz #composer.drop{border-color:var(--chat-line-2);box-shadow:0 1px 2px rgba(0,0,0,.28),0 12px 32px -16px rgba(0,0,0,.7)}
+.hz #input{font-family:var(--hz-font-chat);font-size:15px;font-weight:450;letter-spacing:-.005em;color:var(--chat-ink);
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;transition:height .15s var(--hz-ease-out)}
+.hz #main:not(:has(#hero)) #input{font-size:15px;line-height:22px}
+.hz #input::placeholder{color:var(--chat-ink-4);opacity:1}
+.hz #crow .cbtn svg{width:16px;height:16px;stroke-width:1.5}
+.hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(rgba(5,5,6,0),rgba(5,5,6,.9) 40px,rgba(5,5,6,.97))}
+/* the follow-up that waits: said just above the box, never under it (the old line sat on the rim's pseudo-element,
+   display none, so it never showed) */
+.hz #composer.queued::after{content:"";inset:-1px;font:inherit;color:inherit}
+.hz #chat-queued{position:absolute;left:16px;bottom:calc(100% + 8px);font:450 12px/16px var(--hz-font-chat);letter-spacing:-.005em;
+  color:var(--chat-ink-3);pointer-events:none;opacity:0;transition:opacity .15s var(--hz-ease-in-out);-webkit-font-smoothing:antialiased}
+.hz #composer.queued #chat-queued{opacity:1;transition-timing-function:var(--hz-ease-out)}
+/* ---- the send key and the stop key: the same 36 px key, a drawn arrow or a small square, crisp */
+.hz #send svg{width:16px;height:16px;stroke-width:1.5;transform:none}
+/* ---- your words: a quiet bubble on the right of the reading column, Inter 15 on 22, 10 / 14 inside, 14 round; the
+   copy and edit keys under it on hover; past about twelve lines it folds behind Show more */
+.hz .msg.user{display:flex;flex-direction:column;align-items:flex-end;max-width:640px;margin:0 0 8px}
+.hz #chat-inner>.msg.ai{margin-bottom:24px}   /* the turn's rhythm on the 8 grid: the answer's keys, 24, the next question */
+/* one shared edge for the question, the answer and the composer: a classic scrollbar (a PC, a mouse) takes its room on
+   both sides, so the column stays centred over the composer */
+.hz #main:not(:has(#hero)) #chat-scroll{scrollbar-gutter:stable both-edges}
+.hz .msg.user .body{font:450 15px/22px var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink);background:var(--chat-bubble);
+  border-radius:14px;padding:10px 14px;max-width:min(560px,85%);white-space:pre-wrap;overflow-wrap:anywhere;text-wrap:pretty;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;box-sizing:border-box}
+.hz .msg.user .body.clamp:not(.open){max-height:218px;overflow:hidden;
+  -webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 56px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 56px),transparent)}
+.hz .msg.user .umore{align-self:flex-end;margin:4px 0 0;height:28px;padding:0 8px;border:0;border-radius:8px;background:none;cursor:pointer;
+  font:500 12px/1 var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink-3);transition:color .15s var(--hz-ease-out),background .15s var(--hz-ease-out)}
+.hz .msg.user .umore:hover{color:var(--chat-ink);background:rgba(255,255,255,.05)}
+.hz .msg.user .docrow{margin-top:10px;justify-content:flex-end}
+.hz .msg.user .docchip2{border-radius:6px;background:rgba(255,255,255,.06);box-shadow:none;font:450 12px var(--hz-font-chat);color:var(--chat-ink-2)}
+.hz .msg.user .sentimgs{display:flex;justify-content:flex-end}
+.hz .msg.user .ans-foot{display:flex;justify-content:flex-end;margin-top:4px;min-height:28px}
+/* the edit, in place: the bubble becomes a flat box the width of the column; Send re-asks from here */
+.hz .msg.user.editing{align-items:stretch}
+.hz .msg.user.editing>.body,.hz .msg.user.editing>.umore,.hz .msg.user.editing>.ans-foot{display:none}
+.hz .uedit{background:var(--chat-surface);border:var(--chat-hw) solid var(--chat-line-2);border-radius:14px;padding:12px 14px 10px;
+  animation:chatFadeIn .15s var(--hz-ease-out)}
+.hz .uedit-in{display:block;width:100%;box-sizing:border-box;margin:0;padding:0;border:0;outline:0;resize:none;background:transparent;
+  font:450 15px/22px var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink);-webkit-font-smoothing:antialiased;min-height:22px}
+.hz .uedit-row{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.hz .uedit-row button,.hz .chat-err-go,.hz .msg.ai>.retrybtn,.hz .offerrow button{height:32px;padding:0 12px;border-radius:8px;cursor:pointer;
+  font:500 13px/1 var(--hz-font-chat);letter-spacing:-.005em;-webkit-font-smoothing:antialiased;
+  transition:background .15s var(--hz-ease-out),border-color .15s var(--hz-ease-out),color .15s var(--hz-ease-out)}
+.hz .uedit-x,.hz .chat-err-go,.hz .msg.ai>.retrybtn,.hz .offerrow button{background:transparent;color:var(--chat-ink);border:var(--chat-hw) solid var(--chat-line-2)}
+.hz .uedit-x{color:var(--chat-ink-2)}
+.hz .uedit-x:hover,.hz .chat-err-go:hover,.hz .msg.ai>.retrybtn:hover,.hz .offerrow button:hover{background:rgba(255,255,255,.06);color:var(--chat-ink);border-color:rgba(255,255,255,.24)}
+.hz .uedit-ok{background:var(--hz-ember);color:var(--hz-night);border:0}
+.hz .uedit-ok:hover{background:#ed5169}
+.hz .uedit-ok:disabled{background:rgba(255,255,255,.08);color:var(--chat-ink-3);cursor:default}
+.hz .msg.user.saving .uedit{opacity:.6}
+/* ---- the actions, yours and the answer's: small grey keys that fade in on hover or focus and take no room of their
+   own (the row is always there, so nothing moves); keyboard reachable, the ember hairline only from the keyboard;
+   the copy's check for a moment. No scale, no colour but ink. */
+.hz .msg .mact{opacity:0;transition:opacity .15s var(--hz-ease-in-out)}
+.hz:not(.hz-full) .msg .ans-foot .mact{opacity:0}
+.hz .msg:hover .mact,.hz .msg:focus-within .mact,.hz:not(.hz-full) .msg:hover .ans-foot .mact,.hz:not(.hz-full) .msg:focus-within .ans-foot .mact{opacity:1;transition-timing-function:var(--hz-ease-out)}
+.hz .msg.ai.landed>.ans-foot .mact{animation:none}
+@media (hover:none){.hz .msg .mact,.hz:not(.hz-full) .msg .ans-foot .mact{opacity:1}}
+.hz .mab{width:28px;height:28px;border-radius:8px;color:var(--chat-ink-3);background:transparent;transform:none;
+  transition:color .15s var(--hz-ease-out),background .15s var(--hz-ease-out)}
+.hz .mab svg{width:16px;height:16px;stroke-width:1.5}
+.hz .mab:hover{background:rgba(255,255,255,.06);color:var(--chat-ink)}
+.hz .mab:active{transform:none;background:rgba(255,255,255,.09)}
+.hz .mab.on,.hz .mab.done{color:var(--chat-ink)}
+.hz:not(.hz-kb) .mab:focus-visible,.hz:not(.hz-kb) .umore:focus-visible,.hz:not(.hz-kb) .uedit-row button:focus-visible,.hz:not(.hz-kb) .chat-err-go:focus-visible,.hz:not(.hz-kb) #jumpdown:focus-visible{outline:0;box-shadow:none}
+.hz.hz-kb .mab:focus-visible,.hz.hz-kb .umore:focus-visible,.hz.hz-kb .uedit-row button:focus-visible,.hz.hz-kb .chat-err-go:focus-visible,.hz.hz-kb #jumpdown:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+/* ---- the jump key: a 32 px flat key with a drawn arrow, only while an answer is on its way or has landed out of
+   sight and you are up the page; it fades in and out (the hidden attribute still says whether it is there) */
+.hz #jumpdown,.hz #jumpdown[hidden]{display:flex;width:32px;height:32px;border-radius:8px;left:calc(50% - 16px);transform:none;padding:0;
+  background:var(--chat-bubble);color:var(--chat-ink-2);border:var(--chat-hw) solid var(--chat-line-2);
+  -webkit-backdrop-filter:none;backdrop-filter:none;box-shadow:0 4px 12px -6px rgba(0,0,0,.7);
+  transition:opacity .18s var(--hz-ease-out),visibility 0s,background .15s var(--hz-ease-out),color .15s var(--hz-ease-out)}
+.hz #jumpdown[hidden]{opacity:0;visibility:hidden;pointer-events:none;transition:opacity .15s var(--hz-ease-in-out),visibility 0s .15s}
+.hz #jumpdown:hover{background:#27272b;color:var(--chat-ink)}
+.hz #jumpdown svg{width:16px;height:16px}
+/* ---- kind error lines: the ember hairline (an error is one of the ember's places), what happened in plain words, Try
+   again; the technical text only in the line's tooltip */
+.hz .chat-err{display:flex;align-items:center;flex-wrap:wrap;gap:8px 16px;margin:4px 0 0;padding:4px 0 4px 12px;border-left:1px solid var(--hz-ember)}
+.hz .chat-err-t{font:450 14px/20px var(--hz-font-chat);letter-spacing:-.005em;color:var(--chat-ink-2);-webkit-font-smoothing:antialiased}
+.hz .msg.ai>.retrybtn{margin-top:8px}
+/* ---- turns arrive with a 6 px rise and a fade in 200 ms; an opened chat fades up from .55 in 180 ms (never from
+   nothing, so no blank frame); a saved message is drawn settled */
+@keyframes chatTurnIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes chatSwapIn{from{opacity:.55}to{opacity:1}}
+@keyframes chatFadeIn{from{opacity:0}to{opacity:1}}
+.hz #chat-inner>.msg:not(.settled){animation:chatTurnIn .2s var(--hz-ease-out) both}
+.hz #chat-inner>.msg.settled{animation:none}
+.hz #chat-inner.chat-swap{animation:chatSwapIn .18s var(--hz-ease-out)}
+/* ---- the sidebar: a flat lifted panel, compact 13 px rows 32 tall, the chosen row a quiet #1f1f22 */
+html.hz #sidebar{background:var(--chat-panel);-webkit-backdrop-filter:none;backdrop-filter:none;border-right:var(--chat-hw) solid rgba(255,255,255,.07)}
+.hz .chat-item{font:450 13px/18px var(--hz-font-chat);letter-spacing:-.005em;min-height:32px;border-radius:8px;color:#c6c7ce;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.hz .chat-item:hover{background:rgba(255,255,255,.04);color:var(--chat-ink)}
+.hz .chat-item.active{background:var(--chat-sel);color:#f4f4f6;font-weight:500}
+.hz .cday,.hz .cgroup{font:500 11px/16px var(--hz-font-chat);letter-spacing:.06em;text-transform:uppercase;color:var(--chat-ink-4);text-shadow:none;
+  -webkit-font-smoothing:antialiased}
+.hz .chat-item .csnip{font:450 12px/16px var(--hz-font-chat);color:var(--chat-ink-3)}
+.hz #chat-search input{background:#1a1a1d;box-shadow:inset 0 0 0 var(--chat-hw) var(--chat-line);font:450 13px var(--hz-font-chat);letter-spacing:-.005em;
+  color:var(--chat-ink);-webkit-font-smoothing:antialiased}
+.hz #chat-search input:focus{box-shadow:inset 0 0 0 var(--chat-hw) var(--chat-line-2)}
+/* ---- for a screen reader: the landed answer, once */
+.chat-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+@media (prefers-reduced-motion:reduce){
+  .hz #chat-inner>.msg,.hz #chat-inner.chat-swap,.hz .uedit{animation:none!important}
+  .hz #input,.hz .msg .mact,.hz #jumpdown,.hz #jumpdown[hidden],.hz #chat-queued{transition:none}}
+/* ==== the chat (6b590): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -54205,7 +54326,7 @@ __CODE_ROWS__
   <div id="composer-wrap">
     <!-- back to the newest line: shown only while an answer streams and the
          reader has scrolled up out of it (6b425) -->
-    <button id="jumpdown" type="button" title="Jump to the end" aria-label="Jump to the end" hidden>&#8595;</button>
+    <button id="jumpdown" type="button" title="Jump to the end" aria-label="Jump to the end" hidden><svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v9.5"/><path d="M3.5 8.5 8 13l4.5-4.5"/></svg></button>
     <!-- starter prompts: inside composer-wrap so the row is EXACTLY the
          composer's width without having to restate it -->
     <div id="suggest" hidden></div>
@@ -57866,11 +57987,11 @@ inner.addEventListener("click",e=>{
   const msg=b.closest(".msg"),text=(msg&&msg._txt)||"",act=b.dataset.act;
   if(act==="copy"){
     copyText(text).then(ok=>{
-      if(ok){b.classList.add("done");setTimeout(()=>b.classList.remove("done"),1200);}
+      if(ok)chatCopied(b);   // a check and "Copied" for a moment (6b590)
       else copyFlash(b,false,ICO.copy,true);
     });
   }else if(act==="redo")regenerate();
-  else if(act==="edit")editResend(text);
+  else if(act==="edit"){if(!chatEditOpen(msg))editResend(text);}   // in place under Horizon (6b590)
   else if(act==="speak"){
     // the app's own voice reads the answer; pressed again, it stops
     const on=b.classList.contains("on");
@@ -58201,6 +58322,7 @@ function userBody(body,text,docs){
   text=String(text==null?"":text);
   const m=/\n?📄 (.+)$/.exec(text);
   body.textContent=m?text.slice(0,m.index):text;
+  chatClamp(body);                 // a long question folds behind Show more (6b590)
   if(!m)return;
   const row=document.createElement("div");row.className="docrow";
   row.innerHTML=m[1].split(", ").map(n=>{
@@ -58750,8 +58872,10 @@ const input=$("#input"),sendBtn=$("#send");
 // pasting and the code that fills it (dictation, edit and resend, chips), up
 // to 45% of the window, then it scrolls
 function fitInput(){
-  input.style.height="auto";
-  input.style.height=Math.min(input.scrollHeight,Math.max(180,Math.round(innerHeight*0.45)))+"px";
+  // measured on a hidden twin (6b590), so the box's own height never passes through "auto" and can ease
+  const h=chatFitMeasure();
+  if(h==null){input.style.height="auto";input.style.height=Math.min(input.scrollHeight,Math.max(180,Math.round(innerHeight*0.45)))+"px";return;}
+  input.style.height=Math.min(h,Math.max(180,Math.round(innerHeight*0.45)))+"px";
 }
 input.addEventListener("input",fitInput);
 (function(){
@@ -58774,13 +58898,15 @@ function sendSafe(){
   }
 }
 input.addEventListener("keydown",e=>{
-  if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendSafe();}
+  // an input method's Enter confirms the word being composed and never sends (6b590)
+  if(e.key==="Enter"&&!e.shiftKey){if(e.isComposing||e.keyCode===229)return;e.preventDefault();sendSafe();}
 });
 // a queued follow-up that was cleared is not sent (6b570)
 input.addEventListener("input",()=>{if(sendQueued&&!input.value.trim()){sendQueued=false;
   const qc=$("#composer");if(qc)qc.classList.remove("queued");}});
 // during a Vera Rubin run the first ■ stops it cleanly, a second cuts the stream (6b519)
-sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()):sendSafe(); });
+sendBtn.addEventListener("click",()=>{ generating?(rubinStop()||abortCtl.abort()):sendSafe();
+  if(isHz())input.focus({preventScroll:true}); });   // the words go back to the box after a send or a stop (6b590)
 
 /* ------------------------------------------------------ image paste */
 // paste a screenshot/photo straight into the composer: it becomes a chip,
@@ -59059,13 +59185,16 @@ input.addEventListener("paste",e=>{
 // var, not let: addMsg pins, and a let read before this line runs would
 // throw in the temporal dead zone and take the whole page with it
 var chatPinned=true,chatLastTop=0,CHAT_SLACK=40;
+// a whole chat painted at once pins once, at the end, not 200 times (chatBulk); an answer that
+// started or landed while the reader was up the page keeps the jump key (chatUnseen) (6b590)
+var chatBulk=0,chatUnseen=false;
 function chatGap(){return scroller.scrollHeight-scroller.scrollTop-scroller.clientHeight;}
 function chatMoved(){
   // the reader moved the view up since the app last placed it
   const top=scroller.scrollTop,gap=chatGap();
   if(top<chatLastTop-1&&gap>4)chatPinned=false;
   else if(!chatPinned&&(gap<=4||(top>chatLastTop+1&&gap<=CHAT_SLACK)))
-    chatPinned=true;
+    {chatPinned=true;chatUnseen=false;}
   chatLastTop=top;
 }
 /* THE STATUS CARD CLEARS THE COMPOSER (6b425, per Patrick: "After a
@@ -59099,7 +59228,7 @@ function chatToBottom(smooth){
 }
 function chatJumpPaint(){
   const b=$("#jumpdown");
-  if(b)b.hidden=!(generating&&!chatPinned&&chatGap()>CHAT_SLACK);
+  if(b)b.hidden=!((generating||chatUnseen)&&!chatPinned&&chatGap()>CHAT_SLACK);
 }
 function autoScroll(smooth){
   chatMoved();                      // a drag that hasn't fired its event yet
@@ -59123,7 +59252,7 @@ function chatEase(){
     chatLastTop=scroller.scrollTop;chatEaseRaf=requestAnimationFrame(step);};
   chatEaseRaf=requestAnimationFrame(step);
 }
-function chatPin(smooth){chatPinned=true;chatToBottom(smooth);chatJumpPaint();}
+function chatPin(smooth){chatPinned=true;chatUnseen=false;if(chatBulk)return;chatToBottom(smooth);chatJumpPaint();}
 scroller.addEventListener("wheel",e=>{
   if(!(e.deltaY<0)||scroller.scrollTop<=0||e.defaultPrevented)return;
   // a box inside the answer that scrolls up itself (a long code card, a
@@ -59250,6 +59379,7 @@ async function send(){
   const sentImages=pendingImages.slice();
   const sentDocs=pendingDocs.slice();
   pendingImages=[];pendingDocs=[];paintChips();
+  chatDraftBack();                 // an edit's send: the box's own draft and files come back (6b590)
   const shown=(text||(sentImages.length?"🖼️ (image)":"")
     ||(sentDocs.length?"📄 (file)":""))
     +(sentDocs.length&&text?"":"")
@@ -59288,7 +59418,7 @@ async function send(){
     after_len:myMessages.length-1,after_hash:chatHash(myMessages,myMessages.length-1)};
   generating=true; document.body.classList.add("gen"); genChat=myChat;
   if(globalThis.hzReady)hzOnSend();           // Horizon: the shockwave, the live aurora (6b526)
-  sendBtn.textContent="■"; sendBtn.classList.add("stop"); sendBtn.title="Stop";
+  chatSendKey(true);   // the stop key (6b590): a drawn square, not a "■" glyph
   const aiDiv=addMsg("assistant","",null,null,null,null,null,null,{live:true,mode:tier,effort:typeof hzEffortWire==="function"?hzEffortWire():""}); const body=aiDiv.querySelector(".body");
   if(globalThis.hzReady&&typeof hzStarStart==="function")hzStarStart(aiDiv);   // the writing star (6b544)
   aiDiv.classList.add("live");     // soft mask on the newest line
@@ -59739,6 +59869,7 @@ async function send(){
     rb.addEventListener("click",()=>{rb.remove();regenerate();});
     aiDiv.appendChild(rb);
   }
+  if(isErr&&!wasAborted)chatErrPaint(aiDiv,full);   // a kind line and Try again (6b590)
   if(full&&!isErr){
     // THE NUMBERS LIVE BESIDE THE ANSWER NOW (6b528): the spine's final step
     // carries the writer's pace (its real output tokens over the RATE clock),
@@ -59796,7 +59927,8 @@ async function send(){
   generating=false;abortCtl=null;genChat=null;document.body.classList.remove("gen");
   if(globalThis.hzReady)hzOnLand(wasAborted);  // Horizon: the sky settles (6b526)
   srvBoost=false;     // the bars go back to their normal rate (6b461)
-  sendBtn.textContent="↑";sendBtn.classList.remove("stop");sendBtn.title="Send";
+  chatSendKey(false);   // back to the send arrow (6b590)
+  chatLanded(aiDiv,full,wasAborted,isErr,myChat);   // read out once; the jump key if it landed out of sight (6b590)
   if(curChat===myChat)autoScroll();
   chatJumpPaint();                 // the ↓ is a streaming control only
   input.focus();
@@ -59818,6 +59950,7 @@ async function send(){
     sendQueued=false;{const qc=$("#composer");if(qc)qc.classList.remove("queued");}
     if(input.value.trim()&&!generating)setTimeout(sendSafe,60);
   }
+  chatIdleKick();                  // an edit waiting for this answer to end (6b590)
 }
 
 /* ------------------------------------------------------------- greeting */
@@ -60127,8 +60260,11 @@ function redrawOpen(){
   inner.innerHTML="";
   if(!messages.length){resetHero();return;}
   const sc=chats.find(x=>x.id===curChat),by=sc&&sc.src&&sc.src.name;   // 6b529
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
-    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));
+  chatBulk++;
+  try{messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",
+    m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));}
+  finally{chatBulk--;}
+  if(chatPinned)chatToBottom(false);   // one pin for the whole repaint (6b590)
 }
 async function loadChatsFromDisk(){
   try{
@@ -60939,14 +61075,18 @@ function loadChat(id){
   // the DOM below, and the typed-answer path (6b257) must not advance
   // an orphaned funnel into whichever chat is on screen
   fnState=null;fnAnswer=null;
+  chatPlaceSave();                 // where the chat being left was read to (6b590)
   curChat=id;
   messages=c.messages.slice();
   inner.innerHTML="";
   const by=c.src&&c.src.name;     // a chat brought from another app (6b529)
   // only the messages brought in carry the other app's byline (integration); an answer written here signs with SIGN_BRAND
-  messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));
+  chatBulk++;
+  try{messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));}
+  finally{chatBulk--;}
   renderChats();
   markSeen();
+  chatArrive(id);                  // lands at once, fades in, the box focused (6b590)
 }
 renderChats();
 loadChatsFromDisk();
@@ -61359,6 +61499,8 @@ document.addEventListener("keydown",e=>{
     }
     return;
   }
+  // ↑ in an empty box opens your last question in place, as Save and Cancel (6b590)
+  if(e.key==="ArrowUp"&&e.target===input&&!input.value.trim()&&!e.shiftKey&&!e.isComposing&&chatEditLast()){e.preventDefault();return;}
   // ↑ on an empty composer recalls your last message to edit
   if(e.key==="ArrowUp"&&e.target===input&&!input.value.trim()
      &&!generating){
@@ -61382,6 +61524,7 @@ $("#newchat").addEventListener("click",()=>{
   pendingEdit=null;                 // a new chat drops an edit that was waiting (6b343)
   if(generating&&abortCtl)abortCtl.abort();
   chatTrunc=null;
+  chatPlaceSave();chatUnseen=false;   // where the chat being left was read to (6b590)
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
@@ -68748,7 +68891,7 @@ function hzDebugApply(){
     if(d.state!=="landed"){document.body.classList.add("gen");hzS.gen=true;hzS.genLocal=d.server!=="1";root.classList.add("hz-busy");
       if(d.server==="1"&&typeof srvList!=="undefined"&&srvList[0])hzS.srvWorking=srvList[0].name;
       if(hzS.sky)hzS.sky.setBusy(true);
-      $("#send").classList.add("stop");$("#send").textContent="■";hzMachinesPaint();}
+      chatSendKey(true);hzMachinesPaint();}
     if(d.state==="boom")$("#send").style.transform="scale(.96)";   // the press, held (6b553: no rings)
   }
   setTimeout(hzGlowFit,80);
@@ -68937,6 +69080,294 @@ function slFxSync(on){
     .observe(av,{childList:true,subtree:true});}
 })();
 /* ===================================================== HORIZON end (6b526) */
+
+/* ==== THE CHAT (6b590): script begin ==== */
+// THE CHAT (6b590, per Patrick: "as far as how the actual chat part behaves, let's make that equally perfect, top-notch,
+// beautiful"; then "Claude-sharp chrome plus GPT-grade motion, somewhere in the middle"). How chatting behaves around
+// the stream (the stream itself, the answer's footer card and the Ultra stars are another branch's): the send and stop
+// key drawn, a chat opening where it was left (or at its end) before its first frame, the jump key only for an answer
+// out of sight, your question edited in place, a long question folded, a big paste as a file, the copy's quiet check,
+// kind error lines with Try again, one announcement per answer, the drop target. Functions and var only: send() and
+// the Horizon boot call into this block, and a let or const read before this line runs would end the page (the TDZ).
+function chatIco(k){
+  return k==="stop"?'<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><rect x="4" y="4" width="8" height="8" rx="1.5" fill="currentColor"/></svg>'
+    :k==="check"?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'
+    :'<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 13V3.5"/><path d="M3.5 7.5 8 3l4.5 4.5"/></svg>';
+}
+// THE SEND KEY AND THE STOP KEY: the same 36 px key, an arrow or a small square, drawn (the "■" and "↑" glyphs it
+// used to swap to sat at different sizes and baselines from the drawn arrow it started with)
+function chatSendKey(stop){
+  const b=document.getElementById("send");if(!b)return;
+  b.innerHTML=chatIco(stop?"stop":"send");
+  b.classList.toggle("stop",!!stop);
+  b.title=stop?"Stop":"Send";b.setAttribute("aria-label",stop?"Stop":"Send");
+}
+// THE BOX GROWS SMOOTHLY: its height is measured on a hidden twin with the same width, type and padding, so the box
+// itself goes straight from one height to the next and the height can ease (.15 s); null when the twin can't be made
+var chatTwin=null;
+function chatFitMeasure(){
+  if(!document.documentElement.classList.contains("hz")||!input.isConnected||!input.clientWidth)return null;
+  let t=chatTwin;
+  if(!t){t=chatTwin=document.createElement("textarea");t.setAttribute("aria-hidden","true");t.tabIndex=-1;t.rows=1;
+    t.style.cssText="position:absolute;left:-10000px;top:0;visibility:hidden;pointer-events:none;overflow:hidden;height:0;min-height:0;max-height:none;transition:none";
+    document.body.appendChild(t);}
+  const c=getComputedStyle(input);
+  for(const k of ["fontFamily","fontSize","fontWeight","fontStyle","lineHeight","letterSpacing","wordSpacing","textTransform","textIndent",
+    "paddingTop","paddingBottom","whiteSpace","wordBreak","overflowWrap","tabSize","fontVariationSettings"])t.style[k]=c[k];
+  t.style.boxSizing="content-box";t.style.border="0";t.style.paddingLeft=t.style.paddingRight="0";
+  t.style.width=(input.clientWidth-parseFloat(c.paddingLeft)-parseFloat(c.paddingRight))+"px";
+  t.value=input.value;
+  let h=t.scrollHeight;               // the text and the vertical padding
+  if(c.boxSizing==="border-box")h+=parseFloat(c.borderTopWidth)+parseFloat(c.borderBottomWidth);
+  else h-=parseFloat(c.paddingTop)+parseFloat(c.paddingBottom);
+  return Math.max(h,parseFloat(c.minHeight)||0);
+}
+// WHERE A CHAT WAS LEFT: a chat left scrolled up opens where it was; any other opens at its end. Kept for this run only.
+var chatPlacesM=null,chatSwapT=0;
+function chatPlaces(){return chatPlacesM||(chatPlacesM=new Map());}
+function chatPlaceSave(){
+  if(!curChat||!document.documentElement.classList.contains("hz"))return;
+  const P=chatPlaces();
+  if(!chatPinned&&chatGap()>CHAT_SLACK)P.set(curChat,scroller.scrollTop);else P.delete(curChat);
+  if(P.size>200)P.delete(P.keys().next().value);
+}
+// A CHAT OPENS AT ONCE: painted in one pass (loadChat), placed before its first frame (no glide down from the top, no
+// flash), faded in over 180 ms from .55 (never from nothing), the title in the header, the box focused
+function chatArrive(id){
+  chatUnseen=false;chatGlideTo=0;chatAnc=null;
+  const at=chatPlaces().get(id);
+  chatRoom();
+  if(at!=null){scroller.style.scrollBehavior="auto";scroller.scrollTop=at;scroller.style.scrollBehavior="";
+    chatLastTop=scroller.scrollTop;chatPinned=chatGap()<=4;}
+  else{chatPinned=true;chatToBottom(false);}
+  chatJumpPaint();
+  if(!isHz())return;
+  inner.classList.remove("chat-swap");void inner.offsetWidth;inner.classList.add("chat-swap");
+  clearTimeout(chatSwapT);chatSwapT=setTimeout(()=>inner.classList.remove("chat-swap"),240);
+  if(typeof hzTitlePaint==="function")hzTitlePaint();
+  const a=document.activeElement;
+  if(!(a&&a.id==="chat-q"))input.focus({preventScroll:true});
+}
+// THE JUMP KEY'S OTHER HALF: an answer that lands while the reader is up the page keeps the key until they come down;
+// and the answer is read out once, as it lands (the live region; never token by token)
+function chatLanded(div,full,stopped,isErr,myChat){
+  if(myChat!==curChat||!div)return;
+  if(full&&!stopped&&!chatPinned)chatUnseen=true;
+  if(isErr)return;                 // the error line is its own alert
+  const b=div.querySelector(":scope>.body");
+  const t=b?(b.innerText||"").trim():"";
+  chatSay(stopped?(t?"Stopped. "+t:"Stopped."):t);
+}
+function chatSay(t){
+  let r=document.getElementById("chat-live");
+  if(!r){r=document.createElement("div");r.id="chat-live";r.className="chat-sr";r.setAttribute("aria-live","polite");
+    r.setAttribute("aria-atomic","true");document.body.appendChild(r);}
+  r.textContent="";
+  setTimeout(()=>{r.textContent=String(t||"").slice(0,1500);},50);
+}
+// WAITING FOR AN ANSWER TO END: an edit saved mid-answer stops it (or, in another chat, waits for it); send() calls
+// chatIdleKick as its very last step, after the stopped answer is saved
+var chatIdleQ=[];
+function chatIdle(){return new Promise(r=>{if(!generating)r();else chatIdleQ.push(r);});}
+function chatIdleKick(){if(generating)return;const q=chatIdleQ;chatIdleQ=[];q.forEach(f=>{try{f();}catch(e){}});}
+// EDIT IN PLACE (per Patrick's brief: "Edit-in-place with Save/Cancel, which re-asks from there"): the question turns
+// into a box where it stands, Enter or Send re-asks from there (what came after it goes; what is above stays on screen
+// untouched), Esc or Cancel puts it back. The composer's own draft and files wait and come back after the send.
+function chatUserIndex(div){
+  const us=[...inner.querySelectorAll(":scope>.msg.user")],k=us.indexOf(div);if(k<0)return -1;
+  let n=-1;for(let i=0;i<messages.length;i++)if(messages[i].role==="user"&&++n===k)return i;
+  return -1;
+}
+function chatEditOpen(div){
+  if(!isHz()||!div||!div.classList.contains("user")||uiMode==="funnel")return false;
+  const lc=chats.find(x=>x.id===curChat);if(lc&&lc.lane==="funnel")return false;
+  if(div.classList.contains("editing")){const t=div.querySelector(".uedit-in");if(t)t.focus();return true;}
+  const i=chatUserIndex(div);if(i<0)return false;
+  inner.querySelectorAll(":scope>.msg.user.editing").forEach(d=>chatEditClose(d,false));
+  const raw=String(messages[i].content||"").replace(/\n?📄 .*$/,"").trim();
+  const box=document.createElement("div");box.className="uedit";
+  box.innerHTML='<textarea class="uedit-in" rows="1" aria-label="Edit your message"></textarea>'
+    +'<div class="uedit-row"><button type="button" class="uedit-x">Cancel</button><button type="button" class="uedit-ok">Send</button></div>';
+  div.classList.add("editing");div.appendChild(box);
+  const ta=box.querySelector("textarea"),ok=box.querySelector(".uedit-ok");
+  ta.value=raw;
+  const fit=()=>{ta.style.height="auto";ta.style.height=Math.min(ta.scrollHeight,Math.round(innerHeight*.4))+"px";};
+  fit();
+  ta.addEventListener("input",()=>{fit();ok.disabled=!ta.value.trim();});
+  ta.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){e.preventDefault();e.stopPropagation();chatEditClose(div,true);return;}
+    if(e.key==="Enter"&&!e.shiftKey&&!e.isComposing&&e.keyCode!==229){e.preventDefault();chatEditSave(div);}
+  });
+  ta.focus({preventScroll:true});ta.setSelectionRange(ta.value.length,ta.value.length);
+  // in view, clear of the header above it and the composer below
+  const r=div.getBoundingClientRect(),top=chatTopEdge(),room=scroller.getBoundingClientRect().bottom-(parseFloat(scroller.style.getPropertyValue("--cwh"))||0);
+  if(r.top<top)chatScrollBy(r.top-top);else if(r.bottom>room)chatScrollBy(Math.min(r.bottom-room+16,r.top-top));
+  return true;
+}
+function chatEditClose(div,refocus){
+  if(!div)return;
+  const b=div.querySelector(":scope>.uedit");if(b)b.remove();
+  div.classList.remove("editing","saving");
+  if(refocus)input.focus({preventScroll:true});
+}
+var chatDraft=null;
+function chatDraftBack(){
+  const d=chatDraft;if(!d)return;chatDraft=null;
+  input.value=d.v||"";pendingImages=d.im||[];pendingDocs=d.dc||[];paintChips();
+  if(globalThis.hzReady&&hzS&&hzS.hasText)hzS.hasText();
+}
+async function chatEditSave(div){
+  const ta=div&&div.querySelector(".uedit-in");if(!ta||div.classList.contains("saving"))return;
+  const text=ta.value.trim();if(!text){chatEditClose(div,true);return;}
+  const k=[...inner.querySelectorAll(":scope>.msg.user")].indexOf(div),chat=curChat;
+  div.classList.add("saving");
+  if(generating){
+    if(abortCtl&&curChat===genChat)abortCtl.abort();      // this chat's answer stops, as Stop does
+    await chatIdle();                                     // and is saved before the rewind
+    if(curChat!==chat)return;
+  }
+  const d2=[...inner.querySelectorAll(":scope>.msg.user")][k];
+  const i=d2?chatUserIndex(d2):-1;
+  if(i<0||generating){chatEditClose(div,true);return;}
+  for(let n=d2;n;){const nx=n.nextElementSibling;n.remove();n=nx;}
+  messages.splice(i);
+  if(curChat)chatTrunc={id:curChat,to:i,hash:chatHash(messages,i)};
+  chatDraft={v:input.value,im:pendingImages,dc:pendingDocs};
+  pendingImages=[];pendingDocs=[];paintChips();
+  input.value=text;
+  chatPinned=true;
+  sendSafe();
+  input.focus({preventScroll:true});
+}
+// ↑ in an empty box: the last question, in place
+function chatEditLast(){
+  if(!isHz()||generating)return false;
+  const us=inner.querySelectorAll(":scope>.msg.user");
+  return us.length?chatEditOpen(us[us.length-1]):false;
+}
+// A LONG QUESTION FOLDS: past about twelve lines (counted from the text, no layout read, so a 200-message chat opens
+// as fast) it shows nine and a Show more key; the key is the only thing that opens it
+function chatClamp(body){
+  if(!document.documentElement.classList.contains("hz"))return;
+  const t=body.textContent||"";
+  if(t.length<500&&t.split("\n").length<=12)return;
+  let n=0;for(const l of t.split("\n"))n+=Math.max(1,Math.ceil(l.length/60));
+  if(n<=12)return;
+  body.classList.add("clamp");
+  const b=document.createElement("button");b.type="button";b.className="umore";b.textContent="Show more";b.setAttribute("aria-expanded","false");
+  body.insertAdjacentElement("afterend",b);
+}
+// THE COPY'S CHECK: the icon becomes a check and the key says "Copied" for 1.4 s; nothing else moves
+function chatCopied(b){
+  if(!b)return;
+  b.classList.add("done");
+  if(isHz()&&b._ico==null){b._ico=b.innerHTML;b.innerHTML=chatIco("check");}
+  b.setAttribute("aria-label","Copied");b.title="Copied";
+  clearTimeout(b._ct);
+  b._ct=setTimeout(()=>{b.classList.remove("done");if(b._ico!=null){b.innerHTML=b._ico;b._ico=null;}b.setAttribute("aria-label","Copy");b.title="Copy";},1400);
+}
+// KIND ERROR LINES: what went wrong in plain words, the technical text kept in the line's tooltip, and Try again;
+// a partial answer above the failure stays
+function chatErrKind(m){
+  m=String(m||"").trim();
+  if(/failed to fetch|load failed|network ?error|err_[a-z_]+|econn|connection (?:was )?(?:reset|refused|lost|closed|dropped)/i.test(m))
+    return "The connection dropped before the answer finished.";
+  if(/timed? ?out\b/i.test(m))return "That took too long, so it stopped.";
+  if(/out of memory|\boom\b|code -9\b|\bkilled\b/i.test(m))return (IS_PC?"This PC":"This Mac")+" ran out of memory for that model.";
+  const tech=/\b(?:error|exception|traceback|errno|stack)\b|\b[A-Za-z]+(?:Error|Exception)\b|\bat [\w$.]+ ?\(|[{}<>]|\bHTTP\b|\b[1-5]\d\d\b|\w_\w|\(\)|\bnull\b|\bundefined\b/i;
+  return m&&m.length<=180&&!tech.test(m)?m:"Something went wrong while answering.";
+}
+function chatErrPaint(div,full){
+  const b=div&&div.querySelector(":scope>.body");if(!b)return;
+  const s=String(full||""),W="⚠️",at=s.lastIndexOf(W);
+  const pre=at>=0?s.slice(0,at).trim():"",msg=(at>=0?s.slice(at+W.length):s).trim();
+  const tree=(b.querySelector(".worktree")||{}).outerHTML||"";
+  b.innerHTML=tree+(pre?renderMD(pre):"")+'<div class="chat-err" role="alert"><span class="chat-err-t"></span>'
+    +'<button type="button" class="chat-err-go">Try again</button></div>';
+  const t=b.querySelector(".chat-err-t");t.textContent=chatErrKind(msg);if(msg&&t.textContent!==msg)t.title=msg;
+}
+// A BIG PASTE IS A FILE: past 3,000 characters or 60 lines, pasted text becomes a chip ("Pasted text.txt"), read
+// whole on this computer like a .txt (6b522's path: measured, the 70 % line, the chip's tokens), so the box stays a box
+var CHAT_PASTE_CHARS=3000,CHAT_PASTE_LINES=60;
+function chatPaste(e){
+  if(!isHz()||e.defaultPrevented)return;
+  const cd=e.clipboardData;if(!cd)return;
+  if([...(cd.items||[])].some(it=>it.type&&it.type.startsWith("image/")))return;
+  const t=cd.getData("text/plain")||"";
+  if(t.length<CHAT_PASTE_CHARS&&t.split("\n").length<CHAT_PASTE_LINES)return;
+  if(pendingDocs.length>=2)return;           // the files are full: it lands as text
+  e.preventDefault();
+  const n=pendingDocs.filter(d=>d.pasted).length;
+  pendingDocs.push({name:n?"Pasted text "+(n+1)+".txt":"Pasted text.txt",text:t,local:true,pasted:true,bytes:new Blob([t]).size,
+    bad:false,tok:Math.ceil(t.length/4),exact:false,mode:"full"});
+  paintChips();docMeasure();
+}
+// SCROLL ANCHORING THAT WEBKIT LACKS: while the reader is up the page, the first message in view keeps its place when
+// something above it changes size (a picture, a fold opened, a code card); at the end, the end is kept. The place is
+// read once the scrolling rests (100 ms), never on every frame of it, and only used while the view is where it was read
+var chatAnc=null,chatAncT=0;
+function chatAnchorNote(){
+  clearTimeout(chatAncT);chatAncT=0;
+  if(chatPinned){chatAnc=null;return;}
+  const top=scroller.getBoundingClientRect().top,ks=inner.children;
+  let lo=0,hi=ks.length-1,el=null;
+  while(lo<=hi){const mid=(lo+hi)>>1,r=ks[mid].getBoundingClientRect();if(r.bottom>top+1){el=ks[mid];hi=mid-1;}else lo=mid+1;}
+  chatAnc=el?{el:el,top:el.getBoundingClientRect().top,st:scroller.scrollTop}:null;
+}
+// a scroll the app makes: at once (never the smooth glide), the reader's place unpinned, and the anchor read again so the
+// next size change keeps this place and not the one before it
+function chatScrollBy(d,keepPin){
+  if(!keepPin)chatPinned=false;
+  scroller.style.scrollBehavior="auto";scroller.scrollTop+=d;scroller.style.scrollBehavior="";
+  chatLastTop=scroller.scrollTop;chatAnchorNote();
+}
+// the first line of the chat a reader can see: under the header (it floats over the chat) and 16 px more
+function chatTopEdge(){
+  const h=$("#hz-top"),sr=scroller.getBoundingClientRect();
+  return Math.max(sr.top,h?h.getBoundingClientRect().bottom:0)+16;
+}
+function chatAnchorKeep(){
+  if(chatBulk)return;
+  if(chatPinned){if(!generating&&!document.querySelector("#hero"))chatToBottom(false);return;}
+  // read while the reader was elsewhere (still scrolling, or the place never read): read it now, move nothing
+  if(!chatAnc||!chatAnc.el.isConnected||Math.abs(scroller.scrollTop-chatAnc.st)>1){chatAnchorNote();return;}
+  const d=chatAnc.el.getBoundingClientRect().top-chatAnc.top;
+  if(Math.abs(d)>=1)chatScrollBy(d,true);
+}
+function chatInit(){
+  chatSendKey(!!generating);
+  inner.addEventListener("click",e=>{
+    const t=e.target;if(!t||!t.closest)return;
+    const more=t.closest(".umore");
+    if(more){const b=more.previousElementSibling;if(!b)return;const open=!b.classList.contains("open");
+      chatPinned=false;b.classList.toggle("open",open);more.textContent=open?"Show less":"Show more";more.setAttribute("aria-expanded",String(open));
+      if(!open){const r=more.closest(".msg").getBoundingClientRect(),top=chatTopEdge();
+        if(r.top<top)chatScrollBy(r.top-top);}
+      chatAnchorNote();return;}
+    const x=t.closest(".uedit-x");if(x){chatEditClose(x.closest(".msg"),true);return;}
+    const ok=t.closest(".uedit-ok");if(ok){chatEditSave(ok.closest(".msg"));return;}
+    if(t.closest(".chat-err-go")){regenerate();return;}
+  });
+  input.addEventListener("paste",chatPaste);
+  {const c=$("#composer");if(c&&!$("#chat-queued")){const q=document.createElement("div");q.id="chat-queued";q.setAttribute("aria-live","polite");
+    q.textContent="";c.appendChild(q);
+    new MutationObserver(()=>{if(c.classList.contains("queued"))q.textContent="Sends when this answer is done";}).observe(c,{attributes:true,attributeFilter:["class"]});}}
+  const comp=$("#composer");let dn=0;
+  addEventListener("dragenter",e=>{if(hasFiles(e)&&comp){dn++;comp.classList.add("drop");}});
+  addEventListener("dragleave",e=>{if(hasFiles(e)&&comp&&--dn<=0){dn=0;comp.classList.remove("drop");}});
+  addEventListener("drop",()=>{dn=0;if(comp)comp.classList.remove("drop");});
+  scroller.addEventListener("scroll",()=>{clearTimeout(chatAncT);chatAncT=setTimeout(chatAnchorNote,100);},{passive:true});
+  if(window.ResizeObserver)new ResizeObserver(chatAnchorKeep).observe(inner);
+  if(window.ResizeObserver&&comp)new ResizeObserver(chatJumpPlace).observe(comp);
+  addEventListener("resize",chatJumpPlace);chatJumpPlace();
+}
+// the jump key sits over the composer's centre, a whole pixel (the composer is not centred in its row in a chat)
+function chatJumpPlace(){
+  const b=$("#jumpdown"),c=$("#composer");if(!b||!c||!isHz())return;
+  b.style.left=Math.round(c.offsetLeft+c.offsetWidth/2-16)+"px";
+}
+chatInit();
+/* ==== the chat (6b590): script end ==== */
 
 /* ==== bring your chats (6b529): script begin ==== */
 // BRING YOUR CHATS (6b529, per Patrick: "quickly connect another AI app and

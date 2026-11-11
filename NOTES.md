@@ -20642,3 +20642,124 @@ stream-landing-half-speed.mp4, ultra-conversation-4s.mp4).
 - The flow's Answer node shows no Polish for a single draft rewritten by the same model (it is not a separate stage in
   the frames); a reopened chat from before 6b528 has no record of its calls, so it shows the flow without the privacy
   line, by design.
+## 6b590 — the chat, top-notch: how chatting behaves, around the stream (7.0 beta 4, per Patrick)
+
+Patrick: "as far as how the actual chat part behaves, let's make that equally perfect, top-notch, beautiful." Then,
+for every beta-4 branch: "Claude-sharp chrome plus GPT-grade motion, somewhere in the middle"; "very sharp. Think how
+Claude looks"; "super GPT smooth and beautiful, but Claude very tight and to the point. Turn it up." Inter for the UI
+and the person's words (the font file is beta-4-panel's). Branch `beta-4-chat` from beta-3 (c5d44c5). Not here, by
+agreement: the stream itself (cadence, word fade, progressive markdown, the end dot, draft to final), the answer's
+footer chips and card, and the conversation's Ultra stars (beta-4-panel's).
+
+**The audit** (a dev copy on 9944 of c5d44c5 and one on 9945 of this branch, each with a seeded store: a chat of 220
+turns with a 22-line question, six short ones; headless Chromium driven by Playwright with a stand-in /api/chat in the
+page; the same script on both; then a real WKWebView harness). What was rough:
+1. **Opening a long chat glided down from the top.** `loadChat` painted each message through `addMsg`, whose
+   `chatPin(true)` started a smooth scroll and measured the composer 220 times; the view sat 50,400 px above the end
+   80 ms after the click and slid down for about a second (28,700 px still to go at 80 ms in WKWebView). Short chats
+   did the same over a few hundred px. A chat left scrolled up reopened at its end.
+2. **Edit wiped the conversation.** The pencil cut the chat back to that question at once (a blank page when it was the
+   first) and dropped the text into the composer; the composer's own draft was overwritten; ↑ did the same.
+3. **An input method's Enter sent the message** (a Japanese or Chinese word being composed went out half typed).
+4. **The send key turned into text glyphs**: "■" while streaming and "↑" after, at another size and baseline than the
+   drawn arrow it starts with.
+5. **Raw errors**: "⚠️ RuntimeError: mlx_lm.server exited with code -9", "⚠️ Failed to fetch", and no way to try again
+   (the retry key only came for an empty answer).
+6. **The actions were always on** under every answer and question in Calm and Balanced (6b542's rule), five icons a
+   turn; the copy's confirmation turned the icon green.
+7. **The jump key vanished the moment an answer landed**, even when it landed out of sight.
+8. **The queued follow-up's line never showed**: "Sends when this answer is done" sat on `#composer::after`, which the
+   Ultra rim keeps `display: none` (and at Ultra it would have drawn as the rim).
+9. Focus stayed on the clicked chat row after a switch; the box grew in 26 px jumps; a pasted page of text went into the
+   box as text; a long question stood at full height (1,173 px); no announcement for a screen reader when an answer
+   landed; the composer and the sidebar were frosted glass; the question was plain text at the column's left.
+
+**Now** (one CSS block, THE CHAT (6b590), before HORIZON end; one script block before bring-your-chats; a handful of
+surgical edits in place):
+- **A chat opens at once, where it was left.** `loadChat` and `redrawOpen` paint under `chatBulk` (`chatPin` only marks
+  the view pinned), then `chatArrive` places it before the first frame: the place the chat was left at if it was left
+  scrolled up (`chatPlaces`, this run only), else the end, instantly; it fades up from .55 in 180 ms (never from
+  nothing), the header's title follows, the composer takes the focus (not while searching). A `ResizeObserver` on the
+  chat keeps the end in view while pinned, and up the page keeps the first message in view where it is when anything
+  above it changes size (WebKit has no scroll anchoring): the place is read when scrolling rests, never every frame.
+- **The edit in place** (`chatEditOpen`): the question becomes a flat box where it stands, Enter or Send re-asks from
+  there (what came after goes, what is above stays on screen), Esc or Cancel puts it back. Mid-answer it stops this
+  chat's answer as Stop does and waits for it to be saved (`chatIdle`, kicked as send()'s last step), or waits for
+  another chat's. The composer's draft and files wait and come back (`chatDraftBack`). ↑ in an empty box opens the last
+  question this way. Classic and the Funnels lane keep `editResend`.
+- **Enter** sends, Shift+Enter is a new line, and an input method's Enter (isComposing, keyCode 229) only confirms the
+  word. **Esc** stops (as before). The send key keeps the focus in the box after a send or a stop.
+- **The keys are drawn**: `chatSendKey` swaps a 16 px arrow and an 8 px square in the same 36 px key, aria-label Send or
+  Stop; the jump key's arrow is drawn too.
+- **The box grows smoothly**: `fitInput` measures on a hidden twin (`chatFitMeasure`), so the height goes straight from
+  one value to the next and eases in 150 ms, to 156 px, then scrolls.
+- **A big paste is a file**: past 3,000 characters or 60 lines the text becomes a chip, "Pasted text.txt", read whole on
+  this computer like a .txt (6b522's path: measured, the 70 % line, the tokens). Drag and drop lights the composer's
+  edge.
+- **The question** is a quiet bubble on the right of the reading column (#1f1f22, 14 round, Inter 15 on 22, 10 / 14
+  inside, at most 560 or 85 %); its right edge is the composer's, the answer's left edge the composer's
+  (`scrollbar-gutter: stable both-edges`, so a classic scrollbar on a PC keeps them centred). Past about twelve lines
+  (counted from the text, no layout read) it shows nine and Show more.
+- **The actions** (yours: copy, edit; the answer's: copy, read aloud, try again, thumbs) fade in on hover or focus in
+  150 ms; their row is always there, so nothing moves; 28 px keys, 8 round, 16 px icons at 1.5 px strokes, grey to
+  ink, no scale, no colour; the ember hairline from the keyboard only. Copy: a check and "Copied" for 1.4 s.
+- **Kind error lines** (`chatErrPaint`): the ember hairline, what happened in plain words, Try again (regenerate); the
+  technical text only in the line's tooltip; a partial answer above it stays. The offer keys (6b570) and the empty
+  answer's Try again share the same 32 px key.
+- **The jump key**: 32 px, 8 round, flat, over the composer's centre (`chatJumpPlace`, a whole pixel), fading in and out;
+  shown while an answer streams out of sight (as before) and now also for one that landed out of sight
+  (`chatUnseen`), until you come back down.
+- **New turns** rise 6 px and fade in 200 ms; saved ones are drawn settled. **The queued line** is a real element above
+  the box. **A screen reader** hears the landed answer once (`#chat-live`, polite; "Stopped." first for a stop), never
+  token by token. Reduced motion: no rise, fade or ease.
+- **Flat and sharp** (the owner's Claude reference): the composer #151517 with a hairline, 14 round, no blur; the
+  sidebar a flat #141416 panel, 13 px rows 32 tall at 450, the chosen row #1f1f22, labels 11 px caps at .06em; hairlines
+  one device pixel (`--chat-hw` .5 px at 2x); antialiased; ink by colour, not opacity; one easing family, 150 to 240 ms.
+
+**Measured, before (c5d44c5) and after, three runs each** (Chromium is Playwright's, Metal, uncapped frame rate for the
+scroll; WebKit is a WKWebView harness, `scratchpad/chat4/wk/main.swift`, on a 60 Hz display):
+| | before (c5d44c5) | after |
+|---|---|---|
+| a 220-turn chat, click to first frame, Chromium | 56 / 58 / 155 ms | 56 / 61 / 63 ms |
+| same, WebKit | 107 / 116 / 128 ms | 75 / 79 / 86 ms |
+| where it is at its first frame (px above the end), WebKit | 51,116 | 0 |
+| 80 ms later, Chromium / WebKit | 50,284-50,670 / 28,780-32,716 (gliding) | 0 / 0 |
+| scrolling it, 37 px a frame: frame p95, Chromium uncapped | 3.2 / 3.3 / 4.0 ms | 3.9 / 3.9 / 4.9 ms |
+| same, WebKit (60 Hz display) p50 / p95 | 17 / 18-19 ms | 17 / 18 ms |
+| frame p95 during each motion, Chromium uncapped (switch long, switch short, a sent turn, the box growing, the hover fade) | 2.5, 3.0, 1.2, 3.2, 3.2 ms | 1.1, 3.1, 0.9, 3.1, 3.2 ms |
+| layout shift switching chats (Chromium CLS; WebKit: the composer's and header's boxes) | 0; unchanged | 0; unchanged |
+| the box growing, five lines | 26 px jumps | eased, 150 ms |
+| the edit (messages on screen after the pencil, a 4-message chat) | 0 | 4, the box in place |
+| an input method's Enter | sent | not sent |
+
+Every motion is inside a 120 Hz frame (8.3 ms) at p95 with room to spare; the scroll's p95 is about 0.7 ms higher than
+before (the composer's opaque foot and the bubbles), still half the budget.
+
+**Copy, old -> new (for Patrick's approval):** the raw error ("⚠️ RuntimeError: mlx_lm.server exited with code -9", "⚠️
+Failed to fetch") -> "This Mac ran out of memory for that model." / "The connection dropped before the answer
+finished." / "That took too long, so it stopped." / "Something went wrong while answering." (a short message already
+in plain words is kept as it is), each with "Try again"; Copy's tooltip after a copy "Copy" -> "Copied" (1.4 s); new
+"Show more" / "Show less"; the edit's keys "Cancel" and "Send"; the big paste's chip "Pasted text.txt"; the stop key's
+label "Stop" (it had only a tooltip).
+
+**Gauntlet:** new section "6b590 the chat" before the scorecard. The source (one check, six mutants): no blur, glow or
+text shadow in the block, the flat surfaces and the hairline, the IME guard, drawn keys, one pin per chat, the reveal,
+one easing family at 150 to 240 ms, no let or const in the script block (the TDZ). The page (headless Chromium over the
+DevTools protocol, node's own WebSocket; a stand-in /api/chat; two chats made on the page): 18 named steps, then eleven
+mutants served in place of the page, each caught by the step it breaks (the IME guard, the instant landing, the kept
+place, the edit in place, a glyph on the stop key, the reveal, the kind error, the paste, the jump key's second half, the
+announcement, the 6 px rise). Re-run against this branch's copy (the full run is for integration): 6b590 (3/3), 6b343
+the edit mid-answer, 6b425 follow and pins, 6b528 the delegated actions, beta-3 the chrome (7), 6b555 the streamed answer
+and the header: all 15 pass (the 6b555 streamed answer failed twice to send within its 30 s while the dev copy was
+downloading 3.5 GB of sky footage that the pages were also playing, and passed on the quiet re-runs; the same check
+passed on beta-3's copy). Not re-run: the 6b570 fluent page check (it needs the servers harness); its four mutation
+anchors are untouched.
+
+**Left / worth knowing.**
+- New chat while an answer streams still stops it (switching chats does not); unchanged here.
+- The home after New chat is the greeting and the composer (the sky's and the home's); not changed.
+- Message-level virtualisation was not needed: a 220-turn chat opens in about 60 ms (Chromium) / 85 ms (WebKit) to its
+  first frame and scrolls well inside a 120 Hz frame; 1,000-turn chats were not measured.
+- 120 Hz is not measurable on this machine's displays (both engines cap at 60 Hz on screen); the uncapped Chromium
+  frame time is the proxy.
+- Inter falls back to the system's sans until beta-4-panel's font file lands.
