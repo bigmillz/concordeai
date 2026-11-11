@@ -22633,3 +22633,88 @@ Security > Speech Recognition." (C++ shell before macOS 26); "Couldn’t start d
 takes 300 ms of the fake device's own time, and the pre-roll keeps what is said meanwhile. The send key turns ember
 once the words land (as for typed text, 6b542's rule); during listening and finishing it stays silver. The Python-app
 bundle (`build_macos_app.sh`) still carries no helper (6b543).
+
+## 6b650 — answers-1: everyday answers like a friend's: how you feel and a bite to eat never search, effort buys care not length, no assumption openers, honest no-results, a stand-in web for every test (7.0 beta 5, per Patrick)
+
+Patrick: "I'm asking it, what's for breakfast, and saying, I'm tired, and it's giving me a bunch of crap." Then, in
+the C++ Preview (Ollama1 · gemma4:12b, Ultra), after the breakfast answer, "What if I'm run down?" came back as a
+lecture ("your autonomic nervous system is overtaxed and your cortisol levels are likely spiking or crashing", a
+header "Immediate physiological resets", NSDR, "Zone 1 movement… optic flow"): "it's great, but it's not a very
+inviting answer". On beta 3, Fast, local: "What's for breakfast?" opened "Since I can't see your kitchen or know your
+specific dietary preferences, I'll assume you're looking for a reliable, high-protein breakfast…" and called eggs
+"the standard high-utility choice": "kind of rubbish… Claude still looks so much cleaner." And: "I want the queries
+that come back to be perfect, like Fable level." Branch `answers-1` from beta-4 (26de274), on 6b626/6b640's triage.
+
+**What the beta-4 head did (Fast, Gemma 4 26B, the everyday set below).** Feelings and food asks with a question mark
+searched (needs_search's "a question mark anywhere asks"): "I'm so stressed about work right now" cited a stranger's
+autoimmune paralysis and holiday-gift statistics; "can't sleep" got two ## headings and the autonomic nervous system;
+"What if I'm run down?" 228 words on sleep hygiene, electrolytes and thyroid imbalances. Openers: "Since I don't know
+what's in your fridge…, I'll give you three different directions" (breakfast, dinner), "Since I can't know if this
+is a one-off…, I'll provide strategies for both" (sleep), "Since I don't know your city…, I've put together a
+low-stimulation itinerary" (Saturday). The system prompt asked for it: "make a reasonable assumption, name it in one
+clause". "how many minutes in 3.5 hours?" went down the place path: "I can't find a spot called Many Minutes 3 in 5".
+Small talk was already right (6b640).
+
+**What changed.**
+- `answer_kind` → "personal" (`_ak_personal`, `_AK_FEEL_RX`, `_AK_FOOD_RX`): how the person feels (tired, run down,
+  stressed, down, bored, can't sleep, a headache, slept badly, "ugh, Monday") or an everyday bite (what's for
+  breakfast, what should I eat, what can I make with…, "pizza or tacos tonight?"). Not when it names a place, a
+  venue near or open, a fresh fact (`_AK_SOCIAL_NOT_RX`), "where/nearest/open/delivery/restaurant", or a name (a
+  cuisine is not one). A personal turn: no web, no carried search (grounded_followup), no "today" borrowing of the
+  last search's subject (the short-follow-up branch, which also caught small talk), one seat and one pass in any
+  mode (the triage's "short"), no polish reviser on any of the three single-answer paths (the reviser sees only the
+  question and the technical brief, and is what turned a short answer into a lecture at Ultra), no look through the
+  person's chats on a weak cue (know_wants 1: "I'm" was enough to cite an old breakfast chat).
+- `PERSONAL_RULE` for the writer: one human line that meets the feeling, two to four plain doable ideas (food as a
+  bolded name and one tempting line), no science or jargon, no headings or sources, never an assumption opener, about
+  40-120 words "whatever the effort setting: more effort means more care, not more words", a doctor line only when
+  it's been going on or sounds serious (urgent signs: get help now), at most one light question.
+- The system prompt: an assumption is named only when it changes the answer, never as an opener about what it can't
+  see. The post-pass (`answer_polish`) drops a first sentence that is only "Since I can't see/know…, I'll
+  assume/give/provide…" when the answer goes on after it (`_ANS_ASSUME_RX`).
+- A unit conversion is a sum (`_AK_CONVERT_RX`: minutes in 3.5 hours, 30 Celsius in Fahrenheit, ounces in a cup;
+  not currencies); "2 to the 10th" is a sum; "can you say that shorter?" and "which one did you suggest first?" are
+  about the chat; "how long do I boil an egg…" is a how-to; "French toast" is a how-to (a cuisine is no name).
+- No results, said honestly (per Patrick via the lead): GROUND_NONE answers a stable question with nothing said
+  about the search; a current one begins with one plain line that live results didn't come through ("I couldn't
+  get live results just now, so I can't check last night's score."), then what it knows, dated, never as now, never
+  a website instead of an answer. The listings rule no longer asks for "the current wide releases you know of this
+  month" from memory (2024's films came back as "this weekend, November 14, 2026").
+- `CLAUDE_PRICES` gains claude-haiku-5-5 ($0.10/$0.50): the quick ladder's first Claude rung was counted at Fable
+  5.1's price, 100x.
+
+**No test asks a real search engine (per Patrick via the lead).** This Mac's connection was bot-flagged by the test
+traffic: html.duckduckgo.com answered 202 with its "anomaly" page, search.brave.com 429, ddgs "No results found" from
+both (bing and yandex still answered; SEARCH_ENGINES unchanged, Patrick's call). Every baseline search logged
+`hits=0`. The dev-only hook `search-fixture=<file.json>` answers ddgs text/news/images from a file, reads only the
+file's pages, never asks the official feeds and treats the connection as up (`# ==== 6b650 search fixture ====`).
+Every gauntlet copy not behind a test proxy gets an empty one (`_NO_WEB`); run_bench.py, scorecard.py and
+everyday.py use one by default (`no_web.json`, or `--search-fixture`), the real engines only with `--real-web`, and
+refuse a checkout without the hook. The release step's scorecard history was made with the real web.
+
+**The everyday set** (`tools/answer_eval/everyday.json`, `everyday.py`): 65 scored turns in 11 categories (feelings
+9, small talk 6, practical 11, known facts 8, fresh 6, sums 5, follow-ups 5, the chat 4, the Short setting 3, Code
+lane 4, small decisions 4), Patrick's four prompts among them, each with a rubric (search or not, a length band,
+must/never patterns, the tone) and GLOBAL_NEVER ("I didn't find", a length limit, training data, filler, a heading
+first, citations on an unsearched answer). The bar: Claude Fable 5.1 wrote its own answer to every turn
+(`everyday_refs.json`, a Fable subagent, no keys of Patrick's); the scorecard's local judge (Qwen 3.6 35B A3B, MLX,
+temperature 0) grades useful / voice / size / overall against it. Fresh questions read `everyday_search.json`, an
+invented stand-in web dated 2026-11-11 (bitcoin left out on purpose: the no-results path).
+
+**Measured.** The search decision on the set's 51 turns that have one (no model): beta-4 30 of 51 right, answers-1 51
+of 51 (feelings 3/9 → 9/9, practical 4/10 → 10/10, sums 3/5 → 5/5, the chat 2/4 → 4/4, decisions 0/2 → 2/2; small
+talk, fresh and follow-ups were already right). The beta-4 answers quoted above are its Fast run on Gemma 4 26B (with
+the real web, then on the stand-in web, 51 turns). The model before/after (Fast; Gemma 4 12B at Ultra on 32 turns;
+the judge against Fable's answers) waits for the machine: beta 4's release run goes alone first. Commands:
+`everyday.py run --label base-fast --config fast --repo <beta-4 + the fixture block>` and `--label after1-fast`
+on this branch, the same with `--config g12-ultra --only …`, then `judge` and `show base-fast after1-fast`.
+
+**Checks.** A 6b650 block (the kinds on Patrick's prompts and their controls, the handler's wiring, the rules' words,
+the post-pass on the breakfast opener, Haiku 5.5's price, one live ask on the copy) and 16 mutants. Re-pinned at the
+same strength: 6b626's needs-search count (three paths now), its world-how-to and chat-rewritten mutants, its
+GROUND_NONE pin, 6b640's SOCIAL_RULE line. quality-2's namespace gains the names answer_kind now reads (it lacked
+6b640's `_AK_SOCIAL_RX` too, a NameError on beta-4). GAUNTLET_TODO
+
+**Left.** The how-to rule still sends a capitalised name to the web; Code-lane asks still search (the Coding agent
+keeps auto_web). Fable 5.1 as the Pro/Max compositor when a Claude key exists is costed in the report (about $0.17*
+an answer against Opus 5.5's $0.07*), not switched: Patrick's call.
