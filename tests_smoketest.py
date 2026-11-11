@@ -45062,7 +45062,7 @@ def _sl549_aurora(js):
     fr = re.search(r'vec3 c=mix\(vec3\(([^)]*)\),vec3\(([^)]*)\),smoothstep\(0\.,\.3,d\)\);c=mix\(c,pal\(', js)   # (6b621) the demo's order: the edge-to-tip pair, then the palette's touch
     cur = re.findall(r'hzDrawAuroraLayer\(\w+,\{w:\d+,h:\d+,rgb:"(\d+),(\d+),(\d+)"', js)
     wash = re.findall(r'bloom\([.\d]+,[.\d]+,[.\d]+,[.\d]+,"(\d+),(\d+),(\d+)",', js)
-    if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 4:
+    if len(pals) != 2 or not fr or len(cur) != 3 or len(wash) != 2:   # 6b631: the demo's two silver blooms (were four blue-violet)
         return False
     cols = [tuple(float(v) for v in g_.split(",")) for g_ in [x_ for p_ in pals for x_ in p_] + [fr.group(1), fr.group(2)]]
     cols += [tuple(int(v) / 255 for v in c_) for c_ in cur + wash]
@@ -45179,8 +45179,8 @@ check("6b552 the effort slider, slim and fluid: a slim silver-white pill (220 x 
       and not _sl549(_hz_css, _hz_js.replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)"), page)
       and not _sl549(_hz_css, _hz_js.replace(_jsfn(_hz_js, "async function hzTraceIn(el,opts){"), _jsfn(_hz_js, "async function hzTraceIn(el,opts){").replace("b=vec3(.76,.66,1.)", "b=vec3(1.,.561,.769)")), page)   # the greeting's trace alone back to rose
       and not _sl549(_hz_css, _hz_js.replace("vec3 c=mix(vec3(.62,.78,1.),vec3(.7,.6,1.),smoothstep(0.,.3,d));", "vec3 c=mix(vec3(.5,.94,.84),vec3(.7,.6,1.),smoothstep(0.,.3,d));"), page)   # a mint lower edge (6b555: the preview's blue edge)
-      and not _sl549(_hz_css, _hz_js.replace('rgb:"186,176,255",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
-      and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"150,118,255",.4);', 'bloom(.72,.30,.38,.32,"255,118,178",.4);'), page)
+      and not _sl549(_hz_css, _hz_js.replace('rgb:"190,184,236",k:k,gain:fr*0.7', 'rgb:"150,236,212",k:k,gain:fr*0.7'), page)
+      and not _sl549(_hz_css, _hz_js.replace('bloom(.72,.30,.38,.32,"210,216,232",.3);', 'bloom(.72,.30,.38,.32,"255,118,178",.3);'), page)
       # THE KNOB STAYS THE KNOB (6b553, per Patrick: "one star that sits there spinning just looks tacky"): the star back in the
       # markup, the knob folded away at Ultra, a morphing knob (a star clip), a spinning knob, a script morphing it, a wide halo, a violet halo
       and not _sl549(_hz_css, _hz_js.replace('<i class="hz-sl-core"></i></span>', '<i class="hz-sl-core"></i><svg class="hz-sl-star" viewBox="-10 -10 20 20" aria-hidden="true"><path d="M0 -10L3 -3L10 0L3 3L0 10L-3 3L-10 0L-3 -3Z"/></svg></span>'), page)
