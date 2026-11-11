@@ -48387,6 +48387,25 @@ for _mf, _mn, _ma, _mb, _mw in _FR_MUT:
 check("6b630's rules each break a check when broken (%d mutants)" % len(_FR_MUT), not _fr_missed, "%r" % _fr_missed)
 # ==== first run (6b630): end ====
 
+# ==== 6b620 beta-4 integration: begin ====
+# (6b620, per Patrick via the coordinator: "Wake up server" keeps working in a server's quiet hours, a deliberate click
+# wins; "Test relay" is treated the same way, the coordinator's default.) Settings' two buttons go through
+# server_wake_test, which must never consult the quiet hours; the questions' own wakes still do (6b600).
+print("== beta-4: Settings' Wake up server and Test relay work in quiet hours (6b620) ==")
+def _b620_wt(src):
+    m_ = re.search(r"\ndef server_wake_test\(.*?(?=\ndef )", src, re.S)
+    return m_.group(0) if m_ else ""
+def _b620_ok(src):
+    wt_ = _b620_wt(src)
+    sw_ = re.search(r"\ndef server_wake\(.*?(?=\ndef )", src, re.S)
+    return (bool(wt_) and "quiet" not in wt_ and "relay_only" in wt_ and "_srv_relay_post(e)" in wt_
+            and bool(sw_) and "if not only and server_quiet(e):" in sw_.group(0))
+_b620_mut = _MILLENAI_SRC.replace("    if relay_only:\n        r = _srv_relay_post(e)",
+                                  "    if server_quiet(e):\n        return {\"ok\": False, \"kind\": \"quiet\", \"err\": \"quiet\"}\n    if relay_only:\n        r = _srv_relay_post(e)", 1)
+check("6b620 Settings' Wake up server and Test relay ignore the quiet hours (a deliberate click wins); a question's wake still keeps them; the mutant (the buttons held by the quiet hours) is caught",
+      _b620_ok(_MILLENAI_SRC) and _b620_mut != _MILLENAI_SRC and not _b620_ok(_b620_mut), "")
+# ==== 6b620 beta-4 integration: end ====
+
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
 for n, o, d in RESULTS:
