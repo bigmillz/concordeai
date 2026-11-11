@@ -9455,12 +9455,14 @@ _rv0 = json.loads(req("/api/stats")[2]).get("data_rev")
 req("/api/chats"); req("/api/chats/one?id=" + _c1); req("/api/chats/search?q=pine")
 _st1 = os.stat(os.path.join(INST.home, "chats.v2.json"))
 _lc = page[page.index("function loadChat(id){"):page.index("function loadChat(id){") + 1200]
-_nc = page[page.index('$("#newchat").addEventListener'):page.index('$("#newchat").addEventListener') + 400]
+# New chat's body is chatFresh since 6b628 (a lane with no chat of its own opens a fresh one the same way): re-pinned there
+_nc = page[page.index('function chatFresh(){'):page.index('function chatFresh(){') + 600]
 check("LOC-3: viewing, switching and New chat write nothing",
       (_st0.st_mtime_ns, _st0.st_size) == (_st1.st_mtime_ns, _st1.st_size)
       and isinstance(_rv0, int) and json.loads(req("/api/stats")[2]).get("data_rev") == _rv0
       and "chatOps(" not in _lc.split("\n}")[0] and "api(" not in _lc.split("\n}")[0]
-      and "chatOps(" not in _nc.split("});")[0],
+      and "chatOps(" not in _nc.split("\n}")[0] and "api(" not in _nc.split("\n}")[0]
+      and '$("#newchat").addEventListener("click",()=>{chatFresh();input.focus();});' in page,
       "%r" % [_rv0])
 # 6b480: the search's hits say where the chat matched
 _sh480 = json.loads(req("/api/chats/search?q=pine")[2] or b"{}")
@@ -9624,7 +9626,7 @@ check("review: funnel Try again, deferred rewinds, refused requests, Cmd+Q",
 # finished saving, so the partial answer and the rewind land in order.
 _er = page[page.index("function editResend(text){"):page.index("function addMsg(")]
 _sd = page[page.index("const saved=await syncChat(myChat,null,wasAborted?myMessages.length:0);"):][:700]
-_nc = page[page.index('$("#newchat").addEventListener("click",()=>{'):][:200]
+_nc = page[page.index('function chatFresh(){'):][:200]   # New chat's body (6b628), re-pinned
 def _edit_ok(er, sd, nc, decl):
     return ("let pendingEdit=null," in decl
             and "if(generating){" in er and "pendingEdit=text;abortCtl.abort();return;" in er
@@ -10614,7 +10616,12 @@ let adv=null,advOn=false,autonomy="auto",tierOff={},agent="",uiMode="ai",council
 function paintAgents(){} function paintModels(){} function advChip(){} function paintAutonomy(){}
 function modeShow(w){uiMode=w;}
 function isCloudMode(){return false;}function cloudTierParse(){return {};}function cloudPickRetire(t){return t;}function isSrvMode(){return false;}function srvModeGone(){}function advPrune(){}function micWarmPaint(){}
-""" + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m){")
+let chats=[],curChat=null,messages=[];function loadChat(){}function chatFresh(){}   // the lane's own chat (6b628): nothing to open here
+function sxLaneSoon(){}   // 6b625's lane repaint, which setAgent calls (it threw here since 6b625)
+var LANE_LEFT={};
+""" + _sbseg + _jsfn(page, "function setTier(name,quiet){") + _jsfn(page, "function switchLane(m,how){")
+             + _jsfn(page, "function laneOfChat(c){") + _jsfn(page, "function laneChatFor(m,list,left){")
+             + _jsfn(page, "function laneToChat(){") + _jsfn(page, "function laneOpen(m,how){")
              + _jsfn(page, "function setAgent(name,guess){") + r"""
 const boot=storeBoot();
 if(run.click==="tier")setTier("Pro");
@@ -18386,9 +18393,13 @@ _ls_bad = [n for n, ok in [
      and "swapLen=dripShown;swapWords=hzWords(hzStarNodes(body).nodes.map(o=>o.n.data).join(\" \"));dripShown=0;}\n        else{dripShown=0;" in page   # both paths zero it (6b580)
      and "streamEnded=false,dripCut=-1;" in page),
     ("the old every-chunk reset is gone", "if(cut>=0)dripShown=0;" not in page),
+    # re-pinned for 6b628: a switch now opens the lane's own chat, through loadChat or chatFresh only (the sidebar's
+    # path, which never stops or redraws an answer on its way: 6b624), and still never touches the pane itself
     ("modeShow leaves the message pane alone",
-     "inner.innerHTML" not in page.split("function modeShow(which){")[1].split("function switchLane(m){")[0]
-     and "loadChat(" not in page.split("function switchLane(m){")[1].split("$$(\"#mode-tabs .ltab\")")[0]),
+     "inner.innerHTML" not in page.split("function modeShow(which){")[1].split("function switchLane(m,how){")[0]
+     and "inner.innerHTML" not in page.split("function switchLane(m,how){")[1].split("$$(\"#mode-tabs .ltab\")")[0]
+     and "abort" not in page.split("function switchLane(m,how){")[1].split("$$(\"#mode-tabs .ltab\")")[0]
+     and "if(id){if(id!==curChat)loadChat(id);}\n  else if(curChat||messages.length)chatFresh();" in page.split("function switchLane(m,how){")[1].split("$$(\"#mode-tabs .ltab\")")[0]),
 ] if not ok]
 check("6b463: a RESET replays the answer once and a lane switch leaves the streaming message alone",
       not _ls_bad, "%r" % _ls_bad)
@@ -42271,13 +42282,13 @@ _rs_main = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="
 _rs_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
 _rs_shim = _rs_main[_rs_main.index("const BRIDGE_SHIM"):_rs_main.index('})();"#;')]
 check("the Tauri shell hands the token over through one command that checks scheme, host and the sidecar's port; starts on about:blank in the night colour; grants its one command and the title bar's two (drag, zoom); the shim holds no secret",
-      _rs_main.count("#[tauri::command]") == 1
+      _rs_main.count("#[tauri::command]") == 2 and "fn pick_folder(webview: tauri::Webview, bridge: State<'_, Bridge>) -> Option<String> {\n    api_token(webview, bridge)?;" in _rs_main   # 6b628's folder picker, re-pinned
       and 'url.scheme() == "http" && url.host_str() == Some("127.0.0.1") && url.port() == Some(*port)' in _rs_main
       and 'WebviewUrl::External("about:blank"' in _rs_main
       and ".background_color(NIGHT)" in _rs_main and "Color(0x03, 0x04, 0x0a, 0xff)" in _rs_main
       and ".initialization_script(BRIDGE_SHIM)" in _rs_main
       and "initialization_script_for_all_frames" not in _rs_main
-      and _rs_cap.get("permissions") == ["allow-api-token", "core:window:allow-start-dragging",
+      and _rs_cap.get("permissions") == ["allow-api-token", "allow-pick-folder", "core:window:allow-start-dragging",
                                          "core:window:allow-internal-toggle-maximize"]
       and _rs_cap.get("remote", {}).get("urls") == ["http://127.0.0.1:*"]
       and "token" not in _rs_shim.replace("api_token", "")
@@ -47227,7 +47238,7 @@ ch.stderr.on("data", async d => {
       const nr=n.getBoundingClientRect(),kr=k.getBoundingClientRect();r.open=getComputedStyle(n).display!=="none";r.exp=k.getAttribute("aria-expanded");
       r.under=Math.round(Math.abs((nr.left+nr.right)/2-(kr.left+kr.right)/2));r.gap=Math.round(nr.top-kr.bottom);
       const code=n.querySelector('[data-m="code"]'),cr=code.getBoundingClientRect(),e=document.elementFromPoint(cr.left+cr.width/2,cr.top+cr.height/2);r.hit=!!(e&&code.contains(e));
-      code.click();await W(400);r.mode=uiMode;r.closed=getComputedStyle(n).display==="none";r.label=k.textContent.trim();
+      code.click();await W(400);r.mode=uiMode;r.closed=!top.classList.contains("hz-lmo")&&k.getAttribute("aria-expanded")==="false"&&(getComputedStyle(n).display==="none"||!top.classList.contains("hz-hd5"));r.label=k.textContent.trim();   /* re-pinned for 6b628: Code opens its own (fresh) chat, whose home has room for the lanes inline; the menu is closed either way */
       switchLane("ai");await W(300);return r;})()`);
     await size(1440);
   }
@@ -47282,8 +47293,8 @@ def _b624_ok(r):
 # (1) the source
 _b624_css = page[page.find("/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): begin"):page.find("/* ==== THE HEADER, THE COLUMN AND THE SIDEBAR (6b624): end")]
 def _b624_src(css, js, blk):
-    nc = js[js.find('$("#newchat").addEventListener("click",()=>{'):]
-    nc = nc[:nc.find("});")]
+    nc = js[js.find('function chatFresh(){'):]   # New chat's body since 6b628, re-pinned; the key calls it
+    nc = nc[:nc.find("\n}")] if '$("#newchat").addEventListener("click",()=>{chatFresh();input.focus();});' in js else ""
     col = _jsfn(js, "function hzColFit(){"); ff = _jsfn(js, "function hzFlowFit(){")
     return (len(blk) > 2000 and not re.search(r"text-shadow:(?!none)|[^-]filter:|backdrop-filter:(?!none)|drop-shadow|0 0 (?:[2-9]|\d\d)px", blk)
             and ".hz #main:not(:has(#hero)) #hz-top::before{" in blk and "background:linear-gradient(180deg,#0f0f11 0,#0f0f11 calc(100% - 16px),rgba(15,15,17,0))}" in blk
@@ -49409,6 +49420,445 @@ try:
 except OSError:
     pass
 # ==== 6b627 robust: end ====
+# ==== 6b628 usable: begin ====
+print("== usable (6b628): each lane its own chat, a folder picker, the picture model asked first, What's new, Effects kept ==")
+# USABLE (6b628, per Patrick: "it has to be usable"; the beta-4 usability walkthrough). Five fixes, each with mutants
+# the same predicate catches. (1) Each lane opens its own chat: the one it was left on, else its newest, else a fresh
+# one; a mode picked from another lane goes to Chat with Chat's chat (pure laneChatFor in node; live in headless
+# Chromium on the copy's page with a stand-in stream and the store's half of a turn). (2) The Workspace's "Choose
+# folder…": the Tauri shell's pick_folder (an NSOpenPanel, origin-checked as api_token) or pywebview's own panel from
+# the server; the key hidden with neither and the typed path as before (the Rust by its source; the server's picker
+# with a stand-in webview; the page live). (3) A picture with no picture model is asked first: a line with the
+# model and its size, Download and Not now; nothing downloads until Download, the row follows the download to Ask
+# again, which sends the question again with its picture (vision_offer with stand-ins; the saved record; the page
+# live, /api/model/download and /api/setup stubbed). (4) What's new without the first open's steps. (5) The Effects
+# level kept in prefs.json (fx_level): a window with none of its own takes it; one with its own keeps it.
+def _u628_exec(src, names, ns=None):
+    import ast as _a
+    ns = dict(ns or {}); ns.setdefault("re", re); ns.setdefault("json", json); ns.setdefault("os", os)
+    for node in _a.parse(src).body:
+        nm = [node.name] if isinstance(node, (_a.FunctionDef, _a.ClassDef)) else [t.id for t in getattr(node, "targets", []) if isinstance(t, _a.Name)]
+        if set(nm) & set(names):
+            exec(compile(_a.Module([node], []), "u628", "exec"), ns)
+    return ns
+
+# (1) pure: the chat a lane opens on
+_U628_LANE = r'''
+const C=[{id:"a1",lane:"ai",ts:10},{id:"a2",ts:30},{id:"k1",lane:"code",ts:20},{id:"k2",lane:"code",ts:40},{id:"g1",lane:"agents",ts:50},{id:"f1",lane:"funnel",ts:5}];
+const out={
+ left:laneChatFor("code",C,"k1"),            // the one it was left on
+ fresh:laneChatFor("code",C,null),           // left on a fresh one: a fresh one again
+ newest:laneChatFor("code",C,undefined),     // never visited: its newest
+ gone:laneChatFor("code",C,"k9"),            // the one left was deleted: its newest
+ other:laneChatFor("code",C,"a1"),           // a chat of another lane is never opened here
+ ai:laneChatFor("ai",C,undefined),           // an old agents-lane chat lives under Chat, as the sidebar lists it
+ none:laneChatFor("funnel",[],undefined),
+ lanes:[laneOfChat({lane:"code"}),laneOfChat({}),laneOfChat({lane:"agents"}),laneOfChat(null)]};
+process.stdout.write(JSON.stringify(out));
+'''
+def _u628_lane(pg):
+    try:
+        js = _jsfn(pg, "function laneOfChat(c){") + _jsfn(pg, "function laneChatFor(m,list,left){")
+        return _node_json(js + _U628_LANE, "u628lane.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _u628_lane_ok(o):
+    return (o.get("left") == "k1" and o.get("fresh") is None and o.get("newest") == "k2" and o.get("gone") == "k2"
+            and o.get("other") == "k2" and o.get("ai") == "g1" and o.get("none") is None and o.get("lanes") == ["code", "ai", "ai", "ai"])
+_u628_lo = _u628_lane(page)
+_u628_lm = [(d_, _u628_lane_ok(_u628_lane(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("a lane left on a fresh chat reopens its last", "  if(left===null)return null;\n", ""),
+    ("the oldest, not the newest", "if(!best||(+c.ts||0)>(+best.ts||0))best=c;", "if(!best||(+c.ts||0)<(+best.ts||0))best=c;"),
+    ("another lane's chat opened here", "  if(left&&mine.some(c=>c.id===left))return left;", "  if(left)return left;"),
+    ("an agents-lane chat lost from Chat", 'return l==="code"||l==="funnel"?l:"ai";}', "return l;}")]]
+check("6b628 each lane's own chat, pure (laneChatFor): the chat it was left on, a fresh one when it was left fresh, else its newest, never another lane's, an old agents-lane chat under Chat; four mutants caught",
+      _u628_lane_ok(_u628_lo) and all(r_ is False for _, r_ in _u628_lm), "%r" % ([_u628_lo] + _u628_lm,))
+# the wiring, by its source
+def _u628_wire(pg):
+    sl = _jsfn(pg, "function switchLane(m,how){"); lo = _jsfn(pg, "function laneOpen(m,how){"); lt = _jsfn(pg, "function laneToChat(){")
+    st = _jsfn(pg, "function setTier(name,quiet){"); ps = _jsfn(pg, "function pickServerModel(label){"); lc = _jsfn(pg, "function loadChat(id){")
+    tk = _jsfn(pg, "function startTask(name,stage){")
+    return ("if(m!==from)LANE_LEFT[from]=curChat||null;" in sl and 'if(m!==from&&how!=="keep")laneOpen(m,how);' in sl
+            and sl.index("LANE_LEFT[from]=") < sl.index("modeShow(m);") < sl.index("laneOpen(m,how)")
+            and "if(id){if(id!==curChat)loadChat(id);}" in lo and "else if(curChat||messages.length)chatFresh();" in lo
+            and "var LANE_LEFT={};" in pg and 'if(uiMode!=="ai"&&LANE_LEFT)switchLane("ai");' in lt
+            and "laneToChat();" in st and 'modeShow("ai")' not in st and "laneToChat();" in ps
+            and 'if(laneOfChat(c)!==uiMode)switchLane(laneOfChat(c),"keep");' in lc
+            and 'if(uiMode!=="code")switchLane("code","fresh");' in tk
+            and '$("#newchat").addEventListener("click",()=>{chatFresh();input.focus();});' in pg)
+check("6b628 each lane's own chat, the wiring: a switch remembers the chat it leaves and opens the lane's, opening a chat from another lane keeps it (keep), a task starts fresh, a mode or a server model picked from another lane goes through the switch (LANE_LEFT a var: setTier reaches it at boot); three mutants caught",
+      _u628_wire(page)
+      and not _u628_wire(page.replace('switchLane(laneOfChat(c),"keep");', "switchLane(laneOfChat(c));", 1))
+      and not _u628_wire(page.replace("  laneToChat();   // a mode is the Chat lane's", '  if(typeof modeShow==="function")modeShow("ai");   // a mode is the Chat lane\'s', 1))
+      and not _u628_wire(page.replace("var LANE_LEFT={};", "const LANE_LEFT={};", 1)), "")
+
+# (2) the folder picker: the Rust side by its source (the shell's existing check is re-pinned for its second command)
+_u628_rs = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+_u628_cap = json.load(open(os.path.join("shell", "src-tauri", "capabilities", "main.json"), encoding="utf-8"))
+_u628_toml = open(os.path.join("shell", "src-tauri", "Cargo.toml"), encoding="utf-8").read()
+_u628_build = open(os.path.join("shell", "src-tauri", "build.rs"), encoding="utf-8").read()
+def _u628_rs_ok(rs, cap, toml, build):
+    pf = rs[rs.find("fn pick_folder("):rs.find("fn pick_folder(") + 400] if "fn pick_folder(" in rs else ""
+    fp = rs[rs.find('#[cfg(target_os = "macos")]\nfn folder_panel()'):][:900]
+    shim = rs[rs.index("const BRIDGE_SHIM"):rs.index('})();"#;', rs.index("const BRIDGE_SHIM"))]
+    return (rs.count("#[tauri::command]") == 2 and "fn pick_folder(webview: tauri::Webview, bridge: State<'_, Bridge>) -> Option<String> {\n    api_token(webview, bridge)?;\n    folder_panel()\n}" in rs
+            and "generate_handler![api_token, pick_folder]" in rs
+            and "MainThreadMarker::new()?" in fp and "NSOpenPanel::openPanel(mtm)" in fp and "setCanChooseDirectories(true)" in fp
+            and "setCanChooseFiles(false)" in fp and "setAllowsMultipleSelection(false)" in fp and "runModal() != NSModalResponseOK" in fp
+            and '#[cfg(not(target_os = "macos"))]\nfn folder_panel() -> Option<String> {\n    None\n}' in rs
+            and 'pick_folder: function(){ return pick(); }' in shim and 't("pick_folder")' in shim and "token" not in shim.replace("api_token", "")
+            and cap.get("permissions", [None])[:2] == ["allow-api-token", "allow-pick-folder"]
+            and '.commands(&["api_token", "pick_folder"])' in build
+            and "objc2-app-kit = { version = \"0.3\", default-features = false" in toml
+            and os.path.exists(os.path.join("shell", "src-tauri", "permissions", "autogenerated", "pick_folder.toml")))
+check("6b628 the folder picker in the Mac shell: pick_folder answers only the app's own origin (api_token's check first), on the main thread with the system's folder panel (folders only, one, Choose), None on a cancel and off a Mac; the shim offers it and holds no secret; its permission granted and generated; the objc2 crates Tauri already builds; three mutants caught",
+      _u628_rs_ok(_u628_rs, _u628_cap, _u628_toml, _u628_build)
+      and not _u628_rs_ok(_u628_rs.replace("    api_token(webview, bridge)?;\n    folder_panel()", "    let _ = (webview, bridge);\n    folder_panel()", 1), _u628_cap, _u628_toml, _u628_build)
+      and not _u628_rs_ok(_u628_rs.replace("setCanChooseFiles(false)", "setCanChooseFiles(true)", 1), _u628_cap, _u628_toml, _u628_build)
+      and not _u628_rs_ok(_u628_rs, dict(_u628_cap, permissions=[p_ for p_ in _u628_cap.get("permissions", []) if p_ != "allow-pick-folder"]), _u628_toml, _u628_build), "")
+# the server's picker (pywebview's window), with a stand-in webview
+class _U628Win:
+    def __init__(self, r, boom=False):
+        self.r, self.boom, self.calls = r, boom, []
+    def create_file_dialog(self, kind, directory=""):
+        self.calls.append((kind, directory))
+        if self.boom:
+            raise RuntimeError("no")
+        return self.r
+def _u628_pick(src):
+    out = {}
+    for tag, wins, has in (("nowin", [], True), ("nowv", [_U628Win(("/p",))], False), ("tuple", [_U628Win(("/a/b",))], True),
+                           ("str", [_U628Win("/c")], True), ("cancel", [_U628Win(None)], True), ("empty", [_U628Win(())], True),
+                           ("boom", [_U628Win(("/x",), boom=True)], True)):
+        wv = type("wv", (), {"windows": wins, "FileDialog": type("FD", (), {"FOLDER": 20}), "FOLDER_DIALOG": 20})
+        try:
+            ns = _u628_exec(src, {"ws_picker", "ws_pick_folder"}, {"HAS_WEBVIEW": has, "webview": wv})
+            out[tag] = [ns["ws_picker"](), ns["ws_pick_folder"]("/nope/missing")] + ([wins[0].calls] if wins else [])
+        except Exception as e_:
+            out[tag] = repr(e_)
+    return out
+def _u628_pick_ok(o):
+    home = os.path.expanduser("~")
+    return (o.get("nowin") == ["", {"none": True}] and o.get("nowv") == ["", {"none": True}, []]
+            and o.get("tuple") == ["window", {"path": "/a/b"}, [(20, home)]] and o.get("str") == ["window", {"path": "/c"}, [(20, home)]]
+            and o.get("cancel") == ["window", {"cancel": True}, [(20, home)]] and o.get("empty") == ["window", {"cancel": True}, [(20, home)]]
+            and o.get("boom") == ["window", {"none": True}, [(20, home)]])
+_u628_po = _u628_pick(_MILLENAI_SRC)
+_u628_pm = [_u628_pick(_MILLENAI_SRC.replace('        return "window" if HAS_WEBVIEW and len(webview.windows) > 0 else ""', '        return "window"', 1)),
+            _u628_pick(_MILLENAI_SRC.replace('    return {"path": p} if p else {"cancel": True}\n# ==== THE FOLDER PICKER', '    return {"path": p}\n# ==== THE FOLDER PICKER', 1))]
+_u628_ws = [req("/api/workspace"), req("/api/workspace/pick"), req("/api/workspace/pick", "POST", {})]
+check("6b628 the server's folder picker: pywebview's folder panel only with a window of its own (a windowless copy and the Tauri sidecar say none), from the home folder when the start is missing, a path, a cancel, a failure as none; GET /api/workspace says whether it can, a GET to /pick is refused, the POST says none here; two mutants caught",
+      _u628_pick_ok(_u628_po) and not any(_u628_pick_ok(m_) for m_ in _u628_pm)
+      and _u628_ws[0][0] == 200 and json.loads(_u628_ws[0][2]).get("pick") == "" and _u628_ws[1][0] == 405
+      and _u628_ws[2][0] == 200 and json.loads(_u628_ws[2][2]) == {"none": True},
+      "%r" % ([_u628_po] + _u628_pm + [(s_, b_[:80]) for s_, _h, b_ in _u628_ws],))
+
+# (3) the picture model, asked first: vision_offer with stand-ins
+def _u628_vis(src):
+    out = {}
+    for tag, job, sup, fits, keyed in (("offer", {}, True, True, False), ("keyed", {}, True, True, True), ("busy", {"status": "downloading"}, True, True, False),
+                                       ("cant", {}, True, False, False), ("unsup", {}, False, True, False)):
+        said = []
+        ns = {"VISION_MODEL": "Qwen 3.5 Vision 9B", "_setup_lock": __import__("threading").Lock(), "_setup_jobs": {"Qwen 3.5 Vision 9B": job} if job else {},
+              "SUPPORTED": {"Qwen 3.5 Vision 9B": sup}, "model_fits_machine": lambda l, f_=fits: f_, "MODEL_INFO": {"Qwen 3.5 Vision 9B": {"gb": 6.6}},
+              "NUL": "\x00", "Ctl": lambda s_: ("CTL", s_), "start_model_downloads": lambda *a: said.append(("DOWNLOAD", a))}
+        try:
+            ns = _u628_exec(src, {"vision_offer"}, ns)
+            r_ = ns["vision_offer"](said.append, keyed)
+            out[tag] = [r_] + [x if isinstance(x, str) else (x[0], json.loads(x[1].strip("\x00").split(":", 1)[1])) if isinstance(x, tuple) and x[0] == "CTL" else x for x in said]
+        except Exception as e_:
+            out[tag] = repr(e_)
+    return out
+def _u628_vis_ok(o):
+    off, ky, bz, ct, us = (o.get(k) or [] for k in ("offer", "keyed", "busy", "cant", "unsup"))
+    return (off == ["offer", "Reading pictures needs the picture model, Qwen 3.5 Vision 9B. It’s a 6.6 GB download.", ("CTL", {"pull": "Qwen 3.5 Vision 9B", "gb": 6.6})]
+            and len(ky) == 3 and ky[1].endswith("Or turn on cloud models in Settings > Models > Cloud and your saved key reads pictures now.")
+            and bz == ["busy", "The picture model, Qwen 3.5 Vision 9B, is still downloading. Send the picture again when it’s done."]
+            and ct == ["cant", "Reading pictures needs Qwen 3.5 Vision 9B, and this computer can’t run it."] and us == ct[:1] + ct[1:])
+_u628_vo = _u628_vis(_MILLENAI_SRC)
+_u628_br = _MILLENAI_SRC[_MILLENAI_SRC.index("        # first image before the vision engine exists: ASK"):][:900] if "        # first image before the vision engine exists: ASK" in _MILLENAI_SRC else ""
+_u628_vm = _u628_vis(_MILLENAI_SRC.replace('    emit(Ctl(NUL + "OFFER:" + json.dumps({"pull": lab, "gb": gb}) + NUL))\n    return "offer"',
+                                           '    start_model_downloads([lab])\n    return "offer"', 1))
+check("6b628 the picture model asked first (vision_offer): one line with the model and its size and an OFFER frame for Download and Not now, nothing downloaded; a download on its way said instead; a computer that can't run it told so; a saved Claude or Gemini key named; the chat's branch calls it and no longer starts the download; the mutant (the download started, no keys) caught",
+      _u628_vis_ok(_u628_vo) and not _u628_vis_ok(_u628_vm)
+      and "vision_offer(emit, _vkey)" in _u628_br and "start_model_downloads" not in _u628_br
+      and 'start_model_downloads(["Qwen 3.5 Vision 9B"])' not in _MILLENAI_SRC, "%r" % ([_u628_vo, _u628_vm],))
+# the saved record keeps the offer (turn_record, lifted as the store's checks do)
+def _u628_rec(src):
+    want = {"_TURN_TAGS", "_TURN_FRAME", "_TURN_PART", "_TURN_RESET", "_TURN_BOLD_SKIP", "turn_text", "turn_record", "_places_worth_showing"}
+    try:
+        ns = _u628_exec(src, want)
+        a = ns["turn_record"]("Reading pictures needs it.\x00OFFER:" + json.dumps({"pull": "Qwen 3.5 Vision 9B", "gb": 6.6}) + "\x00")
+        b = ns["turn_record"]("Desktop didn’t answer.\x00OFFER:{\"server\": \"Desktop\", \"asleep\": 1}\x00")
+        return [a.get("offer"), b.get("offer")]
+    except Exception as e_:
+        return repr(e_)
+_u628_ro = _u628_rec(_MILLENAI_SRC)
+check("6b628 a reopened chat keeps the picture model's keys (turn_record saves {pull, gb}); a server pick's way on is as it was; the mutant (the pull dropped) caught",
+      _u628_ro == [{"pull": "Qwen 3.5 Vision 9B", "gb": 6.6}, {"server": "Desktop", "asleep": 1}]
+      and _u628_rec(_MILLENAI_SRC.replace('elif tag == "OFFER" and isinstance(d, dict) and d.get("pull"):', 'elif tag == "OFFER" and isinstance(d, dict) and d.get("pull") and False:', 1))[0] != {"pull": "Qwen 3.5 Vision 9B", "gb": 6.6},
+      "%r" % (_u628_ro,))
+
+# (4) What's new: no first-open steps inside the app
+def _u628_notes(src):
+    try:
+        un = _u628_exec(src, {"WHATS_NEW_OPEN", "WHATS_NEW_CLOSE", "user_notes"})["user_notes"]
+    except Exception as e_:
+        return repr(e_)
+    old = ("**ConcordeAI 7.0 beta 2**\n\n- A slimmer slider.\n- A faster first run.\n\nFirst open on a Mac: System Settings › Privacy & Security › Open Anyway. "
+           "On Windows: More info › Run anyway.\n\n**macOS** — download the .dmg.")
+    new = "<!-- whats-new -->\n- A starter model\n- Import a ChatGPT .zip export\nFirst open on a Mac: Open Anyway.\n<!-- /whats-new -->\n\n**macOS** — the .dmg"
+    return [un(old), un(new)]
+_u628_no = _u628_notes(_MILLENAI_SRC)
+check("6b628 What's new never shows the first open's steps (Open Anyway, Run anyway), in an old body or between the markers; a first run and a .zip between the markers stay; the mutant caught",
+      _u628_no == ["**ConcordeAI 7.0 beta 2**\n\n- A slimmer slider.\n- A faster first run.", "- A starter model\n- Import a ChatGPT .zip export"]
+      and _u628_notes(_MILLENAI_SRC.replace(" if not first.search(ln)).strip()[:4000]", ").strip()[:4000]", 1)) != _u628_no, "%r" % (_u628_no,))
+
+# (5) the Effects level in prefs.json: the server's half
+_u628_fx0 = json.loads(req("/api/prefs")[2] or b"{}").get("fx_level")
+_u628_fxp = [json.loads(req("/api/prefs", "POST", {"fx_level": v_})[2] or b"{}") for v_ in ("loud", 3, "full")]
+_u628_fx1 = json.loads(req("/api/prefs")[2] or b"{}").get("fx_level")
+_u628_ns = _u628_exec(_MILLENAI_SRC, {"SYNCED_SETTINGS", "PROFILE_LOCAL", "MACHINE", "MACHINE_PREFIXES", "pref_class"})
+check("6b628 the Effects level is a setting of this profile on this computer (fx_level, PROFILE_LOCAL): Calm, Balanced or Full kept, anything else ignored",
+      _u628_ns["pref_class"]("fx_level") == "local" and "fx_level" in _u628_fxp[0].get("ignored", []) and "fx_level" in _u628_fxp[1].get("ignored", [])
+      and _u628_fx1 == "full", "%r" % ([_u628_fx0, _u628_fxp, _u628_fx1],))
+
+# the page, live, in headless Chromium: the lanes, the picker, the picture model's keys, the Effects level
+_U628_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 150000);") + r'''  const scene = process.argv[9], W = +process.argv[10] || 1440, extra = process.argv[11] || "";
+  function stub(cfg) {
+    const real = window.fetch.bind(window), N = String.fromCharCode(0), enc = new TextEncoder(), S = window.__store = {};
+    window.__sent = []; window.__errs = []; window.__dl = []; window.__setupN = 0; window.__route = null;
+    addEventListener("error", e => { if (!/ResizeObserver loop/.test(String(e.message))) window.__errs.push(String(e.message)); });
+    const J = o => Promise.resolve(new Response(JSON.stringify(o), { headers: { "Content-Type": "application/json" } }));
+    window.fetch = (u, o) => { const p = String(u && u.url || u).split("?")[0];
+      if (window.__route) { const r = window.__route(p, o, real, u); if (r) return r; }
+      if (p.endsWith("/api/chats/one")) { const c = S[new URL(String(u), location.href).searchParams.get("id")]; if (c) return J({ chat: JSON.parse(JSON.stringify(c)) }); }
+      if (p.endsWith("/api/chat")) { let b = {}; try { b = JSON.parse(o.body); } catch (e) {} window.__sent.push(b);
+        const q = (b.messages || []).slice(-1)[0] || {}, txt = window.__reply ? window.__reply(b) : "Stand-in answer to " + String(q.content || "").slice(0, 30) + ".", cid = b.chat_id;
+        if (cid) { const c = S[cid] = S[cid] || { id: cid, lane: b.lane || "ai", title: String(q.content || "").slice(0, 48), messages: [] }; c.ts = Date.now(); c.messages = (b.messages || []).map(m => ({ role: m.role, content: m.content })); }
+        const ms = window.__ms || 400; let c; const body = new ReadableStream({ start(x) { c = x; } });
+        (async () => { c.enqueue(enc.encode(N + "STATUS:Thinking" + N)); const w = txt.split(/(?<=\s)/); for (const x of w) { await new Promise(r => setTimeout(r, ms / w.length)); c.enqueue(enc.encode(x)); }
+          if (cid) { S[cid].messages.push({ role: "assistant", content: txt.split(N)[0] }); S[cid].ts = Date.now(); } c.close(); })();
+        return Promise.resolve(new Response(body, { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", "X-Models": "stand-in", "X-Web-Search": "0" } })); }
+      return real(u, o); };
+  }
+  const lsfx = scene === "fx" ? "" : `localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});`;
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{${lsfx}localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");}catch(e){}
+    (${stub.toString()})({});`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const until = async (x, ms) => { for (let i = 0; i < (ms || 15000) / 100; i++) { if (await ev(x)) return true; await sleep(100); } return false; };
+  const click = async sel => { const p = await ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e||!e.getClientRects().length)return null;e.scrollIntoView({block:"center"});const r=e.getBoundingClientRect(),x=r.left+r.width/2,y=r.top+r.height/2,h=document.elementFromPoint(x,y);return {x,y,hit:!!h&&(h===e||e.contains(h))};})()`);
+    if (!p) return { hit: false, none: true };
+    await send("Input.dispatchMouseEvent", { type: "mousePressed", x: p.x, y: p.y, button: "left", clickCount: 1 });
+    await send("Input.dispatchMouseEvent", { type: "mouseReleased", x: p.x, y: p.y, button: "left", clickCount: 1 }); return p; };
+  const ready = async () => { let ok = false; for (let i = 0; i < 400 && !ok; i++) { await sleep(200); ok = await ev(`!!document.querySelector("#input")&&typeof switchLane==="function"&&typeof prefsReady!=="undefined"&&prefsReady&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); } return ok; };
+  if (!(await ready())) { out.errs.push("page not ready"); return done(0); }
+  await sleep(1000);
+  await ev(`window.hzNmBlock=()=>false`);   // a stand-in answers whatever is installed
+  const ask = async q => { const n = await ev(`window.__sent.length`);
+    await ev(`(()=>{const i=document.querySelector("#input");i.focus();i.value=${JSON.stringify(q)};i.dispatchEvent(new Event("input",{bubbles:true}));return 1;})()`);
+    const k = await click("#send"); await until(`window.__sent.length>${n}&&!generating`, 15000); await sleep(500); return k; };
+  const hits = sel => ev(`(()=>{const e=document.querySelector(${JSON.stringify(sel)});if(!e||!e.getClientRects().length)return false;const r=e.getBoundingClientRect(),h=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return !!h&&(h===e||e.contains(h));})()`);
+  const tab = async m => { const sel = `#hz-lanes [role=tab][data-m="${m}"]`;
+    if (!(await hits(sel)) && (await hits("#hz-lanemenu"))) { await click("#hz-lanemenu"); await sleep(350); }
+    const k = (await hits(sel)) ? await click(sel) : { hit: false }; await sleep(500); return k.hit; };
+  if (scene === "lanes") {
+    const st = `(()=>{const c=chats.find(x=>x.id===curChat)||{};return {lane:uiMode,title:c.title||null,cur:curChat,
+      msgs:[...document.querySelectorAll("#chat-inner>.msg")].map(m=>m.className.split(" ")[1]),hero:!!document.querySelector("#hero"),
+      unread:chats.filter(x=>x.unread).map(x=>x.title),rows:[...document.querySelectorAll("#chat-list .chat-item")].map(r=>(r.classList.contains("active")?"*":"")+r.querySelector(".ct").textContent)};})()`;
+    const S = out.s = {}; out.tabs = [];
+    await ask("Chat question one"); S.a = await ev(st);
+    out.tabs.push(await tab("code")); S.b = await ev(st);
+    await ask("Code question one"); S.c = await ev(st);
+    out.tabs.push(await tab("ai")); S.d = await ev(st);
+    out.tabs.push(await tab("code")); S.e = await ev(st);
+    out.tabs.push(await tab("ai"));
+    await ev(`window.__ms=3000`);
+    await ev(`(()=>{const i=document.querySelector("#input");i.value="Chat question two";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+    await sleep(700); out.tabs.push(await tab("code")); S.f = await ev(st); S.fGen = await ev(`generating`);
+    await until(`!generating`, 15000); await sleep(600); S.g = await ev(st);
+    out.tabs.push(await tab("ai")); S.h = await ev(st);
+    await ev(`window.__ms=400`);
+    out.tabs.push(await tab("code")); await ev(`document.querySelector("#newchat").click()`); await sleep(300); S.i = await ev(st);
+    out.tabs.push(await tab("funnel")); S.j = await ev(st); out.tabs.push(await tab("code")); S.k = await ev(st);
+    // a mode picked in Code: Chat, with Chat's own chat
+    await ev(`loadChat((chats.find(c=>c.title==="Code question one")||{}).id)`); await sleep(400);
+    if (await hits("#hz-effort .hz-pick")) { await click("#hz-effort .hz-pick"); await sleep(400); }
+    const t = await ev(`(()=>{const o=[...document.querySelectorAll("#hz-menu .hz-opt")].find(o=>o.dataset.t!==tier&&!o.classList.contains("off"));return o?o.dataset.t:null;})()`);
+    if (t) { await click(`#hz-menu .hz-opt[data-t="${t}"]`); await sleep(600); }
+    S.m = await ev(st); S.mt = t;
+    out.lanesSent = await ev(`window.__sent.map(b=>[b.lane,(b.messages||[]).slice(-1)[0].content])`);
+    out.sw = await ev(`[document.documentElement.scrollWidth,innerWidth]`);
+  } else if (scene === "pick") {
+    const st = `(()=>{const b=document.querySelector("#ws-pick"),r=b&&b.getBoundingClientRect(),h=r&&r.width?document.elementFromPoint(r.left+r.width/2,r.top+r.height/2):null;
+      return {hidden:!b||b.hidden||!b.offsetParent,w:r?Math.round(r.width):0,hit:!!h&&(h===b||b.contains(h)),text:b?b.textContent:null,path:document.querySelector("#ws-path").value,note:document.querySelector("#ws-note").textContent};})()`;
+    const off = `api("/api/workspace/off",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}).then(()=>1)`;
+    const root = `api("/api/workspace").then(r=>r.json()).then(d=>d.root)`;
+    await ev(off); await tab("code"); await ev(`setAgent("Workspace")`); await sleep(600);
+    if (!(await ev(`!!document.querySelector("#ws-path").offsetParent`))) { await click("#hz-sb"); await sleep(700); }
+    out.none = await ev(st);
+    await ev(`(()=>{const i=document.querySelector("#ws-path");i.value=${JSON.stringify(extra)};return 1;})()`); out.useHit = (await click("#ws-set")).hit; await sleep(900);
+    out.typed = await ev(st); out.typedRoot = await ev(root); await ev(off);
+    // the Mac shell's bridge: a cancel, then the folder
+    await ev(`(()=>{window.__picks=[null,${JSON.stringify(extra)}];window.__asked=0;const a=window.pywebview.api;window.pywebview={platform:"tauri",api:{api_token:a.api_token,pick_folder:()=>{window.__asked++;return Promise.resolve(window.__picks.shift());}}};
+      document.querySelector("#ws-path").value="";document.querySelector("#ws-note").textContent="";wsRefresh();return 1;})()`); await sleep(700);
+    out.shell = await ev(st); out.shellCancel = (await click("#ws-pick")).hit; await sleep(500);
+    out.cancel = await ev(st); out.cancelRoot = await ev(root);
+    out.shellPick = (await click("#ws-pick")).hit; await sleep(1000);
+    out.picked = await ev(st); out.pickedRoot = await ev(root); out.asked = await ev(`window.__asked`); await ev(off);
+    // pywebview's window, from the server: the status says it can, a pick, then none (the key goes)
+    await ev(`(()=>{const a=window.pywebview.api;window.pywebview={api:{api_token:a.api_token}};window.__wp=[{path:${JSON.stringify(extra)}},{none:true}];window.__wpBody=[];
+      window.__route=(p,o,real,u)=>{if(p.endsWith("/api/workspace/pick")){window.__wpBody.push(JSON.parse(o.body||"{}"));return Promise.resolve(new Response(JSON.stringify(window.__wp.shift()),{headers:{"Content-Type":"application/json"}}));}
+        if(p.endsWith("/api/workspace")&&!(o&&o.method))return real(u,o).then(r=>r.json()).then(d=>new Response(JSON.stringify(Object.assign(d,{pick:"window"})),{headers:{"Content-Type":"application/json"}}));return null;};
+      document.querySelector("#ws-path").value="";wsRefresh();return 1;})()`); await sleep(700);
+    out.win = await ev(st); out.winPick = (await click("#ws-pick")).hit; await sleep(1000);
+    out.winPicked = await ev(st); out.winRoot = await ev(root);
+    await click("#ws-pick"); await sleep(700); out.winNone = await ev(st); out.wpBody = await ev(`window.__wpBody`);
+    await ev(`window.__route=null`); await ev(off);
+    out.sw = await ev(`[document.documentElement.scrollWidth,innerWidth]`);
+  } else if (scene === "vis") {
+    await ev(`(()=>{const N=String.fromCharCode(0);window.__reply=b=>window.__visReady?"It is a diner receipt; the total is 11.75.":"Reading pictures needs the picture model, Qwen 3.5 Vision 9B. It’s a 6.6 GB download."+N+"OFFER:"+JSON.stringify({pull:"Qwen 3.5 Vision 9B",gb:6.6})+N;
+      const J=o=>Promise.resolve(new Response(JSON.stringify(o),{headers:{"Content-Type":"application/json"}}));
+      window.__route=(p,o)=>{if(p.endsWith("/api/model/download")){window.__dl.push(JSON.parse(o.body));return J({started:["Qwen 3.5 Vision 9B"]});}
+        if(p.endsWith("/api/setup")&&window.__dl.length){const n=++window.__setupN;return J({models:[{label:"Qwen 3.5 Vision 9B",status:n<3?"downloading":"ready",pct:n<3?n*30:100}]});}return null;};
+      VIS_POLL_MS=150;return 1;})()`);
+    const img = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    const row = `(()=>{const a=[...document.querySelectorAll("#chat-inner>.msg.ai")].pop(),r=a&&a.querySelector(":scope>.offerrow");return r?{cls:r.className,text:r.textContent,keys:[...r.querySelectorAll("button")].map(b=>{const q=b.getBoundingClientRect(),h=document.elementFromPoint(q.left+q.width/2,q.top+q.height/2);return [b.textContent,b.dataset.offer,!!h&&(h===b||b.contains(h)),Math.round(q.height)];})}:null;})()`;
+    await ev(`(()=>{pendingImages=[${JSON.stringify(img)}];paintChips();return 1;})()`); await ask("What is the total on this receipt?");
+    out.offer = await ev(row); out.dl0 = await ev(`window.__dl.length`);
+    out.text = await ev(`[...document.querySelectorAll("#chat-inner>.msg.ai")].pop().querySelector(".body").innerText`);
+    out.later = (await click(".offerrow.vis button[data-offer=later]")).hit; await sleep(250);
+    out.afterLater = await ev(row); out.dl1 = await ev(`window.__dl.length`);
+    await ev(`(()=>{pendingImages=[${JSON.stringify(img)}];paintChips();return 1;})()`);
+    const n0 = await ev(`window.__sent.length`); await ask("And this one?"); await until(`window.__sent.length>${n0}&&!generating`, 10000); await sleep(400);
+    out.pull = (await click(".offerrow.vis button[data-offer=pull]")).hit; await sleep(200); out.during = await ev(row);
+    await until(`/ready/.test((document.querySelector(".offerrow.vis")||{}).textContent||"")`, 8000); out.ready = await ev(row); out.dl2 = await ev(`window.__dl`);
+    await ev(`window.__visReady=1`); const n1 = await ev(`window.__sent.length`);
+    out.ask = (await click(".offerrow.vis button[data-offer=ask]")).hit; await until(`window.__sent.length>${n1}&&!generating`, 10000); await sleep(500);
+    out.again = await ev(`(()=>{const b=window.__sent[window.__sent.length-1],m=(b.messages||[]).slice(-1)[0]||{};return {images:(b.images||[]).length,content:m.content,
+      last:[...document.querySelectorAll("#chat-inner>.msg.ai")].pop().querySelector(".body").innerText,row:!!document.querySelector(".offerrow.vis")};})()`);
+    out.sw = await ev(`[document.documentElement.scrollWidth,innerWidth]`);
+  } else if (scene === "fx") {
+    // a window with no level of its own: the saved one; then its own level, kept; then a pick saved
+    await sleep(800);
+    out.fresh = await ev(`[document.documentElement.classList.contains("hz-full"),document.documentElement.classList.contains("hz-bal"),localStorage.getItem("millen.fxlevel"),(document.querySelector("#fx-level")||{}).value]`);
+    await ev(`localStorage.setItem("millen.fxlevel","calm"),1`);
+    await send("Page.reload", {}); await sleep(500);
+    if (!(await ready())) { out.errs.push("page not ready after reload"); return done(0); }
+    await sleep(1200);
+    out.own = await ev(`[document.documentElement.classList.contains("hz-full"),document.documentElement.classList.contains("hz-bal"),localStorage.getItem("millen.fxlevel")]`);
+    await ev(`(()=>{const s=document.querySelector("#fx-level");s.value="balanced";s.dispatchEvent(new Event("change",{bubbles:true}));return 1;})()`); await sleep(1200);
+    out.saved = await ev(`api("/api/prefs").then(r=>r.json()).then(p=>p.fx_level)`);
+  }
+  out.errs = out.errs.concat(await ev(`window.__errs`) || []);
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _u628_live(scene, width=1440, mutation=None, extra="", fx="balanced"):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="u628-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_U628_CDP)
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, fx,
+            os.path.join(d_, "mut.json") if mutation else "", scene, str(width), extra]
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=170)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _u628_lanes_ok(r, wide=True):
+    S = r.get("s") or {}
+    g = lambda k: S.get(k) or {}
+    return (not r.get("err") and not r.get("errs") and all(r.get("tabs") or [False])
+            and g("a").get("lane") == "ai" and g("a").get("title") == "Chat question one" and g("a").get("msgs") == ["user", "ai"]
+            and g("b").get("lane") == "code" and g("b").get("cur") is None and g("b").get("hero") is True and g("b").get("msgs") == []
+            and g("c").get("lane") == "code" and g("c").get("title") == "Code question one" and g("c").get("msgs") == ["user", "ai"] and g("c").get("rows") == ["*Code question one"]
+            and g("d").get("lane") == "ai" and g("d").get("title") == "Chat question one" and g("d").get("msgs") == ["user", "ai"] and "*Chat question one" in (g("d").get("rows") or [])
+            and g("e").get("lane") == "code" and g("e").get("title") == "Code question one" and g("e").get("msgs") == ["user", "ai"]
+            and g("f").get("title") == "Code question one" and S.get("fGen") is True
+            and g("g").get("title") == "Code question one" and g("g").get("unread") == ["Chat question one"]           # the answer landed in its own chat, unread
+            and g("h").get("title") == "Chat question one" and g("h").get("msgs") == ["user", "ai", "user", "ai"] and g("h").get("unread") == []
+            and g("i").get("cur") is None and g("i").get("lane") == "code" and g("j").get("lane") == "funnel" and g("j").get("cur") is None
+            and g("k").get("cur") is None and g("k").get("lane") == "code" and g("k").get("hero") is True                 # left fresh, back fresh
+            and (not wide or (bool(S.get("mt")) and g("m").get("lane") == "ai" and g("m").get("title") == "Chat question one"))   # a mode picked in Code: Chat's own chat
+            and r.get("lanesSent") == [["ai", "Chat question one"], ["code", "Code question one"], ["ai", "Chat question two"]]
+            and (r.get("sw") or [0, 1])[0] == (r.get("sw") or [0, 1])[1])
+def _u628_pick_live_ok(r, proj):
+    n_ = lambda o: (o or {}).get("note", "")
+    return (not r.get("err") and not r.get("errs")
+            and (r.get("none") or {}).get("hidden") is True and r.get("useHit") is True                                  # no bridge: no key, the typed path as before
+            and (r.get("typed") or {}).get("path") == proj and n_(r.get("typed")) == "2 files indexed" and r.get("typedRoot") == proj
+            and (r.get("shell") or {}).get("hidden") is False and (r.get("shell") or {}).get("hit") is True
+            and (r.get("shell") or {}).get("text") == "Choose folder…" and (r.get("shell") or {}).get("w", 0) >= 150
+            and r.get("shellCancel") is True and (r.get("cancel") or {}).get("path") == "" and r.get("cancelRoot") == ""          # a cancel changes nothing
+            and r.get("shellPick") is True and (r.get("picked") or {}).get("path") == proj and n_(r.get("picked")) == "2 files indexed"
+            and r.get("pickedRoot") == proj and r.get("asked") == 2
+            and (r.get("win") or {}).get("hidden") is False and r.get("winPick") is True and (r.get("winPicked") or {}).get("path") == proj
+            and r.get("winRoot") == proj and (r.get("winNone") or {}).get("hidden") is True and (r.get("wpBody") or [{}])[0] == {"start": ""}
+            and (r.get("sw") or [0, 1])[0] == (r.get("sw") or [0, 1])[1])
+def _u628_vis_live_ok(r):
+    o, rd, ag = r.get("offer") or {}, r.get("ready") or {}, r.get("again") or {}
+    return (not r.get("err") and not r.get("errs")
+            and o.get("cls") == "offerrow vis" and o.get("keys") == [["Download", "pull", True, 32], ["Not now", "later", True, 32]]
+            and r.get("text") == "Reading pictures needs the picture model, Qwen 3.5 Vision 9B. It’s a 6.6 GB download." and r.get("dl0") == 0
+            and r.get("later") is True and r.get("afterLater") is None and r.get("dl1") == 0                              # Not now: the keys go, nothing downloads
+            and r.get("pull") is True and (r.get("during") or {}).get("text", "").startswith("Downloading the picture model…")
+            and rd.get("text") == "The picture model is ready.Ask again" and rd.get("keys") == [["Ask again", "ask", True, 32]]
+            and r.get("dl2") == [{"labels": ["Qwen 3.5 Vision 9B"]}]
+            and r.get("ask") is True and ag.get("images") == 1 and ag.get("content") == "And this one?" and ag.get("row") is False
+            and ag.get("last") == "It is a diner receipt; the total is 11.75."
+            and (r.get("sw") or [0, 1])[0] == (r.get("sw") or [0, 1])[1])
+_u628_proj = os.path.realpath(tempfile.mkdtemp(prefix="u628proj-", dir=_SMOKE_TMP))
+os.makedirs(os.path.join(_u628_proj, "src"))
+open(os.path.join(_u628_proj, "src", "app.py"), "w").write("print('hi')\n"); open(os.path.join(_u628_proj, "README.md"), "w").write("# p\n")
+_u628_L = _u628_live("lanes", 1440); _u628_Ln = _u628_live("lanes", 760)
+check("6b628 live (headless Chromium, the copy's page, a stand-in stream and the store's half of a turn): Code opens fresh, a code question goes to a Code chat, back in Chat its chat, back in Code its chat; a slow answer left for Code lands in its own chat, unread, and is there on return; a lane left fresh comes back fresh; a mode picked in Code goes to Chat with Chat's own chat; at 1440 and 760, nothing sideways",
+      _u628_lanes_ok(_u628_L) and _u628_lanes_ok(_u628_Ln, wide=False), json.dumps({"w": _u628_L, "n": _u628_Ln})[:1500])
+_u628_P = _u628_live("pick", 1440, extra=_u628_proj)
+check("6b628 live: the Workspace's Choose folder… hidden with no bridge (the typed path works as before); with the Mac shell's pick_folder a real click picks, a cancel changes nothing, the folder is set through /api/workspace/set and its files counted; with this server's window (pywebview) the same, and a server with no window takes the key away",
+      _u628_pick_live_ok(_u628_P, _u628_proj), json.dumps(_u628_P)[:1500])
+_u628_V = _u628_live("vis", 1440)
+check("6b628 live: a picture with no picture model: the line names it and its size, Download and Not now (32 tall, hit) under it, nothing downloaded; Not now takes the keys away; Download starts it (/api/model/download, stubbed), the row follows it to ready and Ask again sends the question again with its picture",
+      _u628_vis_live_ok(_u628_V), json.dumps(_u628_V)[:1500])
+def _u628_fx_ok(r):
+    return (not r.get("err") and not r.get("errs") and r.get("fresh") == [True, False, "full", "full"]
+            and r.get("own") == [False, False, "calm"] and r.get("saved") == "balanced")
+def _u628_fx_run(mutation=None):
+    req("/api/prefs", "POST", {"fx_level": "full"})        # saved in another window
+    return _u628_live("fx", 1440, mutation)
+_u628_F = _u628_fx_run()
+check("6b628 live: the Effects level saved in prefs.json reaches a window with none of its own (Full here); a window with its own keeps it (Calm); a pick in Settings is saved",
+      _u628_fx_ok(_u628_F), json.dumps(_u628_F)[:800])
+_u628_mw = [
+    ("lanes", "a switch that opens nothing (the walkthrough's bug back)", [["  if(m!==from&&how!==\"keep\")laneOpen(m,how);   // 6b628", ""]], _u628_lanes_ok),
+    ("lanes", "a lane with no chat keeps the other lane's on screen", [["  else if(curChat||messages.length)chatFresh();", ""]], _u628_lanes_ok),
+    ("lanes", "a mode picked in Code keeps the code chat", [["  if(uiMode!==\"ai\"&&LANE_LEFT)switchLane(\"ai\");", "  if(false)switchLane(\"ai\");"]], _u628_lanes_ok),
+    ("pick", "the key never shown", [["function wsPickPaint(){const b=$(\"#ws-pick\");if(b)b.hidden=!(wsShellPick()||wsPickOK);}", "function wsPickPaint(){const b=$(\"#ws-pick\");if(b)b.hidden=true;}"]], lambda r: _u628_pick_live_ok(r, _u628_proj)),
+    ("pick", "a pick never set", [["    if(typeof path===\"string\"&&path){$(\"#ws-path\").value=path;await wsUse(path);}", ""]], lambda r: _u628_pick_live_ok(r, _u628_proj)),
+    ("vis", "the server pick's keys for the picture model", [["  if(o.pull){visOfferRow(div,o);return;}   // the picture model, asked first (6b628)", ""]], _u628_vis_live_ok),
+    ("vis", "Ask again without its picture", [["  pendingImages=[e.img];paintChips();\n  regenerate();", "  regenerate();"]], _u628_vis_live_ok),
+    ("fx", "the saved level never taken", [["  if(typeof fxAdopt===\"function\")fxAdopt(P.fx_level);", ""]], _u628_fx_ok),
+    ("fx", "the saved level over a window's own", [["  if(own!==null)return false;\n", ""]], _u628_fx_ok),
+    ("fx", "a pick in Settings not saved", [["setFxLevel(fsel.value);fxKeep();", "setFxLevel(fsel.value);"]], _u628_fx_ok),
+    ("vis", "Not now downloads anyway", [["  if(act===\"later\"){row.remove();input.focus();return;}", "  if(act===\"later\"){row.remove();api(\"/api/model/download\",{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify({labels:[lab]})});return;}"]], _u628_vis_live_ok),
+]
+_u628_mr = []
+for sc_, d_, m_, ok_ in _u628_mw:
+    r_ = _u628_fx_run(m_) if sc_ == "fx" else _u628_live(sc_, 1440, m_, extra=_u628_proj if sc_ == "pick" else "")
+    _u628_mr.append((d_, r_.get("mutated", 0) >= 1 and not ok_(r_)))
+req("/api/prefs", "POST", {"fx_level": "balanced"})   # the default again, as a copy with none would read
+check("6b628 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _ in _u628_mr),
+      all(c_ for _, c_ in _u628_mr), json.dumps(_u628_mr))
+# ==== 6b628 usable: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

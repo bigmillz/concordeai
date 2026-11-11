@@ -1,11 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "The app's own page may call one command of the app's own, api_token; the command itself checks the page's origin against the sidecar's port before answering (6b532). The header drags the window and a double-click on it zooms, as a title bar's would (the Mac shell's corner: the page runs under the title bar).",
+  "description": "The app's own page may call two commands of the app's own, api_token and pick_folder (the system's folder panel for the Code lane's Workspace, 6b628); each checks the page's origin against the sidecar's port before answering (6b532). The header drags the window and a double-click on it zooms, as a title bar's would (the Mac shell's corner: the page runs under the title bar).",
   "local": true,
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
   "windows": ["main"],
-  "permissions": ["allow-api-token", "core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize"]
+  "permissions": ["allow-api-token", "allow-pick-folder", "core:window:allow-start-dragging", "core:window:allow-internal-toggle-maximize"]
 }

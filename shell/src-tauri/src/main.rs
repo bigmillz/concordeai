@@ -133,9 +133,48 @@ fn api_token(webview: tauri::Webview, bridge: State<'_, Bridge>) -> Option<Strin
     }
 }
 
+/// THE FOLDER PICKER (6b628, per Patrick: "it has to be usable"; the
+/// walkthrough: the Code lane's Workspace wanted a typed path). The page asks
+/// for a folder and gets the system's own panel: a folder's path, or None when
+/// the person cancels. Answered only for the app's own origin, as api_token is
+/// (the token's own check comes first). A sync command runs on the main
+/// thread, where AppKit's panels must; off a Mac it is None and the page keeps
+/// its typed path. The path goes nowhere from here: the page hands it to
+/// /api/workspace/set, which checks it as it checks a typed one.
+#[tauri::command]
+fn pick_folder(webview: tauri::Webview, bridge: State<'_, Bridge>) -> Option<String> {
+    api_token(webview, bridge)?;
+    folder_panel()
+}
+
+#[cfg(target_os = "macos")]
+fn folder_panel() -> Option<String> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::{NSModalResponseOK, NSOpenPanel};
+    use objc2_foundation::NSString;
+    let mtm = MainThreadMarker::new()?;
+    let panel = NSOpenPanel::openPanel(mtm);
+    panel.setCanChooseDirectories(true);
+    panel.setCanChooseFiles(false);
+    panel.setAllowsMultipleSelection(false);
+    panel.setCanCreateDirectories(true);
+    panel.setPrompt(Some(&NSString::from_str("Choose")));
+    if panel.runModal() != NSModalResponseOK {
+        return None;
+    }
+    let path = panel.URL()?.path()?.to_string();
+    if path.is_empty() { None } else { Some(path) }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn folder_panel() -> Option<String> {
+    None
+}
+
 /// The page expects pywebview's bridge: window.pywebview.api.api_token()
 /// returning a promise, and a `pywebviewready` event. This shim gives it
-/// exactly that over Tauri's IPC and nothing more; it holds no secret, so
+/// exactly that over Tauri's IPC, and the folder picker (6b628), and nothing
+/// more; it holds no secret, so
 /// it is safe in every frame the window may ever show. The page's own code
 /// (apiTok) retries until a string of 32+ chars comes back.
 const BRIDGE_SHIM: &str = r#"(function(){
@@ -144,7 +183,11 @@ const BRIDGE_SHIM: &str = r#"(function(){
     var t = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
     return t ? t("api_token") : Promise.reject(new Error("no bridge"));
   }
-  var api = Object.freeze({ api_token: function(){ return invoke(); } });
+  function pick(){
+    var t = window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+    return t ? t("pick_folder") : Promise.resolve(null);
+  }
+  var api = Object.freeze({ api_token: function(){ return invoke(); }, pick_folder: function(){ return pick(); } });
   Object.defineProperty(window, "pywebview", {
     value: Object.freeze({ platform: "tauri", api: api }), writable: false, configurable: false });
   var fire = function(){ try { window.dispatchEvent(new Event("pywebviewready")); } catch (e) {} };
@@ -1357,7 +1400,7 @@ fn main() {
         .manage(Bridge::default())
         .manage(Sidecar { child: Mutex::new(None) })
         .manage(WinMemo::default())
-        .invoke_handler(tauri::generate_handler![api_token])
+        .invoke_handler(tauri::generate_handler![api_token, pick_folder])
         .setup(|app| {
             mark("setup");
             let handle = app.handle().clone();
