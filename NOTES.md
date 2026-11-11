@@ -20296,3 +20296,34 @@ from the server tuning report.
   estimate against nvidia-smi); 7 `kv:` mutants in `tests/mutate.py`, all killed.
 - Not changed: the 5% weights margin (gpt-oss's estimate still sits ~1.4 GiB over what the card holds), the K/V
   type (f16 assumed; the server runs f16), the app's `SRV_CTX_DEFAULT` (beta-5 integrator).
+
+## 6b661 — the admin panel's full-power test (per Patrick)
+
+Patrick (a screenshot of the admin panel): a "full GPU, full CPU, full fan, everything" test; in the pop-up he
+chose GPU + CPU + fans, no disk stress. In the Controls tab, a card: length chips (1 to 5 minutes), Start (asks
+first), Stop, a countdown, live readings every 2 s and a result card.
+
+- `lib/o1fulltest.py`, `bin/ollama1-fulltest`, `systemd/ollama1-fulltest@.service` (instance = seconds) and
+  `ollama1-fulltest-stop.service`; polkit lets o1admin start `ollama1-fulltest@(60|120|180|240|300).service` and the
+  stop unit, nothing else. Loads: `tools/gpu-burn.sh` on `fan_cal_model` (else gemma4:12b) and stress-ng `--cpu 0
+  --cpu-method matrixprod --verify` at nice 10 (the card's feeding thread keeps up); fans and pump through the fan
+  service's existing hold file (`fancal-hold.json`, pct 100, `"by": "fulltest"`), so the cooler's pump goes extreme
+  by the fan service's own rule. No governor or card-limit change: nothing to restore but the hold, which
+  ExecStopPost removes after any end (only its own: the calibration's hold has no `by`).
+- Safeguards, all in the program (the page only asks): the 300 s cap twice (polkit and `length_of`/`Runner`),
+  night 23:00-08:00 by the server's clock, the gateway (in flight, queued, or a request in the last 120 s) at start
+  and during the run, one run (a flock, `running()`, and busy_reasons for the calibration, burns, downloads,
+  updates), the fan service reporting, Tctl 90 C, card 85 C, coolant 40 C, the kernel log every 4 s (NVMe errors,
+  PCIe AER, Xid, machine checks). `o1sleep.BUSY_UNITS` has `ollama1-fulltest@*.service`; the unit holds the
+  inhibitor (`o1sleep.Inhibit`) only while it runs. TimeoutStartSec=420 is the unit's own last stop.
+- Pass/fail: Fail on a kernel-log record, a thermal or hardware slowdown or power brake of the card (its power limit
+  alone is normal at full load), stress-ng's verification, or the card under 50% busy after the first 30 s;
+  Stopped for Stop, a request or the night; else Pass.
+- If the box hangs under load: the SP5100 TCO hardware watchdog (60 s, petted every 10 s by ollama1-watchdog
+  only while the system disk answers) resets it; `panic=10` on the kernel line, `kernel.hardlockup_panic=1` and
+  `kernel.hung_task_panic=1` turn a hard lockup or a hung task into a reboot. A power-supply trip (a full card and
+  a full processor together) would switch it off: only the power button brings it back.
+- Tests: `tests/test_fulltest.py` (27), `TestFullTest` in `tests/test_admin.py` (5), the polkit cases in
+  `tests/polkit_check.js`; 14 `fulltest:` mutants in `tests/mutate.py`, all killed. Copy is placeholder until
+  Patrick approves it.
+

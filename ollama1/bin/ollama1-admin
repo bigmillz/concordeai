@@ -36,6 +36,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 import o1cpu  # noqa: E402
 import o1fan  # noqa: E402
 import o1fancal  # noqa: E402
+import o1fulltest  # noqa: E402
 import o1gputune  # noqa: E402
 import o1idle  # noqa: E402
 import o1leds  # noqa: E402
@@ -66,12 +67,14 @@ FIXED_UNITS = {
     "power-apply": "ollama1-power-apply.service",
     "fancal": "ollama1-fancal.service",                  # the fan calibration (6b505), about 40 minutes
     "fancal-abort": "ollama1-fancal-abort.service",      # ... and its Abort: stops it at once
+    "fulltest-stop": "ollama1-fulltest-stop.service",    # the full-power test's Stop (6b661)
 }
 TEMPLATE_UNITS = {
     "remove-device": "ollama1-rmdevice@%s.service",
     "pull": "ollama1-pull@%s.service",
     "remove-model": "ollama1-rmmodel@%s.service",
     "sleep-config": "ollama1-sleepcfg@%s.service",       # %s: on-30 / off-60 (6b402)
+    "fulltest": "ollama1-fulltest@%s.service",           # %s: 60, 120, 180, 240 or 300 seconds (6b661)
 }
 SLEEP_WAIT_S = 8.0     # how long the answer to a sleep-setting change waits for the unit to say what it saved
 HISTORY_COLS = 13     # t, tps, gpu busy, vram, gpu temp, gpu power, active, cpu temp, cpu GHz, cpu %, RAM GiB,
@@ -181,6 +184,55 @@ def clean_fancal(prog, last, cal):
                    "heavy_pct": _num(cal.get("heavy_pct")), "model": _txt(cal.get("model"), 80),
                    "found": {"query": _num(found.get("query")), "burn": _num(found.get("burn"))}}
     return {"run": run_of(run), "cal": cal_out, "total_s": o1fancal.SHORT_S + o1fancal.LONG_S + o1fancal.BURN_S}
+
+
+def clean_fulltest(prog, last):
+    """The full-power test (6b661): the run in progress (/run/ollama1/fulltest.json, "stalled" when its writer went
+    quiet), else the last result (/var/lib/ollama1/fulltest-last.json). Known fields only."""
+    st = prog if isinstance(prog, dict) and prog.get("state") in ("running", "stalled") else (prog or last)
+    if not isinstance(st, dict):
+        return None
+    d = lambda v: v if isinstance(v, dict) else {}           # noqa: E731
+    words = lambda v, n: [_txt(x, 30) for x in (v if isinstance(v, list) else [])[:n] if isinstance(x, str)]  # noqa: E731
+
+    def gpu(g):
+        g = d(g)
+        return {k: _num(g.get(k)) for k in ("busy", "mhz", "max_mhz", "watts", "limit_w", "c")} | {
+            "reasons": words(g.get("reasons"), 6)}
+
+    def cpu(c):
+        c = d(c)
+        return {k: _num(c.get(k)) for k in ("busy", "mhz", "mhz_min", "mhz_max", "c")}
+
+    def fan(f):
+        f = d(f)
+        return {"phase": _txt(f.get("phase"), 16), "pct": _num(f.get("pct")), "pump_rpm": _num(f.get("pump_rpm")),
+                "coolant_c": _num(f.get("coolant_c")),
+                "fans": [{"label": _txt(x.get("label"), 30), "rpm": _num(x.get("rpm"))}
+                         for x in (f.get("fans") if isinstance(f.get("fans"), list) else [])[:8] if isinstance(x, dict)]}
+    pk = ("gpu_c", "gpu_w", "gpu_mhz", "cpu_c", "cpu_mhz", "coolant_c", "pump_rpm", "fan_rpm")
+    now = d(st.get("now"))
+    out = {"state": _txt(st.get("state"), 12), "seconds": _num(st.get("seconds")), "left": _num(st.get("left")),
+           "t": _num(st.get("t")), "at": _num(st.get("at")), "started": _num(st.get("started")),
+           "reason": _txt(st.get("reason"), 200),
+           "limits": {k: _num(d(st.get("limits")).get(k)) for k in ("cpu_c", "gpu_c", "coolant_c")},
+           "now": {"gpu": gpu(now.get("gpu")), "cpu": cpu(now.get("cpu")), "fan": fan(now.get("fan"))} if now else None,
+           "peak": {k: _num(d(st.get("peak")).get(k)) for k in pk} if st.get("peak") else None}
+    r = d(st.get("result"))
+    if r:
+        th = d(r.get("throttle"))
+        out["result"] = {
+            "verdict": _txt(r.get("verdict"), 8), "line": _txt(r.get("line"), 300),
+            "peak": {k: _num(d(r.get("peak")).get(k)) for k in pk},
+            "sustained": {k: _num(d(r.get("sustained")).get(k)) for k in ("gpu_mhz", "gpu_w", "gpu_busy", "cpu_mhz",
+                                                                           "cpu_busy")},
+            "limit_w": _num(r.get("limit_w")),
+            "throttle": {"gpu": words(th.get("gpu"), 6), "gpu_bad": words(th.get("gpu_bad"), 6),
+                         "cpu": th.get("cpu") is True},
+            "errors": [{"kind": _txt(e.get("kind"), 20), "line": _txt(e.get("line"), 160)}
+                       for e in (r.get("errors") if isinstance(r.get("errors"), list) else [])[:8] if isinstance(e, dict)],
+            "cpu": _txt(r.get("cpu"), 120), "gpu": _txt(r.get("gpu"), 200)}
+    return out
 
 
 def clean_leds(st):
@@ -381,7 +433,8 @@ class Panel:
                                                                          max_bytes=8192), now)),
                               ("gpu_tune", lambda: clean_gpu_tune(o1gputune.read_state())),
                               ("fancal", lambda: clean_fancal(o1fancal.read_progress(now), o1fancal.read_last(),
-                                                              o1fancal.o1work.read_calibration()))):
+                                                              o1fancal.o1work.read_calibration())),
+                              ("fulltest", lambda: clean_fulltest(o1fulltest.read_progress(now), o1fulltest.read_last()))):
                 try:
                     st[key] = read()
                 except Exception:
@@ -598,6 +651,8 @@ class Panel:
                     return 409, "not now: " + why
             if act == "fancal-abort" and not o1fancal.running(self.clock()):
                 return 409, "no fan calibration is running"
+            if act == "fulltest-stop" and not o1fulltest.running(self.clock()):
+                return 409, "no full-power test is running"
             if act == "sleep":
                 if obj.get("confirm") != "sleep":
                     return 400, "confirm the sleep"
@@ -605,6 +660,18 @@ class Panel:
                 if reasons:
                     return 409, "not now: " + "; ".join(reasons)
             unit = FIXED_UNITS[act]
+        elif act == "fulltest":
+            # the full-power test (6b661): one of five lengths, confirmed, and the unit asks all of it again as root
+            secs = o1fulltest.length_of(arg)
+            if secs is None:
+                return 400, "the length must be 1 to 5 minutes"
+            if obj.get("confirm") != "fulltest":
+                return 400, "confirm the test"
+            why = o1fulltest.refusal(secs, now=self.clock(), busy=self.busy, tools=lambda: [],
+                                     progress=o1fulltest.read_progress)
+            if why:
+                return 409, "not now: " + why
+            unit = TEMPLATE_UNITS[act] % secs
         elif act == "remove-device":
             ids = {d["id"] for d in o1pair.devices_list()}
             if not isinstance(arg, str) or not re.match(r"^[0-9a-f]{16}$", arg) or arg not in ids:
@@ -1097,6 +1164,13 @@ ul.errs{margin:8px 0 0;padding-left:18px;color:var(--red)}
 .sleepbox .switch{background:rgba(255,255,255,.03)}
 .chipbtn[aria-pressed=true]{background:rgba(45,212,239,.16);border-color:rgba(45,212,239,.55);color:var(--ink)}
 #minbox{width:84px}
+/* the full-power test (6b661) */
+.ftgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}
+.ftgrid>div{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.ftgrid b{display:block;font-size:12px;font-weight:600;color:var(--ink2)}
+.ftgrid .v{font-size:20px;font-weight:750;font-variant-numeric:tabular-nums}
+.ftgrid .note{margin-top:2px}
+.ftres{margin-top:12px;font-weight:650}.ftres.ok{color:var(--green)}.ftres.bad{color:var(--red)}.ftres.warn{color:var(--amber)}
 .sleepbox .st{font-size:22px;font-weight:750;font-variant-numeric:tabular-nums}
 /* logs */
 .tabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
@@ -1317,6 +1391,15 @@ footer{max-width:1680px;margin:0 auto;padding:0 28px 40px;color:var(--muted);fon
   <div class="note mt">The terminal still asks for your Linux user and password.</div>
   <dl class="kv mt" id="acts"></dl>
  </div>
+ <div class="card s12" id="ftcard"><h3><span class="t"><svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg>Full-power test</span><span class="chip" id="ftchip">-</span></h3>
+  <div class="row between"><div><div class="st" id="fthead">-</div><div class="sub" id="ftsub">GPU, every CPU thread, fans and pump at 100%. Up to 5 minutes.</div></div>
+   <div class="row" role="group" aria-label="Test length in minutes" id="ftmins"><button type="button" class="small chipbtn" data-ftmin="60">1 min</button><button type="button" class="small chipbtn" data-ftmin="120" aria-pressed="true">2 min</button><button type="button" class="small chipbtn" data-ftmin="180">3 min</button><button type="button" class="small chipbtn" data-ftmin="240">4 min</button><button type="button" class="small chipbtn" data-ftmin="300">5 min</button>
+    <button type="button" class="small primary" data-act="fulltest" id="ftstart">Start test</button><button type="button" class="small danger" data-act="fulltest-stop" id="ftstop" hidden>Stop</button></div></div>
+  <div class="holdbar" id="ftbar" hidden><i></i></div>
+  <div class="ftgrid" id="ftlive"></div>
+  <div class="ftres" id="ftres"></div><dl class="kv mt" id="ftsum"></dl>
+  <div class="note mt">Stops by itself after the time you pick, at CPU 90 °C, GPU 85 °C or coolant 40 °C, on a disk or PCIe error, or when a request comes in. Not at night.</div>
+ </div>
 </div>
 </section>
 
@@ -1383,7 +1466,7 @@ function toast(title,text,kind){const t=el('div',undefined,'toast'+(kind?' '+kin
  $('toasts').append(t);setTimeout(()=>t.remove(),kind==='bad'?10000:6000);}
 const LABEL={update:'Apply updates',restart:'Restart services',reboot:'Reboot',shutdown:'Shut down',sleep:'Sleep',pair:'Pairing window',backup:'Back up','lan-on':'LAN mode on','lan-off':'LAN mode off',
  'library-preview':'Model library check','library-sync':'Model library sync','remove-device':'Remove device',pull:'Download model','remove-model':'Remove model',
- fancal:'Fan calibration','fancal-abort':'Fan calibration abort'};
+ fancal:'Fan calibration','fancal-abort':'Fan calibration abort',fulltest:'Full-power test','fulltest-stop':'Full-power test stop'};
 async function act(action,arg,confirm,btn){if(btn){btn.disabled=true;btn.setAttribute('aria-busy','true');}
  const r=await post('/api/action',{action,arg,confirm});
  if(btn){btn.disabled=false;btn.removeAttribute('aria-busy');}
@@ -1414,6 +1497,7 @@ document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-ac
  if(a==='lan'){if(await ask(lan?{title:'Turn LAN mode off?',body:['The gateway will answer only through Cloudflare again.'],ok:'Turn off'}:
    {title:'Turn LAN mode on?',body:['Turn LAN mode on? The gateway will also answer on the home network without Cloudflare Access (signatures still required, traffic unencrypted).'],ok:'Turn on',danger:true}))act(lan?'lan-off':'lan-on',null,undefined,b);return;}
  if(a==='fancal'){if(await ask({title:'Calibrate the fans?',body:['It takes about 40 minutes: a 2½-minute model query with the fans at 100%, a 10-minute one while they step down, then a 25-minute graphics-card burn. The fans will be loud at the start and the card will be hot for a while.','It won\'t start while the server is serving, and it stops at once if a request comes in, if you press Abort, or on heat or a hardware error. The levels it finds replace the working level (fan_work_pct stays as the fallback).'],ok:'Calibrate'}))act('fancal',null,'fancal',b);return;}
+ if(a==='fulltest'){const sec=ftLen(),m=sec/60;if(await ask({title:'Run the full-power test?',body:['The GPU, every CPU thread, the fans and the pump run flat out for '+m+' min. It is loud.','It stops by itself on heat, a disk or PCIe error, or a request.'],ok:'Start'}))act('fulltest',String(sec),'fulltest',b);return;}
  if(a==='update'&&!await ask({title:'Apply updates now?',body:['Apply all pending updates and update Ollama now?'],ok:'Apply updates'}))return;
  if(a==='restart'&&!await ask({title:'Restart the services?',body:['Restart Ollama, the gateway, the terminal and the tunnel? Running requests end.'],ok:'Restart',danger:true}))return;
  act(a,undefined,undefined,b);});
@@ -1567,6 +1651,36 @@ function renderCal(c,f){if(!c)return;const r=c.run,cal=c.cal,run=!!r&&r.state===
  const why=r&&r.state!=='done'&&r.reason?'Last run '+(st?st[0].toLowerCase():r.state)+(r.at?' '+ago(r.at):'')+': '+r.reason:'';
  $('caltemps').textContent=why;
  $('calsteps').textContent=f.levels==='calibration'&&f.stepped?'Working at the heavy level now: a temperature came near its limit.':'';}
+// ---- the full-power test (6b661) -------------------------------------------------------------
+const FTSTATE={running:['Running','info'],stalled:['Stopped','bad'],done:['Done','ok'],failed:['Failed','bad'],stopped:['Stopped','warn'],refused:['Not started','warn']};
+function ftLen(){const b=document.querySelector('#ftmins [data-ftmin][aria-pressed="true"]');return b?+b.dataset.ftmin:120;}
+document.addEventListener('click',ev=>{const b=ev.target.closest('[data-ftmin]');if(!b)return;document.querySelectorAll('#ftmins [data-ftmin]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));});
+const n0=v=>isNum(v)?String(Math.round(v)):'?';
+function ftBox(lab,val,sub,cls){const d=el('div');d.append(el('b',lab),el('div',val,'v'+(cls?' '+cls:'')));if(sub)d.append(el('div',sub,'note'));return d;}
+function renderFull(f){if(!f){chip('ftchip','Not run yet','');$('fthead').textContent='Ready';return;}const run=f.state==='running',L=f.limits||{};
+ $('ftstart').hidden=run;$('ftstop').hidden=!run;document.querySelectorAll('#ftmins [data-ftmin]').forEach(x=>x.disabled=run);
+ const st=FTSTATE[f.state]||[f.state||'-',''];chip('ftchip',st[0],st[1]);
+ const bar=$('ftbar');bar.hidden=!run;
+ if(run){$('fthead').textContent=mmss(f.left||0)+' left';$('ftsub').textContent='of '+mmss(f.seconds||0)+'  ·  stops at CPU '+n0(L.cpu_c)+' °C, GPU '+n0(L.gpu_c)+' °C, coolant '+n0(L.coolant_c)+' °C';
+  bar.firstChild.style.width=(f.seconds?clamp(1-(f.left||0)/f.seconds,0,1)*100:0)+'%';}
+ else{$('fthead').textContent=f.result?(f.at?stamp(f.at):'Last test'):'-';$('ftsub').textContent='GPU, every CPU thread, fans and pump at 100%. Up to 5 minutes.';}
+ const G=$('ftlive');G.replaceChildren();const nw=f.now;
+ if(nw&&(run||!f.result)){const g=nw.gpu||{},c=nw.cpu||{},fn=nw.fan||{};
+  G.append(ftBox('GPU',n0(g.busy)+'%',n0(g.mhz)+' MHz  ·  '+n0(g.watts)+' of '+n0(g.limit_w)+' W  ·  '+n0(g.c)+' °C',isNum(g.c)&&g.c>=(L.gpu_c||85)-5?'bad':''),
+   ftBox('CPU',n0(c.busy)+'%',n0(c.mhz)+' MHz avg ('+n0(c.mhz_min)+'-'+n0(c.mhz_max)+')  ·  Tctl '+n0(c.c)+' °C',isNum(c.c)&&c.c>=(L.cpu_c||90)-5?'bad':''),
+   ftBox('Fans',isNum(fn.pct)?Math.round(fn.pct)+'%':'?',(fn.fans||[]).map(x=>n0(x.rpm)).join(' / ')+' rpm'+(isNum(fn.pump_rpm)?'  ·  pump '+n0(fn.pump_rpm)+' rpm':'')),
+   ftBox('Coolant',isNum(fn.coolant_c)?fn.coolant_c.toFixed(1)+' °C':'?','stops at '+n0(L.coolant_c)+' °C',isNum(fn.coolant_c)&&fn.coolant_c>=(L.coolant_c||40)-3?'bad':''),
+   ftBox('Throttling',(g.reasons||[]).length?(g.reasons||[]).join(', '):'none',''));}
+ const r=f.result,R=$('ftres'),S=$('ftsum');
+ if(r&&!run){R.textContent=r.line||'';R.className='ftres '+(r.verdict==='pass'?'ok':r.verdict==='fail'?'bad':'warn');
+  const p=r.peak||{},u=r.sustained||{},th=r.throttle||{};
+  kv(S,[['GPU peak',n0(p.gpu_c)+' °C  ·  '+n0(p.gpu_w)+' of '+n0(r.limit_w)+' W  ·  '+n0(p.gpu_mhz)+' MHz'],
+   ['GPU sustained',n0(u.gpu_mhz)+' MHz  ·  '+n0(u.gpu_w)+' W  ·  '+n0(u.gpu_busy)+'% busy'],
+   ['CPU peak',n0(p.cpu_c)+' °C  ·  '+n0(p.cpu_mhz)+' MHz'],['CPU sustained',n0(u.cpu_mhz)+' MHz  ·  '+n0(u.cpu_busy)+'% busy'],
+   ['Cooling peak','coolant '+(isNum(p.coolant_c)?p.coolant_c.toFixed(1):'?')+' °C  ·  pump '+n0(p.pump_rpm)+' rpm  ·  fans '+n0(p.fan_rpm)+' rpm'],
+   ['Throttling',(th.gpu_bad||[]).length?'GPU: '+th.gpu.join(', '):(th.gpu||[]).length?'GPU at its power limit (normal at full load)':'none',(th.gpu_bad||[]).length?'bad':''],
+   ['Kernel log',(r.errors||[]).length?r.errors.map(e=>e.kind+': '+e.line).join('  |  '):'no NVMe, PCIe or hardware errors',(r.errors||[]).length?'bad':'']]);}
+ else{R.textContent=f.state==='refused'&&f.reason?'Not started: '+f.reason:'';R.className='ftres warn';S.replaceChildren();}}
 function renderLeds(l){const orb=$('orb');
  if(!l){chip('ledchip','Not reporting','');$('ledstate').textContent='-';$('ledwhy').textContent='The lights service isn\'t reporting (it is off unless setup.sh --leds on).';$('leddevs').textContent='';orb.style.background='#1a2030';orb.style.boxShadow='none';return;}
  const rgb=l.rgb||[40,48,64],c='rgb('+rgb.join(',')+')';orb.style.background='radial-gradient(circle at 35% 30%,#fff8,'+c+' 45%,'+c+')';orb.style.boxShadow='0 0 34px 6px rgba('+rgb.join(',')+',.45)';
@@ -1667,7 +1781,7 @@ async function refreshFast(){let s;try{s=await api('/api/state');}catch(e){setLi
  fetchedAt=Date.now()/1000;if(isNum(s.time))skew=s.time-fetchedAt;lastState=s;if(JOBS[0].t)setLive('','Live');
  $('asof').textContent='Updated '+new Date().toLocaleTimeString();
  pushLive(s);
- const parts=[['hero',()=>renderHero(s)],['gauges',()=>renderGauges(s)],['cpu',()=>renderCpu(s.cpu,s)],['fans',()=>renderFans(s.fan_status)],['cal',()=>renderCal(s.fancal,s.fan_status)],['leds',()=>renderLeds(s.leds_status)],
+ const parts=[['hero',()=>renderHero(s)],['gauges',()=>renderGauges(s)],['cpu',()=>renderCpu(s.cpu,s)],['fans',()=>renderFans(s.fan_status)],['cal',()=>renderCal(s.fancal,s.fan_status)],['full',()=>renderFull(s.fulltest)],['leds',()=>renderLeds(s.leds_status)],
   ['storage',()=>renderStorage(s)],['net',()=>renderNet(s)],['tune',()=>renderTune(s.gpu_tune,s.gpu)],['svc',()=>renderSvc(s)],['loaded',()=>renderLoaded(s)],['charts',draw]];
  for(const [,f] of parts){try{f();}catch(e){}}
  const fl=$('fanline');if(fl){fl.hidden=!s.fan;fl.textContent=s.fan||'';}

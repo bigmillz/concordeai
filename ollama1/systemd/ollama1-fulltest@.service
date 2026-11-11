@@ -1,0 +1,43 @@
+# The full-power test (6b661): the graphics card (tools/gpu-burn.sh), every processor thread (stress-ng, matrix
+# maths, verified; no disk stressors) and the fans and pump at 100% for %i seconds: 60, 120, 180, 240 or 300, which
+# the program checks again (lib/o1fulltest.py; never over 300). polkit lets the admin panel's user (o1admin) START
+# an instance with one of those five lengths and nothing else; its Stop starts ollama1-fulltest-stop.service. Not
+# started at boot (no [Install]). While it runs auto sleep and the Sleep button say no (lib/o1sleep.py BUSY_UNITS)
+# and it holds a logind inhibitor; only then.
+#
+# Root, because the card's readings, the kernel log, llama-bench's GPU access and the fan service's hold file need
+# it, but boxed in like the fan calibration: it writes only /run/ollama1 and /var/lib/ollama1 (its progress, its
+# result, stress-ng's few lines), reads /home only (llama-bench lives in ~/llama-bench), has no network and gains
+# nothing. ExecStopPost gives the fans back after any end, a kill or a crash included; KillMode control-group takes
+# both loads with it. TimeoutStartSec is the last stop if the program itself hangs: 300 s and the start's checks.
+[Unit]
+Description=ollama1: full-power test, %i s (the card, every processor thread, fans and pump at 100%%)
+After=ollama.service ollama1-fan.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-fulltest run %i
+ExecStopPost=/usr/local/lib/ollama1/bin/ollama1-fulltest stop-post
+WorkingDirectory=/run/ollama1
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=420
+TimeoutStopSec=20
+KillMode=control-group
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1 /var/lib/ollama1
+ProtectHome=read-only
+PrivateTmp=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+UMask=0022

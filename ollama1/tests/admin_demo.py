@@ -69,6 +69,7 @@ class Fake:
         self.actions = {}
         self.cal_start = None            # a fan calibration running (6b505), 30 times faster than the real one
         self.cal_end = None
+        self.ft = None                   # a full-power test running (6b661): (start, seconds), at 5 times the speed
         self.lock = threading.Lock()
 
     def w(self, rel, text):
@@ -284,6 +285,7 @@ class Fake:
               "hottest": temps[0], "closest": temps[1], "hot": []}
         st.update(work=40, heavy=60, levels="calibration", stepped=False)
         lvl = self.calibration(now, busy)
+        self.fulltest(now)
         if lvl is not None:
             st.update(phase="tuning", pct=lvl, why="fan calibration: testing %d%%" % lvl)
             for o in outs:
@@ -383,6 +385,37 @@ class Fake:
         self.wj("run/ollama1/fancal.json", prog)
         return pct
 
+    def fulltest(self, now):
+        """The full-power test's files (6b661): a run started from the page at 5 times the speed, with readings
+        that climb, then a result card."""
+        if self.ft is None:
+            return
+        start, secs, stopped = self.ft
+        t = min(secs, (now - start) * 5)
+        k = min(1.0, t / 90.0)
+        sample = {"gpu": {"busy": 99, "mhz": 2790 - 60 * k, "max_mhz": 3135, "watts": 298, "limit_w": 300,
+                          "c": 41 + 27 * k, "reasons": ["power limit"]},
+                  "cpu": {"busy": 100, "mhz": 4380 - 120 * k, "mhz_min": 4150, "mhz_max": 4525, "c": 58 + 21 * k},
+                  "fan": {"phase": "tuning", "pct": 100, "pump_rpm": 2840, "coolant_c": 24 + 7 * k,
+                          "fans": [{"label": "case/CPU fan 2", "rpm": 1490}, {"label": "case/CPU fan 3", "rpm": 1620},
+                                   {"label": "case/CPU fan 5", "rpm": 1610}, {"label": "case/CPU fan 7", "rpm": 2130}]}}
+        st = {"at": int(now), "state": "running", "started": int(start), "seconds": secs, "left": int(secs - t),
+              "t": int(t), "now": sample, "reason": "", "limits": {"cpu_c": 90, "gpu_c": 85, "coolant_c": 40},
+              "peak": {"gpu_c": sample["gpu"]["c"], "gpu_w": 299, "cpu_c": sample["cpu"]["c"]}}
+        if stopped or t >= secs:
+            verdict = "stopped" if stopped else "pass"
+            st.update(state="stopped" if stopped else "done", left=0, reason="stopped from the panel" if stopped else "")
+            st["result"] = {"verdict": verdict, "line": "Stopped: stopped from the panel" if stopped else
+                            "Pass: %d s at full power, no errors, no thermal slowdown" % secs,
+                            "peak": {"gpu_c": 68, "gpu_w": 301, "gpu_mhz": 2805, "cpu_c": 79.1, "cpu_mhz": 4525,
+                                     "coolant_c": 31.2, "pump_rpm": 2860, "fan_rpm": 2140},
+                            "sustained": {"gpu_mhz": 2730, "gpu_w": 297, "gpu_busy": 99, "cpu_mhz": 4270, "cpu_busy": 100},
+                            "limit_w": 300, "throttle": {"gpu": ["power limit"], "gpu_bad": [], "cpu": False},
+                            "errors": [], "cpu": "ok", "gpu": None}
+            self.wj("var/lib/ollama1/fulltest-last.json", st)
+            self.ft = None
+        self.wj("run/ollama1/fulltest.json", st)
+
     # -- what the units would have done ---------------------------------------
     def run_unit(self, unit):
         import o1library
@@ -424,6 +457,10 @@ class Fake:
                 self.models = {n: s for n, s in self.models.items() if name_hash(n) != h}
             elif verb == "fancal":
                 self.cal_start, self.cal_end = time.time(), None
+            elif verb == "fulltest":
+                self.ft = (time.time(), int(unit.split("@")[1].split(".")[0]), False)
+            elif verb == "fulltest-stop" and self.ft:
+                self.ft = (self.ft[0], self.ft[1], True)
             elif verb == "fancal-abort":
                 self.cal_end = ("aborted", "stopped from the panel")
             elif verb == "rmdevice":

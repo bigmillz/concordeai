@@ -1,0 +1,19 @@
+# The admin panel's Stop for the full-power test (6b661): marks that the panel stopped it, then stops the running
+# ollama1-fulltest@*.service (SIGTERM to the run, which ends both loads and gives the fans back at once; the
+# control group after TimeoutStopSec). polkit lets the panel's user START this unit and nothing more.
+[Unit]
+Description=ollama1: stop the full-power test (the admin panel's Stop)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/ollama1/bin/ollama1-fulltest stop
+Environment=PYTHONDONTWRITEBYTECODE=1
+TimeoutStartSec=90
+LimitCORE=0
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/ollama1
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+UMask=0022

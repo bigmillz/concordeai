@@ -486,14 +486,16 @@ class TestGraphicalPage(unittest.TestCase):
         js = self.script(page)
         acts = set(re.findall(r'data-act="([a-z-]+)"', page))
         self.assertEqual(acts, {"sleep", "reboot", "shutdown", "restart", "update", "lan", "backup", "pair",
-                                "fancal", "fancal-abort"})                     # the fan calibration (6b505)
+                                "fancal", "fancal-abort",                      # the fan calibration (6b505)
+                                "fulltest", "fulltest-stop"})                  # the full-power test (6b661)
         mod = A["mod"]
         reach = {"lan-on": "'lan-on'", "lan-off": "'lan-off'", "library-preview": "act('library-preview'",
                  "library-sync": "act('library-sync',p.id,p.id", "power-apply": "post('/api/power/schedule'"}
         for k in mod.FIXED_UNITS:
             self.assertTrue(k in acts or reach.get(k, "\0") in js, k)
         for k, how in (("remove-device", "act('remove-device',x.id"), ("pull", "act('pull',a.hash"),
-                       ("remove-model", "if(c===x.name)act('remove-model',x.hash,c")):
+                       ("remove-model", "if(c===x.name)act('remove-model',x.hash,c"),
+                       ("fulltest", "act('fulltest',String(sec),'fulltest',b)")):
             self.assertIn(k, mod.TEMPLATE_UNITS)
             self.assertIn(how, js)
         # one POST in the whole page: JSON, same origin, the CSRF header
@@ -1258,6 +1260,111 @@ class TestFanCalibration(unittest.TestCase):
             self.assertIn(needle, page, needle)
 
 
+class TestFullTest(unittest.TestCase):
+    """6b661: the full-power test starts ollama1-fulltest@<seconds>.service only with one of five lengths, confirmed,
+    by day and while the server is quiet; Stop only while one runs; the card's data is cut down to known fields."""
+
+    def setUp(self):
+        import o1fan
+        import o1fulltest
+        import o1idle
+        import o1sleep
+        self.F = o1fulltest
+        A["started"].clear()
+        self.panel = A["panel"]
+        self.panel.busy = lambda: []
+        self.addCleanup(setattr, self.panel, "busy", o1sleep.busy_reasons)
+        night = (o1fulltest.NIGHT_START, o1fulltest.NIGHT_END)
+        o1fulltest.NIGHT_START, o1fulltest.NIGHT_END = 24 * 60, 0          # day, whatever the Mac's clock says
+        self.addCleanup(lambda: setattr(o1fulltest, "NIGHT_START", night[0]) or setattr(o1fulltest, "NIGHT_END", night[1]))
+        self.files = [o1fan.status_path(), o1idle.activity_file(), o1fulltest.progress_path(), o1fulltest.last_path()]
+        for f in self.files:
+            self.addCleanup(lambda f=f: os.path.exists(f) and os.unlink(f))
+        self.fan = {"at": int(time.time()), "phase": "idle20", "pct": 20, "outputs": [], "temps": []}
+        self.act = {"last": time.time() - 600, "inflight": 0, "at": time.time()}
+        self.write()
+
+    def write(self, prog=None):
+        from o1common import write_json_atomic
+        import o1fan
+        import o1idle
+        write_json_atomic(o1fan.status_path(), self.fan)
+        write_json_atomic(o1idle.activity_file(), self.act)
+        if prog is not None:
+            write_json_atomic(self.F.progress_path(), prog)
+
+    def why(self, obj):
+        st, data, _ = post(obj)
+        return st, json.loads(data)["result"]
+
+    def test_it_starts_with_a_length_when_confirmed_and_quiet(self):
+        self.assertEqual(self.why({"action": "fulltest", "arg": "120"}), (400, "confirm the test"))
+        for bad in ("600", "301", "30", "", "60;id", None):
+            self.assertEqual(self.why({"action": "fulltest", "arg": bad, "confirm": "fulltest"})[0], 400, bad)
+        self.assertEqual(self.why({"action": "fulltest", "arg": "120", "confirm": "fulltest"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-fulltest@120.service"])
+
+    def test_it_refuses_at_night_while_serving_or_busy(self):
+        cases = (("night", None, "not at night"),
+                 ("act", {"last": time.time(), "inflight": 1, "at": time.time()}, "answering a request"),
+                 ("act", {"last": time.time() - 30, "inflight": 0, "at": time.time()}, "s ago"),
+                 ("busy", ["the fans are being calibrated"], "calibrated"),
+                 ("fan", dict(self.fan, at=int(time.time()) - 60), "fan service isn't running"))
+        for what, val, want in cases:
+            with self.subTest(want):
+                fan, act = dict(self.fan), dict(self.act)
+                if what == "night":
+                    self.F.NIGHT_START = 0
+                elif what == "act":
+                    self.act = val
+                elif what == "fan":
+                    self.fan = val
+                else:
+                    self.panel.busy = lambda: val
+                self.write()
+                st, msg = self.why({"action": "fulltest", "arg": "60", "confirm": "fulltest"})
+                self.assertEqual(st, 409)
+                self.assertIn(want, msg)
+                self.F.NIGHT_START = 24 * 60
+                self.fan, self.act, self.panel.busy = fan, act, (lambda: [])
+                self.write()
+        self.assertEqual(A["started"], [])
+
+    def test_one_at_a_time_and_stop_only_while_running(self):
+        self.assertEqual(self.why({"action": "fulltest-stop"}), (409, "no full-power test is running"))
+        self.write({"at": int(time.time()), "state": "running", "seconds": 60, "left": 40})
+        st, msg = self.why({"action": "fulltest", "arg": "60", "confirm": "fulltest"})
+        self.assertEqual((st, msg), (409, "not now: a full-power test is already running"))
+        self.assertEqual(self.why({"action": "fulltest-stop"})[0], 202)
+        self.assertEqual(A["started"], ["ollama1-fulltest-stop.service"])
+
+    def test_the_card_data(self):
+        self.write({"at": int(time.time()), "state": "done", "seconds": 60, "left": 0, "evil": "<script>",
+                    "limits": {"cpu_c": 90, "gpu_c": 85, "coolant_c": 40},
+                    "now": {"gpu": {"busy": 99, "watts": 290, "limit_w": 300, "reasons": ["power limit", 5], "x": 1},
+                            "cpu": {"c": 71.5}, "fan": {"pump_rpm": 2800, "fans": [{"label": "f", "rpm": 1500}] * 20}},
+                    "result": {"verdict": "pass", "line": "Pass: 60 s", "peak": {"gpu_c": 70, "bogus": 1},
+                               "errors": [{"kind": "NVMe", "line": "nvme0: timeout"}] * 20,
+                               "throttle": {"gpu": ["power limit"], "gpu_bad": [], "cpu": False}}})
+        A["panel"].state_cache = (0, None)
+        st, raw, _ = get("/api/state")
+        f = json.loads(raw)["fulltest"]
+        self.assertEqual((f["state"], f["result"]["verdict"], f["result"]["peak"]["gpu_c"]), ("done", "pass", 70))
+        self.assertNotIn("bogus", f["result"]["peak"])
+        self.assertEqual(len(f["result"]["errors"]), 8)
+        self.assertEqual(f["now"]["gpu"]["reasons"], ["power limit"])
+        self.assertEqual(len(f["now"]["fan"]["fans"]), 8)
+        self.assertNotIn(b"<script>", raw)
+
+    def test_the_page_has_the_card_and_asks_first(self):
+        st, page, _ = get("/")
+        for needle in (b'id="ftcard"', b'data-act="fulltest"', b'data-act="fulltest-stop"', b"function renderFull(",
+                       b"if(a==='fulltest'){", b"act('fulltest',String(sec),'fulltest',b)",
+                       b"['full',()=>renderFull(s.fulltest)]", b'data-ftmin="300"'):
+            self.assertIn(needle, page, needle)
+        self.assertNotIn(b'data-ftmin="360"', page)
+
+
 class TestPolkitMatchesPanel(unittest.TestCase):
     """Every unit the panel can start is allowed by the polkit rule, exists
     in systemd/, and the rule allows nothing else."""
@@ -1283,7 +1390,7 @@ class TestPolkitMatchesPanel(unittest.TestCase):
     def test_template_units(self):
         rule = self.rule()
         pats = [re.compile(p) for p in re.findall(r"/(\^ollama1-[^/]+\$)/", rule)]
-        self.assertEqual(len(pats), 3)                         # pull/rmmodel, rmdevice, sleepcfg (6b402)
+        self.assertEqual(len(pats), 4)                         # pull/rmmodel, rmdevice, sleepcfg (6b402), fulltest (6b661)
 
         def allowed(unit):
             return any(p.fullmatch(unit) for p in pats)
@@ -1300,8 +1407,13 @@ class TestPolkitMatchesPanel(unittest.TestCase):
                     "ollama1-rmdevice@0123456789abcdef0.service", "ollama.service",
                     "ssh.service", "ollama1-pull@..service"):
             self.assertFalse(allowed(bad), bad)
+        for ok in ("ollama1-fulltest@60.service", "ollama1-fulltest@300.service"):
+            self.assertTrue(allowed(ok), ok)
+        for bad in ("ollama1-fulltest@301.service", "ollama1-fulltest@600.service", "ollama1-fulltest@30.service",
+                    "ollama1-fulltest@.service", "ollama1-fulltest@60.service;id", "ollama1-fulltest@ 60.service"):
+            self.assertFalse(allowed(bad), bad)
         for t in ("ollama1-pull@.service", "ollama1-rmmodel@.service", "ollama1-rmdevice@.service",
-                  "ollama1-sleepcfg@.service"):
+                  "ollama1-sleepcfg@.service", "ollama1-fulltest@.service"):
             self.assertTrue(os.path.exists(os.path.join(U.KIT, "systemd", t)), t)
 
     @unittest.skipUnless(__import__("shutil").which("node"), "node not installed")

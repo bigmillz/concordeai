@@ -1,0 +1,29 @@
+#!/usr/bin/python3
+"""ollama1-fulltest: the full-power test (6b661). See lib/o1fulltest.py.
+
+  ollama1-fulltest status         the running test or the last result (no root needed)
+
+Used by the system (root):
+  run SECONDS   ollama1-fulltest@SECONDS.service (60, 120, 180, 240 or 300): the graphics card, every processor
+                thread, the fans and pump at 100%; started from the admin panel's Controls tab
+  stop          ollama1-fulltest-stop.service: the panel's Stop; ends the run at once
+  stop-post     the run's ExecStopPost: the fans' hold goes, whatever ended it
+"""
+import os
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+
+import o1fulltest  # noqa: E402
+
+
+def log(line):
+    print(line, flush=True)       # the journal: lengths, temperatures and verdicts, numbers only
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help", "help"):
+        print(__doc__.strip())
+        sys.exit(0)
+    sys.exit(o1fulltest.main(sys.argv, log))

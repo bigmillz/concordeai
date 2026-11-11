@@ -30,7 +30,8 @@ polkit.addRule(function(action, subject) {
         "ollama1-models-sync.service",
         "ollama1-power-apply.service",
         "ollama1-fancal.service",
-        "ollama1-fancal-abort.service"
+        "ollama1-fancal-abort.service",
+        "ollama1-fulltest-stop.service"
     ];
     if (fixed.indexOf(unit) >= 0) {
         return polkit.Result.YES;
@@ -39,6 +40,10 @@ polkit.addRule(function(action, subject) {
         return polkit.Result.YES;
     }
     if (/^ollama1-rmdevice@[0-9a-f]{16}\.service$/.test(unit)) {
+        return polkit.Result.YES;
+    }
+    // the full-power test (6b661): one of five lengths in seconds; the program checks it again (never over 300)
+    if (/^ollama1-fulltest@(60|120|180|240|300)\.service$/.test(unit)) {
         return polkit.Result.YES;
     }
     // auto sleep (6b402): "on" or "off", a dash, 1 to 4 digits; the unit runs as the

@@ -33,6 +33,17 @@ const cases=[['o1admin','org.freedesktop.systemd1.manage-units','ollama1-restart
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fan.service','stop','no'],
 ['o1dash','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','start','no'],
 ['o1gw','org.freedesktop.systemd1.manage-units','ollama1-fancal.service','start','no'],
+// the full-power test (6b661): five lengths, its stop, and nothing else around it
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@60.service','start','yes'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@300.service','start','yes'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@301.service','start','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@600.service','start','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@30.service','start','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@.service','start','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest@60.service','stop','no'],
+['o1admin','org.freedesktop.systemd1.manage-units','ollama1-fulltest-stop.service','start','yes'],
+['o1dash','org.freedesktop.systemd1.manage-units','ollama1-fulltest@60.service','start','no'],
+['o1gw','org.freedesktop.systemd1.manage-units','ollama1-fulltest@60.service','start','no'],
 // a model set from the app (6b410): the gateway's user starts that one unit, and nothing else
 ['o1admin','org.freedesktop.systemd1.manage-units','ollama1-modelplan.service','start','no'],
 ['o1gw','org.freedesktop.systemd1.manage-units','ollama1-modelplan.service','start','yes'],

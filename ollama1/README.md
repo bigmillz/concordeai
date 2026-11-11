@@ -834,6 +834,25 @@ and the port guard go; the DNS name and the Access app stay in Cloudflare
     a change shows the toast only after the server has read the file back;
     Apply updates now with the updater's last
     result, LAN mode, Back up now and Open terminal;
+  - **Full-power test** (in Controls, 6b661): the graphics card (`tools/gpu-burn.sh`), every processor thread
+    (stress-ng `--cpu 0`, matrix maths, verified, at nice 10; no disk, io or memory stressors) and the fans and
+    pump at 100% (the fan service's hold file, pump extreme) for 1 to 5 minutes, picked on the card; it asks
+    first, then starts `ollama1-fulltest@<seconds>.service` (root; `bin/ollama1-fulltest`, `lib/o1fulltest.py`).
+    While it runs the card shows a countdown, Stop, and live readings every 2 s: the card's busy %, clock, watts
+    against its limit, temperature and throttle reasons (nvidia-smi); the processor's busy %, clocks and Tctl;
+    the fans' and pump's rpm and the coolant. At the end a result card: the peaks, the sustained clocks (the
+    median after the first 30 s), any throttling (the card at its power limit is normal; a thermal or hardware
+    slowdown fails), the kernel log's NVMe, PCIe (AER), Xid or machine-check records, stress-ng's own check, and
+    one Pass, Fail or Stopped line. Everything is enforced by the program as root, not by the page: one of 60,
+    120, 180, 240 or 300 s (polkit allows only those instances, and the program caps at 300 again); refused at
+    night (23:00 to 08:00, the server's clock), while the gateway has a request in flight or queued or answered
+    one in the last 2 minutes, while another full test, the fan calibration, a burn or stability test, a
+    download or an update runs, or when the fan service isn't reporting; stopped at once at Tctl 90 C, the card
+    at 85 C or the coolant at 40 C, on an NVMe or PCIe error (or Xid, machine check) in the kernel log, on a
+    request reaching the gateway, at 23:00, or on Stop (`ollama1-fulltest-stop.service`). It holds a logind
+    inhibitor only while it runs; its ExecStopPost takes the fans' hold away after any end (a kill or a crash
+    too), and it never changes the governor or the card's limits. Files: `/run/ollama1/fulltest.json` (live),
+    `/var/lib/ollama1/fulltest-last.json` (the result). `ollama1-fulltest status` shows the last one.
   - **Devices**, with Remove and Open pairing window;
   - **Logs**: requests, model loads, actions, updates, the model library,
     errors and the services' status lines, each with a filter, Follow new
