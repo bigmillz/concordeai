@@ -22359,6 +22359,16 @@ audit is cloud only, so local and server verdicts had no check); the rewrite is 
 rest, in a conversation, the token) and Ultra's 1.5 px lit ring on the same radius are pinned to the letter (6b640);
 6b631's live check measures them.
 
+**From the lead's check in the C++ preview (WKWebView, Ultra).** (1) The recent rows: verified in a real WKWebView with
+saved chats (four seeded, three shown, the composer on its point, at rest and at Ultra); a page with no chats in its
+store shows none, which is what a preview whose data folder holds none will show. (2) Ultra's hanging stars drew a
+thread from the window's top edge to each star (the chandelier, ported from the demo): the threads are gone, the
+stars sway where they hang, only short links between two stars on screen are drawn (pinned, with its mutant). (3) A
+saved server pick (prefs.json "srv:<id>") was overwritten with "Fast" on a new bundle's first load: srvModeGone
+saved its fall back, and loadServers took an unreadable list as an empty one. The fall back is now the window's own
+(setTier quiet, no prefSet) and an unreadable list decides nothing (pinned; 6b337's node check re-pinned: with an agent
+the fall back paints and saves nothing).
+
 **Release.** `./release.sh --dry-run beta 7.0.0` before main's beta 3 cut built 280; the first try failed at the
 DMG's notarization: "No Keychain password item found for profile: concorde-notary", after the app's own submission
 (the dedicated keychain looked locked by then). See the second dry run's line below.
