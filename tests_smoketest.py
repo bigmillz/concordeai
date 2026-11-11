@@ -24280,6 +24280,7 @@ def _p8c_slow(src):
     downs, said, steps = [], [], []
     ns = {"server_refresh_modes": lambda ctx, **k: None, "server_take_wake_notes": lambda: [], "_srv_plain": lambda n: n,
           "server_gen_sleepers": lambda ctx, kind: [],              # (6b482) nobody asleep
+          "server_take_quiet_notes": lambda: [],                   # (6b600) nobody kept asleep by quiet hours
           "server_gen_pick": lambda ctx, kind: {"name": "Desk", "id": "x"}, "srv_gen_opts": lambda kind, use: {"width": 8, "height": 8},
           "ServerGenStopped": type("ServerGenStopped", (Exception,), {}),
           "StaleProfile": type("StaleProfile", (OSError,), {}), "_client_gone": lambda sock: False,
