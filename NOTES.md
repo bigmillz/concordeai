@@ -20575,6 +20575,11 @@ for the Starter: about 4 min from the first open to the first answer, plus the p
 failure screen, Copy details and Try again were proven in the real WKWebView through the debug shell's probe hook (a
 dead proxy for the download); Quit at 9 s left no process of that HOME; a venv marked unfinished was finished by the
 next launch (2.7 s).
+DMG (universal, both Developer ID signed, not notarized): beta-3's 5,881,829 bytes → 5,902,733 (+20.9 KB); the
+.app 12.88 → 12.94 MB. The Developer ID (hardened runtime) bundle's first run was repeated on a fresh HOME: setup done
+in 67 s, page loaded at 68 s, nothing in the hardened runtime in the way (the downloaded Python carries no quarantine).
+The full gauntlet is owed: 9901 and 9902 were held for the whole session by another helper's `concorde-front`; the
+sections this touches ran standalone (all green but three that need the full run's fixtures, none of them changed).
 
 **Checks.** A 6b630 block of seven checks and 23 mutants: launch.sh's pins and order (static) and its own functions
 run in zsh (a venv's age, pip's lines, a wrong SHA-256 never unpacked, the right one unpacked); the shell's screen,
