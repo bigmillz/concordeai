@@ -71583,6 +71583,7 @@ function sxLanePaint(){
   sxIconsPaint();sxPhPaint();sxLaneLine();sxHostPaint();sxFnHome();
   document.documentElement.classList.toggle("hz-sx-code",sxHz()&&typeof uiMode!=="undefined"&&uiMode==="code");
   if(sxHz()&&typeof hzGlowFit==="function")try{hzGlowFit();}catch(e){}   // the balance and the glow set now, so no resize callback has to change them
+  if(sxHz()&&typeof chatRoom==="function"&&!$("#hero"))try{chatRoom();}catch(e){}   // and the conversation's room under a composer the chip just changed
 }
 // deferred a tick, as modeShow's own repaint is: a hook can run during boot, before the chat's state is declared
 function sxLaneSoon(){setTimeout(()=>{try{sxLanePaint();}catch(e){}},0);}
