@@ -42020,7 +42020,24 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
                                 **({"asleep": 1} if d.get("asleep") else {}))
         elif tag == "STEP" and isinstance(d, dict) and d.get("id"):
             st = got.setdefault("STEP", {})
+            _prev = st.get(d["id"]) or {}
             st[d["id"]] = {k: d[k] for k in ("id", "l", "s", "d") if k in d}
+            # A CODE RUN KEEPS ITS RISK AND ITS SIZE (6b622): a command's
+            # first frame says reading / changes / irreversible (and "· N
+            # steps" for a batch); its last says the result. The reopened
+            # chat draws the risk tag from r, the batch from n.
+            # (inline, so the gauntlet's lifted copy of this function
+            # needs no other name)
+            if re.match(r"(conn|cmd\d+(?:_\d+)?|reboot\d+)$", str(d["id"])):
+                _dd = str(d.get("d") or "")
+                _rk = ("read" if re.match(r"reading\b", _dd) else "write"
+                       if re.match(r"changes\b", _dd) else "danger"
+                       if re.match(r"irreversible\b", _dd) else "")
+                _bn = re.search(r"\u00b7\s*(\d+) steps", _dd)
+                if _rk or _prev.get("r"):
+                    st[d["id"]]["r"] = _rk or _prev["r"]
+                if _bn or _prev.get("n"):
+                    st[d["id"]]["n"] = int(_bn.group(1)) if _bn else _prev["n"]
     full = turn_text(raw)
     if not full and not aborted:
         good = [x for x in drafts if not str(x.get("t", "")).startswith(
@@ -42075,7 +42092,12 @@ def turn_record(raw: str, searched: bool = False, aborted: bool = False):
     if aborted and full:
         rec["stopped"] = True                # a Stop keeps what was shown, and says so (6b570)
     if got.get("STEP"):
-        rec["steps"] = list(got["STEP"].values())[:24]
+        _sv = list(got["STEP"].values())
+        # a Code run is every command it ran, up to REMOTE_CAP and its
+        # batches' lines (6b622); any other answer, its first 24 steps
+        rec["steps"] = _sv[:160] if any(
+            re.match(r"(conn|cmd\d+(?:_\d+)?|reboot\d+)$", str(x.get("id")))
+            for x in _sv) else _sv[:24]
     return rec
 
 
@@ -54578,6 +54600,140 @@ html.hz #sidebar{background:var(--chat-panel);-webkit-backdrop-filter:none;backd
   .hz #chat-inner>.msg,.hz #chat-inner.chat-swap,.hz .uedit{animation:none!important}
   .hz #input,.hz .msg .mact,.hz #jumpdown,.hz #jumpdown[hidden],.hz #chat-queued{transition:none}}
 /* ==== the chat (6b590): end ==== */
+/* ==== THE CODE LANE AND FUNNELS (6b622, per Patrick: "the code page and all that looks really dialed in ... I want
+   this UI to be perfect"; the web demo's Code and Funnels views, "the middle ground"): the same flat surfaces as the
+   chat. Runs: a risk tag (11 px caps), the command in mono, a state line that shimmers silver while it runs (2.4 s a
+   pass) and settles to its result; each run slides in 6 px over 400 ms. The approval card flat (#151517, a hairline,
+   radius 10) under its run, quiet Skip and Approve keys (32 tall, radius 8). Funnels: one vertical hairline, a mark
+   per stage (a 12 px check once answered), flat option cards that lift 1 px on hover, the choices as a trail of chips.
+   One easing family (cubic-bezier(.2,.7,.2,1)). Calm and reduced motion: the finished state at once. Horizon only. */
+.hz{--ln-e:cubic-bezier(.2,.7,.2,1);--ln-ink:#ececf1;--ln-ink2:#c5c6cd;--ln-meta:rgba(255,255,255,.55)}
+@keyframes lnIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes lnSweep{from{background-position:100% 0}to{background-position:-60% 0}}
+/* ---- a Code run: one column (no flow beside it), the runs above the agent's last words */
+.hz.hz-flow .msg.ai.hz-coderun{grid-template-columns:minmax(0,640px)}
+.hz .msg.ai.hz-coderun>.body>.statusline{display:none}
+.hz .msg.ai>ol.hz-runs{grid-column:1;list-style:none;margin:0 0 20px;padding:0;display:flex;flex-direction:column;gap:14px;min-width:0}
+.hz .hz-run{display:grid;grid-template-columns:60px minmax(0,1fr);column-gap:10px;row-gap:4px;align-items:baseline;margin:0;padding:0;min-width:0;
+  animation:lnIn .4s var(--ln-e) both;-webkit-font-smoothing:antialiased}
+.hz .hz-risk{grid-column:1;grid-row:1;align-self:baseline;justify-self:start;box-sizing:border-box;max-width:60px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;
+  color:rgba(255,255,255,.5);border:var(--chat-hw) solid rgba(255,255,255,.18);border-radius:4px;padding:0 5px;white-space:nowrap}
+.hz .hz-risk.w{color:var(--ln-ink);border-color:rgba(255,255,255,.4)}
+.hz .hz-risk.d{color:var(--hz-ember);border-color:rgba(232,65,90,.55)}
+.hz .hz-risk.none{visibility:hidden;padding:0;border:0}
+.hz .hz-run .hz-cmd{grid-column:2;grid-row:1;font:400 13px/20px var(--hz-font-mono);color:var(--ln-ink);background:none;border:0;padding:0;margin:0;
+  overflow-wrap:anywhere;white-space:pre-wrap}
+.hz .hz-run .hz-plan{grid-column:2;grid-row:1;font:500 14px/20px var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-ink)}
+.hz .hz-run .hz-rst{grid-column:2;font:450 12px/16px var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-meta);font-variant-numeric:tabular-nums}
+.hz .hz-run.live>.hz-rst{background:linear-gradient(100deg,#9aa3b5 0%,#9aa3b5 37%,#e9edf5 49%,#9aa3b5 61%,#9aa3b5 100%);background-size:260% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:lnSweep 2.4s linear infinite}
+.hz .hz-run.wait>.hz-rst{color:var(--ln-ink2)}
+.hz .hz-run.fail>.hz-rst{color:var(--hz-ember)}
+.hz .hz-run.conn>.hz-rst{font:400 12px/16px var(--hz-font-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hz .hz-run.conn>.hz-plan,.hz .hz-run.reboot>.hz-plan{font-weight:450}
+/* a batch's lines: under its plan on a short hairline, each with its result on the right */
+.hz .hz-subruns{grid-column:2;list-style:none;margin:4px 0 0;padding:0 0 0 12px;border-left:var(--chat-hw) solid rgba(255,255,255,.12);
+  display:flex;flex-direction:column;gap:6px;min-width:0}
+.hz .hz-run.sub{grid-template-columns:minmax(0,1fr) auto;column-gap:16px}
+.hz .hz-run.sub>.hz-cmd{grid-column:1;font-size:12.5px;color:#d9dae0}
+.hz .hz-run.sub>.hz-rst{grid-column:2;grid-row:1;white-space:nowrap;text-align:right}
+/* ---- the approval card: flat, under its run, arriving last */
+.hz .hz-runs>.hz-apli{list-style:none;margin:2px 0 0;padding:0;animation:lnIn .4s var(--ln-e) both}
+.hz .msg .apcard.hz-ap{margin:0;padding:16px;border-radius:10px;overflow:visible;background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.1);
+  box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;display:flex;flex-direction:column;gap:10px;-webkit-font-smoothing:antialiased}
+.hz .msg .apcard.hz-ap .aph{display:flex;align-items:center;gap:10px;padding:0;border:0;background:none;
+  font:500 13px/16px var(--hz-font-ui);letter-spacing:-.005em;text-transform:none;color:var(--ln-ink)}
+.hz .msg .apcard.hz-ap .aph .hz-risk{align-self:center}
+.hz .msg .apcard.hz-ap .apn{margin-left:auto;font:450 12px/16px var(--hz-font-ui);color:var(--ln-meta);font-variant-numeric:tabular-nums}
+.hz .msg .apcard.hz-ap .apcmd{margin:0;padding:0;background:none;border:0;font:400 13px/20px var(--hz-font-mono);color:var(--ln-ink);
+  white-space:pre-wrap;overflow-wrap:anywhere}
+.hz .msg .apcard.hz-ap .apwhy{margin:0;font:400 14px/20px var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-ink2)}
+.hz .msg .apcard.hz-ap .apfoot{display:flex;justify-content:flex-end;gap:8px;padding:0;margin:4px 0 0}
+.hz .msg .apcard.hz-ap .apbtn{flex:none;width:auto;height:32px;padding:0 14px;border-radius:8px;border:var(--chat-hw) solid rgba(255,255,255,.16);
+  background:transparent;color:var(--ln-ink2);font:500 13px/1 var(--hz-font-ui);letter-spacing:-.005em;box-shadow:none;cursor:pointer;
+  transition:background .15s var(--ln-e),border-color .15s var(--ln-e),color .15s var(--ln-e)}
+.hz .msg .apcard.hz-ap .apbtn.ok{color:var(--ln-ink);border-color:rgba(255,255,255,.34)}
+.hz .msg .apcard.hz-ap .apbtn:hover{background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.4);color:var(--ln-ink)}
+.hz .msg .apcard.hz-ap .apbtn:active{background:rgba(255,255,255,.09);transform:none}
+.hz:not(.hz-kb) .msg .apcard.hz-ap .apbtn:focus-visible{outline:0;box-shadow:none}
+.hz.hz-kb .msg .apcard.hz-ap .apbtn:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+.hz .msg .apcard.hz-ap.decided .apfoot{display:none}
+/* decided, the card folds to its one verdict line under the run (the run above already shows the command and how it went) */
+.hz .msg .apcard.hz-ap.decided{padding:0 0 0 70px;background:none;border:0;gap:0}
+.hz .msg .apcard.hz-ap.decided .apverdict{color:var(--ln-meta)}
+.hz .msg .apcard.hz-ap.decided .aph,.hz .msg .apcard.hz-ap.decided .apcmd,.hz .msg .apcard.hz-ap.decided .apwhy{display:none}
+.hz .hz-runs>.hz-apli:has(.decided){margin-top:-8px}
+.hz .msg .apcard.hz-ap .apverdict{padding:0;font:450 12px/16px var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-meta)}
+/* ---- a funnel: the trail of choices, then the stages on one hairline */
+.hz .msg.ai.hz-fn>.ftrail{grid-column:1;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;min-height:0;
+  position:sticky;top:56px;z-index:3;padding:8px 0 16px}   /* the choices stay in sight as the stages go by */
+/* stuck under the header: the ground behind the chips (only then), and the chat's top fade moves up above them, so
+   the chips are never faded and nothing reads through them */
+.hz .msg.ai.hz-fn>.ftrail.stuck{background:linear-gradient(180deg,#0e0e10 calc(100% - 14px),rgba(14,14,16,0))}
+html.tl:not(.tl-fs).hz .msg.ai.hz-fn>.ftrail{top:72px}
+.hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-webkit-mask-image:linear-gradient(180deg,transparent 46px,#000 56px);mask-image:linear-gradient(180deg,transparent 46px,#000 56px)}
+html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-webkit-mask-image:linear-gradient(180deg,transparent 62px,#000 72px);mask-image:linear-gradient(180deg,transparent 62px,#000 72px)}
+.hz .msg.ai.hz-fn>.ftrail:empty{display:none}
+.hz .hz-fn .ftc{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:6px;border:var(--chat-hw) solid rgba(255,255,255,.22);
+  font:450 12px/1 var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-ink2);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;
+  box-sizing:border-box;-webkit-font-smoothing:antialiased}
+.hz .msg.ai.hz-fn>.hz-stages{grid-column:1;min-width:0;display:flex;flex-direction:column;gap:24px;margin:0 0 4px 0;padding:0 0 0 24px;
+  border-left:var(--chat-hw) solid rgba(255,255,255,.14);margin-left:5px}
+.hz .hz-stage{position:relative;min-width:0;animation:lnIn .4s var(--ln-e) both}
+.hz .hz-stage::before{content:"";position:absolute;left:-28px;top:4px;width:7px;height:7px;box-sizing:border-box;background:#0f0f11;
+  border:var(--chat-hw) solid rgba(255,255,255,.3)}
+.hz .hz-stage.cur::before{border-color:rgba(255,255,255,.7)}
+.hz .hz-stage.err::before{border-color:var(--hz-ember)}
+.hz .hz-stage.done::before,.hz .hz-stage.verdict::before{width:12px;height:12px;left:-30.5px;top:2px;border:0;
+  background:#0f0f11 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.4 6.4l2.4 2.3 4.8-5' fill='none' stroke='%23e2e6ee' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.hz .hz-stage>.body{min-width:0;max-width:none;font:400 14px/20px var(--hz-font-ui);color:var(--ln-ink2)}
+.hz .hz-stage .fn-wait{display:inline-block;font:450 13px/20px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-stage.wait .fn-wait,.hz .hz-stage.cur .fsq{background:linear-gradient(100deg,#aab2c3 0%,#aab2c3 37%,#f2f4f9 49%,#aab2c3 61%,#aab2c3 100%);
+  background-size:260% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:lnSweep 2.4s linear infinite}
+.hz .hz-stage .fstage{margin:0;animation:lnIn .4s var(--ln-e) both}
+.hz .hz-stage .fstage .fpath{display:block;margin:0 0 6px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.hz .hz-stage .fstage .fsq{font:600 15px/22px var(--hz-font-ui);letter-spacing:-.01em;color:var(--ln-ink);margin:0 0 12px}
+.hz .hz-stage.done .fsq{color:var(--ln-meta);font-weight:500}
+.hz .hz-fn .hz-stage .fopts{gap:8px}
+.hz .hz-fn .hz-stage .fopts.rest{display:flex;flex-wrap:wrap}   /* a reopened stage keeps only its choice: a card its own width */
+.hz .hz-fn .hz-stage .fopts.rest .fopt{flex:none;max-width:100%}
+.hz .hz-fn .hz-stage .fopt{background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.14);border-radius:10px;padding:12px 14px;box-shadow:none;
+  -webkit-backdrop-filter:none;backdrop-filter:none;text-align:left;color:var(--ln-ink2);
+  transition:transform .2s var(--ln-e),border-color .2s var(--ln-e),color .2s var(--ln-e),opacity .3s var(--ln-e)}
+.hz .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:translateY(-1px);border-color:rgba(255,255,255,.28);background:var(--chat-surface)}
+.hz .hz-fn .hz-stage .fopt:not(:disabled):active{transform:none}
+.hz .hz-fn .hz-stage .fopt b{font:500 13px/18px var(--hz-font-ui);letter-spacing:-.005em;color:var(--ln-ink);margin:0}
+.hz .hz-fn .hz-stage .fopt span{display:block;margin-top:4px;font:400 12px/17px var(--hz-font-ui);color:var(--ln-meta)}
+.hz .hz-fn .hz-stage .fopt:disabled{cursor:default}
+.hz .hz-fn .hz-stage .fopt.on{border-color:rgba(255,255,255,.42)}
+.hz .hz-fn .hz-stage .fopt.off{opacity:.45}
+.hz:not(.hz-kb) .hz-fn .hz-stage .fopt:focus-visible{outline:0;box-shadow:none}
+.hz.hz-kb .hz-fn .hz-stage .fopt:focus-visible{outline:0;box-shadow:inset 0 0 0 1px var(--hz-ember)}
+/* the verdict: a flat card on the line */
+.hz .hz-stage.verdict>.body{padding:16px 18px;border-radius:10px;background:var(--chat-surface);border:var(--chat-hw) solid rgba(255,255,255,.1);
+  font:400 15px/1.6 var(--hz-font-read);letter-spacing:-.01em;color:rgba(255,255,255,.88);-webkit-font-smoothing:antialiased}
+.hz .hz-stage.verdict .fn-k{display:block;margin:0 0 8px;font:600 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.hz .hz-stage.verdict>.body p{margin:0 0 .8em}
+.hz .hz-stage.verdict>.body p:last-child{margin-bottom:0}
+.hz .hz-stage.verdict>.body strong,.hz .hz-stage.verdict>.body b{color:#fff;font-weight:600}
+.hz .msg.ai.hz-fn>.ans-foot{grid-column:1}
+/* at rest, Calm and reduced motion: the finished state at once */
+.hz .msg.settled .hz-run,.hz .msg.settled .hz-apli,.hz .msg.settled .hz-stage,.hz .msg.settled .fstage{animation:none}
+.hz.hz-calm .hz-run,.hz.hz-calm .hz-apli,.hz.hz-calm .hz-stage,.hz.hz-calm .fstage,
+.hz.hz-calm .hz-run.live>.hz-rst,.hz.hz-calm .hz-stage.cur .fsq,.hz.hz-calm .hz-stage.wait .fn-wait{animation:none}
+.hz.hz-calm .hz-run.live>.hz-rst{background:none;color:var(--ln-ink2)}
+.hz.hz-calm .hz-stage.cur .fsq{background:none;color:var(--ln-ink)}
+.hz.hz-calm .hz-stage.wait .fn-wait{background:none;color:var(--ln-meta)}
+.hz.hz-calm .hz-fn .hz-stage .fopt{transition:none}
+.hz.hz-calm .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:none}
+@media (prefers-reduced-motion:reduce){
+  .hz .hz-run,.hz .hz-apli,.hz .hz-stage,.hz .fstage,.hz .hz-run.live>.hz-rst,.hz .hz-stage.cur .fsq,.hz .hz-stage.wait .fn-wait{animation:none!important}
+  .hz .hz-run.live>.hz-rst{background:none;color:var(--ln-ink2)}
+  .hz .hz-stage.cur .fsq{background:none;color:var(--ln-ink)}
+  .hz .hz-stage.wait .fn-wait{background:none;color:var(--ln-meta)}
+  .hz .hz-fn .hz-stage .fopt{transition:none}
+  .hz .hz-fn .hz-stage .fopt:not(:disabled):hover{transform:none}}
+/* ==== the Code lane and Funnels (6b622): end ==== */
 /* ============================================================ HORIZON end */
 
 /* ==== bring your chats (6b529): styles begin ==== */
@@ -57359,6 +57515,7 @@ const AP_RISK={read:"Read only",write:"Makes changes",
                danger:"Can’t be undone"};
 function showApprove(host,d){
   if(!host)return;
+  if(isHz())return apHzCard(host,d);   // flat, under its run (6b622)
   const card=document.createElement("div");
   card.className="apcard "+(d.risk||"write");
   // a BATCH arrives as newline-joined commands (6b250) — one approval,
@@ -57991,6 +58148,7 @@ function srcBox(srcs){
   const m=howCtx.m||{};
   const has=(srcs&&srcs.length)||(m.steps&&m.steps.length)||(m.usage&&m.usage.length)||(m.drafts&&m.drafts.length);
   if(!has)return "";
+  if(isHz()&&runSteps(m.steps).length)return "";   // a reopened Code run: its runs, at rest (6b622)
   const o={steps:m.steps||[],usage:m.usage||[],drafts:m.drafts||[],run:m.run||null,running:[],live:false,
       secs:0,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]};
   return '<aside class="behind worktree folded" aria-label="Behind this answer">'
@@ -58152,6 +58310,7 @@ function proofHTML(f,numbers){
 // that rode along while it worked goes, its figures redrawn inside the card
 function proofPaint(div,o){
   if(!div||!isHz())return;
+  if(runSteps(o&&o.steps).length){div.querySelectorAll(":scope>aside.behind").forEach(x=>x.remove());return;}   // a Code run: its runs say how (6b622)
   div.querySelectorAll(":scope>.hz-proof,:scope>.hz-card").forEach(x=>x.remove());
   const f=proofFacts(o);
   if(!f.where&&!f.effort&&!f.srcs.length)return;
@@ -58434,12 +58593,109 @@ function etaStages(plan,o){
   return st;
 }
 // ==== eta-js: end ====
+// ==== lanes-js (6b622): begin ====
+// THE CODE LANE'S RUNS (6b622, per Patrick: "the code page and all that looks really dialed in ... I want this UI to be
+// perfect"). The Remote agent's STEP frames (conn, cmd<i>, cmd<i>_<n> for each line of a batch, reboot<i>) drawn as the
+// web demo's runs list in the answer, Horizon only: a risk tag, the command in mono, and a state line that shimmers
+// silver "Running" while it is live and settles to its result (Done, Failed · exit N, Skipped, Waiting for you). Each
+// run slides in 6 px over 400 ms; the approval card arrives last, under the run it belongs to. A Code run has no flow
+// column and no proof line: the runs ARE how the answer was made. The wire is unchanged; a frame's risk (its first
+// detail: reading, changes, irreversible) is kept on the step as r, and a batch's size as n, since the later frames of
+// the same id carry the result instead. Pure but for runsPaint, which keys each row by its id and touches only a row
+// whose words or state changed, so the approval cards between them live on.
+var RUN_RX=/^(conn|cmd\d+(?:_\d+)?|reboot\d+)$/;
+function runSteps(st){return (st||[]).filter(s=>s&&RUN_RX.test(String(s.id||"")));}
+function runRisk(d){d=String(d||"");return /^reading\b/.test(d)?"read":/^changes\b/.test(d)?"write":/^irreversible\b/.test(d)?"danger":"";}
+function runRow(s,x){
+  x=x||{};const id=String(s.id||""),d=String(s.d||""),kind=id==="conn"?"conn":/^reboot/.test(id)?"reboot":"cmd";
+  const risk=s.r||runRisk(d),live=!x.rest;let st="done",txt="",mm;
+  const batch=kind==="cmd"&&!x.sub&&(+s.n>1||/·\s*\d+ steps/.test(d)||/^\d+ of \d+ ran$/.test(d));
+  if(kind==="conn"){st="done";txt=d;}
+  else if(live&&s.s==="run"){st="live";txt="Running";}
+  else if(live&&s.s==="wait"){if(x.ok){st="live";txt="Running";}else{st="wait";txt="Waiting for you";}}
+  else if(s.s==="skip"||/^skipped$/i.test(d)||/nothing ran/i.test(d)){st="skip";txt=/^skipped$/i.test(d)||!d?"Skipped":d;}
+  else if(/^exit 0$/.test(d)){txt="Done";}
+  else if(/^failed$/i.test(d)){st="fail";txt="Failed";}
+  else if((mm=/^failed, exit (\d+)/i.exec(d))){st="fail";txt="Failed · exit "+mm[1];}
+  else if((mm=/^(\d+) of (\d+) ran$/.exec(d))){if(mm[1]===mm[2])txt="Done · "+d;else{st="stop";txt="Stopped · "+d;}}   // the line that failed says so in ember
+  else if(kind==="reboot"&&/^not back/i.test(d)){st="fail";txt=d;}
+  else if(runRisk(d)||/^waiting for you$/i.test(d)||s.s==="run"||s.s==="wait"){st="skip";txt="Stopped";}   // never finished: a Stop, or the run ended
+  else txt=d?(kind==="reboot"?"Done · "+d:d):"Done";
+  const tag=x.sub?"":kind==="conn"?"ssh":kind==="reboot"?"reboot":risk;
+  const tc=kind==="reboot"||risk==="danger"?" d":risk==="write"?" w":"";
+  const what=(kind==="cmd"&&!batch)?'<code class="hz-cmd">'+esc(s.l||"")+'</code>':'<span class="hz-plan">'+esc(s.l||"")+'</span>';
+  return {txt:txt,cls:"hz-run "+st+(x.sub?" sub":"")+(batch?" batch":"")+(kind!=="cmd"?" "+kind:""),
+    html:(x.sub?"":'<span class="hz-risk'+tc+(tag?"":" none")+'">'+esc(tag)+'</span>')+what
+      +(txt?'<span class="hz-rst">'+esc(txt)+'</span>':"")};
+}
+function runsPaint(div,o){
+  if(!div)return null;o=o||{};
+  const list=runSteps(o.steps);if(!list.length)return null;
+  let ol=div.querySelector(":scope>ol.hz-runs");
+  if(!ol){ol=document.createElement("ol");ol.className="hz-runs";ol.setAttribute("aria-label","Commands");
+    div.insertBefore(ol,div.querySelector(":scope>.body"));}
+  const ok=div._runOk||new Set(),rest=!!o.rest;
+  list.forEach(s=>{
+    const m=/^(cmd\d+)_\d+$/.exec(s.id);
+    let li=ol.querySelector('li.hz-run[data-id="'+s.id+'"]');
+    if(!li){li=document.createElement("li");li.dataset.id=s.id;
+      const p=m&&ol.querySelector('li.hz-run[data-id="'+m[1]+'"]');let sub=p&&p.querySelector(":scope>ol.hz-subruns");
+      if(p&&!sub){sub=document.createElement("ol");sub.className="hz-subruns";p.appendChild(sub);}
+      (sub||ol).appendChild(li);}
+    const r=runRow(s,{rest:rest,ok:ok.has(s.id),sub:!!m}),sig=r.cls+"\u0001"+r.html;
+    // a card the run ended unanswered says what the run's own line now says: once is enough
+    const ap=li.nextElementSibling,apc=ap&&ap.classList.contains("hz-apli")&&ap.querySelector(".apcard.decided.no .apverdict");
+    if(apc)ap.hidden=apc.textContent===r.txt;
+    if(li._sig===sig)return;li._sig=sig;li.className=r.cls;
+    const sub=li.querySelector(":scope>ol.hz-subruns");li.innerHTML=r.html;if(sub)li.appendChild(sub);
+  });
+  return ol;
+}
+// THE APPROVAL CARD, flat (6b622): a hairline card under the run it waits on, the risk tag and "Needs your approval",
+// every command of a batch in mono, then two quiet keys, Skip and Approve; once decided the keys go and one verdict
+// line stays. Same classes as Classic's card (apcard, apbtn ok/no, apverdict, decided), so the end of a run still
+// marks an unanswered card "No answer. Nothing ran." and the round trip is the one /api/remote/approve.
+function apHzCard(host,d){
+  const cmd=String(d.cmd||""),lines=cmd.split("\n").filter(x=>x.trim()),risk=d.risk||"write";
+  const rb=/^REBOOT the server/.test(cmd);
+  const card=document.createElement("div");card.className="apcard hz-ap "+risk;card.setAttribute("role","group");card.setAttribute("aria-label","Needs your approval");
+  card.innerHTML='<div class="aph"><span class="hz-risk'+(rb||risk==="danger"?" d":risk==="write"?" w":"")+'">'+esc(rb?"reboot":risk)+'</span>'
+    +'<span class="apt">Needs your approval</span>'+(lines.length>1?'<span class="apn">'+lines.length+' commands</span>':"")+'</div>'
+    +(rb?'<p class="apwhy"></p>':'<pre class="apcmd"></pre>')
+    +'<div class="apfoot"><button type="button" class="apbtn no">Skip</button><button type="button" class="apbtn ok">Approve</button></div>'
+    +'<div class="apverdict" role="status" hidden></div>';
+  if(rb)card.querySelector(".apwhy").textContent=cmd.replace(/^REBOOT the server\s*\u2014\s*/,"")||"Reboot the server";   // the run above says "Reboot the server"; the card, why
+  else card.querySelector(".apcmd").textContent=lines.join("\n");
+  const ol=host.querySelector(":scope>ol.hz-runs"),row=ol&&d.sid&&ol.querySelector('li.hz-run[data-id="'+d.sid+'"]');
+  const li=document.createElement("li");li.className="hz-apli";li.appendChild(card);
+  if(row)row.after(li);else if(ol)ol.appendChild(li);else host.insertBefore(li,host.querySelector(":scope>.body"));
+  card.dataset.jid=d.jid||"";
+  const decide=ok=>{
+    if(card.classList.contains("decided"))return;
+    card.classList.add("decided",ok?"ok":"no");
+    const v=card.querySelector(".apverdict");v.hidden=false;v.textContent=ok?"Sending":"You skipped this";
+    api("/api/remote/approve",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({jid:d.jid,ok:!!ok})}).then(r=>r.json()).then(j=>{
+        if(!ok)return;
+        if(j&&j.ok){v.textContent="You approved this";
+          if(d.sid){(host._runOk=host._runOk||new Set()).add(d.sid);if(stepHost&&host.contains(stepHost))paintSteps();}}
+        else{card.classList.remove("ok");card.classList.add("no");v.textContent="Expired. Nothing ran. Say keep going.";}
+      }).catch(()=>{if(ok)v.textContent="Couldn’t reach the app. Nothing ran.";});
+  };
+  card.querySelector(".apbtn.ok").addEventListener("click",()=>decide(true));
+  card.querySelector(".apbtn.no").addEventListener("click",()=>decide(false));
+  if(typeof autoScroll==="function")autoScroll();
+  return card;
+}
+// ==== lanes-js (6b622): end ====
 function addStep(s){
   if(!s||!s.id)return;
   const at=steps.findIndex(x=>x.id===s.id);
   // remember when this phase (or its sub-step) last advanced, so the
   // bar can interpolate between milestones instead of freezing
   const prev=at>=0?steps[at]:null;
+  if(RUN_RX.test(s.id)){const k=runRisk(s.d),n=/·\s*(\d+) steps/.exec(s.d||"");   // a run keeps its risk and its size (6b622)
+    s.r=k||(prev&&prev.r)||s.r||"";if(n)s.n=+n[1];else if(prev&&prev.n)s.n=prev.n;}
   s._t0=(prev&&prev.d===s.d&&prev.s===s.s)?prev._t0:performance.now();
   if(at>=0)steps[at]=s; else steps.push(s);
   paintSteps();
@@ -58450,6 +58706,9 @@ function paintSteps(){
   // column of the message's grid, never a box inside the prose. Found from the
   // message root, so a repaint of the prose can't touch it.
   const root=(stepHost.closest&&stepHost.closest(".msg"))||stepHost;
+  // a Code run (6b622): its commands as runs in the answer, no flow column beside it
+  if(isHz()&&(root.classList.contains("hz-coderun")||runSteps(steps).length)){root.classList.add("hz-coderun");
+    root.querySelectorAll(":scope>aside.behind").forEach(x=>x.remove());runsPaint(root,{steps:steps});return;}
   let box=root.querySelector(":scope>.worktree");
   if(!box){
     box=document.createElement("aside");box.className="behind worktree";
@@ -58590,6 +58849,7 @@ inner.addEventListener("click",e=>{
 function collapseSteps(srcs,info){
   if(!stepHost)return;
   const root=(stepHost.closest&&stepHost.closest(".msg"))||stepHost;
+  if(isHz()&&root.classList.contains("hz-coderun")){runsPaint(root,{steps:steps,rest:true});stepHost=null;return;}   // the runs at rest (6b622)
   const box=root.querySelector(":scope>.worktree");
   if(!box)return;
   box.classList.remove("warm");   // a sub-5s answer still gets its marginalia
@@ -59465,6 +59725,7 @@ function addMsg(role,text,drafts,srcs,mapd,ph,places,loc,extra,by,model){
   if(role!=="user"&&m.role&&m.offer)offerRow(div,m.offer);   // a reopened chat keeps the way on (6b570)
   if(role!=="user"&&drafts&&drafts.length)paintDrafts(div,drafts,false);
   if(text)msgActions(div,role,text);
+  if(role!=="user"&&m.role&&isHz()&&runSteps(m.steps).length){div.classList.add("hz-coderun");runsPaint(div,{steps:m.steps,rest:true});}   // 6b622
   if(role!=="user"&&m.role&&text&&!m.stopped)proofPaint(div,{steps:m.steps,usage:m.usage,drafts:drafts,run:m.run,rateS:(m.rate&&m.rate.s)||0,srcs:srcs||[]});   // 6b580
   inner.appendChild(div);
   // a new message, a send above all, re-pins the view to the end (6b425)
@@ -60089,7 +60350,7 @@ async function send(){
     if(fnState&&fnState.chat===curChat){
       if(!fnAnswer)return;          // stage still building — keep the text
       input.value="";input.style.height="auto";if(hzReady&&hzS&&hzS.hasText)hzS.hasText();   /* the send key back to glass once the box is empty (6b555) */
-      addMsg("user",text);
+      if(!isHz())addMsg("user",text);   // Horizon: the stage takes it as its chosen card (6b622)
       // one line, whatever was typed: the server reads picks back out
       // of "q → label" assistant turns, and $-anchored regex can't
       // cross a newline (_FUNNEL_PICK_RX)
@@ -60182,6 +60443,7 @@ async function send(){
   autoScroll(true);                // the spinner line in sight too (6b425)
 
   resetSteps(body);
+  if(agent==="Remote"&&uiMode==="code"&&isHz())aiDiv.classList.add("hz-coderun");   // its runs, never an empty flow (6b622)
   abortCtl=new AbortController();
   let full="",t0=performance.now(),tokEst=0,lastRate=0,wasAborted=false,searched=false,status=null,drafts=[],sources=null,photos=null,mapd=null,locCtx="",places=null,placeHint=null;
   // Vera Rubin's frames (6b519): the last of each kind, and what was last drawn
@@ -60469,6 +60731,8 @@ async function send(){
                  // each approval ONCE (it used to stack ~30 live cards)
                  try{const ad=JSON.parse(j);
                    if(!apSeen.has(ad.jid)){apSeen.add(ad.jid);
+                     // the run it waits on: the step the frames left waiting just before it (6b622)
+                     const ws=steps.slice().reverse().find(x=>x.s==="wait"&&RUN_RX.test(x.id));if(ws)ad.sid=ws.id;
                      showApprove(aiDiv,ad);}}catch(e){}}});
       // Vera Rubin's console, drawn when its frames change (6b519)
       if(rbFr.start||rbFr.state){
@@ -60655,7 +60919,7 @@ async function send(){
     if(usage.length)rec.usage=usage.slice();
     if(runInfo)rec.run=runInfo;
     if(rateInfo)rec.rate=rateInfo;
-    if(steps.length)rec.steps=steps.map(s=>({id:s.id,l:s.l,s:"done",d:s.d}));
+    if(steps.length)rec.steps=steps.map(s=>Object.assign({id:s.id,l:s.l,s:s.s==="skip"?"skip":"done",d:s.d},s.r?{r:s.r}:{},s.n?{n:s.n}:{}));   // a run's risk and size ride along (6b622)
     if(offer)rec.offer=offer;
     if(wasAborted)rec.stopped=true;      // a Stop keeps what was shown, and says so (6b570)
     myMessages.push(rec);
@@ -61838,6 +62102,7 @@ function loadChat(id){
   chatBulk++;
   try{messages.forEach(m=>addMsg(m.role==="user"?"user":"assistant",m.content,m.drafts,m.sources,m.map,m.photos,m.places,m.loc,m,m.imp?by:"",m.model));}
   finally{chatBulk--;}
+  fnHzRest(c);                     // Horizon: a funnel reopens as its flow, at rest (6b622)
   renderChats();
   markSeen();
   chatArrive(id);                  // lands at once, fades in, the box focused (6b590)
@@ -61962,7 +62227,7 @@ async function fnStep(pick){
   box.innerHTML='<div class="who">Funnel</div><div class="body">'
     +'<span class="statusline"><i class="cspin"></i> Stage '
     +(fnState.picks.length+1)+'…</span></div>';
-  inner.appendChild(box);autoScroll();
+  if(!fnHzStage(box))inner.appendChild(box);autoScroll();   // Horizon: a stage on the funnel's hairline (6b622)
   let d={};
   // the server saves this stage's turn (the goal, or the pick the page
   // just showed) and, at the end, the summary (0b 5.5, 6b322); the reply
@@ -62017,7 +62282,9 @@ async function fnStep(pick){
   // an errored stage ABANDONS the funnel (as abandoning always did):
   // the message shows, and the composer falls back to plain chat
   // instead of dead-ending on a stage that will never build (6b257)
+  if(d.err)box.classList.add("err");   // the stage's mark on the hairline goes ember (6b622)
   if(d.err){b.innerHTML=esc(d.err);fnState=null;fnAnswer=null;return;}
+  if(d.done&&fnHzDone(box,d)){fnState=null;fnAnswer=null;return;}   // the verdict, flat (6b622)
   if(d.done){
     box.querySelector(".who").textContent="Funnel \u00b7 done";
     b.innerHTML='<div class="fpath">'+esc(fnState.picks.join(" \u2192 "))
@@ -62039,6 +62306,7 @@ async function fnStep(pick){
       +'<b>'+esc(o.label)+'</b>'
       +(o.why?'<span>'+esc(o.why)+'</span>':"")
       +'</button>').join("")+'</div></div>';
+  fnHzReady(box,d);                 // "Stage 2 of 5"; the question shimmers until it is answered (6b622)
   if(pics)fnImgKeep(b,d.options||[],fnState);
   // a typed answer and a clicked card are the SAME thing (6b257, per
   // Patrick: the cards are suggestions, not a menu \u2014 free text must
@@ -62051,7 +62319,7 @@ async function fnStep(pick){
     let busy=false;
     try{busy=await benchBusyNow();}finally{fnPicking=false;}
     if(busy||!fnState||!fnAnswer)return;
-    b.innerHTML='<div class="fpath">stage '+d.stage+' \u00b7 '
+    if(!fnHzPick(box,d,label))b.innerHTML='<div class="fpath">stage '+d.stage+' \u00b7 '
       +esc(d.q)+'</div><b>'+esc(label)+'</b>';
     fnState.asked=(fnState.asked||[]).concat([d.q||""]);
     fnState.picks.push(String(label).slice(0,90));
@@ -62084,6 +62352,108 @@ $("#fn-go").addEventListener("click",()=>{
   fnStep();
 });
 
+// ==== lanes-fn (6b622): begin ====
+// FUNNELS IN THE FLAT CHROME (6b622, per Patrick: "Funnels is the killer feature"; the web demo's view): Horizon draws a
+// funnel as one answer, a vertical flow on a hairline. Each stage slides in (6 px, 400 ms) with its mark on the line;
+// the question in play shimmers silver; the options are flat cards (#151517, a hairline, radius 10) that lift 1 px on
+// hover; on a pick the chosen card flies (520 ms) into the trail of choices at the top, the stage takes a crisp 12 px
+// check on the hairline, and the others step back to 45 %, still there but inert. A typed answer is the same pick: it
+// joins the stage as its chosen card, so no bubble breaks the flow. The verdict is a flat card. Calm and reduced
+// motion: the finished state at once. The wire (/api/funnel), the pictures, the benchmark's refusal and the errors are
+// fnStep's own; these only place and dress what it draws. Classic is untouched (each returns false there).
+var fnHzBox=null,fnHzOf=null,fnHzStickOn=false;   // var, not let: no temporal dead zone for a chat opened early
+// the trail is sticky; it wears the ground (and moves the chat's top fade above it) only while it is stuck
+function fnHzStick(){
+  const sc=$("#chat-scroll");if(!sc)return;let any=false;
+  sc.querySelectorAll(".hz-fn>.ftrail").forEach(t=>{const w=t.previousElementSibling;
+    const on=t.childElementCount>0&&!!w&&t.getBoundingClientRect().top-w.getBoundingClientRect().bottom>13;
+    if(t.classList.contains("stuck")!==on)t.classList.toggle("stuck",on);if(on)any=true;});
+  if(sc.classList.contains("fn-stuck")!==any)sc.classList.toggle("fn-stuck",any);
+}
+function fnHzStickWire(){
+  if(fnHzStickOn)return;const sc=$("#chat-scroll");if(!sc)return;fnHzStickOn=true;let q=false;
+  const go=()=>{if(q)return;q=true;const f=()=>{if(!q)return;q=false;fnHzStick();};requestAnimationFrame(f);setTimeout(f,50);};   // a hidden pane runs no rAF
+  sc.addEventListener("scroll",go,{passive:true});
+}
+function fnHzMotion(){return typeof hzMotionOK==="function"&&hzMotionOK()&&!document.documentElement.classList.contains("hz-calm");}
+function fnHzFlow(){
+  if(fnHzBox&&fnHzOf===fnState&&fnHzBox.isConnected)return fnHzBox;
+  const c=document.createElement("div");c.className="msg ai hz-fn";
+  c.innerHTML='<div class="who">Funnel</div><div class="ftrail" role="list" aria-label="Your choices"></div><div class="hz-stages" role="list"></div>';
+  inner.appendChild(c);fnHzBox=c;fnHzOf=fnState;fnHzStickWire();return c;
+}
+// a new stage: a mark on the funnel's hairline, "Stage N…" until the question comes
+function fnHzStage(box){
+  if(!isHz()||!fnState)return false;
+  const c=fnHzFlow();
+  box.className="hz-stage cur wait";box.setAttribute("role","listitem");
+  box.innerHTML='<div class="body"><span class="fn-wait">Stage '+(fnState.picks.length+1)+'…</span></div>';
+  c.querySelector(".hz-stages").appendChild(box);
+  return true;
+}
+// the question has come: the path moved to the trail, so the stage says only where it is
+function fnHzReady(box,d){
+  if(!box.classList.contains("hz-stage"))return;
+  box.classList.remove("wait");
+  const p=box.querySelector(".fpath");if(p)p.textContent="Stage "+d.stage+" of "+d.total;
+}
+// a pick (a card, or words typed in the box): the stage is done, its choice flies into the trail
+function fnHzPick(box,d,label){
+  if(!box.classList.contains("hz-stage"))return false;
+  const c=box.closest(".hz-fn"),ops=box.querySelector(".fopts"),btns=[...box.querySelectorAll(".fopt")];
+  let on=btns.find(el=>((d.options||[])[+el.dataset.i]||{}).label===label);
+  if(!on&&ops){on=document.createElement("button");on.type="button";on.className="fopt typed";on.innerHTML="<b></b>";
+    on.querySelector("b").textContent=label;ops.appendChild(on);btns.push(on);}
+  btns.forEach(el=>{el.disabled=true;el.tabIndex=-1;el.classList.toggle("on",el===on);el.classList.toggle("off",el!==on);});
+  box.classList.remove("cur");box.classList.add("done");
+  const tr=c&&c.querySelector(":scope>.ftrail");
+  if(tr){const chip=document.createElement("span");chip.className="ftc";chip.setAttribute("role","listitem");chip.textContent=label;tr.appendChild(chip);
+    if(on&&fnHzMotion()&&chip.animate){const a=on.getBoundingClientRect(),b=chip.getBoundingClientRect();
+      chip.animate([{transform:"translate("+Math.round(a.left-b.left)+"px,"+Math.round(a.top-b.top)+"px)",opacity:.5},{transform:"none",opacity:1}],
+        {duration:520,easing:"cubic-bezier(.2,.7,.2,1)"});}}
+  return true;
+}
+// the end: the verdict as a flat card on the line; the byline says done
+function fnHzDone(box,d){
+  if(!box.classList.contains("hz-stage"))return false;
+  const c=box.closest(".hz-fn"),w=c&&c.querySelector(":scope>.who");if(w)w.textContent="Funnel · done";
+  box.className="hz-stage verdict";box.setAttribute("role","listitem");
+  box.querySelector(".body").innerHTML='<span class="fn-k">The pick</span>'+renderMD(d.summary||"");
+  return true;
+}
+// a reopened funnel (loadChat drew its turns as plain messages): its stages ("question → choice") and its verdict
+// gathered into the same flow, at rest; what follows the verdict (a follow-up chat) stays as drawn
+var FN_TURN_RX=/^([^\n]*?) → ([^\n]+)$/;
+function fnHzRest(c){
+  if(fnHzStickOn)setTimeout(fnHzStick,0);   // another chat opened: its own trail, or none
+  if(!isHz()||!c||(c.lane||"")!=="funnel")return;
+  fnHzStickWire();
+  const kids=[...inner.children],ms=(c.messages||[]);
+  if(kids.length!==ms.length)return;
+  for(let i=0;i<ms.length;i++){
+    if(ms[i].role!=="user"||!/^Funnel: /.test(ms[i].content||""))continue;
+    let j=i+1;const picks=[];
+    while(j<ms.length&&ms[j].role==="assistant"&&String(ms[j].content||"").length<=260&&FN_TURN_RX.test(ms[j].content||"")){
+      const m=FN_TURN_RX.exec(ms[j].content);picks.push({q:m[1],l:m[2]});j++;}
+    const sum=(j<ms.length&&ms[j].role==="assistant")?String(ms[j].content||""):"";
+    if(!picks.length&&!sum)continue;
+    const box=document.createElement("div");box.className="msg ai hz-fn settled";
+    const n=picks.length;
+    box.innerHTML='<div class="who">'+(sum?"Funnel · done":"Funnel")+'</div>'
+      +'<div class="ftrail" role="list" aria-label="Your choices">'+picks.map(p=>'<span class="ftc" role="listitem">'+esc(p.l)+'</span>').join("")+'</div>'
+      +'<div class="hz-stages" role="list">'+picks.map((p,k)=>'<div class="hz-stage done" role="listitem"><div class="body"><div class="fstage">'
+        +'<div class="fpath">Stage '+(k+1)+(sum?" of "+n:"")+'</div>'+(p.q?'<div class="fsq">'+esc(p.q)+'</div>':"")
+        +'<div class="fopts rest"><button type="button" class="fopt on" disabled tabindex="-1"><b>'+esc(p.l)+'</b></button></div></div></div></div>').join("")
+      +(sum?'<div class="hz-stage verdict" role="listitem"><div class="body"><span class="fn-k">The pick</span>'+renderMD(sum)+'</div></div>':"")
+      +'</div>';
+    if(sum)msgActions(box,"assistant",sum);
+    const last=sum?j:j-1;
+    inner.insertBefore(box,kids[i+1]||null);
+    for(let k=i+1;k<=last;k++)kids[k].remove();
+    i=last;
+  }
+}
+// ==== lanes-fn (6b622): end ====
 /* "Include cloud models" (6b339): remembered like the effort, sent with
    every stage, greyed and unticked-looking while there is no cloud to
    include (no key saved, or cloud power off); the saved choice is kept */

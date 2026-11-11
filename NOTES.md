@@ -21051,3 +21051,106 @@ caught.
 - "until 08:00" is the server's clock. Away from Florida that is not this computer's 08:00; converting it would need
   saying which clock, so it is left as the kit sends it.
 - This computer's clock decides while the server is asleep; a wrong clock here moves the hours.
+
+## 6b622 — beta-4-lanes: Code and Funnels in the flat chrome (7.0 beta 4, per Patrick)
+
+Per Patrick: "it's very important that the chat page and also obviously the code page and all that looks really
+dialed in ... I want this UI to be perfect." The web demo's Code and Funnels views ("the middle ground", DESIGN.md)
+ported into the app's real Code lane (the Remote SSH agent) and real Funnels. Horizon only; Classic draws what it
+drew. The wire is unchanged: the same STEP and APPROVE frames, the same `/api/remote/approve` and `/api/funnel`.
+
+**What was wrong.** In Horizon the agent's commands were not shown at all: `paintSteps` fed the 6b580 flow, which only
+knows wake, search, read, places, drafts, review, polish and verify, so a Code run showed an empty pipeline ("Answer")
+beside a blue pill Run key on a glass card, and a reopened Code chat showed the same empty flow and a "One pass" proof
+line. A funnel was one `.msg.ai` per stage, each re-signed "Funnel", a pick replacing the stage with a bold label.
+
+**The Code lane now.** The commands are a runs list in the answer (`ol.hz-runs`, above the agent's last words), from
+the frames as they are: the connection (an `SSH` tag, the uname in mono), each command (its risk tag, READ / WRITE /
+DANGER, the command in mono, 13 px), a batch (its plan in prose, its lines under it on a short hairline, each with its
+result on the right), a reboot (a `REBOOT` tag). Under each, one state line: "Running" in the 2.4 s silver sweep while
+live (and the moment its approval is confirmed, before the server says so), "Waiting for you", then Done, Failed,
+Failed · exit N, Stopped · 1 of 2 ran, Skipped, "No answer. Nothing ran.", Done · up 1 minute. Ember only for a failure
+and the DANGER / REBOOT tags (errors are the ember's place). Each run slides in 6 px over 400 ms. `runsPaint` keys every
+row by its id and touches only a row whose words or state changed, so the approval cards between rows live on through
+the stream's re-reads.
+- A frame's risk is only in its first detail (reading / changes / irreversible); the result's frame replaces it. The
+  page keeps it on the step as `r` (and a batch's size as `n`), and `turn_record` now saves both, so a reopened chat
+  has its tags. `turn_record` also keeps every step of a Code run (up to 160; any other answer still its first 24): a
+  40-command run used to lose its tail on reopening. Both inline in `turn_record`, so the gauntlet's lifted copy of
+  it needs no new name.
+- The approval card is flat (`#151517`, a hairline, radius 10, no shadow) and sits under the run it waits on (the
+  APPROVE handler takes the step the frames left waiting): the risk tag, "Needs your approval", every command of a
+  batch in mono ("2 commands" on the right), then Skip and Approve, 32 tall, radius 8, Approve a shade brighter, no
+  fill or glow. A reboot's card says why (the run above already says "Reboot the server"). Decided, it folds to one
+  quiet line under the run ("You approved this"); an unanswered card at the run's end says nothing the run's own line
+  doesn't already say, so it goes. Same classes as Classic's card (apcard, apbtn ok/no, apverdict, decided): the end of
+  a run still marks an unanswered one, and the round trip is the one 6b309 hardened.
+- **With the flow and the proof line:** a Code run has neither. The runs are how the answer was made; an empty
+  pipeline and a "One pass" chip would be wrong. The message is one 640 column (`hz-coderun`), marked at send time
+  for the Remote agent so the flow never shows for a frame, and found by its step ids on a reopened chat.
+  `proofPaint` and `srcBox` stand aside for it. A Code-lane answer from the Coding or Workspace agent has no run
+  steps and keeps the flow and the proof line as a chat answer does.
+
+**Funnels now.** One answer: the trail of choices at the top, the stages on one vertical hairline. Each stage slides
+in with a 7 px mark on the line ("Stage 3…" in the sweep while the question comes), says "STAGE 2 OF 5" (11 px caps;
+the path moved to the trail), and its question shimmers silver until it is answered. The options are flat cards
+(`#151517`, a hairline, radius 10) that lift 1 px on hover. On a pick the chosen card's chip flies into the trail
+(520 ms, cubic-bezier(.2,.7,.2,1)), the stage takes a crisp 12 px check on the hairline, the others step back to 45 %,
+still there and disabled. A typed answer is the same pick: it joins the stage as its chosen card, so no bubble breaks
+the flow (Classic keeps its bubble). The verdict is a flat card on the line under "THE PICK". The trail is sticky
+under the header, so the choices stay in sight down a long funnel: it wears the ground only while stuck, and the
+chat's top fade moves above it then (`fn-stuck`), or the chips would sit in the fade. A reopened funnel is gathered
+into the same flow at rest (`fnHzRest`, after `loadChat` draws the turns): its "question → choice" turns become done
+stages with their choice (the other options were never saved), the next assistant turn the verdict; a follow-up chat
+after it stays as drawn. The pictures, the benchmark's refusal (its Try again card in the stage), errors (the mark
+goes ember) and the wire are fnStep's own; the new pieces only place and dress what it draws, and the pinned lines in
+fnStep are kept. The new top-level names are `var` (no temporal dead zone for a chat opened early).
+
+**Calm and reduced motion:** the finished state at once: no slide, no sweep, no flight, no lift.
+
+**Measured** (stand-in streams only, `scratchpad/b4-lanes/stub.js`: the agent's frames and approvals, `/api/funnel`;
+no model, no server, no SSH host), dev copy on 9933, Chromium headless shell and a real WKWebView, 1440 and 760:
+- Contrast on the ground: tags 5.3 (WRITE 17.5, DANGER 4.85 in ember), commands 17.5, state lines 6.3, "Waiting for
+  you" 12.1, the card's words 15.5, Skip 10.7, Approve 15.5, the trail's chips 12.1, STAGE labels 5.3, a done question
+  6.3, the cards' labels 15.5 and their why 6.2, the verdict 14.2. The other options at 45 % read 4.0 and 2.2: they are
+  disabled controls (WCAG's exemption for inactive components) and the 45 % is the spec.
+- `elementFromPoint` hits the centre of Skip, Approve and every live option card, both engines, both widths.
+- No sideways scroll anywhere (1440 and 760, both engines). Layout shift inside a Code run and a funnel: 0 (WebKit).
+- WebKit frames: p95 19 ms (60 Hz) while runs shimmer and while a question shimmers; across a pick's flight p95 19 ms,
+  one long frame (107–208 ms) at the click in some runs and none in a run of three picks alone. Chromium's headless
+  numbers are the sky in software GL (p95 33–150 ms with or without these views; Classic 16.7).
+- No console errors, both engines.
+
+**Tests:** `== the Code lane's runs and approval card, Funnels on a hairline, in the flat chrome (6b622) ==`. The
+runs, pure in node on the page's runRow (17 frames to their row, tag, state, mono or prose; 5 mutants); the saved
+record through a lifted `turn_record` (risk, size, last state, every step of a Code run; 2 mutants); the css (flat
+cards, the keys, the lift, the 45 %, the verdict, the sweep and the slide, the 12 px check, one column, every rule
+Horizon's, no circle, glow, blur or shadow, Calm and reduced motion still; 5 mutants); live in headless Chromium on
+the copy's page at 1440 and 760, Balanced and Calm (the runs, the card under its run, Approve by a real click and its
+POST, the batch, no flow or proof line; a funnel by click, by typing and by click, the 12 px check, the 45 % inert
+others, the flight only outside Calm, the verdict), with 5 mutants served in place of the page. Proven on a trimmed
+copy on 9951-9953: 34/34. The 6b580 and 6b590 blocks the same way: 6b590 all pass; 6b580's live checks pass, and its
+layout check fails on a79ae7c already (6b590's `.chat-sr` rule is unscoped and its `#jumpdown` has
+`left:calc(50% - 16px)`, both now inside 6b580's slice, which runs to HORIZON end): an integration fix, not this one's.
+
+**Copy, new or changed (for Patrick's approval), Horizon only:**
+- the approval card: "Command" / "N steps" + "Makes changes" → the risk tag + "Needs your approval" (+ "N commands")
+- keys: "Run" / "Skip" → "Skip" / "Approve"
+- verdicts: "sending…" → "Sending"; "✓ running…" → "You approved this"; "skipped" → "You skipped this";
+  "expired — nothing ran; say keep going" → "Expired. Nothing ran. Say keep going."; "couldn't reach the app —
+  nothing ran" → "Couldn't reach the app. Nothing ran."
+- a reboot's card: "REBOOT the server — <why>" → "<why>" (the run above says "Reboot the server")
+- run states (new): "Running", "Waiting for you", "Done", "Failed", "Failed · exit N", "Done · N of N ran",
+  "Stopped · N of M ran", "Stopped", "Skipped", "Done · <uptime>"; tags "ssh", "read", "write", "danger", "reboot"
+- a funnel stage: "stage 2 of 5 · a → b" → "Stage 2 of 5" (the path is the trail); the verdict's label "The pick"
+  (from the demo); "Funnel · done" kept.
+
+**Left / worth knowing.**
+- The command's output is not on the wire (only exit codes), so the demo's output boxes are not drawn; the brief kept
+  the wire as is.
+- A typed funnel answer refused because a benchmark is running leaves the box empty in Horizon (Classic showed the
+  bubble); the stage stays and the answer can be typed again.
+- A run approved too late (the server's 10 minutes gone: "Expired") keeps "Waiting for you" until the server's next
+  frame says "No answer. Nothing ran."; the card's line says Expired at once.
+- Checked in an offscreen WKWebView, not in the shipped window (its 72 px header moves the sticky trail to 72, set
+  by `html.tl`, not seen live).
