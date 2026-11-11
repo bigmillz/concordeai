@@ -57468,6 +57468,8 @@ html:not(.hz) #sx-srv-pair{display:none}
   .hz #about-veil #about-body{padding:20px 16px 32px}
   .hz #about-veil #about-foot{padding:10px 16px}
   .hz #about-veil .sl-seg{max-width:100%;overflow-x:auto;scrollbar-width:none}
+  /* Settings fills the window here; in the Mac shell its tabs start right of the lights (beta 5: half a screen) */
+  html.tl:not(.tl-fs).hz #about-veil #set-rail{padding-left:96px}
 }
 @media (prefers-reduced-motion:reduce){.hz #about-veil:not([hidden]),.hz #about-veil #about-card,.hz #about-veil.sx-out,.hz #about-veil.sx-out #about-card{animation:none}}
 /* ---- ONE TYPE SYSTEM: Inter for the UI and the reading, mono for code only ---------------------------------------- */
@@ -58070,6 +58072,13 @@ html.tl:not(.tl-fs).hz #main:has(#hero) #hz-right,html.tl:not(.tl-fs).hz:not(.hz
    column stays the window's centre */
 html.tl:not(.tl-fs).hz:not(.hz-sbopen) body:has(#main #hero):not(.sbopen) #hz-top,
 html.tl:not(.tl-fs).hz.sbhide body:not(:has(#main #hero)) #hz-top{padding-right:96px}
+/* HALF A SCREEN IN THE MAC SHELL (beta 5, per Patrick: "allow half-screen"; the window goes down to 640 pt): at 760 and
+   under the sidebar is a drawer over the page, so whatever the sidebar's setting the header starts at the window's left
+   edge, under the lights, and keeps their zone (both sides, so the lanes stay centred) unless the drawer is open over it */
+@media (max-width:760px){
+  html.tl:not(.tl-fs).hz body:has(#main #hero):not(.sbopen) #hz-top,
+  html.tl:not(.tl-fs).hz body:not(:has(#main #hero)):not(.sbopen) #hz-top{padding-left:96px;padding-right:96px}
+}
 /* the band: opaque under the header in the working views, a short fade below it; nothing reads through the header */
 .hz #main:not(:has(#hero)) #hz-top::before{content:"";position:absolute;left:0;right:0;top:0;bottom:-16px;z-index:-1;pointer-events:none;
   background:linear-gradient(180deg,#0f0f11 0,#0f0f11 calc(100% - 16px),rgba(15,15,17,0))}
@@ -74129,11 +74138,28 @@ function hzSidebarToggle(){
   if($("#hero")){const open=!root.classList.contains("hz-sbopen");root.classList.toggle("hz-sbopen",open);
     // opened on purpose, it stays open in the chat picked from it (quirks-1: a sidebar shut in a chat earlier
     // vanished the moment a chat was opened from the home's)
-    if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}}}
+    if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}
+      const sa=hzSbState();sa.auto=false;sa.keep=innerWidth<HZ_SB_AUTO;}}
   else{const hide=!root.classList.contains("sbhide");root.classList.toggle("sbhide",hide);
-    try{localStorage.setItem("millen.sbhide",hide?"1":"0");}catch(e){}}
+    try{localStorage.setItem("millen.sbhide",hide?"1":"0");}catch(e){}
+    // a toggle is the person's own choice: it ends a fold the window made, and holds while the window stays narrow
+    const sa=hzSbState();sa.auto=false;sa.keep=innerWidth<HZ_SB_AUTO;}
   hzSidebarLabel();
 }
+// THE SIDEBAR FOLDS ITSELF AT HALF A SCREEN (beta 5, per Patrick: "allow half-screen", the sidebar auto-collapsing): under
+// 900 px a conversation gets the whole window. An open sidebar is folded (sbhide) without touching the saved setting and
+// comes back once the window is 900 px or wider again; the menu key still opens it while narrow, and that holds until
+// the window is wide again. The home's own sidebar (hz-sbopen) is left as it is.
+var HZ_SB_AUTO=900;
+function hzSbState(){return globalThis.hzSbSt||(globalThis.hzSbSt={auto:false,keep:false});}
+function hzSidebarAuto(){
+  const root=document.documentElement,sa=hzSbState();
+  if(!root.classList.contains("hz"))return;
+  if(innerWidth<HZ_SB_AUTO){
+    if(!sa.keep&&!root.classList.contains("sbhide")){root.classList.add("sbhide");sa.auto=true;hzSidebarLabel();}}
+  else{sa.keep=false;if(sa.auto){root.classList.remove("sbhide");sa.auto=false;hzSidebarLabel();}}
+}
+addEventListener("resize",hzSidebarAuto);
 function hzSidebarLabel(){
   const b=$("#hz-sb");if(!b)return;
   const sb=$("#sidebar"),open=!!(sb&&getComputedStyle(sb).display!=="none"&&getComputedStyle(sb).position!=="fixed")||document.body.classList.contains("sbopen");
@@ -74431,7 +74457,7 @@ function hzFxApply(){
 function hzStart(){
   hzS.place=hzFindPlace();
   if(!hzS.starCv)hzS.starCv=document.createElement("canvas");
-  hzSkyPaint();hzDrawWash();hzHomePaint();hzPlaceEffort();hzPauseSync();hzSidebarLabel();hzMediaBoot();
+  hzSidebarAuto();hzSkyPaint();hzDrawWash();hzHomePaint();hzPlaceEffort();hzPauseSync();hzSidebarLabel();hzMediaBoot();
   clearInterval(hzS.skyTimer);hzS.skyTimer=setInterval(()=>{if(!document.hidden)hzSkyPaint();},180000);
   if(typeof api==="function")api("/api/setup").then(r=>r.json()).then(st=>{hzS.accel=st&&st.accel||"";hzMachinesPaint();}).catch(()=>{});
 }

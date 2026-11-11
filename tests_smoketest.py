@@ -46276,7 +46276,7 @@ check("6b555 a whole streamed answer through the real page (headless Chromium, a
 # THE HEADER, ONE ROW (per Patrick, on the Nightly: "Fix this, man. It looks rough": the conversation's title ran over the
 # wordmark and the lanes over its end), AND SETTINGS AND UPDATES IN IT ("Where are the settings and updates, buddy?").
 # Measured in headless Chromium over the DevTools protocol at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell,
-# html.tl, at 1440, 1100 and 940, its narrowest window), on the home and in a conversation with a long title, the sidebar
+# html.tl, at 1440, 1100, 940, 864, 720 and 640, its narrowest window since 6b644), on the home and in a conversation with a long title, the sidebar
 # open and closed: the menu, the wordmark, the title, the lanes, the update pill and the right group's boxes never
 # intersect, nothing is clipped, nothing sits in the traffic-light zone, nothing scrolls sideways, and the Settings gear
 # is there and hittable (elementFromPoint) in every case, its tooltip naming the shortcut. With a stand-in update check:
@@ -46287,8 +46287,8 @@ check("6b555 a whole streamed answer through the real page (headless Chromium, a
 # fit and the groups' no-shrink rules removed (a collision); the gear hidden, the badge's wiring cut and the old list
 # back under the composer (no gear, no badge, rows on the home).
 _B3_HDR = r'''// THE HEADER, ONE ROW, MEASURED (6b555): headless Chromium over the DevTools protocol (node's own WebSocket), the copy's
-// own page, at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell, html.tl, at 1440, 1100 and 940: its window is never
-// narrower), on the home and in a conversation with a long title, the sidebar open and closed. Prints one row per case:
+// own page, at 1440, 1100, 900, 760, 600 and 390 (and as the Mac shell, html.tl, at 1440, 1100, 940, 864, 720 and 640: its
+// window is never narrower since 6b644), on the home and in a conversation with a long title, the sidebar open and closed. Prints one row per case:
 // the boxes that intersect, the ones in the traffic-light zone, anything clipped, the sideways overflow.
 // argv: <chromium> <base> <cookie name> <key> <token> [mutation.json: [[from, to], ...] applied to the page]
 const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
@@ -46366,7 +46366,7 @@ ch.stderr.on("data", async d => {
         await sleep(300);
       }
       for (const side of [true, false]) {
-        for (const w of (tl ? [1440, 1100, 940] : [1440, 1100, 1000, 900, 760, 600, 390])) {
+        for (const w of (tl ? [1440, 1100, 940, 864, 720, 640] : [1440, 1100, 1000, 900, 760, 600, 390])) {   // the Mac shell down to 640 since 6b644
           await size(w);
           for (let k = 0; k < 3; k++) {
             const vis = await ev(`(()=>{const e=document.querySelector("#sidebar");if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50;})()`);
@@ -46381,7 +46381,7 @@ ch.stderr.on("data", async d => {
   // the update badge: none while nothing is pending; "Update ready" beside the gear once the app's own check finds one;
   // at the narrowest the pill gives way to a mark on the gear
   out.badge = {};
-  await ev(`document.documentElement.classList.remove("tl")`);   // a plain window: the Mac shell is never under 940
+  await ev(`document.documentElement.classList.remove("tl")`);   // a plain window (the Mac shell's own cases are above)
   await size(1440); out.badge.none = await ev(MEASURE);
   await ev(`(async()=>{window.__upd=true;await checkUpdate();})()`); await sleep(400);
   for (const w of [1440, 760, 390]) { await size(w); out.badge["w" + w] = await ev(MEASURE); }
@@ -46440,7 +46440,7 @@ def _b3_hdr_static(css, js, pg):
             and _B624_LOOP in fit and "top.classList.remove(...HZ_HD);" in fit
             and 'if(top.getBoundingClientRect().width<HZ_LANES_MENU&&!$("#hero"))top.classList.add("hz-hd5");' in fit
             and 'var HZ_HD=["hz-hd1","hz-hd2","hz-hd3","hz-hd4","hz-hd5","hz-hd6","hz-hd7","hz-hd8"],HZ_LANES_MENU=940;' in js
-            and ".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}" in css
+            and ".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}" in pg   # 6b644: 6b624's rule sits after the Horizon slice
             and "if(tl&&b.left<88&&b.top<56)l=true;" in js and "tv.width<Math.min(96,t.scrollWidth))l=true;" in js
             and 'ro.observe(e);' in js and "  hzHeaderFit();\n}" in js
             # the gear and the badge: a 32 px glass key with its shortcut; the pill mirrors the app's own check, no new call
@@ -46463,11 +46463,11 @@ _b3_h_mut2 = _b3_hdr_run([['<button id="hz-settings" type="button" class="hz-ib"
 _b3_h_mut3 = _b3_hdr_run([[".hz #hz-top.hz-hd5 #hz-lanes{display:none;position:absolute;", ".hz #hz-top.hz-hd5 #hz-lanes{position:absolute;"],
                           [".hz #hz-top.hz-hd5 #hz-lanemenu{display:inline-flex}", ""]])
 _b3_h_mut4 = _b3_hdr_run([[".hz #hz-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);column-gap:16px;padding:0 24px}", ""]])
-check("6b555 the header, one row, with Settings and updates in it, over the home (one to three quiet recent-chat rows the composer's width under it, no suggestion chips; the composer at the golden point; beta 4): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100 and 940), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
+check("6b555 the header, one row, with Settings and updates in it, over the home (one to three quiet recent-chat rows the composer's width under it, no suggestion chips; the composer at the golden point; beta 4): at 1440, 1100, 900, 760, 600 and 390 (the Mac shell's at 1440, 1100, 940, 864, 720 and 640), home and a conversation with a long title, the sidebar open and closed, the menu, the wordmark, the title, the lanes, the update pill and the right group never intersect, nothing is clipped or in the traffic-light zone, nothing scrolls sideways, the Settings gear is there and hittable; the title shows where there is room; \"Update ready\" only while an update is pending, a mark on the gear when narrow; the mutants (no fit; no gear and no badge) are caught",
       _b3_hdr_static(_hz_css, _hz_js, page) and not _b3_hdr_static(_hz_css.replace(".hz #hz-mark{min-width:max-content}", ""), _hz_js, page)
       and not _b3_hdr_static(_hz_css, _hz_js.replace(_B624_LOOP, ""), page)
       and not _b3_hdr_static(_hz_css.replace(".hz #hz-settings{width:32px;height:32px;border-radius:8px;", ".hz #hz-settings{width:32px;height:32px;border-radius:8px;filter:drop-shadow(0 0 6px #fff);"), _hz_js, page)   # a glowing gear
-      and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 40 and not _b3_hdr_bad(_b3_h_ok)
+      and not _b3_h_ok.get("err") and not _b3_h_ok.get("errs") and len(_b3_h_ok.get("cases", [])) == 52 and not _b3_hdr_bad(_b3_h_ok)   # 6b644: the shell's 864, 720 and 640
       and all(c["gear"] and c["gearTitle"] == "Settings (⌘,)" for c in _b3_h_ok["cases"])
       and any(c["where"] == "chat" and c["title"] >= 96 for c in _b3_h_ok["cases"])                              # the title still shows where there is room
       and _b3_hdr_badge_ok(_b3_h_ok) and _b3_home_ok(_b3_h_ok)
@@ -51875,7 +51875,7 @@ function $(q){return q==="#hero"&&hero?{}:null;} function hzTraceKill(){} functi
 '''
 def _q643_sb(pg):
     try:
-        js = _Q643_SB + _jsfn(pg, "function hzSidebarToggle(){") + r'''
+        js = _Q643_SB + _jsfn(pg, "function hzSidebarToggle(){") + _jsfn(pg, "function hzSbState(){") + "var HZ_SB_AUTO=900;\n" + r'''
 const o={};
 hero=false;hzSidebarToggle();o.shutInChat=[cls.has("sbhide"),ls["millen.sbhide"]];          // shut in a chat
 hero=true;hzSidebarToggle();o.openHome=[cls.has("hz-sbopen"),cls.has("sbhide"),ls["millen.sbhide"]];   // opened on the home
@@ -51891,7 +51891,7 @@ def _q643_sb_ok(o):
             and o.get("closeHome") == [False, False] and o.get("shutAgain") == [True, "1"])
 _q643_so = _q643_sb(page)
 _q643_sbm = [(d_, _q643_sb_ok(_q643_sb(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
-    ("the home's open forgets the chat's shut (the shipped bug)", 'if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}}', ""),
+    ("the home's open forgets the chat's shut (the shipped bug)", 'if(open&&root.classList.contains("sbhide")){root.classList.remove("sbhide");', 'if(false){'),
     ("cleared but not remembered", 'root.classList.remove("sbhide");try{localStorage.setItem("millen.sbhide","0");}catch(e){}', 'root.classList.remove("sbhide");')]]
 check("6b643 the sidebar opened on the home stays open in the chat picked from it (a shut from a chat earlier is cleared and remembered); shutting it in a chat still sticks; %d mutants caught" % len(_q643_sbm),
       _q643_sb_ok(_q643_so) and all(r_ is False for _, r_ in _q643_sbm), "%r" % [_q643_so, _q643_sbm])
@@ -51937,6 +51937,395 @@ check("6b643 dictation's download says what happened in plain words: \"Couldn't 
       and "s2.note.slice" not in _q643_vc and "getting the voice engine" not in page
       and _q643_vc.count('"Downloading dictation ("') == 2, "")
 # ==== 6b643 quirks-1: end ====
+
+# ==== 6b644 half a screen: begin ====
+print("== half a screen (6b644): the Mac shell down to 640 pt, the header clear of the lights, the sidebar folding itself, Settings' tabs ==")
+# HALF A SCREEN (6b644, beta 5, per Patrick: "allow half-screen"). The shell's window was never under 940 pt, wider than
+# half of every Mac screen at its default scaling (a 16-inch's half is 864), so Split View and the half-screen tiles
+# could not take it. MIN_W is 640. The page in the Mac shell (html.tl) at 940, 864, 800, 720, 680 and 640: at 760 and
+# under the sidebar is a drawer, so the header keeps the lights' zone whatever the sidebar's setting (the menu key sat
+# under the lights); under 900 px a conversation's sidebar folds itself without changing the setting and comes back
+# when the window is wide again (Patrick: the sidebar auto-collapsing); at 640 Settings fills the window and its tabs
+# start right of the lights. Proved live in headless Chromium and in a real WKWebView (a borderless window off every
+# screen): the header, the composer, the sidebar, an answer, Settings and its every pane, the palette, find and Bring
+# your chats, each control hit by elementFromPoint at its centre, no two overlapping, nothing interactive under the
+# lights, nothing sideways; with mutants served in place of the page.
+_h644_rs = open(os.path.join("shell", "src-tauri", "src", "main.rs"), encoding="utf-8").read()
+def _h644_rs_ok(rs):
+    m_ = re.search(r"const MIN_W: f64 = ([\d.]+);", rs)
+    return (bool(m_) and float(m_.group(1)) <= 1470 / 2 - 64                  # under half of the smallest default screen (a 13-inch Air, 1470)
+            and ".min_inner_size(MIN_W, MIN_H);" in rs and "s.w.clamp(MIN_W, 10000.0)" in rs
+            and ".min_inner_size(940.0" not in rs and "clamp(940.0" not in rs)
+_h644_rm = [("940 back", _h644_rs.replace("const MIN_W: f64 = 640.0;", "const MIN_W: f64 = 940.0;", 1)),
+            ("a restored window clamped to 940", _h644_rs.replace("s.w.clamp(MIN_W, 10000.0)", "s.w.clamp(940.0, 10000.0)", 1))]
+check("6b644 the Mac shell's window goes down to 640 pt (MIN_W, under half of any Mac screen at its default scaling), a restored place clamped to the same; 2 mutants caught",
+      _h644_rs_ok(_h644_rs) and not any(_h644_rs_ok(r_) for _, r_ in _h644_rm), "")
+# the sidebar folding itself, in node on the page's own functions
+_H644_SB = r"""
+const cls=new Set(["hz"]),ls={};let hero=false,innerWidth=1320,labels=0;
+const document={documentElement:{classList:{contains:c=>cls.has(c),toggle:(c,on)=>{on=on===undefined?!cls.has(c):!!on;on?cls.add(c):cls.delete(c);return on;},remove:c=>cls.delete(c),add:c=>cls.add(c)}},body:{classList:{toggle(){}}}};
+const localStorage={setItem:(k,v)=>{ls[k]=String(v);},getItem:k=>ls[k]};
+function $(q){return q==="#hero"&&hero?{}:null;} function hzTraceKill(){} function hzSidebarLabel(){labels++;}
+var HZ_SB_AUTO=900;
+"""
+def _h644_sb(pg):
+    try:
+        js = _H644_SB + _jsfn(pg, "function hzSidebarToggle(){") + _jsfn(pg, "function hzSbState(){") + r"""
+const o={},open=()=>!cls.has("sbhide");
+innerWidth=1320;hzSidebarAuto();o.wide=open();
+innerWidth=864;hzSidebarAuto();o.half=[open(),ls["millen.sbhide"]];        // folded, the setting untouched
+innerWidth=1100;hzSidebarAuto();o.back=open();                               // back when wide
+innerWidth=864;hzSidebarAuto();hzSidebarToggle();o.opened=[open(),ls["millen.sbhide"]];   // the menu key opens it while narrow
+innerWidth=820;hzSidebarAuto();o.held=open();                                // and it holds
+innerWidth=1100;hzSidebarAuto();innerWidth=864;hzSidebarAuto();o.again=open();   // wide again resets the hold
+innerWidth=1320;hzSidebarAuto();hzSidebarToggle();innerWidth=864;hzSidebarAuto();innerWidth=1320;hzSidebarAuto();o.shut=[open(),ls["millen.sbhide"]];   // shut by hand stays shut
+innerWidth=900;cls.delete("sbhide");hzSidebarAuto();o.at900=open();
+process.stdout.write(JSON.stringify(o));"""
+        return _node_json(js, "h644sb.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _h644_sb_ok(o):
+    return (o.get("wide") is True and o.get("half") == [False, None] and o.get("back") is True and o.get("opened") == [True, "0"]
+            and o.get("held") is True and o.get("again") is False and o.get("shut") == [False, "1"] and o.get("at900") is True)
+_h644_so = _h644_sb(page)
+_h644_sm = [(d_, _h644_sb_ok(_h644_sb(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in [
+    ("no fold at half a screen", '    if(!sa.keep&&!root.classList.contains("sbhide")){root.classList.add("sbhide");sa.auto=true;hzSidebarLabel();}}', "    }"),
+    ("never comes back", '  else{sa.keep=false;if(sa.auto){root.classList.remove("sbhide");sa.auto=false;hzSidebarLabel();}}', "  else{sa.keep=false;}"),
+    ("the menu key's open undone by the next resize", "const sa=hzSbState();sa.auto=false;sa.keep=innerWidth<HZ_SB_AUTO;}\n  hzSidebarLabel();", "}\n  hzSidebarLabel();")]]
+check("6b644 a conversation's sidebar folds itself under 900 px without changing the setting and comes back once the window is wide again; the menu key opens it while narrow and that holds until the window is wide; a sidebar shut by hand stays shut; %d mutants caught" % len(_h644_sm),
+      _h644_sb_ok(_h644_so) and all(r_ is False for _, r_ in _h644_sm)
+      and 'addEventListener("resize",hzSidebarAuto);' in page and "hzSidebarAuto();hzSkyPaint();" in page, "%r" % [_h644_so, _h644_sm])
+# live: the page as the Mac shell at half a screen, in headless Chromium, then in a real WKWebView
+_H644_JS = r'''// THE MAC SHELL AT HALF A SCREEN (6b644, beta 5): headless Chromium over the DevTools protocol, the copy's own page as the
+// Mac shell (html.tl), at the given widths: the header, the composer, the sidebar, Settings and an answer, each control
+// proved hittable with elementFromPoint and no two boxes overlapping. argv: <chromium> <base> <cookie> <key> <token> <widths,|dump> [shots dir, or the dump's file] [mut.json]
+const { spawn } = require("child_process"), fs = require("fs"), path = require("path"), os = require("os");
+const [exe, base, ckName, key, tok, widthsArg, shots, mutf] = process.argv.slice(2);
+const WIDTHS = widthsArg === "dump" ? [] : widthsArg.split(",").map(Number);
+const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
+const ud = fs.mkdtempSync(path.join(os.tmpdir(), "q643n-"));
+const ch = widthsArg === "dump" ? { stderr: { on(){} }, on(){}, kill(){} } : spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+  "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
+const out = { cases: [], errs: [], mutated: 0 };
+const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
+  process.stdout.write(JSON.stringify(out)); process.exit(0); };
+setTimeout(() => { out.errs.push("timeout"); done(); }, 280000);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const RICH = "Here is a [link](https://example.com) and `code`.\n\n```python\ndef hello(name):\n    # a long comment line that has to scroll inside its own card when the window is only half a screen wide\n    return name\n```\n\n| A | B | C | D | E | F | G |\n|---|---|---|---|---|---|---|\n| alpha one | beta two | gamma three | delta four | epsilon five | zeta six | eta seven |\n\n" + "A sentence of the answer that wraps. ".repeat(30);
+// what is measured: boxes, overlaps, hits (elementFromPoint at each control's centre lands on it), the sideways overflow
+const MEASURE = `(()=>{
+  const vis=e=>{if(!e)return false;const c=getComputedStyle(e),r=e.getBoundingClientRect();return r.width>1&&r.height>1&&c.display!=="none"&&c.visibility!=="hidden"&&+c.opacity>0.05;};
+  const box=e=>{const r=e.getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom};};
+  const hit=(a,b)=>a.l<b.r-.5&&b.l<a.r-.5&&a.t<b.b-.5&&b.t<a.b-.5;
+  const name=e=>e.id?"#"+e.id:(e.getAttribute("aria-label")||e.title||e.textContent||e.tagName).trim().slice(0,24);
+  const hitOk=e=>{const r=e.getBoundingClientRect();const x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;if(x<0||y<0||x>innerWidth||y>innerHeight)return false;const t=document.elementFromPoint(x,y);return !!t&&(e===t||e.contains(t));};
+  const root=document.documentElement,tl=root.classList.contains("tl")&&!root.classList.contains("tl-fs");
+  const LIGHTS=()=>{if(!(document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs")))return [];const bad=new Set();
+    for(let x=4;x<88;x+=6)for(let y=4;y<56;y+=6){const t=document.elementFromPoint(x,y);const c=t&&t.closest("button,a[href],input,select,textarea,[role=tab],[role=button],[role=slider],label");
+      if(c){const cs=getComputedStyle(c);if(cs.pointerEvents!=="none"&&cs.visibility!=="hidden")bad.add(c.id?"#"+c.id:(c.getAttribute("aria-label")||c.textContent||c.tagName).trim().slice(0,24));}}
+    return [...bad];};
+  const R={w:innerWidth,tl,sw:root.scrollWidth-innerWidth,bad:[]};
+  // the header
+  const H=["#hz-sb","#hz-mark","#hz-title","#hz-lanes","#hz-lanemenu","#hz-effort-slot","#hz-machines","#hz-update","#hz-settings"].map(s=>document.querySelector(s)).filter(vis);
+  for(let i=0;i<H.length;i++)for(let j=i+1;j<H.length;j++)if(hit(box(H[i]),box(H[j])))R.bad.push("header overlap "+name(H[i])+" x "+name(H[j]));
+  LIGHTS().forEach(n=>R.bad.push("under the lights "+n));
+  const top=document.querySelector("#hz-top"),hb=top.getBoundingClientRect();
+  H.forEach(e=>{const b=box(e);if(b.b>hb.bottom+.5||b.r>innerWidth+.5||b.l<-.5)R.bad.push("header out "+name(e));});
+  ["#hz-sb","#hz-settings"].forEach(s=>{const e=document.querySelector(s);if(!vis(e)||!hitOk(e))R.bad.push("header not hittable "+s);});
+  const ln=document.querySelector("#hz-lanes"),lm=document.querySelector("#hz-lanemenu");
+  if(vis(ln))[...ln.querySelectorAll("[role=tab]")].forEach(b=>{if(!hitOk(b))R.bad.push("lane not hittable "+name(b));});
+  else if(!(vis(lm)&&hitOk(lm)))R.bad.push("no way to the lanes");
+  // the composer: inside the window, its controls apart and hittable
+  const comp=document.querySelector("#composer");
+  if(vis(comp)){const cb=box(comp);if(cb.l<-.5||cb.r>innerWidth+.5)R.bad.push("composer out of the window");
+    const C=[...comp.querySelectorAll("button,input,textarea,select,[role=slider]")].filter(vis).filter(e=>!e.closest("[hidden]"));
+    R.comp=C.length;
+    for(let i=0;i<C.length;i++){const bi=box(C[i]);if(bi.r>cb.r+.5||bi.l<cb.l-.5)R.bad.push("composer control out "+name(C[i]));
+      if(C[i].type!=="range"&&C[i].tagName!=="TEXTAREA"&&!hitOk(C[i]))R.bad.push("composer not hittable "+name(C[i]));
+      for(let j=i+1;j<C.length;j++){if(C[j].contains(C[i])||C[i].contains(C[j]))continue;if(hit(bi,box(C[j])))R.bad.push("composer overlap "+name(C[i])+" x "+name(C[j]));}}
+    const ta=comp.querySelector("textarea");if(ta&&ta.getBoundingClientRect().width<160)R.bad.push("composer box too narrow "+Math.round(ta.getBoundingClientRect().width));
+    // the composer against the header and the sidebar
+    if(hit(cb,box(top)))R.bad.push("composer under the header");}
+  // the sidebar: open in the row, or a drawer; never on the composer or the answer while in the row
+  const sb=document.querySelector("#sidebar");R.sb=vis(sb)?Math.round(sb.getBoundingClientRect().width):0;R.sbpos=sb?getComputedStyle(sb).position:"";
+  if(vis(sb)&&R.sbpos!=="fixed"){const s=box(sb);
+    [...document.querySelectorAll("#composer,#chat-inner .msg")].filter(vis).forEach(e=>{if(hit(s,box(e)))R.bad.push("sidebar over "+name(e));});
+    const main=document.querySelector("#main");if(main){R.mainW=Math.round(main.getBoundingClientRect().width);}}
+  // an answer: inside its column, code and tables scroll in their own box, its keys hittable
+  const ans=[...document.querySelectorAll("#chat-inner .msg.ai")].filter(vis).pop();
+  if(ans){const ab=box(ans);if(ab.r>innerWidth+.5)R.bad.push("answer out of the window");
+    ans.querySelectorAll("pre,table").forEach(e=>{const b=box(e);if(b.r>ab.r+1)R.bad.push("answer's "+e.tagName+" out of the answer");});
+    const keys=[...ans.querySelectorAll("button")].filter(k=>{const r=k.getBoundingClientRect(),c=getComputedStyle(k);return r.width>1&&r.height>1&&c.display!=="none"&&c.visibility!=="hidden"&&!k.closest("[hidden],aside.behind,.drafts");});R.akeys=keys.length;
+    keys.forEach(k=>{const b=box(k);if(b.b<innerHeight&&b.t>72&&!hitOk(k))R.bad.push("answer key not hittable "+name(k));});}
+  const q=[...document.querySelectorAll("#chat-inner .msg.user, #chat-inner .msg:not(.ai)")].filter(vis).pop();
+  if(q&&box(q).r>innerWidth+.5)R.bad.push("question out of the window");
+  if(R.sw>0)R.bad.push("sideways scroll "+R.sw);
+  return R;})()`;
+const SETTINGS = `(()=>{
+  const vis=e=>{if(!e)return false;const c=getComputedStyle(e),r=e.getBoundingClientRect();return r.width>1&&r.height>1&&c.display!=="none"&&c.visibility!=="hidden";};
+  const box=e=>{const r=e.getBoundingClientRect();return {l:r.left,t:r.top,r:r.right,b:r.bottom};};
+  const hit=(a,b)=>a.l<b.r-.5&&b.l<a.r-.5&&a.t<b.b-.5&&b.t<a.b-.5;
+  const hitOk=e=>{const r=e.getBoundingClientRect();const x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;const t=document.elementFromPoint(x,y);return !!t&&(e===t||e.contains(t));};
+  const v=document.querySelector("#about-veil"),R={bad:[],tl:document.documentElement.classList.contains("tl")};
+  const card=[...v.querySelectorAll("#about-card")].find(vis)||v.firstElementChild;const cb=box(card);R.card=[Math.round(cb.l),Math.round(cb.r),Math.round(cb.t),Math.round(cb.b)];
+  if(cb.l<-.5||cb.r>innerWidth+.5||cb.t<-.5||cb.b>innerHeight+.5)R.bad.push("dialog out of the window");
+  const LIGHTS=()=>{if(!(document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs")))return [];const bad=new Set();
+    for(let x=4;x<88;x+=6)for(let y=4;y<56;y+=6){const t=document.elementFromPoint(x,y);const c=t&&t.closest("button,a[href],input,select,textarea,[role=tab],[role=button],[role=slider],label");
+      if(c){const cs=getComputedStyle(c);if(cs.pointerEvents!=="none"&&cs.visibility!=="hidden")bad.add(c.id?"#"+c.id:(c.getAttribute("aria-label")||c.textContent||c.tagName).trim().slice(0,24));}}
+    return [...bad];};
+  LIGHTS().forEach(n=>R.bad.push("under the lights "+n));
+  const rail=[...v.querySelectorAll("[data-pane]")].filter(vis);R.rail=rail.length;
+  rail.forEach(b=>{b.scrollIntoView({block:"nearest",inline:"nearest"});if(!hitOk(b))R.bad.push("rail not hittable "+b.textContent.trim());});
+  rail[0]&&rail[0].scrollIntoView({block:"nearest",inline:"nearest"});
+  for(const b of rail){b.click();const p=document.getElementById(b.dataset.pane);if(!p||!vis(p))continue;const pb=box(p);
+    if(pb.r>cb.r+1)R.bad.push("pane out of the dialog "+b.dataset.pane);
+    rail.forEach(r=>{if(hit(box(r),pb))R.bad.push("rail over the pane "+b.dataset.pane);});
+    if(p.scrollWidth>p.clientWidth+2)R.bad.push("pane scrolls sideways "+b.dataset.pane+" "+(p.scrollWidth-p.clientWidth));
+    [...p.querySelectorAll("button,input,select,textarea")].filter(vis).forEach(e=>{const eb=box(e);if(eb.r>pb.r+1||eb.l<pb.l-1)R.bad.push("control out of "+b.dataset.pane+": "+(e.id||e.textContent.trim().slice(0,20)));});}
+  const close=[...v.querySelectorAll("button")].filter(vis).find(b=>/^Close$/.test(b.textContent.trim()));
+  if(!close||!hitOk(close))R.bad.push("Close not hittable");
+  if(document.documentElement.scrollWidth>innerWidth)R.bad.push("sideways scroll");
+  return R;})()`;
+const OVERLAY = sel => `(()=>{
+  const vis=e=>{if(!e)return false;const c=getComputedStyle(e),r=e.getBoundingClientRect();return r.width>1&&r.height>1&&c.display!=="none"&&c.visibility!=="hidden";};
+  const hitOk=e=>{const r=e.getBoundingClientRect();const x=(r.left+r.right)/2,y=(r.top+r.bottom)/2;const t=document.elementFromPoint(x,y);return !!t&&(e===t||e.contains(t));};
+  const LIGHTS=()=>{if(!(document.documentElement.classList.contains("tl")&&!document.documentElement.classList.contains("tl-fs")))return [];const bad=new Set();
+    for(let x=4;x<88;x+=6)for(let y=4;y<56;y+=6){const t=document.elementFromPoint(x,y);const c=t&&t.closest("button,a[href],input,select,textarea,[role=tab],[role=button],[role=slider],label");
+      if(c){const cs=getComputedStyle(c);if(cs.pointerEvents!=="none"&&cs.visibility!=="hidden")bad.add(c.id?"#"+c.id:(c.getAttribute("aria-label")||c.textContent||c.tagName).trim().slice(0,24));}}
+    return [...bad];};
+  const R={bad:[]};const e=[...document.querySelectorAll("${sel}")].find(vis);if(!e){R.bad.push("not open ${sel}");return R;}
+  const r=e.getBoundingClientRect();R.box=[Math.round(r.left),Math.round(r.right),Math.round(r.top),Math.round(r.bottom)];
+  if(r.left<-.5||r.right>innerWidth+.5||r.top<-.5||r.bottom>innerHeight+.5)R.bad.push("out of the window");
+  LIGHTS().forEach(n=>R.bad.push("under the lights "+n));
+  [...e.querySelectorAll("button,input")].filter(vis).forEach(b=>{const q=b.getBoundingClientRect();if(q.bottom<innerHeight&&q.top>0&&!hitOk(b))R.bad.push("not hittable "+(b.id||b.textContent.trim().slice(0,20)));});
+  if(document.documentElement.scrollWidth>innerWidth)R.bad.push("sideways scroll");
+  return R;})()`;
+if (widthsArg === "dump") { fs.writeFileSync(shots, JSON.stringify({ MEASURE, SETTINGS, OVERLAY: OVERLAY("@SEL@"), RICH })); process.exit(0); }
+let buf = "";
+ch.stderr.on("data", async d => {
+  buf += d; const m = buf.match(/DevTools listening on (ws:\/\/[^\s]+)/); if (!m || out.ws) return; out.ws = 1;
+  const port = new URL(m[1]).port;
+  let list = []; for (let i = 0; i < 50 && !list.find(t => t.type === "page"); i++) { try { list = await (await fetch("http://127.0.0.1:" + port + "/json/list")).json(); } catch (e) {} await sleep(100); }
+  const pg = list.find(t => t.type === "page"); if (!pg) { out.errs.push("no page"); return done(); }
+  const ws = new WebSocket(pg.webSocketDebuggerUrl); let id = 0; const wait = new Map();
+  const send = (method, params) => new Promise(res => { const i = ++id; wait.set(i, res); ws.send(JSON.stringify({ id: i, method, params: params || {} })); });
+  ws.onmessage = async ev => { const msg = JSON.parse(ev.data);
+    if (msg.id && wait.has(msg.id)) { wait.get(msg.id)(msg.result || { error: msg.error }); wait.delete(msg.id); return; }
+    if (msg.method === "Runtime.exceptionThrown") out.errs.push("exception: " + JSON.stringify(msg.params.exceptionDetails.exception&&msg.params.exceptionDetails.exception.description).slice(0, 400));
+    if (msg.method === "Fetch.requestPaused") { const p = msg.params; out.mutated++;
+      const b = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      let html = b.base64Encoded ? Buffer.from(b.body, "base64").toString("utf8") : b.body;
+      for (const [f, t] of mut) { if (html.indexOf(f) < 0) out.errs.push("mutation anchor missing: " + f.slice(0, 60)); html = html.split(f).join(t); }
+      await send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200, responseHeaders: [{ name: "Content-Type", value: "text/html; charset=utf-8" }, { name: "Cache-Control", value: "no-store" }], body: Buffer.from(html, "utf8").toString("base64") }); } };
+  await new Promise(r => { ws.onopen = r; });
+  await send("Runtime.enable"); await send("Page.enable"); await send("Network.enable");
+  await send("Network.setCookie", { name: ckName, value: key, url: base + "/" });
+  if (mut) await send("Fetch.enable", { patterns: [{ urlPattern: base + "/", resourceType: "Document", requestStage: "Response" }] });
+  // the Mac shell: html.tl from the first paint (as the server marks it), the token as the shell hands it, a stand-in answer
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel","calm");}catch(e){}
+    (function(){const real=window.fetch.bind(window);window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){const enc=new TextEncoder();
+      return Promise.resolve(new Response(new ReadableStream({start(c){c.enqueue(enc.encode(${JSON.stringify(RICH)}));setTimeout(()=>c.close(),50);}}),{status:200,headers:{"Content-Type":"text/plain; charset=utf-8"}}));}
+      return real(u,o);};})();` });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  const size = async w => { await send("Emulation.setDeviceMetricsOverride", { width: w, height: 860, deviceScaleFactor: 1, mobile: false }); await ev(`dispatchEvent(new Event("resize"))`); await sleep(350); };
+  const shot = async n => { if (!shots) return; const r = await send("Page.captureScreenshot", { format: "png" }); if (r && r.data) fs.writeFileSync(path.join(shots, n + ".png"), Buffer.from(r.data, "base64")); };
+  await size(1320);
+  let ready = false;
+  await send("Page.navigate", { url: base + "/" });
+  for (let i = 0; i < 300 && !ready; i++) { await sleep(200); ready = await ev(`!!document.querySelector("#hz-top")&&typeof hzS!=="undefined"&&!!hzS&&!hzS.intro`); }
+  if (!ready) { out.errs.push("page not ready"); return done(); }
+  await ev(`document.documentElement.classList.add("tl")`);
+  await ev(`(()=>{const s=document.createElement("style");s.textContent="*{transition:none!important;animation:none!important}";document.head.appendChild(s);})()`);
+  await sleep(600);
+  for (const where of ["home", "chat"]) {
+    if (where === "chat") {
+      await ev(`(()=>{const i=document.querySelector("#input");i.value="Plan a long weekend in Lisbon with two good walks, one great dinner and somewhere quiet to read";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();})()`);
+      await sleep(3000);
+    }
+    for (const side of [true, false]) {
+      for (const w of WIDTHS) {
+        await size(w);
+        for (let k = 0; k < 3; k++) {
+          const vis = await ev(`(()=>{const e=document.querySelector("#sidebar");if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50;})()`);
+          if (vis === side || (side && w <= 760)) break;
+          await ev(`document.querySelector("#hz-sb").click()`); await sleep(400); }
+        await sleep(250);
+        const r = await ev(MEASURE); out.cases.push({ where, side, w, ...r });
+        if (where === "chat" && !side) await shot(where + "-" + w);
+        if (where === "chat" && side) await shot(where + "-sb-" + w);
+        if (where === "home" && !side) await shot("home-" + w);
+      }
+    }
+  }
+  // the sidebar folds itself under 900 px in a conversation and comes back when the window is wide again; the saved
+  // setting never changes; the menu key opens it while narrow and that holds until the window is wide again
+  const SBV = `(()=>{const e=document.querySelector("#sidebar"),r=e.getBoundingClientRect();return getComputedStyle(e).display!=="none"&&r.width>100&&r.right>50&&getComputedStyle(e).position!=="fixed";})()`;
+  const LS = `localStorage.getItem("millen.sbhide")`;
+  out.fold = {};
+  await size(1100);
+  for (let k = 0; k < 3 && !(await ev(SBV)); k++) { await ev(`document.querySelector("#hz-sb").click()`); await sleep(300); }
+  out.fold.wide = [await ev(SBV), await ev(LS)];
+  await size(864); out.fold.half = [await ev(SBV), await ev(LS)]; await shot("fold-864");
+  await size(1100); out.fold.back = [await ev(SBV), await ev(LS)];
+  await size(864); await ev(`document.querySelector("#hz-sb").click()`); await sleep(300); out.fold.opened = [await ev(SBV), await ev(LS)];
+  await size(820); out.fold.held = [await ev(SBV)];
+  await size(1100); await size(864); out.fold.again = [await ev(SBV), await ev(LS)];
+  // Settings at each width
+  out.settings = {};
+  for (const w of WIDTHS) { await size(w); await ev(`openAbout()`); await sleep(500); out.settings["w" + w] = await ev(SETTINGS);
+    await ev(`document.querySelector('#about-veil [data-pane="sx-p-general"]')&&document.querySelector('#about-veil [data-pane="sx-p-general"]').click()`); await sleep(150); await shot("settings-" + w);
+    await ev(`document.querySelector("#about-veil").hidden=true`); await sleep(200); }
+  // the overlays at each width: the palette (Cmd+K), find (Cmd+F, in the chat), Bring your chats
+  out.overlays = {};
+  for (const w of WIDTHS) { await size(w); const o = {};
+    await ev(`palOpen()`); await sleep(300); o.palette = await ev(OVERLAY("#palette>*")); await shot("palette-" + w); await ev(`palClose()`); await sleep(150);
+    await ev(`findOpen()`); await sleep(300); o.find = await ev(OVERLAY("#findbar")); await shot("find-" + w); await ev(`findClose()`); await sleep(150);
+    await ev(`impOpen()`); await sleep(500); o.import = await ev(OVERLAY("#imp-veil>*,#imp-sheet,#imp-card")); await shot("import-" + w); await ev(`typeof impEsc==="function"&&impEsc()`); await sleep(300);
+    out.overlays["w" + w] = o; }
+  done();
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(); } });
+'''
+_H644_SWIFT = r'''// wk.swift <base> <port> <key> <token> <exprs.json> <widths,> <out.json> [mut.json]
+// The same narrow-window measurements in a real WKWebView (the shipped engine), in a borderless window placed far off every
+// screen (nothing is ever shown), with the Mac shell's html.tl and the shell's token bridge.
+import AppKit
+import WebKit
+let a = CommandLine.arguments
+let base = a[1], port = a[2], key = a[3], tok = a[4]
+let ex = try! JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: a[5]))) as! [String: String]
+let widths = a[6].split(separator: ",").map { Double($0)! }
+let outPath = a[7]
+let mut: [[String]] = a.count > 8 ? (try! JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: a[8]))) as! [[String]]) : []
+let app = NSApplication.shared
+app.setActivationPolicy(.prohibited)
+var results: [String: Any] = ["cases": [], "settings": [:], "errs": []]
+func jsStr(_ s: String) -> String { let d = try! JSONSerialization.data(withJSONObject: [s]); let t = String(data: d, encoding: .utf8)!; return String(t.dropFirst().dropLast()) }
+class Runner: NSObject, WKNavigationDelegate {
+  var wv: WKWebView!; var win: NSWindow!; var loaded = false; var mutated = 0
+  func start() {
+    let cfg = WKWebViewConfiguration()
+    let shim = "window.pywebview={api:{api_token:()=>Promise.resolve(\(jsStr(tok)))}};try{localStorage.setItem('millen.fxlevel','calm');}catch(e){}" +
+      "(function(){const real=window.fetch.bind(window);window.fetch=(u,o)=>{if(String(u).split('?')[0].endsWith('/api/chat')){const enc=new TextEncoder();" +
+      "return Promise.resolve(new Response(new ReadableStream({start(c){c.enqueue(enc.encode(\(jsStr(ex["RICH"]!))));setTimeout(()=>c.close(),50);}}),{status:200,headers:{'Content-Type':'text/plain; charset=utf-8'}}));}return real(u,o);};})();"
+    cfg.userContentController.addUserScript(WKUserScript(source: shim, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+    win = NSWindow(contentRect: NSRect(x: -30000, y: -30000, width: 1100, height: 860), styleMask: [.borderless], backing: .buffered, defer: false)
+    wv = WKWebView(frame: NSRect(x: 0, y: 0, width: 1100, height: 860), configuration: cfg)
+    wv.navigationDelegate = self
+    win.contentView = wv
+    win.setFrameOrigin(NSPoint(x: -30000, y: -30000))
+    win.orderBack(nil)
+    let ck = HTTPCookie(properties: [.name: "millen_key_\(port)", .value: key, .domain: "127.0.0.1", .path: "/"])!
+    cfg.websiteDataStore.httpCookieStore.setCookie(ck) {
+      if self.mut.isEmpty { self.wv.load(URLRequest(url: URL(string: base + "/")!)) }
+      else {   // a mutant: the page fetched here, changed, and loaded as that origin's document
+        var rq = URLRequest(url: URL(string: base + "/")!); rq.setValue("millen_key_\(port)=\(key)", forHTTPHeaderField: "Cookie")
+        URLSession.shared.dataTask(with: rq) { d, _, _ in var h = String(data: d!, encoding: .utf8)!
+          for m in mutGlobal { if h.contains(m[0]) { self.mutated += 1 }; h = h.replacingOccurrences(of: m[0], with: m[1]) }
+          DispatchQueue.main.async { self.wv.loadHTMLString(h, baseURL: URL(string: base + "/")!) } }.resume() }
+    }
+  }
+  var mut: [[String]] { return mutGlobal }
+  func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { if !loaded { loaded = true; Task { await self.run() } } }
+  func ev(_ js: String) async -> Any? { do { return try await wv.evaluateJavaScript(js) } catch { (results["errs"] as! NSMutableArray?)?.add("\(error)"); return "ERR \(error)" } }
+  func sleep(_ s: Double) async { try? await Task.sleep(nanoseconds: UInt64(s * 1e9)) }
+  func size(_ w: Double) async { win.setContentSize(NSSize(width: w, height: 860)); wv.frame = NSRect(x: 0, y: 0, width: w, height: 860); await sleep(0.15); _ = await ev("dispatchEvent(new Event('resize'));1"); await sleep(0.35) }
+  @MainActor func run() async {
+    var errs: [String] = []
+    for _ in 0..<150 { if let r = await ev("!!document.querySelector('#hz-top')&&typeof hzS!=='undefined'&&!!hzS&&!hzS.intro") as? Bool, r { break }; await sleep(0.2) }
+    _ = await ev("document.documentElement.classList.add('tl');(()=>{const s=document.createElement('style');s.textContent='*{transition:none!important;animation:none!important}';document.head.appendChild(s);})();1")
+    await sleep(0.5)
+    var cases: [[String: Any]] = []
+    for whr in ["home", "chat"] {
+      if whr == "chat" { _ = await ev("(()=>{const i=document.querySelector('#input');i.value='Plan a long weekend in Lisbon with two good walks';i.dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#send').click();return 1})()"); await sleep(3) }
+      for side in [true, false] { for w in widths { await size(w)
+        for _ in 0..<3 { let vis = await ev("(()=>{const e=document.querySelector('#sidebar');if(!e)return false;const r=e.getBoundingClientRect();return getComputedStyle(e).display!=='none'&&r.width>100&&r.right>50;})()") as? Bool ?? false
+          if vis == side || (side && w <= 760) { break }; _ = await ev("document.querySelector('#hz-sb').click();1"); await sleep(0.4) }
+        await sleep(0.2)
+        var r = (await ev(ex["MEASURE"]!) as? [String: Any]) ?? ["bad": ["no result"]]
+        r["where"] = whr; r["side"] = side; r["w"] = w; cases.append(r) } }
+    }
+    var st: [String: Any] = [:]
+    for w in widths { await size(w); _ = await ev("openAbout();1"); await sleep(0.5); st["w\(Int(w))"] = await ev(ex["SETTINGS"]!) ?? "nil"; _ = await ev("document.querySelector('#about-veil').hidden=true;1"); await sleep(0.2) }
+    let res: [String: Any] = ["cases": cases, "settings": st, "errs": errs, "mutated": mutated, "ua": (await ev("navigator.userAgent") as? String) ?? ""]
+    try! JSONSerialization.data(withJSONObject: res).write(to: URL(fileURLWithPath: outPath))
+    exit(0)
+  }
+}
+let mutGlobal = mut
+let r = Runner()
+DispatchQueue.main.asyncAfter(deadline: .now() + 240) { FileHandle.standardError.write("timeout\n".data(using: .utf8)!); exit(3) }
+r.start()
+app.run()
+'''
+_H644_W = "940,864,800,720,680,640"
+_H644_MUT = [["  html.tl:not(.tl-fs).hz body:has(#main #hero):not(.sbopen) #hz-top,\n  html.tl:not(.tl-fs).hz body:not(:has(#main #hero)):not(.sbopen) #hz-top{padding-left:96px;padding-right:96px}\n", ""],
+             ["  html.tl:not(.tl-fs).hz #about-veil #set-rail{padding-left:96px}\n", ""],
+             ['addEventListener("resize",hzSidebarAuto);', ""], ["hzSidebarAuto();hzSkyPaint();", "hzSkyPaint();"]]
+_h644_dir = tempfile.mkdtemp(prefix="h644-", dir=_SMOKE_TMP)
+open(os.path.join(_h644_dir, "narrow.js"), "w").write(_H644_JS)
+def _h644_run(widths, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    args = ["nice", "-n", "15", "node", os.path.join(_h644_dir, "narrow.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, widths, ""]
+    if mutation:
+        mp_ = os.path.join(_h644_dir, "mut.json"); open(mp_, "w").write(json.dumps(mutation)); args.append(mp_)
+    try:
+        return json.loads(subprocess.run(args, capture_output=True, text=True, timeout=300).stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _h644_bad(r):
+    b_ = [("%s %s %s" % (c["where"], "sb" if c["side"] else "--", c["w"]), c["bad"]) for c in r.get("cases", []) if c.get("bad")]
+    b_ += [("settings " + k_, v_["bad"]) for k_, v_ in (r.get("settings") or {}).items() if isinstance(v_, dict) and v_.get("bad")]
+    b_ += [("%s %s" % (k_, n_), o_["bad"]) for k_, v_ in (r.get("overlays") or {}).items() for n_, o_ in v_.items() if o_.get("bad")]
+    return b_
+def _h644_fold_ok(r):
+    f_ = r.get("fold") or {}
+    return (f_.get("wide") == [True, "0"] and f_.get("half") == [False, "0"] and f_.get("back") == [True, "0"]
+            and f_.get("opened") == [True, "0"] and f_.get("held") == [True] and f_.get("again") == [False, "0"])
+_h644_ok = _h644_run(_H644_W)
+_h644_mu = _h644_run("864,720,640", _H644_MUT)
+_h644_n = len(_H644_W.split(","))
+check("6b644 the page as the Mac shell at 940, 864, 800, 720, 680 and 640 px (headless Chromium): home and a conversation with an answer (code, a table, links), the sidebar open and shut, Settings and each of its panes, the palette, find and Bring your chats: every control hit at its centre (elementFromPoint), none overlapping, nothing interactive under the traffic lights, nothing out of the window or sideways; the sidebar folds itself at 864 and comes back at 1100; the mutants (the header's narrow reservation, Settings' tabs and the fold removed, served in place of the page) are caught",
+      not _h644_ok.get("err") and not _h644_ok.get("errs") and len(_h644_ok.get("cases", [])) == 4 * _h644_n
+      and len(_h644_ok.get("settings") or {}) == _h644_n and len(_h644_ok.get("overlays") or {}) == _h644_n
+      and not _h644_bad(_h644_ok) and _h644_fold_ok(_h644_ok)
+      and all(c.get("comp", 0) >= 4 for c in _h644_ok["cases"]) and any(c.get("akeys", 0) >= 3 for c in _h644_ok["cases"])
+      and _h644_mu.get("mutated", 0) >= 1 and not _h644_fold_ok(_h644_mu)
+      and any("under the lights #hz-sb" in " ".join(b_) for _, b_ in _h644_bad(_h644_mu))
+      and any(k_ == "settings w640" and any("under the lights" in x_ for x_ in b_) for k_, b_ in _h644_bad(_h644_mu)),
+      json.dumps({"bad": _h644_bad(_h644_ok)[:6], "err": _h644_ok.get("err") or _h644_ok.get("errs"), "fold": _h644_ok.get("fold"), "mut": _h644_bad(_h644_mu)[:4], "mfold": _h644_mu.get("fold")})[:1400])
+# the same in the shipped engine: a real WKWebView in a borderless window off every screen (built here with swiftc)
+def _h644_wk(widths, mutation=None):
+    if not shutil.which("swiftc") or sys.platform != "darwin":
+        return {"err": "no swiftc"}
+    try:
+        exe_ = os.path.join(_h644_dir, "wk")
+        if not os.path.exists(exe_):
+            open(os.path.join(_h644_dir, "wk.swift"), "w").write(_H644_SWIFT)
+            subprocess.run(["swiftc", "-O", os.path.join(_h644_dir, "wk.swift"), "-o", exe_], capture_output=True, timeout=300)
+        ex_ = os.path.join(_h644_dir, "exprs.json")
+        if not os.path.exists(ex_):
+            subprocess.run(["node", os.path.join(_h644_dir, "narrow.js"), "x", "x", "x", "x", "x", "dump", ex_], capture_output=True, timeout=60)
+        out_ = os.path.join(_h644_dir, "wk-%d.json" % int(time.time() * 1000))
+        args = [exe_, BASE, str(PORT_), K.split("=", 1)[1], TOKEN, ex_, widths, out_]
+        if mutation:
+            mp_ = os.path.join(_h644_dir, "wkmut.json"); open(mp_, "w").write(json.dumps(mutation)); args.append(mp_)
+        subprocess.run(args, capture_output=True, timeout=300)
+        return json.load(open(out_))
+    except Exception as e_:
+        return {"err": repr(e_)}
+_h644_wo = _h644_wk("940,864,720,640")
+_h644_wm = _h644_wk("864,720,640", _H644_MUT[:2])
+check("6b644 the same in a real WKWebView (the shipped engine, a borderless window off every screen) at 940, 864, 720 and 640: the header, the composer, the sidebar, an answer and Settings' every pane clear of each other and of the lights, each control hit at its centre; the header's and Settings' narrow rules removed (served in place) are caught",
+      "AppleWebKit" in _h644_wo.get("ua", "") and not _h644_wo.get("err") and len(_h644_wo.get("cases", [])) == 16
+      and not _h644_bad(_h644_wo) and _h644_wm.get("mutated", 0) == 2
+      and any("under the lights #hz-sb" in " ".join(b_) for _, b_ in _h644_bad(_h644_wm))
+      and any(k_ == "settings w640" for k_, _ in _h644_bad(_h644_wm)),
+      json.dumps({"err": _h644_wo.get("err"), "bad": _h644_bad(_h644_wo)[:6], "mut": _h644_bad(_h644_wm)[:4]})[:900])
+# ==== 6b644 half a screen: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

@@ -35,6 +35,10 @@ const TL_X: f64 = 16.0;
 #[cfg(target_os = "macos")]
 const TL_Y: f64 = 38.0;
 
+/// The window's smallest inner size in points (beta 5: half a screen).
+const MIN_W: f64 = 640.0;
+const MIN_H: f64 = 620.0;
+
 /// How long to give the server to write its note before giving up.
 const SERVER_START_TIMEOUT: Duration = Duration::from_secs(180);
 
@@ -1194,7 +1198,7 @@ fn restored_window(app: &AppHandle) -> Option<WinState> {
     if !(s.x.is_finite() && s.y.is_finite() && s.w.is_finite() && s.h.is_finite()) {
         return None;
     }
-    let s = WinState { w: s.w.clamp(940.0, 10000.0), h: s.h.clamp(620.0, 10000.0), ..s };
+    let s = WinState { w: s.w.clamp(MIN_W, 10000.0), h: s.h.clamp(MIN_H, 10000.0), ..s };
     let on_screen = app.available_monitors().ok()?.iter().any(|m| {
         let sf = m.scale_factor();
         let (mx, my) = (m.position().x as f64 / sf, m.position().y as f64 / sf);
@@ -1222,7 +1226,11 @@ fn open_window(app: &AppHandle) -> tauri::Result<()> {
     let b = WebviewWindowBuilder::new(app, "main", WebviewUrl::External("about:blank".parse().unwrap()))
         .title("ConcordeAI")
         .inner_size(1320.0, 860.0)
-        .min_inner_size(940.0, 620.0);
+        // HALF A SCREEN (beta 5, per Patrick: "allow half-screen"): 640 pt
+        // wide is under half of every Mac screen at its default scaling (a
+        // 16-inch's half is 864), so Split View and the half-screen tiles take
+        // the window; the page keeps the lights' zone clear down to it
+        .min_inner_size(MIN_W, MIN_H);
     let b = match restored {
         Some(s) => b.inner_size(s.w, s.h).position(s.x, s.y),
         None => b.center(),
