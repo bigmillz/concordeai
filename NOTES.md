@@ -21351,6 +21351,36 @@ app's is ice white (Ultra is one cool pair). The sky's clock still runs at half 
 invisible at 30 %). The demo's rain falls in a conversation; the app's stays the home's (6b580, per Patrick: "we don't
 have to litter the place with stars"). The conversation's burst stays centred over the composer (6b580) where the demo's
 leaves the knob. Not measured: 120 Hz (both engines cap at 60 here), WKWebView in the built shell's own window.
+
+**Later the same night (relayed by the lead, per Patrick), four more passes on this branch.**
+- **Less blue** ("the rest looks awfully blue"; his target picture: near-black, the aurora above the greeting, graphite
+  composer, no full-height rain). At rest the GPU curtain keeps .55 of its chroma (the ice-violet pair back at Ultra),
+  its rays fall off 1.35× faster with height (1× at Ultra), the CSS ice rays live in a band above the greeting (mask
+  `ellipse 52% 32% at 50% 30%`, was `54% 44% at 50% 52%`) at `saturate(.55)`, the wash at `.25`; the footage's blue
+  excess (`b − (r+g)/2`) is cut by .65 at rest and .35 at Ultra (`dbl`); the composer's under-glow (`#hz-cglow`) is silver at
+  rest and ice only at Ultra; the moonlight neutral; `#hz-sky`'s fallback ground #050506. The composer itself was already
+  graphite (#151517, 6b580). Measured over the sky outside the UI (1440, night): Full home blue excess 7.3 → 2.5 (pixels
+  visibly tinted 51 % → 0.5 %), Balanced 4.3 → ~2.5 (23 % → 0–3 %), Ultra at rest keeps its ice (8.1 → 5.1).
+- **The living rays** ("some sort of creative and dynamic effect to those Northern Light streaks"): ripples of light run
+  sideways through the rays (about 35 px/s, the mean brightness kept, deeper at Ultra), each ray's height breathes on its
+  own (about 14 s), and every 20–40 s a section of the curtain brightens and lifts (2 s in on the smootherstep, 1.5 s
+  held, 2.5 s out; Balanced at half on its slower clock). On the continuous clock: Calm and reduced motion still.
+- **More stars** ("Definitely push ultra harder as far as more stars"): the field above the box 90 in Full (45 Balanced),
+  eight glints (four), a deeper layer of 50 (25) and a third layer of 40 (20) pin-points (.6–.9 px, sharp twinkle); 12
+  births (6) in the hang; the landing's shower 5–8 streaks; a shooting star 0.7–1.2 s into the hang; the motes round the
+  composer every 130 ms, at most 60, three in ten the larger four-point glints. The lit rim and the composer's corners
+  untouched, as asked.
+- **The slider's feel** ("more like Astra ... where it just seems magical"): held, the knob and the fill follow the hand
+  through a soft critically damped spring (about 120 ms, no overshoot) with a gentle magnetic pull toward each stop
+  (inside 6 %); the aurora's strength follows the knob's place while it moves (`S.level` with the fractional effort);
+  the track thickens a touch on hover and hold (×1.12); held, the fill's dots shimmer through it and fade on release;
+  from Extra up the fill takes the ice-violet pair (Extra at half); the level's name crossfades in place (200 ms, its width
+  held). Not done: the asked-for "slight overshoot": DESIGN's pinned rule is no bounce anywhere, so the spring settles
+  without one until Patrick says otherwise. Calm and reduced motion: the hand, directly.
+- Mirrored into the web demo's `beta/index.html` (the scratchpad copy; not pushed). Cost: Chromium rAF p95 16.7–16.8
+  ms through the arrival, at rest and through a slow drag Low → Ultra → Low; WKWebView on screen p95 18 ms (arrival and
+  rest). A comment swallowed a statement during the edit (the arrival's field never built); caught by the live check's
+  field count before commit.
 ## 6b622 — beta-4-lanes: Code and Funnels in the flat chrome (7.0 beta 4, per Patrick)
 
 Per Patrick: "it's very important that the chat page and also obviously the code page and all that looks really
