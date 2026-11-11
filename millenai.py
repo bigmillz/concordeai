@@ -661,6 +661,9 @@ _KNOWN_ENV = frozenset((
     # a dev copy's release feed (6b537): the updater proven against a local
     # stand-in for api.github.com; honoured only when DEV_HOME is set
     "MILLENAI_UPDATE_API",
+    # a dev copy's dictation helper (6b543; missing here until 6b641, so a
+    # copy that named one refused to start); honoured only when DEV_HOME is set
+    "MILLENAI_DICT_HELPER",
     "MILLENAI_Q3_OFF",       # 6b523: shape, followup, vendor, polish
     "MILLENAI_Q4_NOTHINK"))  # 6b560: think:false on server answers (a pilot)
 
@@ -11141,7 +11144,7 @@ PROFILE_LOCAL = frozenset((
     "turbo", "tier", "model", "council", "agent", "codeagent", "adv", "advon",
     "remote_autonomy", "workspace", "veo_day", "veo_count", "veo_daily_cap",
     "lend", "lend_pick", "studio_opts.*.neg", "mic_warm",
-    "cloud_balance", "comps"))
+    "cloud_balance", "comps", "dict_lang"))
 MACHINE = frozenset((
     "app_models", "model_offers", "no_limits", "include_giants",
     "auto_cleanup", "studio_image", "studio_video", "studio_opts",
@@ -11430,7 +11433,8 @@ def split_prefs(ctx, incoming: dict, old=None) -> dict:
         if c is None or k == "studio_opts.*.neg" or (
                 c == "synced" and not synced_value_ok(k, v)) or (
                 k in LOCAL_BOOL and not isinstance(v, bool)) or (
-                k == "comps" and not comps_ok(v)):
+                k == "comps" and not comps_ok(v)) or (
+                k == "dict_lang" and not dict_lang_ok(v)):
             ignored.append(k)
         else:
             by[c][k] = v
@@ -18534,30 +18538,75 @@ def _transcribe_wav(wav_bytes: bytes) -> str:
     return _transcribe_audio(_wav_to_f32(wav_bytes))
 
 
-def _transcribe_audio(audio) -> str:
+# THE LANGUAGE IS TOLD, NEVER GUESSED (6b641, per Patrick: he said "What's
+# up, man?" and the composer got "Hvittar"). Whisper left to itself detects
+# the language from the clip, and a one- or two-second clip is too little to
+# go on: it picked a Nordic one. Every whisper call now names the language:
+# the dictation language the page sent (Settings, or the system's), else the
+# first of the system's preferred languages, else English.
+_LANG_RE = re.compile(r"^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8}){0,3}$")
+
+
+def dict_lang_ok(v) -> bool:
+    """A dictation language as the page sends it: "" (the system's) or a
+    BCP-47 tag such as en-US, es-419, pt-BR, zh-Hans-CN."""
+    return isinstance(v, str) and (v == "" or (len(v) <= 35 and bool(_LANG_RE.match(v))))
+
+
+def _system_langs() -> list:
+    """The system's preferred languages, in order (macOS: AppleLanguages)."""
+    if IS_MAC:
+        try:
+            import plistlib
+            with open(os.path.expanduser("~/Library/Preferences/.GlobalPreferences.plist"), "rb") as f:
+                got = plistlib.load(f).get("AppleLanguages") or []
+            return [x for x in got if isinstance(x, str)]
+        except Exception:
+            return []
+    try:
+        import locale as _lc
+        loc = _lc.getlocale()[0] or ""
+        return [loc.replace("_", "-")] if loc else []
+    except Exception:
+        return []
+
+
+def _whisper_lang(lang: str = "") -> str:
+    """Whisper's two-letter language: the one asked for, else the system's
+    first, else English. Never None: None is whisper's "detect it"."""
+    for cand in ([lang] if lang else []) + _system_langs():
+        if dict_lang_ok(cand) and cand:
+            code = cand.replace("_", "-").split("-")[0].lower()
+            if len(code) == 2:
+                return code
+    return "en"
+
+
+def _transcribe_audio(audio, lang: str = "") -> str:
     """Whisper over float32 mono 16 kHz samples (the model stays loaded in
-    the process after the first call)."""
+    the process after the first call), in the language named (6b641)."""
     if IS_ARM:
         import mlx_whisper
+    wl = _whisper_lang(lang)
     with _whisper_lock:
         if IS_ARM:
-            out = mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_REPO)
+            out = mlx_whisper.transcribe(audio, path_or_hf_repo=WHISPER_REPO, language=wl)
             return out["text"].strip()
         # faster-whisper: CUDA when the box can use it, CPU otherwise
         global _fw_model
         gpu = _whisper_cuda() and not _fw_cuda["failed"]
         try:
-            return _fw_transcribe(audio, gpu)
+            return _fw_transcribe(audio, gpu, wl)
         except Exception:
             if not gpu:
                 raise
         # the card failed anyway: the same model, on the CPU from now on
         _fw_cuda["failed"] = True
         _fw_model = None
-        return _fw_transcribe(audio, False)
+        return _fw_transcribe(audio, False, wl)
 
 
-def _fw_transcribe(audio, gpu: bool) -> str:
+def _fw_transcribe(audio, gpu: bool, wl: str = "en") -> str:
     global _fw_model
     from faster_whisper import WhisperModel
     if _fw_model is None:
@@ -18566,7 +18615,7 @@ def _fw_transcribe(audio, gpu: bool) -> str:
                                  compute_type="float16" if gpu else "int8")
     # the words are decoded while the segments are read, so a card that
     # fails does so inside this call
-    segments, _info = _fw_model.transcribe(audio, beam_size=5 if gpu else 1)
+    segments, _info = _fw_model.transcribe(audio, beam_size=5 if gpu else 1, language=wl)
     return " ".join(sg.text for sg in segments).strip()
 
 
@@ -18627,7 +18676,11 @@ def _dict_helper_path():
 def _dict_engine_name() -> str:
     if "dict-fake" in TEST_HOOKS:
         return "fake"
-    return "system" if _dict_helper_path() else "whisper"
+    # a helper that just died before it was ready is not the engine (6b641:
+    # the status said "system" while whisper did the work)
+    if _dict_helper_path() and time.time() - _dict_helper.failed >= 60:
+        return "system"
+    return "whisper"
 
 
 def _dict_partials_possible() -> bool:
@@ -18639,42 +18692,76 @@ def _dict_partials_possible() -> bool:
 
 class _DictHelper:
     """The one resident system-recognizer process. Spawned ahead of the
-    first dictation (the page warms it when the composer takes focus),
-    kept for the next, killed at exit. Frames in: u32 LE length + PCM
-    int16 16 kHz mono; a zero length ends the utterance. Lines out: JSON
-    with ev (ready, listening, partial, final, done, err) and u, the
-    utterance number, so a late line for an old one is dropped."""
+    first dictation (the page warms it at launch and when the composer
+    takes focus), kept for the next, killed at exit. Frames in: u32 LE
+    length + PCM int16 16 kHz mono; a zero length ends the utterance;
+    0xFFFFFFFF + u32 BEGINS one with the number this side chose (6b641).
+    Lines out: JSON with ev (ready, listening, partial, final, done, err)
+    and u, so a late line for an old one is dropped.
+
+    6b641, the "Hvittar" bugs, all three on the way to whisper guessing
+    the language of a short clip:
+      * the helper took Locale.current, the REGION (en_UY on a Mac set to
+        Uruguay while its language is English), which the recognizer
+        doesn't carry: it died at launch, start() waited out the 8 s
+        ready timer at every press, and the session fell to whisper. Now
+        the language is passed (--locale, the page's choice) and the
+        helper picks among the preferred LANGUAGES, English when none
+        fits; a death ends the wait at once;
+      * the utterance numbers drifted: an utterance with no audio (a
+        microphone that failed, a slip) was counted here and not in the
+        helper, and from then on every line was dropped as an old one's:
+        no partials, the 4 s final wait, then whisper. Now this side
+        names each utterance in a BEGIN frame;
+      * the recognizer finalises in segments, and the first "final" was
+        taken as the end ("What's up?" kept, " Man." lost, or the other
+        way round). Now partials and the final are the whole utterance
+        and "done" ends the wait."""
 
     def __init__(self):
         self.lock = threading.Lock()      # spawn / write
         self.p = None
         self.ready = threading.Event()
+        self.dead = threading.Event()     # the process ended (6b641): no waiting it out
         self.sess = None                  # the session the lines belong to
-        self.u = 0                        # utterances started on this process
+        self.u = 0                        # utterances begun on this process
+        self.lang = ""                    # the --locale it was started with
+        self.locale = ""                  # the locale it chose (its "ready" line)
+        self.failed = 0.0                 # when it last died before ready: not respawned for a minute
 
     def alive(self) -> bool:
         return self.p is not None and self.p.poll() is None
 
-    def start(self) -> bool:
-        """True once the helper says ready (at once when it already is)."""
+    def start(self, lang: str = "") -> bool:
+        """True once the helper says ready (at once when it already is). A
+        different language restarts it; one that just died before ready
+        isn't respawned for a minute (whisper does the work meanwhile)."""
+        lang = lang if dict_lang_ok(lang) else ""
         with self.lock:
+            if self.alive() and self.lang != lang and self.sess is None:
+                self._kill()
             if self.alive():
                 p = self.p
             else:
                 path = _dict_helper_path()
-                if not path:
+                if not path or time.time() - self.failed < 60:
                     return False
                 try:
-                    p = subprocess.Popen([path], stdin=subprocess.PIPE,
+                    p = subprocess.Popen([path] + (["--locale", lang] if lang else []),
+                                         stdin=subprocess.PIPE,
                                          stdout=subprocess.PIPE,
                                          stderr=subprocess.DEVNULL)
                 except OSError:
                     return False
-                self.p, self.u = p, 0
+                self.p, self.u, self.lang, self.locale = p, 0, lang, ""
                 self.ready.clear()
+                self.dead.clear()
                 ctx_thread(target=self._read, args=(p,), daemon=True,
                            bind=False).start()
-        return self.ready.wait(DICT_READY_WAIT_S) and self.alive()
+        end = time.time() + DICT_READY_WAIT_S
+        while not self.ready.is_set() and not self.dead.is_set() and time.time() < end:
+            self.ready.wait(0.02)
+        return self.ready.is_set() and self.alive()
 
     def _read(self, p):
         for line in p.stdout:
@@ -18684,6 +18771,7 @@ class _DictHelper:
                 continue
             ev = d.get("ev")
             if ev == "ready":
+                self.locale = str(d.get("text", ""))[:40]
                 self.ready.set()
                 continue
             s = self.sess
@@ -18692,14 +18780,31 @@ class _DictHelper:
             if ev == "partial":
                 s.set_partial(d.get("text", ""))
             elif ev == "final":
-                s.set_final(d.get("text", ""))
-            elif ev == "err":
-                s.set_final(None)
+                s.final = d.get("text", "")
+            elif ev == "done":
+                s.done.set()
+            elif ev == "err" and s.final is None:
+                s.err = str(d.get("text", ""))[:200]
         # the pipe closed: the helper died; a session waiting gets its partial
+        if not self.ready.is_set():
+            self.failed = time.time()
         s = self.sess
         if s is not None:
             s.set_final(None)
         self.ready.clear()
+        self.dead.set()
+
+    def _kill(self):
+        p, self.p = self.p, None
+        if p is not None and p.poll() is None:
+            try:
+                p.stdin.close()
+            except OSError:
+                pass
+            try:
+                p.wait(1.0)
+            except subprocess.TimeoutExpired:
+                p.kill()
 
     def _frame(self, b: bytes) -> bool:
         with self.lock:
@@ -18713,13 +18818,25 @@ class _DictHelper:
                 return False
 
     def begin(self, sess) -> bool:
-        """Bind a session; its first frame starts the helper's utterance."""
-        if not self.start():
+        """Bind a session and BEGIN its utterance by number (6b641): the
+        helper takes the number from this frame, so the two never drift.
+        One still open (a page that went away mid-dictation) ends here."""
+        if not self.start(sess.lang):
             return False
         with self.lock:
+            if not self.alive():
+                return False
+            old = self.sess
             self.u += 1
             sess.u = self.u
             self.sess = sess
+            try:
+                if old is not None and not old.ended:
+                    self.p.stdin.write(struct.pack("<I", 0))
+                self.p.stdin.write(struct.pack("<II", 0xFFFFFFFF, sess.u))
+                self.p.stdin.flush()
+            except (OSError, ValueError):
+                return False
         return True
 
     def feed(self, sess, b: bytes) -> bool:
@@ -18735,16 +18852,8 @@ class _DictHelper:
 
     def stop(self):
         with self.lock:
-            p, self.p, self.sess = self.p, None, None
-        if p is not None and p.poll() is None:
-            try:
-                p.stdin.close()
-            except OSError:
-                pass
-            try:
-                p.wait(1.0)
-            except subprocess.TimeoutExpired:
-                p.kill()
+            self.sess = None
+            self._kill()
 
 
 _dict_helper = _DictHelper()
@@ -18760,9 +18869,11 @@ class _DictSession:
     """One dictation: the audio so far, the last partial, the final. Dropped
     the moment it ends or is cancelled; nothing of it is written anywhere."""
 
-    def __init__(self, engine: str):
+    def __init__(self, engine: str, lang: str = ""):
         self.sid = secrets.token_hex(8)
         self.engine = engine
+        self.lang = lang if dict_lang_ok(lang) else ""   # 6b641: told, never guessed
+        self.err = ""
         self.partials = _dict_partials_possible()
         self.pcm = bytearray()
         self.partial = ""
@@ -18808,7 +18919,7 @@ class _DictSession:
     def _whisper_pass(self):
         try:
             n = len(self.pcm)
-            text = _transcribe_audio(_pcm16_to_f32(self.pcm[:n]))
+            text = _transcribe_audio(_pcm16_to_f32(self.pcm[:n]), self.lang)
             self.passed = n
             self.set_partial(text)
         except Exception:
@@ -18826,17 +18937,19 @@ class _DictSession:
                 if _dict_helper.end(self):
                     self.done.wait(DICT_FINAL_WAIT_S)
                 _dict_helper.release(self)
+                # the helper's whole utterance; "" when it heard nothing (not a
+                # reason for whisper to guess at the noise, 6b641)
                 if self.final is not None:
-                    return self.final.strip()
+                    return (self.final or "").strip()
                 if self.partial:
                     return self.partial.strip()
-                # the helper never answered (dead, or not even bound): whisper has the audio
-                return _transcribe_audio(_pcm16_to_f32(self.pcm)).strip() \
+                # the helper died under it: whisper has the audio, in the language named
+                return _transcribe_audio(_pcm16_to_f32(self.pcm), self.lang).strip() \
                     if _whisper_libs() and _whisper_weights() else ""
             if self.engine == "fake":
                 return "heard %.1f s." % self.secs()
             # whisper: the whole clip, once (a partial pass under way finishes first: the lock)
-            return _transcribe_audio(_pcm16_to_f32(self.pcm)).strip()
+            return _transcribe_audio(_pcm16_to_f32(self.pcm), self.lang).strip()
         finally:
             self.pcm = bytearray()
 
@@ -18853,15 +18966,17 @@ _dict_sessions = {}
 _dict_sess_lock = threading.Lock()
 
 
-def _dict_start():
-    """A new session on the engine this computer has; the one before it,
-    if any, is dropped (there is one microphone)."""
+def _dict_start(lang: str = ""):
+    """A new session on the engine this computer has, in the language named
+    ("" = the system's); the one before it, if any, is dropped (there is
+    one microphone)."""
+    lang = lang if dict_lang_ok(lang) else ""
     engine = _dict_engine_name()
-    if engine == "system" and not _dict_helper.start():
+    if engine == "system" and not _dict_helper.start(lang):
         engine = "whisper" if _whisper_libs() and _whisper_weights() else "none"
     if engine == "none":
         return None
-    s = _DictSession(engine)
+    s = _DictSession(engine, lang)
     if engine == "system" and not _dict_helper.begin(s):
         s.engine = engine = "whisper"
     if engine == "whisper":
@@ -18884,12 +18999,13 @@ def _dict_drop(s):
         _dict_sessions.pop(s.sid, None)
 
 
-def _dict_warm():
-    """Ahead of a press: the helper spawned (the page asks when the composer
-    takes focus). Whisper's weights are not loaded here: 1.6 GB held for a
-    dictation that may not come; the first press loads them instead."""
+def _dict_warm(lang: str = ""):
+    """Ahead of a press: the helper spawned in the language the page names
+    (the page asks at launch and when the composer takes focus). Whisper's
+    weights are not loaded here: 1.6 GB held for a dictation that may not
+    come; the first press loads them instead."""
     if _dict_engine_name() == "system":
-        ctx_thread(target=_dict_helper.start, daemon=True, bind=False).start()
+        ctx_thread(target=_dict_helper.start, args=(lang,), daemon=True, bind=False).start()
 
 
 _whisper_warmed = {"v": False}
@@ -44930,20 +45046,31 @@ class StudioHandler(http.server.BaseHTTPRequestHandler):
             _sid = urllib.parse.parse_qs(_q).get("sid", [""])[0]
             n = int(self.headers.get("Content-Length", 0) or 0)
             body = self.rfile.read(n) if n else b""
+            # the dictation language (6b641): ?lang= on warm, {"lang"} on start;
+            # "" is the system's preferred languages, never a guess from the audio
+            _lang = urllib.parse.parse_qs(_q).get("lang", [""])[0]
+            if _route == "/api/dictate/start" and body:
+                try:
+                    _lang = str((json.loads(body) or {}).get("lang") or "")
+                except (ValueError, AttributeError):
+                    _lang = ""
+            _lang = _lang if dict_lang_ok(_lang) else ""
             if _route == "/api/dictate/warm":
-                _dict_warm()
+                _dict_warm(_lang)
                 self._send_json({"ok": True, "engine": _dict_engine_name()})
                 return
             if _route == "/api/dictate/start":
                 if not (_voice_supported() and _voice_ready()):
                     self._send_json({"ok": False, "ready": False})
                     return
-                s = _dict_start()
+                s = _dict_start(_lang)
                 if s is None:
                     self._send_json({"ok": False, "ready": False})
                     return
                 self._send_json({"ok": True, "sid": s.sid, "engine": s.engine,
-                                 "partials": s.partials})
+                                 "partials": s.partials,
+                                 "locale": _dict_helper.locale if s.engine == "system"
+                                 else _whisper_lang(s.lang)})
                 return
             s = _dict_get(_sid)
             if s is None:
@@ -49451,6 +49578,7 @@ body.resizing{cursor:col-resize;user-select:none}
 #brand-row #settings-btn{margin-left:2px}
 #p-about .toggle-row{margin-top:10px;font-size:12px;padding:2px 2px}
 #p-about .toggle-row span{color:var(--dim)}
+#dictlang-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 0 6px}   /* 6b641 */
 #micwarm-note{font-size:11px;line-height:1.5;color:var(--faint);
   margin:0 2px 2px 36px}
 /* 6b294, per Patrick: an arrow, sized like the buttons beside it */
@@ -51256,7 +51384,7 @@ body.gen #chip-model{color:var(--accent)}
   padding:6px 4px;
 }
 #input::placeholder{color:var(--faint)}
-#input.dictating{opacity:.62}         /* a partial, while it may still change (6b543) */
+#input.dictating{caret-color:transparent}   /* a partial reads as typed text, the caret still while it may change (6b543, 6b641) */
 #cbtns{display:flex;align-items:center;gap:2px;flex-shrink:0;
   margin-left:auto;padding-left:4px}
 .cbtn:active{transform:scale(.94)}
@@ -51274,7 +51402,7 @@ body.gen #chip-model{color:var(--accent)}
 #send:hover{background:var(--accent-hot);color:#000}
 #send:disabled{background:var(--line);color:var(--faint);cursor:default}
 #send.stop{background:var(--red);color:#fff;font-size:11px}
-#mic.rec{color:var(--red);background:rgba(226,109,90,.14)}
+#mic.rec{color:#e9ecf2;background:rgba(184,211,236,.14)}   /* listening: silver and ice, never red (6b641) */
 #voicebtn svg{width:17px;height:17px}
 #voicebtn.on{color:var(--accent-hot);background:var(--accent-dim)}
 /* VOICE CHAT IS PARKED (6b242, per Patrick). It speaks the FINISHED
@@ -51284,7 +51412,7 @@ body.gen #chip-model{color:var(--accent)}
    once the voice path has its own fast lane. */
 #voicebtn.parked{opacity:.3;cursor:not-allowed}
 #voicebtn.parked:hover{background:none;color:rgba(255,255,255,.78)}
-#mic.rec{animation:blink 1s ease infinite}
+#mic.rec{animation:none}             /* no blinking while it listens (6b641) */
 /* the settings row INSIDE the box (6.0b3, Claude-style): engine pill
    left, actions right */
 #crow{display:flex;align-items:center;justify-content:space-between;
@@ -54142,7 +54270,7 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
 .hz #about-veil #up-notes ul{margin:0 0 8px;padding-left:16px}
 .hz #about-veil #up-notes li{margin:0 0 6px}
 .hz #about-veil #about-check{margin:16px 0 8px}
-.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil #dictlang-row,.hz #about-veil .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:16px;
   min-height:48px;margin:0;padding:8px 0;border-top:1px solid var(--sl-hair);font:400 14px/1.4 var(--sl-ui);font-style:normal;color:var(--sl-ink)}
 .hz #about-veil .toggle-row{flex-direction:row-reverse;cursor:pointer}
 .hz #about-veil #p-about #fx-toggle{display:none}   /* one Effects control: Calm is the old Off (6b551) */
@@ -54314,7 +54442,7 @@ html:not(.hz) .sl-sel{display:none}
   .hz #about-veil .snav.on::after{display:none}
   .hz #about-veil #about-body{padding:16px}
   .hz #about-veil #about-foot{padding:12px 16px}
-  .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row{flex-wrap:wrap;row-gap:8px}
+  .hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil #dictlang-row{flex-wrap:wrap;row-gap:8px}
 }
 /* ==== THE DELIVERY (6b570, per Patrick: "how it cranks it out ... It could be so much cleaner and more beautiful") ==== */
 /* ---- ONE WORKING LINE: while the answer is on its way the byline steps aside and one quiet line says what is
@@ -55083,9 +55211,9 @@ html:not(.hz) #sx-build{display:none}
 .hz #about-veil #up-notes b{color:var(--sx-ink);font-weight:600}
 .hz #about-veil #about-check{width:auto;align-self:flex-start;margin:16px 0 16px}
 /* rows: 48 high on hairlines, the label 13/500, its note 12 at 55 % */
-.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil .toggle-row{min-height:48px;padding:8px 0;margin:0;
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil #dictlang-row,.hz #about-veil .toggle-row{min-height:48px;padding:8px 0;margin:0;
   border-top:var(--sx-hl) solid rgba(255,255,255,.08);font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
-.hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span{
+.hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span,.hz #about-veil #dictlang-row>span{
   font:500 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
 .hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #sugg-note,.hz #about-veil #autoclean-note{margin:-8px 0 0;padding:0 0 12px;
   font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
@@ -55229,6 +55357,16 @@ html:not(.hz) #sx-build{display:none}
 .hz #composer.hastext:has(#mic.rec) #send:not(:disabled):not(.stop),.hz #composer.hastext.sx-dict #send:not(:disabled):not(.stop){background:transparent;color:var(--hz-ink);
   box-shadow:inset 0 0 0 1px var(--hz-line)}
 @media (prefers-reduced-motion:reduce){.hz #mic.rec{transition:none}}
+/* ---- LISTENING (6b641, per Patrick: "let's make it so much more polished"; dark, silver and one ice hue, no rose, no
+   rings, no flashes): the composer's edge turns a still ice hairline while it listens and until the words land
+   (#composer.dict-on, dictLit); the send key stays the quiet outline under the words however many there are; the mic
+   key's level is drawn in ice; the words read as typed text (no dimming). Nothing pulses or glows. */
+.hz{--hz-ice:#b8d3ec}
+.hz #composer.dict-on,.hz #composer.dict-on:focus-within{border-color:rgba(184,211,236,.5)}
+.hz #composer.dict-on #send:not(:disabled):not(.stop),.hz #composer.dict-on.hastext #send:not(:disabled):not(.stop){background:transparent;color:var(--hz-ink);box-shadow:inset 0 0 0 1px var(--hz-line)}
+.hz #composer.dict-on .hz-strike{display:none}
+.hz #mic.rec{color:var(--hz-ice);border-color:rgba(184,211,236,.42);background:rgba(184,211,236,.08)}
+.hz #input.dictating{opacity:1}
 /* ---- THE PDF CHIP: plain words and one action, flat --------------------------------------------------------------- */
 .hz .docchip.sx-pdf{display:inline-flex;align-items:center;gap:10px;height:auto;min-height:36px;max-width:min(560px,100%);padding:6px 6px 6px 10px;border-radius:10px;
   border:var(--sx-hl) solid rgba(255,255,255,.12);background:#151517;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;font:450 13px/18px var(--hz-font-ui);color:var(--sx-ink)}
@@ -56344,6 +56482,24 @@ __CODE_ROWS__
           <option value="balanced">Balanced</option>
           <option value="full">Full</option></select></label>
       <div id="fx-level-note">Balanced is the default. Full is the whole show.</div>
+      <!-- 6b641, per Patrick ("What's up, man?" came out "Hvittar"): the
+           language dictation listens for, told to the recognizer and never
+           guessed from the audio. "" follows the computer's own languages -->
+      <label id="dictlang-row"><span>Dictation language</span>
+        <select id="dict-lang"><option value="">Same as this computer</option>
+          <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option>
+          <option value="en-AU">English (Australia)</option><option value="en-IN">English (India)</option>
+          <option value="es-ES">Spanish (Spain)</option><option value="es-MX">Spanish (Mexico)</option>
+          <option value="es-US">Spanish (US)</option><option value="es-CL">Spanish (Chile)</option>
+          <option value="pt-BR">Portuguese (Brazil)</option><option value="pt-PT">Portuguese (Portugal)</option>
+          <option value="fr-FR">French</option><option value="de-DE">German</option>
+          <option value="it-IT">Italian</option><option value="nl-NL">Dutch</option>
+          <option value="sv-SE">Swedish</option><option value="pl-PL">Polish</option>
+          <option value="ru-RU">Russian</option><option value="uk-UA">Ukrainian</option>
+          <option value="tr-TR">Turkish</option><option value="ar-SA">Arabic</option>
+          <option value="hi-IN">Hindi</option><option value="ja-JP">Japanese</option>
+          <option value="ko-KR">Korean</option><option value="zh-CN">Chinese (Mainland)</option>
+          <option value="zh-TW">Chinese (Taiwan)</option></select></label>
       <!-- 6b345, per Patrick ("it takes about a, two seconds each time for
            it to switch on"): the microphone stays open for 15 s after a
            dictation, so the next hold starts at once. Open, not listening. -->
@@ -64648,7 +64804,7 @@ function dictKey(ev,now){
 }
 function dictPrompt(){
   return dictSt.mode==="hold"?"Listening. Release to finish."
-    :"Listening. Press "+DICT_KEY+" or tap the mic to finish.";
+    :"Listening. Pause or press "+DICT_KEY+" to finish.";
 }
 function audioSecs(bufs,sr){
   let n=0;for(const c of bufs)n+=c.length;
@@ -64782,13 +64938,116 @@ function pcm16(f,srIn){
   for(let i=0;i<a.length;i++)o[i]=Math.max(-1,Math.min(1,a[i]))*32767;
   return o;
 }
+/* DICTATION, POLISHED (6b641, per Patrick: "the voice responsiveness is
+   sorely lacking… let's make it so much more polished. And like, in C++.")
+   - THE LANGUAGE IS TOLD: dictLang() is Settings' choice (the "dict_lang"
+     preference), "" for the system's preferred languages; it rides every
+     warm and start, and nothing downstream guesses it from the audio (his
+     "What's up, man?" came out "Hvittar": whisper guessing a short clip);
+   - A TOGGLE ENDS ITSELF: a tap of the hotkey or the mic keeps listening
+     until the words stop for DICT_AUTOSTOP_MS (the level under the room's
+     floor and no new words), or nothing at all is said for
+     DICT_NOSPEECH_MS; the hotkey again or Esc end it sooner. A hold ends
+     at the release, as before (6b550);
+   - WHERE THE WORDS GO: at the caret, between what was already typed
+     before and after it, and they read as typed text while they come;
+   - NATIVE WHEN THE SHELL HAS IT: the C++ shell captures and recognizes in
+     its own process (window.pywebview.api.voice, cpp-voice); the page then
+     takes its level, partials and final from window.__concordeVoice and
+     the server isn't involved. Without it (the Tauri shell, a browser),
+     the server's session, as before. */
+const DICT_AUTOSTOP_MS=1000;     // a toggle ends this long after the words stop
+const DICT_NOSPEECH_MS=8000;     // ...or this long after the start with nothing said
+const DICT_VAD_MIN=0.012;        // RMS a chunk must pass to be speech (and 4x the room's floor)
+const DICT_VAD_PRIOR=0.003;     // the room's level until 1.5 s of it has been heard
+const dictV={win:[],speech:false,loudMs:0,lastAt:0,quietAt:0,startAt:0,partAt:0};
+let dictPre="",dictSuf="",dictNat=null;
+function dictLang(){
+  const v=typeof P==="object"&&P?P.dict_lang:"";
+  return typeof v==="string"&&/^([A-Za-z]{2,3}([-_][A-Za-z0-9]{2,8}){0,3})?$/.test(v)?v:"";
+}
+function dictNative(){
+  const a=window.pywebview&&window.pywebview.api;
+  return !!(a&&typeof a.voice==="function");
+}
+function dictRms(f){
+  let q=0;for(let i=0;i<f.length;i++)q+=f[i]*f[i];
+  return Math.sqrt(q/Math.max(1,f.length));
+}
+// a new utterance: the room unknown, nothing said yet
+function dictVadReset(now){
+  dictV.win=[];dictV.speech=false;dictV.loudMs=0;dictV.lastAt=now;dictV.quietAt=0;dictV.startAt=now;dictV.partAt=0;
+}
+// one chunk's level; "stop" when a toggle should end on its own. The room is
+// the quietest chunk of the last 1.5 s (speech dips between words, noise
+// doesn't), the prior until that much has been heard; speech is a quarter
+// second above four times it, or any words from the recognizer
+function dictVad(rms,now){
+  const v=dictV,dt=Math.max(0,Math.min(250,now-v.lastAt));v.lastAt=now;
+  v.win.push([now,rms]);while(v.win.length&&now-v.win[0][0]>1500)v.win.shift();
+  let floor=Math.min(...v.win.map(x=>x[1]));
+  if(now-v.startAt<1500)floor=Math.min(floor,DICT_VAD_PRIOR);
+  if(rms>Math.max(DICT_VAD_MIN,floor*4)){v.loudMs+=dt||43;v.quietAt=0;if(v.loudMs>=250)v.speech=true;}
+  else if(!v.quietAt)v.quietAt=now;
+  return dictAuto(now);
+}
+function dictAuto(now){
+  const v=dictV;
+  if(!recording||dictSt.mode==="hold")return "";        // a hold ends at the release
+  if(v.speech&&v.quietAt&&now-v.quietAt>=DICT_AUTOSTOP_MS
+    &&now-v.partAt>=DICT_AUTOSTOP_MS*.6)return "stop";   // the words stopped
+  if(!v.speech&&v.startAt&&now-v.startAt>=DICT_NOSPEECH_MS)return "stop";
+  return "";
+}
+// what the composer held at the start, split at the caret: the words go between
+function dictAnchor(){
+  const v=String(input.value||"");
+  const a=typeof input.selectionStart==="number"?input.selectionStart:v.length;
+  const b=typeof input.selectionEnd==="number"?input.selectionEnd:a;
+  let pre=v.slice(0,a),suf=v.slice(b);
+  if(pre&&!/\s$/.test(pre))pre+=" ";
+  if(suf&&!/^\s/.test(suf))suf=" "+suf;
+  dictPre=pre;dictSuf=suf;
+}
 function micChunk(e){
   if(!micCap)return;                   // the warm window records nothing
   if(typeof dictMeter==="function")dictMeter(e.inputBuffer.getChannelData(0));   // the live level (6b625)
-  const b=pcm16(e.inputBuffer.getChannelData(0),micCtx.sampleRate);
+  const ch=e.inputBuffer.getChannelData(0);
+  const b=pcm16(ch,micCtx.sampleRate);
   dictQ.push(b);dictSecs+=b.length/16000;
   if(!recHeard){recHeard=true;dictTrace("chunk");recPaint();}
   dictPump();                          // the pre-roll waits here until the session answers
+  if(dictVad(dictRms(ch),Date.now())==="stop")dictAct("auto");
+}
+// THE NATIVE PATH (6b641): the C++ shell's events. Only the utterance it
+// started counts; a level is the meter and the pause, a partial is the whole
+// utterance so far, the final and done end a stop
+function dictNatEv(ev){
+  const n=dictNat;
+  if(!ev||!n||ev.u!==n.u)return;
+  if(ev.ev==="listening"){dictTrace("gum");return;}
+  if(ev.ev==="level"){
+    const r=+ev.rms||0;
+    if(!recHeard){recHeard=true;recPaint();dictTrace("chunk");}
+    if(typeof dictMeterRms==="function")dictMeterRms(r);
+    if(dictVad(r,Date.now())==="stop")dictAct("auto");
+    return;
+  }
+  if(ev.ev==="partial"){n.text=String(ev.text||"");dictShow(n.text,false);return;}
+  if(ev.ev==="final"){n.final=String(ev.text||"");return;}
+  if(ev.ev==="err"){n.err=ev.code||"err";return;}
+  if(ev.ev==="done"&&n.res)n.res();
+}
+window.__concordeVoice=dictNatEv;
+function dictNatCall(cmd){
+  try{return Promise.resolve(window.pywebview.api.voice(cmd)).catch(()=>null);}
+  catch(e){return Promise.resolve(null);}
+}
+function dictNatMsg(code){
+  return code==="mic-denied"?micMsg({name:"NotAllowedError"})
+    :code==="no-mic"?micMsg({name:"NotFoundError"})
+    :code==="speech-denied"?"Speech recognition is off. Allow it in System Settings > Privacy & Security > Speech Recognition."
+    :"Couldn’t start dictation. Try again.";
 }
 function recPaint(){
   if(recording&&recHeard)input.placeholder=dictPrompt();
@@ -64796,6 +65055,10 @@ function recPaint(){
 // the indicator: the mic button and the composer's words, at the keydown
 function dictLit(on){
   micBtn.classList.toggle("rec",on);
+  // the composer's listening state (6b641): silver and ice, kept through
+  // "Finishing…" until the words land, so the send key never turns ember under them
+  const cmp=typeof document!=="undefined"&&document.getElementById?document.getElementById("composer"):null;
+  if(cmp)cmp.classList.toggle("dict-on",on);
   if(on)input.placeholder="Listening…";
   else input.classList.remove("dictating");
   if(!on&&typeof dictMeterOff==="function")dictMeterOff();
@@ -64820,10 +65083,14 @@ function dictPump(){
 }
 // text in the composer, in place: dimmed while it is a partial, plain when final
 function dictShow(text,final){
-  if(!final&&!dictSid)return;          // a late partial for a session that is over
+  if(!final&&!dictSid&&!dictNat)return;   // a late partial for a session that is over
   if(!final&&(!text||text===dictPartial))return;
+  if(!final){dictV.partAt=Date.now();dictV.speech=true;}   // new words: speech, and not a pause yet
   dictPartial=final?"":text;
-  input.value=text;
+  const t=String(text||"").trim();
+  input.value=t?dictPre+t+dictSuf:(dictPre+dictSuf).trim()?dictPre.replace(/\s$/,"")+dictSuf:"";
+  if(typeof input.setSelectionRange==="function"){
+    const c=(dictPre+t).length;try{input.setSelectionRange(c,c);}catch(e){}}
   input.classList.toggle("dictating",!final);
   input.dispatchEvent(new Event("input"));
   if(!final&&text)dictTrace("partial");
@@ -64832,13 +65099,15 @@ function dictShow(text,final){
 function dictDrop(){
   const sid=dictSid;dictSid=null;dictQ=[];dictPartial="";
   if(sid)api("/api/dictate/cancel?sid="+sid,{method:"POST"}).catch(()=>{});
+  const n=dictNat;dictNat=null;
+  if(n)dictNatCall({act:"cancel",u:n.u});
 }
 // the session: one round trip, in parallel with the microphone. True with a
 // session; false when the engine isn't in (ensureVoice has put the download
 // words on the composer); throws when the server can't be reached
 async function dictOpen(){
   const r=await api("/api/dictate/start",{method:"POST",
-    headers:{"Content-Type":"application/json"},body:"{}"});
+    headers:{"Content-Type":"application/json"},body:JSON.stringify({lang:dictLang()})});
   if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("start "+r.status);}
   const d=await r.json();
   if(!d.ok){
@@ -64859,8 +65128,9 @@ async function dictOpen(){
 // measured in Blink: the indicator could not paint until it was done)
 function dictWarm(){
   const n=Date.now();if(n-dictWarmT<60000)return;dictWarmT=n;
+  if(dictNative()){dictNatCall({act:"warm",lang:dictLang()});return;}   // the shell's own recognizer (6b641)
   try{micCtxGet();}catch(e){}
-  api("/api/dictate/warm",{method:"POST"}).catch(()=>{});
+  api("/api/dictate/warm?lang="+encodeURIComponent(dictLang()),{method:"POST"}).catch(()=>{});
 }
 // begin capturing; resolves once the processor is wired and micCap is on
 async function micAttach(){
@@ -64906,6 +65176,7 @@ function micClose(force){
 async function stopRec(){
   recording=false;
   dictKey({type:"end"},0);             // however it ended, the hotkey starts clean
+  if(dictNat)return dictNatStop();     // the shell's own recognizer (6b641)
   const clip=micDetach();
   dictTrace("up");
   const sid=dictSid;
@@ -64926,14 +65197,63 @@ async function stopRec(){
     if(!r.ok){if(r.status===503)voiceReady=false;throw new Error("Couldn’t transcribe. Try again.");}
     const text=((await r.json()).text||"").trim();
     dictTrace("final");
-    input.placeholder="Ask anything";
-    dictShow(text,true);
-    if(text&&voiceChat)send();          // voice chat: straight to the model
+    dictLand(text);
   }catch(e){
     // the words heard so far stand, plain, and the composer says why
     if(dictPartial)dictShow(dictPartial,true);else input.classList.remove("dictating");
+    dictLit(false);
     input.placeholder="Couldn’t transcribe. Try again.";
   }
+}
+// the final lands: in place, plain; nothing heard says so (6b641)
+function dictLand(text){
+  input.placeholder=text?"Ask anything":"Didn’t catch that. Try again.";
+  dictShow(text,true);
+  dictLit(false);
+  if(text&&voiceChat)send();          // voice chat: straight to the model
+}
+const DICT_NAT_WAIT_MS=4000;   // the shell's final after a stop; past it, the last partial stands
+async function dictNatStop(){
+  const n=dictNat;
+  dictTrace("up");
+  if((Date.now()-n.t0)/1000<DICT_MIN_CLIP_S){   // a slip: never transcribed (6b338)
+    dictDrop();dictLit(false);
+    input.placeholder="Didn’t catch that. Try again.";return;}
+  micBtn.classList.remove("rec");input.placeholder="Finishing…";
+  if(typeof dictMeterOff==="function")dictMeterOff();
+  const done=new Promise(res=>{n.res=res;setTimeout(res,DICT_NAT_WAIT_MS);});
+  const r=await dictNatCall({act:"stop",u:n.u});
+  if(r&&r.ok)await done;
+  if(dictNat===n)dictNat=null;
+  const text=String(n.final!=null?n.final:n.text||"").trim();
+  dictTrace("final");
+  dictLand(text);
+}
+// the native start, the same rules as dictStart's: lit at once, a second
+// ask while it is under way is a stop, a failed start resets the hotkey
+async function dictStartNat(){
+  dictStarting=true;dictPend=false;
+  dictTrace("down");dictAnchor();dictVadReset(Date.now());
+  dictLit(true);dictTrace("lit");
+  let nat=null;
+  try{nat=await dictNatStart();}finally{dictStarting=false;}
+  if(nat===null){if(!dictPend)return dictStart(true);dictLit(false);}   // no recognizer in the shell: the server's
+  if(nat!==true){dictPend=false;dictKey({type:"end"},0);return;}
+  recording=true;recPaint();
+  if(dictPend){dictPend=false;return stopRec();}
+}
+// the shell's start: true listening, false refused (its words are on the
+// composer), null when the shell has no recognizer here (the server's path)
+async function dictNatStart(){
+  const r=await dictNatCall({act:"start",lang:dictLang()});
+  if(r&&r.ok){
+    dictNat={u:r.u,t0:Date.now(),text:"",final:null,res:null,err:""};
+    dictTrace("session");
+    return true;
+  }
+  if(!r||r.code==="no-engine")return null;
+  dictLit(false);input.placeholder=dictNatMsg(r.code);
+  return false;
 }
 
 // Settings, Advanced, the palette, the first-run and update dialogs:
@@ -64949,11 +65269,13 @@ function micMsg(e){
     :IS_PC?"Microphone blocked. Allow it in Settings > Privacy & security > Microphone."
     :"Microphone blocked. Allow it in System Settings > Privacy & Security > Microphone.";
 }
-async function dictStart(){
+async function dictStart(srv){
   if(dictStarting){dictPend=true;dictKey({type:"end"},0);return;}  // a second ask is a stop
+  if(!srv&&dictNative())return dictStartNat();   // the shell's own capture and recognizer (6b641)
   dictStarting=true;dictPend=false;
   let on=false;
-  dictTrace("down");
+  if(!srv){dictTrace("down");dictAnchor();}
+  dictVadReset(Date.now());
   dictLit(true);dictTrace("lit");      // the indicator in the keydown itself, before any await
   try{
     api("/api/speak",{method:"POST",headers:{"Content-Type":"application/json"},
@@ -64990,7 +65312,7 @@ async function dictStart(){
 }
 function dictAct(a){
   if(a==="start")dictStart();
-  else if(a==="stop"){if(recording)stopRec();else if(dictStarting)dictPend=true;}
+  else if(a==="stop"||a==="auto"){if(recording)stopRec();else if(dictStarting)dictPend=true;}
   else recPaint();                     // hold became toggle
 }
 function dictAway(){
@@ -65009,12 +65331,17 @@ micBtn.addEventListener("click",()=>{
   dictStart();
 });
 document.addEventListener("keydown",e=>{
+  // Esc ends a dictation, the words kept (6b641); ahead of every other Esc
+  if(e.key==="Escape"&&(recording||dictStarting)){
+    e.preventDefault();e.stopImmediatePropagation();dictAct("stop");return;}
   const mod=IS_PC?(e.ctrlKey&&!e.metaKey):(e.metaKey&&!e.ctrlKey);
   if(!mod||e.altKey||e.shiftKey)return;
   if(!dictIsD(e.key,e.code))return;
+  // the chord is ours everywhere, a dialog included: in a browser it is
+  // also "bookmark this page", which must never open (6b641)
+  e.preventDefault();
   const modal=dictModal();
   const a=dictKey({type:"down",repeat:e.repeat,modal,rec:recording},Date.now());
-  if(!modal||a==="stop")e.preventDefault();   // a stop is ours even in a dialog
   dictAct(a);
 },true);
 document.addEventListener("keyup",e=>{
@@ -65044,9 +65371,22 @@ function micWarmPaint(){
   t.addEventListener("click",()=>setMicWarm(!micWarmOn()));
   if(IS_PC)$("#micwarm-note").textContent="On for 15 seconds after you dictate.";
 })();
-// the recognizer is readied when the composer takes focus (6b543), so a
-// press finds it listening; once a minute at most
+// the dictation language (6b641): the saved preference "dict_lang", "" for
+// the computer's own languages; a change re-readies the recognizer in it
+(function(){
+  const sel=$("#dict-lang");if(!sel)return;
+  const paint=()=>{const v=dictLang();if(sel.value!==v)sel.value=v;};
+  paint();setTimeout(paint,1500);
+  sel.addEventListener("change",()=>{
+    prefSet({dict_lang:sel.value});P.dict_lang=sel.value;dictWarmT=0;dictWarm();});
+})();
+// the recognizer is readied when the composer takes focus (6b543), and at
+// launch (6b641: the first press of a session no longer pays the spawn), so
+// a press finds it listening; once a minute at most
 input.addEventListener("focus",dictWarm);
+setTimeout(function dictBootWarm(k){   // once the settings are in, so it warms in the chosen language
+  if(!prefsReady&&k<20){setTimeout(()=>dictBootWarm(k+1),250);return;}
+  try{dictWarm();}catch(e){}},1200,0);
 
 /* ------------------------------------------------------ find in chat */
 // 6b352, per Patrick: "Command or Control F should open a find box for the
@@ -72585,10 +72925,19 @@ function dictMeter(f){
   if(!sxLv)sxLv=new Array(14).fill(0);sxLv.push(lv);sxLv.shift();sxLvAt=performance.now();
   sxLvDraw(cv);
 }
+// the level from an RMS alone: the shell's own capture sends one ~20 times a second (6b641)
+function dictMeterRms(rms){
+  if(!sxHz())return;const mic=$("#mic");if(!mic||!mic.classList.contains("rec"))return;
+  let cv=mic.querySelector("canvas.sx-lvl");
+  if(!cv){cv=document.createElement("canvas");cv.className="sx-lvl";cv.setAttribute("aria-hidden","true");cv.width=80;cv.height=32;mic.appendChild(cv);}
+  const lv=Math.min(1,Math.pow(Math.min(1,(+rms||0)*7),.6));
+  if(!sxLv)sxLv=new Array(14).fill(0);sxLv.push(lv);sxLv.shift();sxLvAt=performance.now();
+  sxLvDraw(cv);
+}
 function sxLvDraw(cv){
   const g=cv.getContext&&cv.getContext("2d");if(!g||!sxLv)return;
   const W=cv.width,H=cv.height,n=sxLv.length,bw=3,step=W/n;g.clearRect(0,0,W,H);
-  for(let i=0;i<n;i++){const h=Math.max(3,Math.round(sxLv[i]*(H-4)));g.fillStyle="rgba(233,236,242,"+(.45+.55*(i+1)/n).toFixed(2)+")";
+  for(let i=0;i<n;i++){const h=Math.max(3,Math.round(sxLv[i]*(H-4)));g.fillStyle="rgba(184,211,236,"+(.45+.55*(i+1)/n).toFixed(2)+")";   /* ice (6b641) */
     g.fillRect(Math.round(i*step+(step-bw)/2),Math.round((H-h)/2),bw,h);}
 }
 function dictMeterOff(){sxLv=null;const cv=document.querySelector("#mic canvas.sx-lvl");if(cv&&cv.getContext)cv.getContext("2d").clearRect(0,0,cv.width,cv.height);}
