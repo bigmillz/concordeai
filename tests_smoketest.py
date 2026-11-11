@@ -46686,6 +46686,298 @@ for d_, m_, fx_, caught_ in _ln_mw:
 check("6b622 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _ln_mr2),
       all(ok_ for _, ok_, _ in _ln_mr2), json.dumps(_ln_mr2)[:1500])
 # ==== 6b622 lanes: end ====
+# ==== 6b623 markdown: begin ====
+print("== markdown as models write it: nested lists, numbering, h4-h6, tasks, strike, footnotes, quotes, autolinks, math (6b623) ==")
+# MARKDOWN, PROPERLY (6b623, per Patrick: "I want this UI to be perfect"). The daily audit's P0: nested lists showed as raw
+# text, numbering restarted and "10." lost its number, h4-h6, task lists, ~~strike~~, footnotes, _italic_ inside bold and
+# lists inside quotes showed raw, bare URLs were not links and widened the column, $math$ showed raw. renderMD is now a
+# line parser with a nesting stack (lists and quotes parsed again inside), and the inline rules run on each leaf with each
+# finished piece held aside. Three halves: a golden corpus (the audit's twelve and the shapes models write) through the
+# page's own renderMD in node, compared exactly (a code card and a download box compared by their language and code, so
+# their own markup is pinned where it lives), with every streamed prefix of a long answer rendering sanely; ten mutants of
+# the renderer, each caught by the same predicate; the css flat and scoped; and the long answer streamed through the real
+# page in headless Chromium at 760 and 390 (no sideways scroll, no layout shift at the landing), with two mutants served
+# in place of the page (the wrap rules gone; a style that moves at the landing), each caught.
+_MD623_GOLD = [
+    ('### Nested lists',
+     '<h3>Nested lists</h3>'),
+    ('- Top level one\n  - nested two-space\n    - nested deeper\n- Top level two\n   - nested three-space',
+     '<ul><li>Top level one<ul><li>nested two-space<ul><li>nested deeper</li></ul></li></ul></li><li>Top level two<ul><li>nested three-space</li></ul></li></ul>'),
+    ('1. First\n   1. sub a\n   2. sub b\n2. Second\n10. Tenth item',
+     '<ol><li data-n="1">First<ol><li data-n="1">sub a</li><li data-n="2">sub b</li></ol></li><li data-n="2">Second</li><li data-n="10" value="10">Tenth item</li></ol>'),
+    ('- [ ] task open\n- [x] task done',
+     '<ul><li class="task"><span class="tbox" role="checkbox" aria-checked="false" aria-disabled="true" aria-label="Not done"></span>task open</li><li class="task"><span class="tbox on" role="checkbox" aria-checked="true" aria-disabled="true" aria-label="Done"></span>task done</li></ul>'),
+    ('#### A level-four heading\n\nA link: [Apple](https://apple.com) and a bare URL https://example.com/a/very/long/path/that/keeps/going/and/going/and/going/forever/and/ever/amen?with=query&and=more',
+     '<h4>A level-four heading</h4><p>A link: <a href="https://apple.com" target="_blank" rel="noopener noreferrer">Apple</a> and a bare URL <a href="https://example.com/a/very/long/path/that/keeps/going/and/going/and/going/forever/and/ever/amen?with=query&amp;and=more" target="_blank" rel="noopener noreferrer">https://example.com/a/very/long/path/that/keeps/going/and/going/and/going/forever/and/ever/amen?with=query&amp;and=more</a></p>'),
+    ('---',
+     '<hr>'),
+    ('Inline math $E = mc^2$ and display:\n\n$$\\int_0^1 x^2\\,dx = \\tfrac13$$',
+     '<p>Inline math <code class="math">E = mc^2</code> and display:</p><div class="mathblock"><code class="math">\\int_0^1 x^2\\,dx = \\tfrac13</code></div>'),
+    ('| A | B | C | D | E | F | G | H | I |\n|---|---|---|---|---|---|---|---|---|\n| alpha-long-cell | beta | gamma | delta | epsilon | zeta | eta | theta | iota-very-long-cell-content |',
+     '<table><thead><tr><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th><th>I</th></tr></thead><tbody><tr><td>alpha-long-cell</td><td>beta</td><td>gamma</td><td>delta</td><td>epsilon</td><td>zeta</td><td>eta</td><td>theta</td><td>iota-very-long-cell-content</td></tr></tbody></table>'),
+    ('```\nno language here\n```',
+     '[card code|no language here]'),
+    ('Footnote style[^1] and ~~strikethrough~~ and <kbd>Cmd</kbd>+<kbd>K</kbd>.\n\n[^1]: the note',
+     '<p>Footnote style<sup class="fnref" data-fn="1" title="Note 1">1</sup> and <del>strikethrough</del> and &lt;kbd&gt;Cmd&lt;/kbd&gt;+&lt;kbd&gt;K&lt;/kbd&gt;.</p><section class="fnotes" aria-label="Notes"><ol><li data-fn="1" data-n="1" value="1">the note</li></ol></section>'),
+    ('> quote line one\n> quote line two\n>\n> - list in quote',
+     '<blockquote><p>quote line one<br>quote line two</p><ul><li>list in quote</li></ul></blockquote>'),
+    ('Emoji \U0001f680 and **bold _nested italic_ bold**.',
+     '<p>Emoji \U0001f680 and <strong>bold <em>nested italic</em> bold</strong>.</p>'),
+    ('- a\n\t- tab nested\n\t\t- deeper',
+     '<ul><li>a<ul><li>tab nested<ul><li>deeper</li></ul></li></ul></li></ul>'),
+    ('1. one\n  - two-space under a number\n2. two',
+     '<ol><li data-n="1">one<ul><li>two-space under a number</li></ul></li><li data-n="2">two</li></ol>'),
+    ('- a\n    - four-space nested\n- b',
+     '<ul><li>a<ul><li>four-space nested</li></ul></li><li>b</li></ul>'),
+    ('1. a\n1. b\n1. c',
+     '<ol><li data-n="1">a</li><li data-n="2">b</li><li data-n="3">c</li></ol>'),
+    ('1. a\n2. b\n\nSome para\n\n3. c\n4. d',
+     '<ol><li data-n="1">a</li><li data-n="2">b</li></ol><p>Some para</p><ol start="3"><li data-n="3">c</li><li data-n="4">d</li></ol>'),
+    ('1. Step one\n\n   ```bash\n   brew install x\n   ```\n\n2. Step two',
+     '<ol><li data-n="1"><p>Step one</p>[card bash|brew install x]</li><li data-n="2"><p>Step two</p></li></ol>'),
+    ('1. Run:\n```sh\nmake\n```\n2. Then test',
+     '<ol><li data-n="1">Run:</li></ol>[card sh|make]<ol start="2"><li data-n="2">Then test</li></ol>'),
+    ('- item with code:\n  ```js\n  let x = 1;\n  ```\n- next',
+     '<ul><li>item with code:[card js|let x = 1;]</li><li>next</li></ul>'),
+    ('1. a\n\n   more of a\n2. b',
+     '<ol><li data-n="1"><p>a</p><p>more of a</p></li><li data-n="2"><p>b</p></li></ol>'),
+    ('- item\ncontinued lazily\n- next',
+     '<ul><li>item<br>continued lazily</li><li>next</li></ul>'),
+    ('- a\n- b\n\n\n- c',
+     '<ul><li><p>a</p></li><li><p>b</p></li><li><p>c</p></li></ul>'),
+    ('1) paren one\n2) paren two',
+     '<ol><li data-n="1">paren one</li><li data-n="2">paren two</li></ol>'),
+    ('Para\n- interrupts\n- list',
+     '<p>Para</p><ul><li>interrupts</li><li>list</li></ul>'),
+    ('- [x] done\n- [ ] open\n- plain',
+     '<ul><li class="task"><span class="tbox on" role="checkbox" aria-checked="true" aria-disabled="true" aria-label="Done"></span>done</li><li class="task"><span class="tbox" role="checkbox" aria-checked="false" aria-disabled="true" aria-label="Not done"></span>open</li><li>plain</li></ul>'),
+    ('> 1. in a quote\n> 2. two\n>\n> ```py\n> x = 1\n> ```\n> after',
+     '<blockquote><ol><li data-n="1">in a quote</li><li data-n="2">two</li></ol>[card py|x = 1]<p>after</p></blockquote>'),
+    ('> outer\n> > inner',
+     '<blockquote><p>outer</p><blockquote><p>inner</p></blockquote></blockquote>'),
+    ('###### six\n##### five\n# one #',
+     '<h6>six</h6><h5>five</h5><h1>one</h1>'),
+    ('#hashtag is not a heading',
+     '<p>#hashtag is not a heading</p>'),
+    ('Text\n---\nmore',
+     '<h2>Text</h2><p>more</p>'),
+    ('***\n___\n- - -',
+     '<hr><hr><hr>'),
+    ('a_b_c and __init__ and _real italic_ and __two words__.',
+     '<p>a_b_c and __init__ and <em>real italic</em> and <strong>two words</strong>.</p>'),
+    ('private_ and dunder_name_ stay names',
+     '<p>private_ and dunder_name_ stay names</p>'),
+    ('**bold *it* bold** and *em **strong** em* and ***both***',
+     '<p><strong>bold <em>it</em> bold</strong> and <em>em <strong>strong</strong> em</em> and <strong><em>both</em></strong></p>'),
+    ('2 * 3 * 4 = 24 and ~~gone~~ and ~not~',
+     '<p>2 * 3 * 4 = 24 and <del>gone</del> and ~not~</p>'),
+    ('Price: $5 and $10, then $20.',
+     '<p>Price: $5 and $10, then $20.</p>'),
+    ('Use $HOME and $PATH; between $5-$10 or $5/$10; I paid $5 for it and 3$ more.',
+     '<p>Use $HOME and $PATH; between $5-$10 or $5/$10; I paid $5 for it and 3$ more.</p>'),
+    ('The rule $a^2 + b^2 = c^2$ holds; $x$ too, and \\(y\\).',
+     '<p>The rule <code class="math">a^2 + b^2 = c^2</code> holds; <code class="math">x</code> too, and <code class="math">y</code>.</p>'),
+    ('Escaped \\$5 and \\*not italic\\* and $$a_1 + a_2$$ inline.',
+     '<p>Escaped $5 and *not italic* and <code class="math">a_1 + a_2</code> inline.</p>'),
+    ('\\[\nE = mc^2\n\\]',
+     '<div class="mathblock"><code class="math">E = mc^2</code></div>'),
+    ('<https://example.com/a?b=1&c=2> and https://example.com/x).',
+     '<p><a href="https://example.com/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer">https://example.com/a?b=1&amp;c=2</a> and <a href="https://example.com/x" target="_blank" rel="noopener noreferrer">https://example.com/x</a>).</p>'),
+    ('(see https://en.wikipedia.org/wiki/Foo_(bar)) and [w](https://en.wikipedia.org/wiki/Foo_(bar))',
+     '<p>(see <a href="https://en.wikipedia.org/wiki/Foo_(bar)" target="_blank" rel="noopener noreferrer">https://en.wikipedia.org/wiki/Foo_(bar)</a>) and <a href="https://en.wikipedia.org/wiki/Foo_(bar)" target="_blank" rel="noopener noreferrer">w</a></p>'),
+    ('javascript:alert(1) and <javascript:alert(1)> and [x](javascript:alert(1)) and <a href="x">raw</a>',
+     '<p>javascript:alert(1) and &lt;javascript:alert(1)&gt; and [x](javascript:alert(1)) and &lt;a href=&quot;x&quot;&gt;raw&lt;/a&gt;</p>'),
+    ('https://a.example/"onmouseover="x and **https://b.example/q_r_s**',
+     '<p><a href="https://a.example/" target="_blank" rel="noopener noreferrer">https://a.example/</a>&quot;onmouseover=&quot;x and <strong><a href="https://b.example/q_r_s" target="_blank" rel="noopener noreferrer">https://b.example/q_r_s</a></strong></p>'),
+    ('[^a] then [^b] then [^a].\n\n[^b]: bee\n[^a]: ay\n  more ay',
+     '<p><sup class="fnref" data-fn="1" title="Note 1">1</sup> then <sup class="fnref" data-fn="2" title="Note 2">2</sup> then <sup class="fnref" data-fn="1" title="Note 1">1</sup>.</p><section class="fnotes" aria-label="Notes"><ol><li data-fn="1" data-n="1" value="1">ay<br>more ay</li><li data-fn="2" data-n="2" value="2">bee</li></ol></section>'),
+    ('Rubin ships [1][3] and [2, 4]; see `a[1]` and [12](https://a.b).',
+     '<p>Rubin ships <sup class="cite" data-n="1" title="source 1">1</sup><sup class="cite" data-n="3" title="source 3">3</sup> and <sup class="cite" data-n="2" title="source 2">2</sup><sup class="cite" data-n="4" title="source 4">4</sup>; see <code>a[1]</code> and <a href="https://a.b" target="_blank" rel="noopener noreferrer">12</a>.</p>'),
+    ('| A | B | C |\n|:--|:-:|--:|\n| **x** | a \\| b | `c|d` |',
+     '<table><thead><tr><th>A</th><th class="ta-c">B</th><th class="ta-r">C</th></tr></thead><tbody><tr><td><strong>x</strong></td><td class="ta-c">a | b</td><td class="ta-r"><code>c|d</code></td></tr></tbody></table>'),
+    ('- | in a list | table |\n  |---|---|\n  | 1 | 2 |',
+     '<ul><li><table><thead><tr><th>in a list</th><th>table</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table></li></ul>'),
+    ('Before\n\n[[dl:{"id":"x1","name":"f.csv","ext":"csv","size":2000}]]\n\nAfter',
+     '<p>Before</p>[dl x1]<p>After</p>'),
+    ('<think>a</think>Answer',
+     '<details><summary>Reasoning</summary><div class="think-body">a</div></details><p>Answer</p>'),
+    ('- ',
+     '<ul><li></li></ul>'),
+    ('1.',
+     '<ol><li data-n="1"></li></ol>'),
+]
+_MD623_LONG = '## A home backup that holds up\n\nA good backup keeps **three copies** on **two kinds** of storage, with *one* somewhere else [1]. It costs about $450 up front and $10 a month, or $0 if you rotate a drive.\n\n### What to buy\n\n- **The NAS:** a two-bay model with snapshots\n  - two NAS-rated drives, 8 TB each\n  - a small UPS, so a power cut never interrupts a write\n    - 600 VA is plenty for two bays\n- **The offsite copy:** an encrypted bucket\n- **A spare drive** you swap monthly, ~~USB 2~~ USB-C\n\n### Setting it up\n\n1. Put both drives in and make a mirror.\n2. Turn on hourly snapshots, kept for 30 days.\n3. Add the nightly job:\n\n   ```bash\n   rsync -a --delete "$HOME/Documents/" nas:/volume1/backup/documents/\n   ```\n\n4. Point the offsite copy at the NAS.\n\nThen leave it a week and check the logs.\n\n5. Restore one folder to prove it works.\n10. Write the setup down, keys included.\n\n#### Before you call it done\n\n- [x] the mirror is healthy\n- [x] snapshots run every hour\n- [ ] a restore test, once a quarter\n\n| Option | Cost to start | Monthly | Restore |\n|:--|--:|--:|:-:|\n| Two-bay NAS | $450 | $0 | **fast** |\n| Cloud bucket, 2 TB | $0 | $10 | slow |\n| NAS plus cloud | $450 | $10 | fast and safe |\n\n> A backup you have never restored is a hope, not a plan.\n>\n> - test the restore\n> - write it down\n\nStorage grows about $S = S_0 \\cdot 1.3^t$ a year, so plan for it:[^1]\n\n$$\nS_{5} = 4\\,\\text{TB} \\times 1.3^{5} \\approx 14.9\\,\\text{TB}\n$$\n\nThe vendor\'s guide is at https://kb.synology.com/en-global/DSM/tutorial/How_to_back_up_your_Synology_NAS_with_Hyper_Backup_to_a_remote_destination_and_restore_it?version=7&lang=en and the rule itself is old but sound.\n\n[^1]: Based on the last five years of a typical family\'s photo library.\n\nStand-in answer complete.'
+# a code card and a download box are compared by what they carry (their markup is pinned by their own blocks)
+def _md623_norm(h):
+    h = re.sub(r'<div class="codecard"><div class="codebar"><span>([^<]*)</span>.*?<code>(.*?)</code></pre></div>',
+               lambda m: "[card %s|%s]" % (m.group(1), re.sub(r"<[^>]+>", "", m.group(2))), h, flags=re.S)
+    return re.sub(r'<div class="dlbox" data-id="([^"]*)">.*?</button></div>', r"[dl \1]", h, flags=re.S)
+def _md623_run(src):
+    try:
+        js = (_ann_js_src(src) + _jsfn(src, "function hzMdClose(t){") + r'''
+const I=JSON.parse(require("fs").readFileSync(0,"utf8")),out={gold:[],thr:0,raw:[],n:0};
+for(const c of I.gold){try{out.gold.push(renderMD(c));}catch(e){out.gold.push("THROW "+e);}}
+// every whole-word prefix of the long answer, as the reveal shows it: never a throw, never a raw marker on the page
+const A=I.long;
+for(let k=1;k<=A.length;k++){if(k<A.length&&/\S/.test(A[k]))continue;let h;
+  try{h=renderMD(hzMdClose(A.slice(0,k)));out.n++;}catch(e){out.thr++;continue;}
+  const t=h.replace(/<pre>[\s\S]*?<\/pre>/g,"").replace(/<code[^>]*>[\s\S]*?<\/code>/g,"").replace(/<[^>]+>/g,"\n");
+  if(/(^|\n)\s*(- |\d+\. |#{1,6} |&gt; )|\[\^1\]|~~|\$\$/.test(t))out.raw.push(k);}
+process.stdout.write(JSON.stringify(out));''')
+        f_ = os.path.join(tempfile.mkdtemp(dir=_SMOKE_TMP), "md623.js")
+        open(f_, "w").write(js)
+        r_ = subprocess.run(["node", f_], input=json.dumps({"gold": [c for c, _ in _MD623_GOLD], "long": _MD623_LONG}),
+                            capture_output=True, text=True, timeout=120)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _md623_bad(o):
+    """the golden cases that differ (index, got), plus the stream's faults"""
+    if o.get("err") or len(o.get("gold", [])) != len(_MD623_GOLD):
+        return ["run: %s" % o.get("err")]
+    bad = [(i, _md623_norm(g)) for i, (g, (_c, want)) in enumerate(zip(o["gold"], _MD623_GOLD)) if _md623_norm(g) != want]
+    if o.get("thr") or o.get("raw") or o.get("n", 0) < 300:
+        bad.append(("stream", o.get("thr"), o.get("raw", [])[:6], o.get("n")))
+    return bad
+def _md623_safe(o):
+    """no attribute a page could run: no on* attribute, no javascript: anywhere in a tag, every link http(s) and _blank noopener"""
+    tags = re.findall(r"<[a-z][^>]*>", "".join(o.get("gold", [])))
+    return (bool(tags) and not any(re.search(r"\son\w+=|javascript:", t, re.I) for t in tags)
+            and all(re.fullmatch(r'<a href="https?://[^"<>\s]+" target="_blank" rel="noopener noreferrer">', t) for t in tags if t.startswith("<a ")))
+_md623_o = _md623_run(_MILLENAI_SRC)
+check("6b623 the golden corpus (%d cases: the audit's twelve, nested lists by 2, 3, 4 spaces and tabs, numbering that carries on and keeps "
+      "\"10.\", loose and tight items, code in an item and in a quote, h1-h6, tasks, strike, footnotes, emphasis nesting, money "
+      "that stays money, math as code, autolinks, citations, aligned tables, the tokens) renders exactly through the page's own "
+      "renderMD; every streamed prefix of a long answer renders with no throw and no raw marker; nothing a page could run" % len(_MD623_GOLD),
+      not _md623_bad(_md623_o) and _md623_safe(_md623_o), "%r" % (_md623_bad(_md623_o)[:6],))
+_MD623_MUT = [
+    ("the list stack flattened (no line nests)", "        if(xi>=th){lines.push(x.slice(Math.min(xi,co)));i++;continue;}\n", ""),
+    ("start= dropped", "(start!==1?' start=\"'+start+'\"':\"\")", "\"\""),
+    ("numbers taken as written (1. 1. 1.)", "n=its.length?(sn>prev?sn:prev+1):sn;", "n=sn;"),
+    ("an autolink runs past an entity", "(https?:\\/\\/(?:[^\\s&\\u0000]|&amp;)+)", "(https?:\\/\\/[^\\s\\u0000]+)"),
+    ("<...> autolinks of any scheme", "t=t.replace(/&lt;(https?:\\/\\/(?:[^\\s&]|&amp;)+?)&gt;/g", "t=t.replace(/&lt;([a-z]+:(?:[^\\s&]|&amp;)+?)&gt;/g"),
+    ("currency turned to math", "/^\\d/.test(b)&&!/[\\\\^_=+{}]|&[lg]t;/.test(b)?m:", "false?m:"),
+    ("_ inside words italic", ".replace(/(^|[^\\w_])_(?=[^\\s_])", ".replace(/(^|[^_])_(?=[^\\s_])"),
+    ("a quote holds no blocks", "push(\"<blockquote>\"+blocks(q.join(\"\\n\"),false).h+\"</blockquote>\");", "push(\"<blockquote>\"+inl(q.join(\"\\n\")).replace(/\\n/g,\"<br>\")+\"</blockquote>\");"),
+    ("every list loose", ".split(P0).join(loose?\"<p>\":\"\").split(P1).join(loose?\"</p>\":\"\")", ".split(P0).join(\"<p>\").split(P1).join(\"</p>\")"),
+    ("footnotes read as raw text", "    t=t.replace(/\\[\\^([^\\]\\s]{1,40})\\]/g,", "    t=t.replace(/\\[\\^([^\\]\\s]{1,40})\\]NEVER/g,"),
+    ("a fence in an item breaks the list", "const nest=pre!==\"\"&&", "const nest=false&&"),
+]
+_md623_mr = []
+for d_, a_, b_ in _MD623_MUT:
+    if _MILLENAI_SRC.count(a_) != 1:
+        _md623_mr.append((d_, "ANCHOR %d" % _MILLENAI_SRC.count(a_)))
+        continue
+    o_ = _md623_run(_MILLENAI_SRC.replace(a_, b_, 1))
+    _md623_mr.append((d_, bool(_md623_bad(o_)) or not _md623_safe(o_)))
+check("6b623 the renderer's mutants are each caught by the golden corpus: %s" % "; ".join(d_ for d_, _ in _md623_mr),
+      all(r_ is True for _, r_ in _md623_mr), "%r" % ([x for x in _md623_mr if x[1] is not True],))
+# the css: Horizon's rules scoped under .hz and flat (no circle, no glow); the pieces styled in both looks; the long URL
+# wraps; the numbers read data-n (the counter can't see start= or a jump); the footnote refs and the click that finds the note
+_md623_css = _MILLENAI_SRC[_MILLENAI_SRC.index("/* ==== markdown, properly (6b623): begin ==== */"):_MILLENAI_SRC.index("/* ==== markdown, properly (6b623): end ==== */")]
+def _md623_css_ok(css, src):
+    return (_hz_scoped(css) and _ch554_round(css) and not re.search(r"text-shadow:(?!none)|blur\(|glow|box-shadow:(?!none)", css)
+            and ".hz .msg.ai .body ol>li[data-n]::before{content:attr(data-n)}" in css
+            and ".hz .msg.ai .body ul,.hz .msg.ai .body ol{padding-left:24px}" in css
+            and ".hz .msg.ai .body a{overflow-wrap:anywhere}" in css and ".hz .msg.ai .body{overflow-wrap:break-word}" in css
+            and all(".hz .msg.ai .body " + k in css for k in ("h4{", "h5,", ".tbox{", ".tbox.on::after{", "del{", "sup.fnref{", ".fnotes{", ".mathblock{", ".ta-r{", "li>p{"))
+            and all(".body " + k in src for k in ("h4,.body h5,.body h6{", ".tbox{", "sup.fnref{", ".fnotes{", ".mathblock{", ".ta-r{", "a{overflow-wrap:anywhere}"))
+            and 'e.target.closest&&e.target.closest("sup.fnref")' in src and ".fnotes li[data-fn=" in src)
+check("6b623 the css: Horizon's markdown rules scoped and flat (no circle, glow or shadow), lists 24 px a level with the numbers "
+      "read from data-n, tasks, strike, footnotes, math and aligned cells styled in Horizon and Classic, a long URL wraps; a "
+      "footnote ref finds its note; the mutants (a round box, the numbers from the counter, no wrap) are caught",
+      _md623_css_ok(_md623_css, _MILLENAI_SRC)
+      and not _md623_css_ok(_md623_css + ".hz .msg.ai .body .tbox{border-radius:50%}", _MILLENAI_SRC)
+      and not _md623_css_ok(_md623_css.replace(".hz .msg.ai .body ol>li[data-n]::before{content:attr(data-n)}\n", ""), _MILLENAI_SRC)
+      and not _md623_css_ok(_md623_css.replace(".hz .msg.ai .body a{overflow-wrap:anywhere}\n", ""), _MILLENAI_SRC), "")
+# LIVE, IN HEADLESS CHROMIUM (6b580's harness): the long answer streamed through the real page by a stand-in /api/chat
+_MD623_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 140000);") + "  const ANSWER = " + json.dumps(_MD623_LONG) + ";\n" + r'''  const W = +process.argv[9] || 760;
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");}catch(e){}` + "window.__A=" + JSON.stringify(ANSWER) + ";" + `
+    (function(){const real=window.fetch.bind(window);window.__sent=0;
+      window.fetch=(u,o)=>{if(String(u).split("?")[0].endsWith("/api/chat")){window.__sent++;
+        const enc=new TextEncoder(),N=String.fromCharCode(0),plan=[[0,N+"STATUS:Thinking"+N]];let t=200,r=7;
+        const rnd=()=>{r=(r*16807)%2147483647;return (r-1)/2147483646;};
+        const w=window.__A.split(/(?<=\\s)/);let i=0;while(i<w.length){const n=2+Math.floor(rnd()*6);plan.push([t,w.slice(i,i+n).join("")]);i+=n;t+=20+rnd()*60;}
+        plan.push([t+60,N+"DONE:"+JSON.stringify({f:1.2,t:9,mode:"Fast"})+N]);
+        const body=new ReadableStream({start(c){for(const [at,s] of plan)setTimeout(()=>c.enqueue(enc.encode(s)),at);setTimeout(()=>c.close(),t+200);}});
+        return Promise.resolve(new Response(body,{status:200,headers:{"Content-Type":"text/plain; charset=utf-8","X-Models":"stand-in","X-Web-Search":"0"}}));}
+        return real(u,o);};})();`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&!!document.querySelector("#send")&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await new Promise(r => setTimeout(r, 1200));
+  await ev(`(()=>{const R=window.__md={shifts:[],land:0,top:null,h:null};try{new PerformanceObserver(l=>{for(const e of l.getEntries())if(!e.hadRecentInput)R.shifts.push([performance.now(),e.value]);}).observe({type:"layout-shift"});}catch(e){}
+    const tk=()=>{const a=[...document.querySelectorAll(".msg.ai")].pop();if(a&&a.classList.contains("live")){const b=a.querySelector(".body"),br=b.getBoundingClientRect(),mr=a.getBoundingClientRect();if(b.textContent.trim()){R.top=br.top-mr.top;R.h=br.height;}}
+      else if(a&&!R.land&&R.h)R.land=performance.now();setTimeout(tk,16);};tk();
+    const i=document.querySelector("#input");i.focus();i.value="How should I back up my home office?";i.dispatchEvent(new Event("input",{bubbles:true}));document.querySelector("#send").click();return 1;})()`);
+  out.sent = true;
+  for (let i = 0; i < 400; i++) { await new Promise(r => setTimeout(r, 150)); if (await ev(`window.__md.land>0`)) break; }
+  await new Promise(r => setTimeout(r, 1800));
+  const st = await ev(`(()=>{const R=window.__md,a=[...document.querySelectorAll(".msg.ai")].pop(),b=a.querySelector(".body"),br=b.getBoundingClientRect(),mr=a.getBoundingClientRect(),q=s=>b.querySelectorAll(s).length;
+    let wide=0;b.querySelectorAll("*").forEach(e=>{if(e.closest("pre,.mathblock"))return;const r=e.getBoundingClientRect();if(r.width&&r.right>br.right+1)wide++;});
+    const sc=document.querySelector("#chat-scroll");sc.style.scrollBehavior="auto";const tb=b.querySelector(".tbox");if(tb)tb.scrollIntoView({block:"center"});
+    const tr=tb&&tb.getBoundingClientRect(),hit=tb&&document.elementFromPoint(tr.left+tr.width/2,tr.top+tr.height/2);
+    const txt=b.innerText.split("\\n").filter(l=>!/rsync/.test(l)).join("\\n");
+    return {land:R.land,moved:[+(br.top-mr.top-R.top).toFixed(2),+(br.height-R.h).toFixed(2)],cls:R.shifts.filter(s=>s[0]>R.land-300&&s[0]<R.land+1500).reduce((x,s)=>x+s[1],0),
+      sw:document.documentElement.scrollWidth,iw:innerWidth,ssw:sc.scrollWidth,scw:sc.clientWidth,wide,nested:q("li>ul"),starts:[...b.querySelectorAll("ol[start]")].map(o=>o.getAttribute("start")),
+      nums:[...b.querySelectorAll("ol>li")].map(l=>l.dataset.n).join(","),num10:(()=>{const l=[...b.querySelectorAll("ol>li")].find(x=>x.dataset.n==="10");return l?getComputedStyle(l,"::before").content:"";})(),
+      tasks:q("li.task"),done:q(".tbox.on"),hit:!!tb&&hit===tb,table:q("table"),code:q(".codecard"),inItem:q("li .codecard"),quoteList:q("blockquote ul"),fn:q("sup.fnref")+"/"+q(".fnotes li"),
+      math:q("code.math")+"/"+q(".mathblock"),url:q("a[href^='https://kb.synology.com/']"),h4:q("h4"),del:q("del"),
+      raw:/(^|\\n)\\s*(- |\\d+\\. |#{1,6} |> )|\\[\\^1\\]|~~|\\$\\$/.test(txt),text:/Stand-in answer complete/.test(txt)}})()`);
+  Object.assign(out, st || {}); out.landed = !!(st && st.land);
+  if (!st) out.dbg = await ev(`({msgs:document.querySelectorAll(".msg").length,ai:document.querySelectorAll(".msg.ai").length,land:window.__md&&window.__md.land,sent:window.__sent,gen:typeof generating!=="undefined"&&generating,input:(document.querySelector("#input")||{}).value})`);
+  done(0);
+});
+ch.on("exit", () => { if (!out.ws) { out.errs.push("browser did not start"); done(0); } });
+'''
+def _md623_live(width, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="md623-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_MD623_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, "balanced",
+            os.path.join(d_, "mut.json") if mutation else "", str(width)]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    try:
+        r_ = subprocess.run(args, capture_output=True, text=True, timeout=170)
+        return json.loads(r_.stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _md623_live_ok(r):
+    return (not r.get("err") and not r.get("errs") and r.get("landed") and r.get("text") and r.get("raw") is False
+            and r.get("sw") == r.get("iw") and r.get("ssw", 1) <= r.get("scw", 0) and r.get("wide") == 0       # nothing sideways, nothing past the column
+            and r.get("cls", 1) == 0 and r.get("moved") == [0, 0]                                               # the landing moves nothing
+            and r.get("nested", 0) >= 2 and r.get("starts") == ["5"] and r.get("nums") == "1,2,3,4,5,10,1" and r.get("num10") == '"10"'
+            and r.get("tasks") == 3 and r.get("done") == 2 and r.get("hit") is True and r.get("table") == 1 and r.get("code") == 1 and r.get("inItem") == 1
+            and r.get("quoteList") == 1 and r.get("fn") == "1/1" and r.get("math") == "2/1" and r.get("url") == 1 and r.get("h4") == 1 and r.get("del") == 1)
+_md623_l = {w_: _md623_live(w_) for w_ in (760, 390)}
+check("6b623 live (headless Chromium, the long answer streamed by a stand-in /api/chat): at 760 and 390 it lands with the nested "
+      "list, the numbers 1-4 then 5 and 10 (start= and the jump kept, the 10 drawn), the code card inside its item, ticked boxes "
+      "that are hit, the table, the quote's list, the footnote, math as code, the long URL a link; nothing raw, nothing sideways, "
+      "no layout shift at the landing",
+      all(_md623_live_ok(r_) for r_ in _md623_l.values()), json.dumps(_md623_l)[:1500])
+_md623_lm = [
+    ("the wrap rules gone (the long URL widens the column)",
+     [[".hz .msg.ai .body{overflow-wrap:break-word}\n.hz .msg.ai .body a{overflow-wrap:anywhere}\n", ""],
+      [".msg.ai .body{overflow-wrap:break-word}\n.body a{overflow-wrap:anywhere}\n", ""]], 390,
+     lambda r: r.get("ssw", 0) > r.get("scw", 0) or r.get("wide", 0) > 0),
+    ("a style that changes at the landing", [["/* ==== markdown, properly (6b623): end ==== */",
+                                             ".hz .msg.ai:not(.live) .body .mathblock{padding-top:30px}\n/* ==== markdown, properly (6b623): end ==== */"]], 760,
+     lambda r: r.get("moved") != [0, 0]),
+]
+_md623_lr = []
+for d_, m_, w_, caught_ in _md623_lm:
+    r_ = _md623_live(w_, m_)
+    _md623_lr.append((d_, r_.get("mutated") == 1 and not r_.get("errs") and caught_(r_), {k: r_.get(k) for k in ("ssw", "scw", "wide", "moved", "errs", "mutated")}))
+check("6b623 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _, _ in _md623_lr),
+      all(ok_ for _, ok_, _ in _md623_lr), json.dumps(_md623_lr)[:900])
+# ==== 6b623 markdown: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
