@@ -21370,3 +21370,183 @@ served in place of the page, each caught by the part it breaks.
 - The home folds its lanes only when they cannot fit (the brief's 940 px rule is applied to the working views).
 - Not checked in the shipped window or the Mac shell's corner (html.tl) live: the shell's 72 px header and its light
   zone were exercised by the gauntlet's tl cases in headless Chromium only.
+## 6b625 — beta-4-polish: Settings in the demo's dialog, one type system, the palette, dictation, the PDF chip, the Code lane, Funnels' home (7.0 beta 4, per Patrick)
+
+Per Patrick: "I want this UI to be perfect." The daily-use audit (`scratchpad/audit/daily/`) listed what still read as
+an older app next to the web demo: Settings in its 6b551 glass with mono caps, IBM Plex Mono caps in tables, the
+palette and Funnels' form, a palette footer that printed `↩ open`, a Code chat tagged CHAT, a solid ember send key
+while dictating with nothing showing the mic was hearing, a PDF chip in amber mono, colour emoji in the Code lane, the
+SSH form crammed into the sidebar, Funnels' form in the sidebar, the import sheet in navy, and one invisible cost: the
+Horizon home asked `/api/suggest` on every load, which loads Gemma 26B for chips Horizon has not shown since 6b555.
+Horizon only throughout: Classic draws what it drew (two shared fixes excepted, said below).
+
+**Where it lives.** One css block (`/* ==== THE POLISH (6b625...` at the end of Horizon's css, every rule under `.hz`)
+and one js block (`// ==== polish-js (6b625)` at the end of the script; `var` and function declarations only, so a
+hook called during boot cannot hit a temporal dead zone), plus one-line hooks: `modeShow`, `setAgent`, `resetHero`,
+`remoteRefresh` (each `sxLaneSoon()`, deferred a tick as modeShow's own repaint is), `micChunk` (the level), `dictLit`
+(the level off), `paintChips` (the PDF chip), `suggLoad` (its guard), `paintUsage` (plurals), `paintUpdatesPane`
+(whose notes), `palSearch`/`palPaint` (the lane), `fnHzReady`/`fnHzPick`/`fnHzDone` (the stage hairline),
+`hzBalance` (Funnels' home), the global Escape (the host sheet first), `showAgentPop` (no emoji). HTML: the rail's
+"Settings" label, `#sx-build`, the host chip in the composer row, `#sx-host-veil`, `#sx-fnhome` before
+`#composer-wrap`. The server: `__APP_BUILD__` in the page, and run_remote_agent's batch (below).
+
+**Settings.** The layout is untouched (every pane, id and handler); the look is the demo's (ddfdf72, DESIGN.md
+"Settings"): a flat 672 × 640 dialog on #141416 with a one-device-pixel hairline at 10 %, radius 14, over 55 % black
+(no blur); it fades in over 180 ms and rises 6 px, and fades and sinks the same way out (the `hidden` setter on
+`#about-veil` is wrapped, so every one of the five places that close it gets the fade and the page still reads it as
+closed at once). The rail is 184 wide: "SETTINGS" in Inter 600 11 px caps at 50 %, rows 13 px and 30 high, hover
+#1a1a1d, selected #1f1f22, radius 8, no diamond; the machine's facts (Version, Chip, Memory, Accel, Models) moved to
+its foot in 11 px Inter; the Michroma lockup is hidden in Horizon. Arrow keys move through the rail (a pane's row
+opens it), Tab and Shift-Tab stay inside, focus goes to the selected row on open and back where it was on close,
+Esc or a click outside closes. Panes: headings 15/600, rows 48 high on hairlines, segmented controls on #1a1a1d with
+the choice on #2a2a2f (24 px, radius 6 in 8, no glow on the slide), squared switches 32 × 18 radius 5, flat 32 px
+inputs on #0e0e10 (an ember hairline on focus), buttons 28 px radius 8, cards flat on #0e0e10. The Usage chart is
+three greys instead of amber, green and blue. Models: two-line rows (the name; its size and what it is for) with a
+silver dot and Remove as a small key while managing (Patrick's 6b268 rule kept). A phone: the dialog is the screen
+and the rail a scrolling top row. About: the version from APP_VERSION and the beta/RC number as before, and now
+"Build <APP_BUILD>" under it (template tokens, never typed: it will say 7.0 beta 4 when release.sh sets APP_BETA);
+"What's new" only for the running version or the one on offer; another release's notes say whose they are ("What's
+new in 7.0 beta 3", "7.0 beta 3 released on ..."), which is what a dev build ahead of the channel showed wrongly.
+Usage: "1 request" (the card's label follows the number; Intl.PluralRules, `sxPl`).
+
+**Settings, simpler** (Patrick, relayed 2026-11-11: "let's clean up the settings a lot. Like, it's asking like where
+people live and stuff ... let's simplify"). Horizon only, once at boot, by moving the page's own nodes (`sxSetSimplify`;
+every id and handler kept, the served HTML unchanged, so Classic and the static pins are as they were):
+- **The rail** is About · You · Your stuff · Models › · Usage (Account folded into You; six sections to five).
+- **You** asks two optional things, each with its question over it: "What should Concorde call you?" and "Anything to
+  keep in mind?", then the answer length and Save. The placeholder that asked for a job ("I work in finance") is gone.
+  Under **Advanced**: the account card, Bring your chats, Erase everything (a request for the Account pane opens You
+  with Advanced open, `sxSetRedirect`).
+- **About**'s first screen is the version, the build, What's new, Check now and Effects (one control); Update channel,
+  Check for updates, Look and Keep microphone ready are under Advanced; the Effects note goes.
+- **Your stuff** keeps the privacy line and your chats and folders; the cloud switch, its note, the formats note and
+  "Read everything again" are under Advanced; the paragraph that repeated the section goes. Local models: the line under
+  the heading goes.
+- **Where you live:** no field in Settings, Personality, Your stuff or the wizard asks for a place on this branch (the
+  home-area field went before 7.0). A `home_area` saved by an older build is still read on the server (weather "here",
+  the local clock, Classic's greeting town; profiles, sync and Add carry it); dropping it is a server change pinned by
+  about six checks, left for a decision (see Left).
+
+**One type system.** In Horizon `--sans` is Inter (the system's sans until the file is bundled), so everything that
+fell to Space Grotesk by default is Inter; the greeting keeps Space Grotesk by name, the wordmark Michroma. Mono is
+for code only: the table heads are 12/600 sentence case, the ordered-list numbers, citations, the flow's numbers, the
+proof line and the PDF chip's figures are Inter with tabular figures; inside Settings `--sl-mono` and `--mono` are
+Inter. Caps stay only where the demo has them (`.lvk`, `.risk`, `.day`, `.beta` in Inter 600 11 px .06em): the
+rail's label, the risk tags, STAGE N OF M and THE PICK, the sidebar's day labels.
+
+**The palette.** "↩ open" (the HTML was printing the JS escape); tags in words (Chat, Code, Funnel, Message, New,
+Open, Setting, Mode; Classic keeps its caps text); a chat's tag is its lane (`palKind`, shared: Classic's CODE was
+CHAT too). Flat #141416, the same rise.
+
+**Dictation.** While listening the mic key widens to 84 px and carries a live level: 14 flat silver bars drawn from
+the samples `micChunk` already receives (RMS per ~43 ms chunk), so no new permission and no new audio graph; the
+send key stays the quiet outline while the mic is on (`:has(#mic.rec)`), never the ember. ⌘D / Ctrl+D and the
+dictation path are untouched.
+
+**The PDF chip.** A PDF that can't be read (or is being read) is a flat chip: a drawn file icon, the name, plain words
+in 12 px meta, and one "Remove" key; "PDF needs an update on this computer." reads "This computer can't read PDFs
+yet." (the server's sentence stays in the tooltip).
+
+**The hidden suggestions call.** `suggLoad` returns at once in Horizon, so the home never asks `/api/suggest` and no
+suggestion pass loads a model; Classic still asks and still shows its chips. The "Personal suggestions" switch and
+its note are hidden in Horizon's Settings (they did nothing visible there).
+
+**The Code lane.** Drawn 1.5 px icons in place of colour emoji (Coding `</>`, Workspace folder, Remote server; the
+autonomy cards' lock, play, fast-forward; the agents' hover card drops its emoji). The SSH form left the sidebar: in
+Remote, a compact host chip sits in the composer row ("Connect a server", or the saved `user@host` with a silver dot; under 1100 px only a drawn server icon and the dot,
+so the send key keeps its row)
+and opens a flat sheet ("Your server") holding the very same `#remote-bar` (moved in while open and put back after,
+so every id, the `/api/remote/config` wire, Save, Test connection and Forget old key are the originals). Each lane
+has its placeholder (Coding "Describe the code you need", Workspace "Ask about your project folder", Remote "What
+should happen on the server?") through a wrapped `placeholder` setter, so the dozen places that reset it to "Ask
+anything" get the lane's words; and a line under the greeting says what the lane does. The Run key is neutral
+silver in the Code lane; the light-blue Classic Run key and READ tag are neutral in Horizon; an approval card for a
+danger command has an ember outline (and its Approve an ember hairline).
+- **Per-command approval (server).** In `run_remote_agent`, a batch that holds a danger command no longer asks once
+  for all of it: the batch's one card covers the other commands (priced at the riskiest of them, asked only when
+  they need it), and each danger command gets its own APPROVE just before it runs, its line of the batch waiting
+  (`cmd<i>_<n>` "Waiting for you", so the page puts the card under that line). A Skip stops the batch there (the
+  line Skipped, "1 of 4 ran", the model told), no answer pauses the run as before. Same APPROVE frame, same jid
+  round trip; a lone command is unchanged.
+
+**Funnels.** In Horizon the goal form (`#funnel-wrap`: goal, requirements, prompts, options, stages, effort, include
+cloud, Start) is the lane's home: it moves into `#sx-fnhome` in the main column in place of the composer, flat
+(#141416, hairline, radius 14, Inter labels in sentence case, the effort as the segmented control, Start a silver key),
+and goes back (hidden) to the sidebar once a funnel starts, so the sidebar never holds it. During a funnel the
+composer's cue is "Or type your own answer"; a typed answer is still shown once (6b622's chosen card, no bubble); the
+"Funnel" byline over the trail is gone; and the trail carries a 1 px silver hairline filling to stage N of M
+(`--sxp`, 520 ms on the flight's easing; Calm and reduced motion at once). The balance (`hzBalance`) gives the form
+the composer's place without a resize loop.
+
+**Bring your chats.** Over black, never navy: the sheet flat #141416 with a hairline and radius 14, no stars in it,
+silver icons and keys, the app tiles' padding back (it was zeroed by the sheet's button reset).
+
+**Measured** (stand-in streams only: `scratchpad/b4-polish/stub-all.js`, a seeded home, no servers.json, no cloud key,
+no model run; Chromium headless shell and a real WKWebView, 1440 and 760, Settings also at 390):
+- `/api/suggest` on load: 1 before, 0 after, both engines, every width.
+- No sideways scroll on any surface, both engines, all widths. No console errors (the ResizeObserver loop that the
+  funnel home and the host chip first caused at 760 in WebKit is gone: the balance is set before any resize callback).
+- Settings, live (Chromium): 672 × 640, rgb(20,20,22), radius 14, backdrop rgba(0,0,0,.55), rail 184, rows 30, the
+  label Inter 600 11 px caps, no mono text anywhere in the dialog (before: about 12 mono and 12 caps pieces a pane);
+  at 390 it is the screen, the rail a row. The fade-in is `sxFade`/`sxRise`, Esc gives `sx-out` then hidden at 180 ms
+  and focus back on the gear; 30 Tabs never leave it.
+- Contrast (text in the viewport, both engines): no fail on any touched surface (before: "Include cloud models" 3.27;
+  now 6.7 as meta on #141416). The only flags are the Models dots' hidden ✓ (font-size 0) — not text.
+- `elementFromPoint` hits every visible control's centre; the remaining flags are rows scrolled out of view inside
+  their own scroller (the palette's last row, About's last switch under the foot when not scrolled), as before.
+- WebKit frames (60 Hz, the sky running): Settings opening p95 23 ms, closing 23, the palette 18, the funnel home 26.
+- The dictation level: 1,047 lit pixels in the 80 × 32 canvas after 1.6 s of the stand-in mic; the send key
+  transparent while listening (before: rgb(232,65,90)).
+
+- Settings, simpler (Chromium live, 1440 and 390): the rail's rows About, You, Your stuff, Models, Usage; About's first
+  screen 1 control (before 5); You 2 text fields with their questions and no place, job or units words; an Advanced
+  per pane, closed.
+
+**Tests:** `== the polish ... (6b625) ==`: the css (the dialog's numbers, the rail, rows, controls, the phone, Inter
+for the mono caps, the danger outline, no light blue, the import over black, every rule Horizon's, no glow; 5 mutants);
+pure in node on the page's functions (plurals, the palette's lane, the PDF chip's words and key, the lane placeholders
+and the answer cue; 5 mutants); suggLoad asking nothing in Horizon and once in Classic (1 mutant); What's new says
+whose notes (1 mutant); About's version and build from the constants; run_remote_agent lifted and driven with
+stand-ins (5 scenarios, 2 mutants); live headless Chromium at 1440 and 390 (Settings by the gear with real keys, the
+palette, the dictation level, the host chip and sheet, a danger command's card under its line, Funnels' home and
+hairline, no /api/suggest, the simpler Settings), with 7 mutants served in place of the page. Re-pinned at the same
+strength: 6b551's What's new pin follows the new header (a nightly still never says "in"). Proven on a trimmed copy on 9984–9986.
+
+**Copy, new or changed (for Patrick's approval), Horizon only unless said:**
+- Settings rail: new label "SETTINGS"; the facts "VERSION / CHIP / MEMORY / ACCEL / MODELS" → "Version / Chip / Memory /
+  Accel / Models"; About: new line "Build 279" (the real number); "What's new" → "What's new in 7.0 beta 3" and
+  "Released on …" → "7.0 beta 3 released on …" when the notes are another release's; Usage "Requests" → "Request"
+  for one.
+- Palette (Classic too for the lane): "CHAT" on a Code chat → "Code" (Classic "CODE"), "FUNNEL"; tags "NEW / GO / SET /
+  TIER / MSG" → "New / Open / Setting / Mode / Message"; footer "↩ open" → "↩ open" (both looks).
+- PDF chip: "PDF needs an update on this computer." → "This computer can't read PDFs yet."; "×" → "Remove".
+- Code lane placeholders: "Ask anything" → "Describe the code you need" / "Ask about your project folder" / "What
+  should happen on the server?"; lines under the greeting: "Write, fix and explain code with a model on your
+  machines." / "Work inside a project folder on this computer." / "Run tasks on your server over SSH. You choose what
+  waits for your OK."; host chip "Connect a server" (or the host); sheet "Your server", "Key-only SSH. How much runs
+  before it asks you is up to you."
+- Funnels: the composer during a funnel "Ask anything" → "Or type your own answer"; the "Funnel" byline hidden.
+- Settings: the "Personal suggestions" switch hidden in Horizon.
+- Settings, simpler: rail "Account" + "Personality" → "You" (heading too); new labels "What should Concorde call you?"
+  and "Anything to keep in mind?"; placeholders "Name" → "Optional", "Be direct. I work in finance; assume I know the
+  vocabulary." → "Short answers, and say what you're unsure of."; new "Advanced" disclosure in About, You and Your stuff;
+  removed lines: "Your name, answer length, and standing instructions.", "Your name here, and the way out.", "Balanced is
+  the default. Full is the whole show.", "What's installed, what's loaded, and what each model is for.", and Your
+  stuff's "Answers can draw on your own chats and the folders you choose, found on this computer, and say which chat or
+  file they used." (its privacy line kept).
+
+**Left / worth knowing.**
+- A stored `home_area` (older builds) is still honoured on the server; to drop it: `home_area()` returns "", the prefs
+  schema and ADD_SETTINGS lose the key, the client's `CITY`, and the pins at weather "home", the prefs echo, profiles'
+  Add, sync's set and the 6b390 hide words follow. Weather "what's the weather" with no place would then search or ask.
+- Settings, simpler is applied once at boot in Horizon; switching the look to Classic without a reload keeps the
+  folded layout until the next launch.
+- The task picker (`#task-veil`) still shows its colour emoji per task; Horizon has no way to open it (the task chips
+  have been hidden since 6b555), so it was left. The Code lane home is one line, no chips (Patrick called the chips
+  tacky in 6b555).
+- APP_BETA is 2 on this branch although beta 3 shipped: `./release.sh beta` would cut "beta 3" again. About reads the
+  constant, so the cut must set it to 4.
+- Inter is still not bundled (no download approved): the stack falls to the system's sans (SF on a Mac).
+- The command output is still not on the wire (6b622), so a danger card shows the command, not a preview of what it
+  will delete.
+- Checked in an offscreen WKWebView and headless Chromium, not in the shipped window.
