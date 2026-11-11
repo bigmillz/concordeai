@@ -4648,7 +4648,8 @@ check("a place pin's location test reads the whole address, not its first 80 cha
                     # nothing in the place: no map
                     [True, 0]]
       # the server's own pin test reads it too, and a chat saves the pin only
-      and '(g_.get("full") or "").lower()' in _MILLENAI_SRC
+      and 'if g_ and place_fits(self.locq, g_.get("full")):' in _MILLENAI_SRC   # 6b626: place_fits reads the full name
+      and '    f = str(full or "").lower()' in _MILLENAI_SRC
       and 'for k in ("lat", "lon", "name")' in _MILLENAI_SRC
       and '"MAP:" + json.dumps(geo)' not in _MILLENAI_SRC,
       "%r | %r" % (_gk, _pout))
