@@ -53512,13 +53512,19 @@ check("6b690 SourceSerif4Variable.woff2 in fonts/ is served as @font-face 'Sourc
 print("== tight-2 (6b691): the small dialogs one family, the drawer's scrim, the mode menu's ground, the undo toast above the composer, the wizard's steady card ==")
 # Patrick (2026-11-12): "the little parts of it that need to be perfect." Found in an offscreen WKWebView (scratchpad/t2-tools).
 _T691 = [
-    ".hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#clean-card,#setup-card,#task-card,#new-veil #about-card,#update-veil #about-card){border-radius:16px;background:#191a1e;border:1px solid #26272c;box-shadow:0 24px 80px rgba(0,0,0,.6)}",
+    ".hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#clean-card,#setup-card,#task-card,#new-veil #about-card,#update-veil #about-card){border-radius:16px;background:#191a1e;border:1px solid #26272c;box-shadow:0 24px 80px rgba(0,0,0,.6);padding:20px;text-align:left}",
     ".hz :is(#sx-host-sheet,#imp-sheet){border-radius:16px}",
-    "{box-sizing:border-box;height:36px;min-height:36px;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui)}",
-    ".hz #setup-card button",
-    ":is(.set-h,.adv-h){font:500 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}",
-    ".hz :is(#new-detail,#up-detail,#updated-sub){font-size:13px;line-height:20px}",
+    "{display:block;margin:0 0 12px;font:600 17px/24px var(--hz-font-ui);letter-spacing:-.01em;text-transform:none;text-align:left;color:#fff}",
+    ".adv-h{font:500 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}",
+    ".hz :is(#new-detail,#up-detail,#updated-sub,#setup-sub){font:400 13px/20px var(--hz-font-ui);color:#a9adb8;margin:0 0 12px;text-align:left}",
+    ".hz #setup-sub:empty{display:none}",
+    "height:36px;min-height:36px;margin:0;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui);background:transparent;border:1px solid rgba(255,255,255,.16);color:#e6e6ea;",
+    ") :is(#adv-save,#bmc-go,#srvset-go,#srvall-close,#bmv-close,#gear-ok,#updated-ok,#setup-go,#new-get,#new-retry,#up-go){background:#f2f2f4;border-color:transparent;color:#0b0c10}",
+    ".sh-foot,#adv-foot):not([hidden]),.hz #setup-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:16px 0 0;padding:0;border:0}",
+    ".hz :is(#new-veil,#update-veil) #about-card{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-content:flex-start;gap:8px;width:min(400px,calc(100vw - 32px));height:auto}",
+    ".hz :is(#new-veil,#update-veil) #about-card>button{margin-top:8px;order:1}",
     ".hz #adv-comp{height:36px;box-sizing:border-box}",
+    "[hidden]{display:none!important}",
     ".hz :is(#bmc-card,#srvset-card,#wiz-card) input[type=checkbox]{width:16px;height:16px;flex:none}",
     ".hz #sidebar{box-shadow:8px 0 40px rgba(0,0,0,.45),0 0 0 100vmax rgba(0,0,0,0);transition:transform .28s ease,box-shadow .28s ease}",
     ".hz body.sbopen #sidebar{box-shadow:8px 0 40px rgba(0,0,0,.45),0 0 0 100vmax rgba(0,0,0,.5)}",
@@ -53528,6 +53534,9 @@ _T691 = [
     ".hz #wiz-foot{margin-top:auto}",
     ".hz #wiz-skip{top:8px;right:8px;padding:8px 10px;line-height:15px}",
     ".hz .msg.ai .body ol>li::before{top:0;font-size:13px;line-height:27.54px}",
+    'id="bmc-title">Run in the cloud?</div>',
+    '<div id="new-title">New models</div>',
+    'id="srvset-title">Server settings</div>',
 ]
 def _t691_ok(p_):
     return all(x_ in p_ for x_ in _T691) and p_.rindex("TIGHT-2 (6b691, per Patrick") > p_.rindex("TIGHT-1 (6b690): end")
@@ -53537,6 +53546,7 @@ check("6b691 the served page carries tight-2's block after tight-1's: one card, 
       _t691_ok(page), "")
 check("6b691 each of those rules, removed in turn, is caught", all(not _t691_ok(m_) for _, m_ in _t691_mut),
       str([x_[:50] for x_, m_ in _t691_mut if _t691_ok(m_)]))
+check("6b691 Updated has no sparkle glyph and the dialogs' titles are plain", "&#10024;" not in page and "Run on these cloud models?" not in page and "New models available</div>" not in page, "")
 check("6b691 the drawer's scrim is a box-shadow spread (clicks fall through to the chat, which closes it) and no element that grabs them",
       "body.sbopen::after" not in page and "#sb-scrim" not in page, "")
 # ==== 6b691 tight-2: end ====

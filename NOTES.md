@@ -23426,3 +23426,11 @@ script clicked the folded button. Choosing Code / Funnels / Chat from the menu s
 (idle / listening / finishing: the mic widens for its level meter, the words change), the error and offline lines (crimson rule, Try
 again), first-run wizard styling (its own Frost look, 8 px buttons), type sizes 12 / 13 / 14 / 15 / 17 across the chat.
 No visible copy changed. Verify: gauntlet not run (another was running); the new pins were checked standalone against a dev copy.
+**6b691 addendum (the dialogs, round 2, per Patrick via the coordinator):** every small dialog now has the same title (Inter 17/600 white, -0.01em,
+24 line, left, 20 px card padding; the 11 px caps stay for section labels inside, `.adv-h`) and the same footer: one row, right-aligned, 8 apart,
+36 px pills, the primary filled #f2f2f4 with dark text and the secondary a hairline. New models and Update available no longer stack full-width: their
+buttons are a flex-wrap row (the secondary first, the primary last by `order`). The ✨ on Updated is gone. Static-markup copy: Run on these cloud models?
+> Run in the cloud?, New models available > New models (the script already set "New models" when it opens), the server-set title's empty default >
+Server settings (the script fills "Light on <server>"). Titles are set by script when real (Downloading models becomes Downloading updates / Models /
+Done; the body is the list and the sub line), so the empty cases in a shot are an unfed dialog; an empty `#setup-sub` now takes no space. The buttons
+declare display, so their `[hidden]` has its own rule here (New models hides Retry, Continue in background, Don't ask again).

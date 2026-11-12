@@ -59674,13 +59674,25 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
 .hz .fl-stog{height:28px;margin:-6px -6px}   /* the sources count was 20 high: a 28 px target, the same place on the page */
 /* ==== TIGHT-1 (6b690): end ==== */
 /* ==== TIGHT-2 (6b691, per Patrick: "the little parts of it that need to be perfect"): dialogs one family, the drawer's scrim, the mode menu's ground, the undo toast clear of the composer, the wizard's steady card ==== */
-/* every small dialog: one card (16 radius, #191a1e, 1 px hairline), one button (36 high, pill, 600 14 as in Settings), one label (11 caps) and one note size (13) */
-.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#clean-card,#setup-card,#task-card,#new-veil #about-card,#update-veil #about-card){border-radius:16px;background:#191a1e;border:1px solid #26272c;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+/* every small dialog, one family (per Patrick, via the coordinator): a card (16 radius, #191a1e, 1 px hairline, 20 padding), a title (Inter 17/600 white, left), 11 px caps only for a section label inside, a 13/20 note, and one footer: 36 px pills, right-aligned, 8 apart, the primary filled #f2f2f4 */
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#clean-card,#setup-card,#task-card,#new-veil #about-card,#update-veil #about-card){border-radius:16px;background:#191a1e;border:1px solid #26272c;box-shadow:0 24px 80px rgba(0,0,0,.6);padding:20px;text-align:left}
 .hz :is(#sx-host-sheet,#imp-sheet){border-radius:16px}
-.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#task-card,#new-veil #about-card,#update-veil #about-card) .about-btn,.hz #updated-card .primary,.hz #setup-card button{box-sizing:border-box;height:36px;min-height:36px;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui)}
-.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card) :is(.set-h,.adv-h){font:500 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}
-.hz :is(#adv-card,#bmv-card,#sx-host-sheet) :is(.advp,.bm-desc,.sx-sub),.hz :is(#new-detail,#up-detail,#updated-sub){font-size:13px;line-height:20px}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card) .set-h,.hz :is(#new-veil #new-title,#update-veil #up-title,#setup-card #setup-title,#updated-card h2){display:block;margin:0 0 12px;font:600 17px/24px var(--hz-font-ui);letter-spacing:-.01em;text-transform:none;text-align:left;color:#fff}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card) .adv-h{font:500 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}
+.hz :is(#adv-card,#bmv-card,#sx-host-sheet) :is(.advp,.bm-desc,.sx-sub),.hz :is(#new-detail,#up-detail,#updated-sub,#setup-sub){font:400 13px/20px var(--hz-font-ui);color:#a9adb8;margin:0 0 12px;text-align:left}
+.hz #setup-sub:empty{display:none}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card) :is(.about-btn,.sh-foot button,#adv-foot button,#setup-foot button),.hz :is(#new-veil #about-card,#update-veil #about-card,#task-card) .about-btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;flex:none;width:auto;min-width:0;height:36px;min-height:36px;margin:0;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui);background:transparent;border:1px solid rgba(255,255,255,.16);color:#e6e6ea;cursor:pointer;transition:background-color .12s,border-color .12s}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card,#new-veil #about-card,#update-veil #about-card,#task-card) :is(.about-btn,.sh-foot button,#adv-foot button,#setup-foot button):hover{border-color:rgba(255,255,255,.32);background:rgba(255,255,255,.04)}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card,#new-veil #about-card,#update-veil #about-card) :is(#adv-save,#bmc-go,#srvset-go,#srvall-close,#bmv-close,#gear-ok,#updated-ok,#setup-go,#new-get,#new-retry,#up-go){background:#f2f2f4;border-color:transparent;color:#0b0c10}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card,#new-veil #about-card,#update-veil #about-card) :is(#adv-save,#bmc-go,#srvset-go,#srvall-close,#bmv-close,#gear-ok,#updated-ok,#setup-go,#new-get,#new-retry,#up-go):hover:not(:disabled){background:#fff;border-color:transparent}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card,#new-veil #about-card,#update-veil #about-card) :is(#adv-save,#bmc-go,#srvset-go,#srvall-close,#bmv-close,#gear-ok,#updated-ok,#setup-go,#new-get,#new-retry,#up-go):disabled{opacity:.4;cursor:default}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card) :is(.sh-foot,#adv-foot):not([hidden]),.hz #setup-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:16px 0 0;padding:0;border:0}
+.hz :is(#new-veil,#update-veil) #about-card{display:flex;flex-direction:row;flex-wrap:wrap;justify-content:flex-end;align-content:flex-start;gap:8px;width:min(400px,calc(100vw - 32px));height:auto}
+.hz :is(#new-veil,#update-veil) #about-card>:not(button){flex:0 0 100%;margin:0}
+.hz :is(#new-veil,#update-veil) #about-card>button{margin-top:8px;order:1}
+.hz :is(#new-veil,#update-veil) #about-card>:is(#new-get,#new-retry,#up-go){order:2}
 .hz #adv-comp{height:36px;box-sizing:border-box}
+.hz :is(#new-veil,#update-veil,#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#setup-card) [hidden]{display:none!important}   /* the buttons above declare display: their [hidden] needs its own rule */
 .hz :is(#bmc-card,#srvset-card,#wiz-card) input[type=checkbox]{width:16px;height:16px;flex:none}
 /* the drawer under 760 dims what it covers (it sat over live text at full brightness); the dim fades with the slide */
 @media (max-width:760px){
@@ -60105,7 +60117,7 @@ __CODE_ROWS__
 
 <div id="new-veil" hidden>
   <div id="about-card">
-    <div id="new-title">New models available</div>
+    <div id="new-title">New models</div>
     <div id="new-detail">This version adds new models.</div>
     <div id="new-list"></div>
     <div id="new-sum" hidden></div>
@@ -60497,7 +60509,7 @@ __CODE_ROWS__
      Compare. Both sit over Settings -->
 <div id="bmc-veil" hidden>
   <div id="bmc-card" role="dialog" aria-modal="true" aria-labelledby="bmc-title">
-    <div class="set-h" id="bmc-title">Run on these cloud models?</div>
+    <div class="set-h" id="bmc-title">Run in the cloud?</div>
     <ul id="bmc-list"></ul>
     <p id="bmc-sum"></p>
     <p id="bmc-est"></p>
@@ -60513,7 +60525,7 @@ __CODE_ROWS__
      what will be removed, before anything is -->
 <div id="srvset-veil" hidden>
   <div id="srvset-card" role="dialog" aria-modal="true" aria-labelledby="srvset-title">
-    <div class="set-h" id="srvset-title"></div>
+    <div class="set-h" id="srvset-title">Server settings</div>
     <div id="srvset-list"></div>
     <label class="bmc-ck" id="srvset-rml"><input type="checkbox" id="srvset-rm" checked> <span id="srvset-rmt"></span></label>
     <p id="srvset-sum"></p>
@@ -60556,7 +60568,6 @@ __CODE_ROWS__
 
 <div id="updated-veil" hidden>
   <div id="updated-card">
-    <div class="sh-icon">&#10024;</div>
     <h2>Updated to <span id="updated-ver"></span></h2>
     <p id="updated-sub">What changed</p>
     <div id="updated-notes"></div>
