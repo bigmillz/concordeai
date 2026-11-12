@@ -59017,6 +59017,10 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #about-veil #p-usage .us-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .hz #about-veil #p-usage .us-card,.hz #about-veil #p-usage .bm-ck,.hz #about-veil #p-usage .bm-l,.hz #about-veil #p-usage .bm-tg{min-width:0;max-width:100%}
 .hz #about-veil #p-usage .bm-s,.hz #about-veil #p-usage .us-s,.hz #about-veil #p-usage .bm-gh{overflow-wrap:anywhere}
+/* 6b690: the Usage pane never scrolls sideways at half a screen (beta 4 run G: 25 px at 680): its header row wraps and its selects shrink to the column instead of growing to their longest option */
+.hz #about-veil #p-usage .us-head{flex-wrap:wrap;min-width:0}
+.hz #about-veil #p-usage select{min-width:0;max-width:100%;text-overflow:ellipsis}
+.hz #about-veil #p-usage .bm-pick,.hz #about-veil #p-usage .bm-tg{flex-wrap:wrap;min-width:0}
 /* ==== THE POLISH (6b625): end ==== */
 /* ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have enough VFX going on
    right now. But also, it's very important that the chat page and also obviously the code page and all that looks really
