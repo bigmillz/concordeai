@@ -98,6 +98,8 @@ MACHINE_STATE = frozenset((
     "_HW_MEMSIZE", "_search_hits", "_pending_timer", "_disk_seen",
     # (6b627) the models found damaged, the engines' load times, the loads already said
     "_DMG_SEEN", "_LOADS", "_LOAD_SAID", "_STUB_SEEN", "_STUB_PLACES",
+    # (6b650) the stand-in's recorded rows, the funnel runs' progress and their thread's run id
+    "_FIXTURE_ROWS", "_FN_PROG", "_FN_TL",
     "_journal_run", "_journal_done",
     # the instance, the window, the boot code, the updater
     "_INSTANCE_LOCK", "_BOOT", "_CHROME", "_WINDOW", "_WIN_STATE",
@@ -42932,7 +42934,7 @@ def funnel_research(goal, reqs, asked, picks, say=True) -> dict:
         hosts = list(dict.fromkeys(r["host"] for r in rows))
         _fn_say("search", "Searched the web" if rows else "The web didn't answer", "done" if rows else "err",
                 ("%d results from %s" % (len(rows), ", ".join(hosts[:3]))) if rows else "working from what the model knows")
-    return {"rows": rows, "queries": qs, "at": time.strftime("%b %-d, %Y")}
+    return {"rows": rows, "queries": qs, "at": strftime_np("%b %-d, %Y")}
 
 
 def funnel_market(goal, reqs) -> list:
@@ -43026,7 +43028,7 @@ def funnel_verdict_ask(goal, reqs, asked, picks, walls, research) -> str:
         "- The words a knowledgeable friend would use: plain and warm, no hype, no exclamation marks, never their "
         "answers read back as a list, and never the words wall, binding, constraint or requirement.\n"
         "- The name is the same everywhere it appears."
-        % (goal, time.strftime("%b %-d, %Y"), wl, web))
+        % (goal, strftime_np("%b %-d, %Y"), wl, web))
 
 
 # the local models a funnel's pick is written on first: the stages' own (funnel_stage), not the smallest
@@ -58993,6 +58995,12 @@ html:not(.hz) #sx-lanehome{display:none}
 .hz #about-veil #autoclean-toggle #autoclean-note{margin:0;padding:0;font:450 12px/16px var(--hz-font-ui);color:var(--sx-meta)}
 .hz #about-veil #us-fresh,.hz #about-veil #bm-note,.hz #about-veil #bm-desc:not(.sx-cost){display:none}
 @media (max-width:640px){.hz #about-veil #set-rail{padding:12px 52px 12px 12px;background:none}.hz #about-veil #sx-x{top:12px;right:10px}}
+/* (beta 5) the rail's row scrolls an item into view clear of the x, and the Usage pane never runs wider than its column
+   at a half-screen window: long server labels and figures wrap or shorten (6b644 measured both at 640 and 680) */
+@media (max-width:640px){.hz #about-veil #set-rail{scroll-padding-inline:12px 52px}}
+.hz #about-veil #p-usage .us-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.hz #about-veil #p-usage .us-card,.hz #about-veil #p-usage .bm-ck,.hz #about-veil #p-usage .bm-l,.hz #about-veil #p-usage .bm-tg{min-width:0;max-width:100%}
+.hz #about-veil #p-usage .bm-s,.hz #about-veil #p-usage .us-s,.hz #about-veil #p-usage .bm-gh{overflow-wrap:anywhere}
 /* ==== THE POLISH (6b625): end ==== */
 /* ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621, per Patrick: "I don't think we have enough VFX going on
    right now. But also, it's very important that the chat page and also obviously the code page and all that looks really

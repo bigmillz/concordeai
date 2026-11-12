@@ -23234,3 +23234,21 @@ GROUND_NONE pin, 6b640's SOCIAL_RULE line. quality-2's namespace gains the names
 **Left.** The how-to rule still sends a capitalised name to the web; Code-lane asks still search (the Coding agent
 keeps auto_web). Fable 5.1 as the Pro/Max compositor when a Claude key exists is costed in the report (about $0.17*
 an answer against Opus 5.5's $0.07*), not switched: Patrick's call.
+
+## 6b653 — beta 5: the integration's full run (7.0 beta 5, per Patrick via the lead)
+
+beta-5 = beta 4 (through 6b640's run E fixes) + polish 2c084c1 (Settings, fewer words; Pat approved the copy) +
+funnels-1 (6b650) + quirks-1 aa1bdaa (6b644) + answers-1 (6b651, renumbered from 6b650) + the stars' landing
+(e4a0795) + the C++ window's pieces from cpp-core (6b618: CONCORDE_SHELL in build_shell_dmg.sh, the public port in the
+sibling check and the swap helper). The first full run (e13019e) scored 1735/1743; every red, classified:
+- **Real, in the app:** funnels-1 stamped two prompts with `time.strftime("%b %-d, %Y")`, which Windows rejects
+  (6b317's crash class): both through `strftime_np` now. At a 640 px window (the Mac shell's half screen, 6b644) the
+  Settings rail runs along the top and scrolled its last items under the night edition's x: the rail keeps 52 px of
+  scroll padding at its end. The Usage pane ran 25 px wider than its column at 680 with the run's long server labels:
+  its cards, rows and lines shrink and wrap now (not reproduced with stand-in labels; the 6b644 check will say).
+- **The lints and pins the merges moved:** funnels-1's module containers (`_FIXTURE_ROWS`, `_FN_PROG`, `_FN_TL`) in
+  MACHINE_STATE; the drawer's breakpoint pin counts 6b644's second 760 rule; 6b340's route slice ends at the next
+  route (6b650's warm-up route sits after it); the funnel stage's cloud-flag mutant re-anchored on its market argument;
+  6b644's Settings walk finds the night edition's x by its label; its Chromium keeps the page's fetches home too; the
+  polish gates' and the giants' pins carry 6b651's two kinds.
+

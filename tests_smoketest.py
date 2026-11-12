@@ -2455,7 +2455,9 @@ _page_nohz = (page[:page.index("/* =============================================
               + page[page.index("/* ============================================================ HORIZON end */"):])
 check("mobile drawer present and openable",
       'id="mburger"' in page and "body.sbopen #sidebar" in page
-      and page.count("max-width:760px") == 1
+      # (beta 5) the drawer's one breakpoint, and 6b644's half-screen header rule at the same width
+      and page.count("max-width:760px") == 2
+      and "@media (max-width:760px){\n  html.tl:not(.tl-fs).hz body:has(#main #hero):not(.sbopen) #hz-top," in page
       and "max-width:700px" not in page
       and "#sidebar{display:none}" not in _page_nohz
       and ".hz.hz-sbopen body:has(#main #hero):not(.sbopen) #sidebar{display:flex}" in page)
@@ -24593,7 +24595,8 @@ _P2_MUT = [
     ("a verdict asking the cloud unticked", '                if use_cloud:\n                    for _conf in work_ladder("work"):',
      '                if cloud_allowed():\n                    for _conf in work_ladder("work"):'),
     ("the audit asking the cloud unticked", '                  if out and use_cloud:\n                    _audit = [', '                  if out and cloud_allowed():\n                    _audit = ['),
-    ("the flag not passed to a stage", '                              cloud=use_cloud)', '                              cloud=True)'),
+    ("the flag not passed to a stage", '                              cloud=use_cloud, market=_market)',   # (6b650) the market rides along
+     '                              cloud=True, market=_market)'),
     ("the verdict skipping the server", '                        _sp = server_funnel_pick(self.ctx, "normal")', '                        _sp = None'),
     ("the speed of estimated calls counted", 'if (r.get("w") == "server" and not r.get("x") and not r.get("s")', 'if (r.get("w") == "server" and not r.get("s")'),
     ("a two-token call counted", '                    and o >= 30 and d > 0):', '                    and o >= 1 and d > 0):'),
@@ -29682,8 +29685,9 @@ def _fic_server(src):
     """The stage takes its pictures from funnel_images, all at once; the
     route that asks again reads only the goal, the label and exclude."""
     fs = src[src.index("def funnel_stage("):src.index("# ==== funnel images: begin ====")]
-    rt = src[src.index('        if self.path == "/api/funnel/image":'):
-             src.index('        if self.path == "/api/funnel":')]
+    # (beta 5) the route alone: up to the next route, whichever it is (6b650's warm-up route sits after it now)
+    _rt0 = src.index('        if self.path == "/api/funnel/image":')
+    rt = src[_rt0:src.index('        if self.path == "', _rt0 + 10)]
     ok = ('        for o, img in zip(out, funnel_images(goal, [o["label"] for o in out])):\n'
           '            o["img"] = img\n'
           '            if _fimg_blocked(goal, o["label"]):\n' in fs
@@ -52847,7 +52851,7 @@ const [exe, base, ckName, key, tok, widthsArg, shots, mutf] = process.argv.slice
 const WIDTHS = widthsArg === "dump" ? [] : widthsArg.split(",").map(Number);
 const mut = mutf ? JSON.parse(fs.readFileSync(mutf, "utf8")) : null;
 const ud = fs.mkdtempSync(path.join(os.tmpdir(), "q643n-"));
-const ch = widthsArg === "dump" ? { stderr: { on(){} }, on(){}, kill(){} } : spawn(exe, ["--headless", "--use-mock-keychain", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
+const ch = widthsArg === "dump" ? { stderr: { on(){} }, on(){}, kill(){} } : spawn(exe, ["--headless", "--use-mock-keychain", "--host-resolver-rules=MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1", "--remote-debugging-port=0", "--user-data-dir=" + ud, "--no-first-run",
   "--no-default-browser-check", "--enable-unsafe-swiftshader", "about:blank"], { stdio: ["ignore", "ignore", "pipe"] });
 const out = { cases: [], errs: [], mutated: 0 };
 const done = () => { try { ch.kill("SIGKILL"); } catch (e) {} try { fs.rmSync(ud, { recursive: true, force: true }); } catch (e) {}
@@ -52925,7 +52929,8 @@ const SETTINGS = `(()=>{
     rail.forEach(r=>{if(hit(box(r),pb))R.bad.push("rail over the pane "+b.dataset.pane);});
     if(p.scrollWidth>p.clientWidth+2)R.bad.push("pane scrolls sideways "+b.dataset.pane+" "+(p.scrollWidth-p.clientWidth));
     [...p.querySelectorAll("button,input,select,textarea")].filter(vis).forEach(e=>{const eb=box(e);if(eb.r>pb.r+1||eb.l<pb.l-1)R.bad.push("control out of "+b.dataset.pane+": "+(e.id||e.textContent.trim().slice(0,20)));});}
-  const close=[...v.querySelectorAll("button")].filter(vis).find(b=>/^Close$/.test(b.textContent.trim()));
+  // (beta 5) the night edition's quiet x (aria-label Close) took the footer's Close button's place (6b625)
+  const close=[...v.querySelectorAll("button")].filter(vis).find(b=>/^Close$/.test(b.textContent.trim()||b.getAttribute("aria-label")||""));
   if(!close||!hitOk(close))R.bad.push("Close not hittable");
   if(document.documentElement.scrollWidth>innerWidth)R.bad.push("sideways scroll");
   return R;})()`;
