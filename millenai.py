@@ -57306,19 +57306,30 @@ html:not(.hz) #fx-level-row,html:not(.hz) #fx-level-note{display:none}
    (--hz-kx) and races left and right as a bright ice-white line with a soft bloom (12 px), then gives way to the rim.
    100-700 ms THE BURST: the stars above the box launch from the composer's top edge (--lx/--ly: from there to their
    place), each on its own ease-out (380-600 ms), and settle into their twinkle; two or three (one in Balanced) go a
-   little further and fade. 0-220 ms THE KICK (Full only): the composer presses out and back, 1 > 1.012 > 1, no wobble.
-   Balanced: the rush, a dimmer edge, half the stars, no kick. Calm, reduced motion, effects off: none of it. */
+   little further and fade. 0-220 ms THE KICK: the composer presses out and back, 1 > 1.012 > 1 (Full 1.018), no wobble.
+   THE SLAM (6b677, per Patrick: "make ultra slam super hard"): Balanced plays all of it at full strength (the edge, the
+   kick, every star); Full a little more. THE DEPTH: the sky's GPU canvas (#hz-gl, already its own layer: animating
+   #hz-sky instead re-layered the footage and cost the click a 40 ms frame in WKWebView) draws back a hair in the held
+   breath and swells past the window at the release (1 > .996 > 1.02 > 1 over 2.8 s; Balanced 1.016), never a flash.
+   Calm, reduced motion, effects off: none of it. */
 .hz #composer>.hz-uedge{position:absolute;top:-1.5px;left:var(--hz-r-composer);right:var(--hz-r-composer);height:2px;pointer-events:none;z-index:2;opacity:0;
   background:linear-gradient(90deg,rgba(220,232,255,0),#fff 10%,#eef4ff 50%,#fff 90%,rgba(220,232,255,0));
   box-shadow:0 0 10px 2px rgba(196,216,255,.6);transform-origin:var(--hz-kx,50%) 50%;transform:scaleX(0)}
 .hz.hz-ignite #composer>.hz-uedge{animation:hzUEdge .42s cubic-bezier(.16,1,.3,1) .04s both}
-.hz.hz-bal.hz-ignite #composer>.hz-uedge{animation-name:hzUEdgeBal}
+.hz.hz-full.hz-ignite #composer>.hz-uedge{animation:hzUEdge .56s cubic-bezier(.16,1,.3,1) .04s both}
 @keyframes hzUEdge{0%{opacity:1;transform:scaleX(0)}62%{opacity:1;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}
-@keyframes hzUEdgeBal{0%{opacity:.5;transform:scaleX(0)}62%{opacity:.5;transform:scaleX(1)}100%{opacity:0;transform:scaleX(1)}}
-.hz.hz-full.hz-ignite #composer{animation:hzUKick .36s cubic-bezier(.65,0,.35,1) both}
+.hz.hz-ignite:not(.hz-calm) #composer{animation:hzUKick .36s cubic-bezier(.65,0,.35,1) both}
+.hz.hz-full.hz-ignite #composer{animation-name:hzUKickFull}
 @keyframes hzUKick{0%{scale:1}35%{scale:1.012}100%{scale:1}}
+@keyframes hzUKickFull{0%{scale:1}35%{scale:1.018}100%{scale:1}}
+.hz.hz-slam:not(.hz-calm) #hz-gl{animation:hzSlamDepth 2.8s both}
+.hz.hz-full.hz-slam #hz-gl{animation-name:hzSlamDepthFull}
+@keyframes hzSlamDepth{0%{scale:1;animation-timing-function:cubic-bezier(.3,0,.2,1)}7%{scale:.996;animation-timing-function:cubic-bezier(.16,1,.3,1)}28%{scale:1.016;animation-timing-function:cubic-bezier(.45,0,.2,1)}100%{scale:1}}
+@keyframes hzSlamDepthFull{0%{scale:1;animation-timing-function:cubic-bezier(.3,0,.2,1)}7%{scale:.996;animation-timing-function:cubic-bezier(.16,1,.3,1)}28%{scale:1.02;animation-timing-function:cubic-bezier(.45,0,.2,1)}100%{scale:1}}
+.hz .novideo #hz-gl{animation:none!important}
 .hz .novideo #composer>.hz-uedge{display:none}
 @media (prefers-reduced-motion:reduce){.hz #composer>.hz-uedge{display:none!important}.hz #composer{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.hz #hz-gl{animation:none!important}}
 /* ---- the arrival (6b553): end */
 /* ---- THE LIVING ULTRA (6b553, per Patrick: "Give Ultra a little more effect"): the steady state after the arrival,
    Balanced and Full, tasteful; ice, violet and white; no circles or ovals; nothing new loops on text; transform and
@@ -67895,6 +67906,7 @@ function chatFresh(){
   fnState=null;fnAnswer=null;       // a new chat abandons any funnel
   curChat=null;messages=[];
   resetHero();renderChats();
+  if(typeof hzEffortFresh==="function")hzEffortFresh();   // a new chat starts below Ultra (6b677)
   robKeySync();                     // the key is Send here: the answer on its way is the other chat's (6b627)
 }
 
@@ -74246,11 +74258,17 @@ function hzSkyBoot(){
   // texture (hzS.seamOut, from hzSeamWire); when the clip starts again the footage dissolves from that held frame into
   // the new start over 1.4 s on a smootherstep: no cut, no dip
   S.dissolve=function(){if(held)restartAt=performance.now();};
-  // the held breath (the arrival's anticipation): dim to .92 in 140 ms, held through the hang, back to 1 over
-  // 1600-2600 ms; the sky's clock slows to a tenth for the 140 ms and eases back to full speed by 500 ms
+  // the held breath (the arrival's anticipation): the scene dims by antD (6b677: .16, Full .2; was .08) in 150 ms and
+  // holds the beat to the release at 200 ms, stays down through the hang so the burst reads against it, and comes back
+  // over 2000-3200 ms (never a step up); the sky's clock slows to a tenth for the beat and eases back by 560 ms
   const ss5=u=>u*u*u*(u*(u*6-15)+10),ease=(a,b,x)=>ss5(Math.max(0,Math.min(1,(x-a)/(b-a))));
+  let antD=.16,slamAt=0;
   function breath(nowT){if(!antAt)return [1,1];const ms=nowT-antAt;if(ms>3300){antAt=0;return [1,1];}   // (6b621) the hang held to 2 s, the settle to 3.2 s (was 1.6 and 2.6)
-    return [ms<140?1-.08*(1-Math.pow(1-ms/140,3)):ms<2000?.92:.92+.08*ease(2000,3200,ms),ms<140?.1:ms<500?.1+.9*ease(140,500,ms):1];}
+    return [ms<150?1-antD*(1-Math.pow(1-ms/150,3)):ms<2000?1-antD:1-antD+antD*ease(2000,3200,ms),ms<200?.1:ms<560?.1+.9*ease(200,560,ms):1];}
+  // THE SLAM'S WINDOW (6b677): 1 from the release through the hang (2.6 s), easing to 0 by 3.6 s; while it is up the
+  // arrival plays at full strength in Balanced (the matrix, its wave, the aurora's surge and twist), then the resting
+  // Ultra drops back to Balanced's half
+  const slamE=nowT=>{if(!slamAt)return 0;const ms=nowT-slamAt;if(ms>3600){slamAt=0;return 0;}return 1-ease(2600,3600,ms);};
   const vel=u=>30*u*u*(1-u)*(1-u)/1.875;
   function uTwDeg(nowT){return uTwAt?uTwFrom+(uTwTo-uTwFrom)*ss5(Math.min(1,(nowT-uTwAt)/(UTW_S*1000))):uTwFrom;}
   function twistAt(nowT){let v=0;if(uTwAt){const u=Math.min(1,(nowT-uTwAt)/(UTW_S*1000));v=vel(u)*.8;}return [-uTwDeg(nowT)*Math.PI/180,v];}
@@ -74320,7 +74338,7 @@ function hzSkyBoot(){
     const b=plan.box,P=plan.P,now=performance.now(),n=P.length;
     if(launch&&hm){const far=new Set();while(far.size<Math.min(3,Math.max(2,Math.round(n/9))))far.add(Math.floor(Math.random()*n));
       P.forEach((p,i)=>{if(p.deep){p.born=now+400;return;}p.l0=cb.top-3;p.lt=now+80+Math.random()*260;p.lu=1700+Math.random()*400;p.born=now-600;if(far.has(i))p.far=p.y-60-Math.random()*50;});   // a longer float (6b621: was 1.3-1.6 s)
-      for(let k=0,m=skyMode==="full"?12:6;k<m;k++){const q=hzUFieldStar({},b,k<3,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
+      for(let k=0,m=skyMode==="full"?16:12;k<m;k++){const q=hzUFieldStar({},b,k<3,true,Math.random);q.bt=now+900+Math.random()*1100;q.born=now-600;P.push(q);}}   // star births in the hang (6b621)
     else P.forEach(p=>{p.born=now;});
     // in a conversation the field is the short, light version (6b580, per Patrick: "we don't have to litter the place with
     // stars"; 6b621 the preview's): half the stars, centred over the composer's top edge, each living 2-4 s (hzUFieldStar)
@@ -74342,7 +74360,7 @@ function hzSkyBoot(){
       if(p.bt){if(nowT<p.bt)continue;const u=Math.min(1,(nowT-p.bt)/1400);a*=ss5(u);pfx.star(p.x,y,p.s*5*(1-.4*u),WHITE,.5*Math.sin(Math.PI*u)*edge*fin*ultraE,u*.3);if(u>=1)p.bt=0;}
       pfx.star(p.x,y,p.s*2.2,p.col,a*edge*fin*born*ultraE,0);if(p.big)pfx.star(p.x,y,p.s*.9,WHITE,.35*a*edge*fin*born*ultraE,0);}}
   const MX={w:[{a:0},{a:0}],next:0,arr:0,kx:0,top:0,up:0};
-  function matrixUniforms(nowT,dt){const f=field,on=f&&!hzS.reduced&&skyMode!=="calm",lvm=skyMode==="full"?1:.5;
+  function matrixUniforms(nowT,dt){const f=field,on=f&&!hzS.reduced&&skyMode!=="calm",lvm=skyMode==="full"?1:.5+.5*slamE(nowT);   // Balanced's matrix at full through the slam (6b677)
     if(!on){gl.uniform1f(pS.U.mon,0);return;}
     gl.uniform4f(pS.U.mrect,f.x0,f.y0,f.x1,f.y1);gl.uniform1f(pS.U.mon,ultraE*lvm*Math.min(1,(nowT-f.t0)/600));
     const live=fxLive(),W_=f.x1-f.x0,H_=f.y1-f.y0;
@@ -74391,7 +74409,7 @@ function hzSkyBoot(){
   addEventListener("pointermove",()=>{ptrAt=performance.now();},{passive:true});
   document.addEventListener("input",e=>{if(e.target&&e.target.id==="input")typeAt=performance.now();},true);
   function buildWave(nowT){const cb=R(cbox());if(!cb||!home())return [];const hd=R($("#hz-top")),s_=side(),x0=(s_?s_.right:0)+16,x1=innerWidth-16,y0=(hd?hd.bottom:64)+8,y1=cb.top-6,ex=rects(),cx=cb.left+cb.width/2,cy=cb.top;
-    const full=skyMode==="full",n=full?450:225,keep=full?60:30,trails=full?30:15,out=[],dmax=Math.max(1,Math.hypot(Math.max(cx-x0,x1-cx),(cy-y0)*1.4));let tries=0;
+    const full=skyMode==="full",n=full?600:450,keep=full?60:30,trails=full?40:30,out=[],dmax=Math.max(1,Math.hypot(Math.max(cx-x0,x1-cx),(cy-y0)*1.4));let tries=0;
     while(out.length<n&&tries++<n*8){const x=x0+Math.random()*(x1-x0),y=y0+Math.random()*(y1-y0);if(ex.some(r=>inR(x,y,r,8)))continue;
       const dn=Math.min(1,Math.hypot(x-cx,(y-cy)*1.4)/dmax),far=Math.random()<.4,k=Math.random(),pin=k<.3,big=!pin&&k>.96,i=out.length;
       out.push({x,y,bt:nowT+150+1350*Math.pow(dn,.8)+Math.random()*120,s:pin?.5+Math.random()*.3:big?3+Math.random():far?.7+Math.random()*.4:1.3+Math.random()*1.8,
@@ -74527,7 +74545,7 @@ function hzSkyBoot(){
     // ULTRA: ultraE eases in over about a second and out over about 900 ms; the arrival's surge x^2 e^(2(1-x)) peaks at 1 s
     const uT=ultraWant?1:0;ultraE=still?uT:ultraE+(uT-ultraE)*(1-Math.exp(-dt/(uT>ultraE?.3:EASE_S)));if(Math.abs(uT-ultraE)<.001)ultraE=uT;
     const sx=surgeAt?(nowT-surgeAt)/1000/SURGE_T:9,env=sx<7?sx*sx*Math.exp(2*(1-sx)):0,surge=env*ultraE;
-    const amp_=skyMode==="full"?1:.5;neonBase+=(neonTo-neonBase)*(still?1:1-Math.exp(-dn/.4));neon=neonBase*(1+.56*ultraE*amp_+.45*surge*amp_);surgeNow=surge*amp_;
+    const amp_=skyMode==="full"?1:.5,slm_=skyMode==="full"?1.3:1;neonBase+=(neonTo-neonBase)*(still?1:1-Math.exp(-dn/.4));neon=neonBase*(1+.56*ultraE*amp_+.45*surge*slm_);surgeNow=surge;   // the surge at full in Balanced, its light x1.3 in Full; the folds' twist at full in both (6b677: within 6b621's 24 deg lean)
     const fx_=surgeAt?Math.max(0,(nowT-surgeAt)/1000-.2)/.35:9,flare=fx_<6?fx_*Math.exp(1-fx_):0;flareNow=flare;
     rich=Math.min(1,.55*ultraE+.6*surge);starB=1+.3*ultraE+.3*surge+.9*flare*ultraE;vg=(.2*surge+.04)*ultraE;
     auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1);if(AURSPD>1)auT+=dt*spd*(1+2.2*surge)*br[1]*(still?0:1)*(AURSPD-1);   // ?hz=aurspeed=N (dev copies): the flow N times faster
@@ -74580,15 +74598,15 @@ function hzSkyBoot(){
   S.once=function(){if(S.raf||!hzS.mediaOn)return;S.last=0;S.still();};
   // ULTRA's sky (6b555): on (x, y: the knob's x and the composer's top; smash: an arrival, false: back quietly within
   // 1.5 s or a page opening at Ultra) or off (the power-down: everything fades with ultraE in about 900 ms)
-  S.anticipate=function(){if(!hzS.reduced&&skyMode!=="calm")antAt=performance.now();};   // before the sky is told Ultra is on
+  S.anticipate=function(){if(!hzS.reduced&&skyMode!=="calm"){antAt=performance.now();antD=skyMode==="full"?.2:.16;}};   // before the sky is told Ultra is on
   S.hangs=function(){return chand&&chand.now&&!chandOff?chand.now.map((p,i)=>[p[0],p[1],chand.P[i].x]):[];};
   S.ultra=function(on,x,y,smash){ultraWant=on;const n=performance.now();
     if(on){if(!chand||chandOff){chandOff=0;chand=null;setTimeout(()=>{if(ultraWant&&!chand&&lift())chand=buildChand();},16);}}   // built a frame later: the arrival's own frame stays light
     else{if(chand&&!chandOff)chandOff=n;if(uTwAt||uTwFrom){uTwFrom=uTwDeg(n);uTwTo=0;uTwAt=n;}}
     if(on&&lift()&&!smash){if(!field)setTimeout(()=>{if(ultraWant&&!field)field=buildField(false);},16);}
-    else if(on&&lift()){surgeAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
+    else if(on&&lift()){surgeAt=n;slamAt=n;twDir=Math.random()<.5?-1:1;uTwFrom=uTwDeg(n);uTwTo=UTW_DEG;uTwAt=n;
       nextShoot=n+700+Math.random()*500;nextRain=n+300;cons=null;field=buildField(true);nextSign=n+1500+Math.random()*300;sign=null;hzS.signForce=2;wave=[];setTimeout(()=>{if(ultraWant&&lift())wave=buildWave(n);},16);nextShower=n+1300;landing=true;   // (6b621) a shooting star in the hang (was 4-7 s), a star sign and a bigger shower in the landing
-      if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=skyMode==="full"?n+360:0;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
+      if(x!=null){MX.arr=n;MX.kx=x;MX.top=y;MX.up=n+360;waveX=x;waveY=y;waveR=y;waveAt=n;}   // the matrix lights in one sweep out from the knob's x; the hang's wave rolls up to the greeting
       requestAnimationFrame(()=>requestAnimationFrame(()=>{if(ultraWant&&home())cons=buildCons(skyClock);}));}
     apply();if(skyMode==="calm"||hzS.reduced)S.once();};
   S.state=function(){return {mode:skyMode,ultraE:+ultraE.toFixed(3),neon:+neon.toFixed(3),field:field?field.P.length:0,glints:field?field.P.filter(p=>p.big).length:0,sign:sign?sign.edges.length:0,cons:cons?cons.edges.length:0,chand:chand?chand.P.length:0,
@@ -74629,11 +74647,11 @@ function hzBurstBoot(){
     gl.viewport(0,0,cv.width,cv.height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);P.draw(cw,ch,false);
     if(parts.length){raf=requestAnimationFrame(loop);tm=setTimeout(()=>loop(performance.now()),60);}}   // a timer beside the frame: a hidden page still clears
   const go=()=>{cancelAnimationFrame(raf);raf=requestAnimationFrame(loop);};
-  hzS.burst={burst(cx,cy,half){const t=performance.now(),home=!!$("#hero"),g=$("#hero .greet"),gr=g?g.getBoundingClientRect():null,cb=$("#composer"),top=cb?cb.getBoundingClientRect().top:cy;let hero=0;
-      if(!home&&cb){hzBurstConv(cb.getBoundingClientRect(),half,Math.random).forEach(q=>{q.t0+=t;parts.push(q);});go();return;}   // a conversation's lighter burst (6b580)
+  hzS.burst={burst(cx,cy,sk){sk=sk===true?.5:+sk||1;const t=performance.now(),home=!!$("#hero"),g=$("#hero .greet"),gr=g?g.getBoundingClientRect():null,cb=$("#composer"),top=cb?cb.getBoundingClientRect().top:cy;let hero=0;
+      if(!home&&cb){hzBurstConv(cb.getBoundingClientRect(),sk<1,Math.random).forEach(q=>{q.t0+=t;parts.push(q);});go();return;}   // a conversation's lighter burst (6b580)
       const H=(hzS.sky&&hzS.sky.hangs?hzS.sky.hangs():[]).map((h,i)=>[h,i]).filter(([h])=>home&&gr&&(h[2]>gr.right+24||h[2]<gr.left-24)&&(h[2]>innerWidth/2)===(cx>innerWidth/2)).map(([,i])=>i);
       const above=Math.max(0,cy-top);
-      [[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*(half?.5:1));for(let k=0;k<n;k++){const isHero=w===0&&k%10===0&&hero<6;if(isHero)hero++;const small=w>0,drift=H.length&&Math.random()<.4;
+      [[60,0],[36,200],[24,400]].forEach(([n,dl],w)=>{n=Math.round(n*sk);for(let k=0;k<n;k++){const isHero=w===0&&k%10===0&&hero<6;if(isHero)hero++;const small=w>0,drift=H.length&&Math.random()<.4;
         const f=(k+Math.random()*.7)/n,a=!home?(f<.5?-Math.PI*(1-.2*f*2):-Math.PI*.2*(f-.5)*2):-Math.PI/2+(f-.5)*1.7,d=!home?(small?18+Math.random()*30:28+Math.random()*50):(above/Math.max(.35,Math.cos(Math.abs(a+Math.PI/2))))+6+Math.random()*(small?40:80);
         parts.push({t0:t+dl,x:cx,y:cy,a,d,k:4.5+Math.random()*2.5,p1:Math.random()*6.28,p2:Math.random()*6.28,rise:2+Math.random()*4,
           tg:drift?H[Math.floor(Math.random()*H.length)]:null,j:[(Math.random()-.5)*36,8+Math.random()*26],
@@ -75202,17 +75220,23 @@ function hzTitlePaint(){
 // (the More modes button); Max is in the picker since 6b544 (per Patrick).
 function hzModes(){return ["Fast","Thinking","Pro","Max","Vera Rubin"].filter(n=>TIER_META[n]);}
 const HZ_EFFORT=["Low","Medium","High","Extra","Ultra"],HZ_EFFORT_KEY=["low","medium","high","max","ultra"],HZ_EMAX=HZ_EFFORT.length-1;
+// ULTRA IS A DELIBERATE CHOICE (6b677, per Patrick: "default, not going all the way to ultra, but make ultra slam super
+// hard"): Low to Extra are kept as the last pick (millen.effort), Ultra never is, so a launch or a new chat starts at the
+// last level below Ultra that was picked (Medium if none; an Ultra kept by an older build reads as none). Inside a chat
+// Ultra stays until it is changed, and choosing it again is a fresh arrival every time.
+function hzEffortKept(){let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-3]$/.test(s))v=+s;}catch(e){}return v;}
 function hzEffort(){
   if(hzS&&hzS.effort!=null)return hzS.effort;
-  let v=1;try{const s=localStorage.getItem("millen.effort");if(s!==null&&/^[0-4]$/.test(s))v=+s;}catch(e){}
-  return v;
+  return hzEffortKept();
 }
 function hzEffortWire(){return HZ_EFFORT_KEY[hzEffort()];}    // what a question carries
 function hzEffortSet(i){
   i=Math.max(0,Math.min(HZ_EMAX,Math.round(+i||0)));hzS.effort=i;
-  try{localStorage.setItem("millen.effort",String(i));}catch(e){}
+  if(i<HZ_EMAX)try{localStorage.setItem("millen.effort",String(i));}catch(e){}   // Ultra is never kept (6b677)
   hzEffortPaint();
 }
+// a new chat comes down from Ultra to the kept level (6b677); below Ultra it keeps the level it has
+function hzEffortFresh(){if(!hzS||hzEffort()!==HZ_EMAX)return;hzS.effort=hzEffortKept();hzEffortPaint();}
 function hzModeIndex(t){
   const ms=hzModes(),i=ms.indexOf(t);if(i>=0)return i;
   const s=String(t||"").toLowerCase(),at=(n,d)=>{const k=ms.indexOf(n);return k>=0?k:Math.min(d,ms.length-1);};
@@ -75280,6 +75304,9 @@ function hzEffortPaint(){
 // (--hz-a0: the beam's start, seen from the composer's centre). Calm, reduced motion, a hidden or
 // long-unfocused window: no ignition, the still rim and label alone (Calm's rim fades, in the css).
 function hzUltraFx(){return hzMotionOK()&&hzFxLevel()!=="calm";}
+// THE SLAM'S STRENGTH (6b677): the arrival's burst at Balanced and at Full (Balanced plays the whole arrival since
+// 6b677; Full a third more); the resting Ultra keeps its levels (Balanced half)
+const HZ_SLAM_K=[1,1.35];
 // THE STARS ABOVE THE BOX (6b552; since 6b555 drawn by the sky on the GPU with the dot matrix, the star signs, the
 // shooting stars and the showers: hzUFieldPlan and the sky's ultra(), not the DOM). hzSkyUltra tells the sky: on (an
 // arrival when smash, else quietly: a page opening at Ultra, a return within 1.5 s, Calm) or off.
@@ -75307,9 +75334,10 @@ function hzUltraEls(){
   if(!cb.querySelector(":scope>.hz-uglow")){const g=document.createElement("i");g.className="hz-uglow";g.setAttribute("aria-hidden","true");cb.appendChild(g);}
   hzUltraLitEls(cb);   // the lit edge, the tint and the horizon line (6b621)
 }
-// ONCE PER ARRIVAL (6b553): from a lower level only (the caller), never again within 1.5 s of the last, and once per
-// drag (sliding about Ultra while held never re-fires it)
-function hzUltraGate(now,last,dragFired,dragging){return !(dragging&&dragFired)&&!(last&&now-last<1500);}
+// ONCE PER ARRIVAL (6b553): from a lower level only (the caller), never again within 3 s of the last (6b677: it replays
+// on every return to Ultra after that, so it is not spammy), and once per drag (sliding about Ultra while held never
+// re-fires it)
+function hzUltraGate(now,last,dragFired,dragging){return !(dragging&&dragFired)&&!(last&&now-last<3000);}
 // THE ARRIVAL'S HANG (6b555, per Patrick: "if somebody clicks Ultra, it has a certain hang to it"): weight and timing,
 // one family of easing, no bounce. 1) ANTICIPATION, 0-140 ms: the sky holds its breath (it dims to .92, its clock slows
 // to a tenth); nothing fires. 2) RELEASE, 140-500 ms (hzUltraFire): the bar's rush, the box's edge igniting from the
@@ -75321,12 +75349,15 @@ function hzIgnite(){
   const root=document.documentElement;
   if(!hzUltraFx()){clearTimeout(hzS.igniteT);clearTimeout(hzS.fireT);root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();hzSkyUltra(true,false);return;}
   const now=performance.now(),dragging=hzS.effDrag!=null;
-  if(!hzUltraGate(now,hzS.ultraAt||0,!!hzS.ultraDrag,dragging)){root.classList.remove("hz-ultra-out");hzSkyUltra(true,false);return;}   // back within 1.5 s: the Ultra state returns quietly
+  if(!hzUltraGate(now,hzS.ultraAt||0,!!hzS.ultraDrag,dragging)){root.classList.remove("hz-ultra-out");hzSkyUltra(true,false);return;}   // back within 3 s: the Ultra state returns quietly
   hzS.ultraAt=now;hzS.ultraDrag=dragging;
   clearTimeout(hzS.igniteT);clearTimeout(hzS.fireT);root.classList.remove("hz-ultra-out","hz-ignite");hzUltraAngle();
   if(hzS.sky&&hzS.sky.anticipate)hzS.sky.anticipate();         // the held breath
   root.classList.add("hz-ant");setTimeout(()=>root.classList.remove("hz-ant"),300);   // the knob settles a hair (.97) while the sky holds its breath (6b621)
-  hzS.fireT=setTimeout(hzUltraFire,140);
+  // THE SLAM'S DEPTH (6b677): the sky (its GPU canvas) draws back a hair in the held breath and swells past the window
+  // at the release (1 > .996 > 1.02 > 1 over 2.8 s, Balanced 1.016), on the layer it already has; never restarted mid-swell
+  if(!root.classList.contains("hz-slam")){root.classList.add("hz-slam");clearTimeout(hzS.slamT);hzS.slamT=setTimeout(()=>root.classList.remove("hz-slam"),2900);}
+  hzS.fireT=setTimeout(hzUltraFire,200);                       // the held beat: 200 ms (6b677; was 140)
 }
 function hzUltraFire(){
   const root=document.documentElement;hzS.fireT=0;if(hzS.effI!==4||!hzUltraFx())return;
@@ -75337,13 +75368,14 @@ function hzUltraFire(){
   hzSkyUltra(true,true);                                        // the sky's part of the release and the hang
   const full=hzFxLevel()==="full",c=cb?cb.getBoundingClientRect():null,b=hzBurstBoot();
   // the burst, the glint and the stream leave the knob itself on the home, up through the glass (6b621, the preview's);
-  // in a conversation centred over the composer's top edge (6b580)
-  if(b&&c&&hzS.ukx!=null){const hm=!!$("#hero"),ax=hzUAnchor(hm,c,hzS.ukx),ky=hm?hzKnobY(c):c.top;b.burst(ax,ky,!full);b.glint(ax,ky);if(hm&&b.stream)b.stream(ax,ky);}
-  // the greeting's rim light rides the hang: it rises as the matrix's wave reaches the greeting (Full 1.16 s, at full;
-  // Balanced .86 s, at half) and fades over 1.2 s
+  // in a conversation centred over the composer's top edge (6b580). THE SLAM (6b677): full strength in Balanced too,
+  // a third more in Full (HZ_SLAM_K)
+  if(b&&c&&hzS.ukx!=null){const hm=!!$("#hero"),ax=hzUAnchor(hm,c,hzS.ukx),ky=hm?hzKnobY(c):c.top;b.burst(ax,ky,HZ_SLAM_K[full?1:0]);b.glint(ax,ky);if(hm&&b.stream)b.stream(ax,ky);}
+  // the greeting's rim light rides the hang: it rises as the matrix's wave reaches the greeting (1.16 s, at full, in
+  // Balanced too since 6b677) and holds a beat before it fades over 1.2 s
   const g=$("#hero .greet");clearTimeout(hzS.rimT);
-  if(g)hzS.rimT=setTimeout(()=>{if(hzS.effI!==4)return;g.dataset.g=g.textContent;g.style.setProperty("--hz-rim-a",full?"1":".5");g.classList.add("hz-rim");
-    hzS.rimT=setTimeout(()=>g.classList.remove("hz-rim"),420);},full?1160:860);
+  if(g)hzS.rimT=setTimeout(()=>{if(hzS.effI!==4)return;g.dataset.g=g.textContent;g.style.setProperty("--hz-rim-a","1");g.classList.add("hz-rim");
+    hzS.rimT=setTimeout(()=>g.classList.remove("hz-rim"),full?640:520);},1160);
   hzS.igniteT=setTimeout(()=>root.classList.remove("hz-ignite"),2000);
 }
 // ==== ULTRA AT FULL STRENGTH AND THE WORKING VIEWS' SKY (6b621): begin ====
