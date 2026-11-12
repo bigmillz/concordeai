@@ -23443,3 +23443,8 @@ tight-1's header wrap and select shrink were not the cause. (2) 6b625 live: re-p
 16 on a phone); About's "ConcordeAI 7.0 beta 3 (build 280)" line was never the failing part (it matches). (3) 6b621 live: the arrival (held breath, release,
 line of light) and the push pass; the one red was the resting field, 192 = 180 + 12 births, now 196: 6b677 raised Full's star births from 12 to 16
 without the live drive being run. The 3 s replay gate is not involved (the drive arrives once). Both drives were run standalone against a dev copy.
+**6b691 addendum 3 (run U, 1748/1758):** "mobile drawer present and openable" counted `max-width:760px` at 2; tight-2's scrim is a third media block at that width: the pin says 3 and the scrim has its own. 6b625's mutants: "rows 48 high again" anchored
+on a rule tight-1 had already replaced (rows are 56 there), so it changed nothing and went uncaught; it now moves the 56 to 40 and is caught (all 23 mutants run standalone: caught).
+The "page not ready" drives from 6b628 on did not reproduce: 6b625, 6b628, 6b631, 6b644 (Chromium and the real WKWebView) and 6b665 with its mutants ran in two
+trimmed runs on tight-2 (53 and 40 checks) with nothing red but the one mutant above. The WKWebView run's FileNotFoundError, with no path, points at a missing
+browser binary or temp folder on that machine at that moment, not at the page.

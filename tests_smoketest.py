@@ -2456,7 +2456,7 @@ _page_nohz = (page[:page.index("/* =============================================
 check("mobile drawer present and openable",
       'id="mburger"' in page and "body.sbopen #sidebar" in page
       # (beta 5) the drawer's one breakpoint, and 6b644's half-screen header rule at the same width
-      and page.count("max-width:760px") == 2
+      and page.count("max-width:760px") == 3   # the drawer's, 6b644's header rule, and tight-2's scrim (6b691, pinned in its own block)
       and "@media (max-width:760px){\n  html.tl:not(.tl-fs).hz body:has(#main #hero):not(.sbopen) #hz-top," in page
       and "max-width:700px" not in page
       and "#sidebar{display:none}" not in _page_nohz
@@ -48475,7 +48475,7 @@ _px_mw = [
     ("the job-shaped prompt back in You", [["ps.placeholder=\"Short, direct answers\";", ""]]),
     ("the models' purposes back beside them", [[".hz #about-veil .ros-row .rd:not(.rerr){display:none}", ""]]),
     ("You's long labels back", [['nm.before(sxLabel("user-name","Name"))', 'nm.before(sxLabel("user-name","What should Concorde call you?"))']]),
-    ("rows 48 high again", [[".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}", ".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:48px;padding:8px 0}"]]),
+    ("rows 40 high again (tight-1's are 56; 6b691 re-pinned, the mutant moved with them)", [[".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:56px;padding:8px 0}", ".hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:40px;padding:4px 0}"]]),
     ("What's new back on General's face", [[".hz #about-veil #sx-p-general:not(.sx-notes)>#up-notes{display:none}", ""]]),
     ("Your stuff its own section again", [["gone(g('.snav[data-pane=\"p-know\"]'));", ""]]),
     ("Usage outside Models", [['if(ru){ru.classList.add("snav-kid");mk2.appendChild(ru);}', ""]]),
