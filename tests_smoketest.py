@@ -40683,7 +40683,7 @@ check("the answer's actions, the code cards' line numbers, the spine's steps and
       and ".hz .msg.ai{display:grid;grid-template-columns:minmax(0,640px);align-items:start;margin:0 0 40px}" in page   # 6b580: one column; the flow's 240 only with room
       and ".hz.hz-flow .msg.ai{grid-template-columns:minmax(0,640px) 240px;column-gap:40px}" in page
       and ".msg.ai .body{font-family:var(--hz-font-read);font-size:16.5px;line-height:1.65;" in page
-      and "--hz-font-read:'Inter',-apple-system,system-ui,sans-serif;" in page   # Inter (6b580, per Patrick: "super sharp, super clean")
+      and "--hz-font-read:'Source Serif 4','Charter','Iowan Old Style',Georgia,serif;" in page   # the answer's serif (6b690); Inter stays the UI's (6b580)
       and "@media (max-width:860px){\n  .hz .msg.ai{grid-template-columns:minmax(0,1fr)}" in page
       and "millen.codeLines" in page and "millen.rail" in page and "millen.showModels" in page
       and 'id="rail-btn"' in page and "body.rail" not in page   # one fold (integration): the button drives horizon's state
@@ -52214,7 +52214,7 @@ def _t620_assets(src, files):
 
 _T620_FONTS = ["fonts/Michroma-Regular.ttf", "fonts/SpaceGrotesk-Variable.woff2", "fonts/IBMPlexMono-Regular.woff2",
                "fonts/IBMPlexMono-Medium.woff2", "fonts/IBMPlexMono-SemiBold.woff2",
-               "fonts/InterVariable.woff2"]   # (beta 4) Inter is one of the bundled faces now (not shipped: system-ui stands in)
+               "fonts/InterVariable.woff2", "fonts/SourceSerif4Variable.woff2"]   # (6b690: the answer's serif too) (beta 4) Inter is one of the bundled faces now (not shipped: system-ui stands in)
 _t620_a0 = _t620_assets(_t620_src, _T620_FONTS[:1])
 _t620_a1 = _t620_assets(_t620_src, _T620_FONTS[:3])
 _t620_a2 = _t620_assets(_t620_src, _T620_FONTS + ["vendor/leaflet.js", "vendor/maplibre-gl.css"])
@@ -53462,6 +53462,51 @@ check("6b677 the slam replays on every return to Ultra, at most once per 3 s (a 
       and not _u677_gate(_hz_js.replace("now-last<3000", "now-last<1500"))      # the old 1.5 s: spammy
       and not _u677_gate(_hz_js.replace("now-last<3000", "now-last<9000")), "")  # never replays
 # ==== 6b677 ultra slam: end ====
+
+# ==== 6b690 tight-1: begin ====
+print("== tight-1 (6b690): the answer in Source Serif 4 (bundled-ready), Settings chunkier but tight, the small things ==")
+# Patrick (2026-11-12): "We need to function on the UI that we definitely have ... the little parts of it that need to be
+# perfect." Pinned two ways, each with mutants the same predicate must catch: the page's rules to the letter, and the font
+# wiring in the source (the face is served from fonts/ when the file is there; the file itself awaits his approval).
+_T690 = [
+    ".hz .msg.ai .body{font-size:17px;line-height:1.62;letter-spacing:0;font-weight:400;font-optical-sizing:auto;color:#ebe8e3}",
+    ".hz .msg.user .body{font-family:var(--hz-font-ui);font-size:17px;line-height:1.5;",
+    ".hz .msg.ai .body sup.fnref{font:500 10.5px/1 var(--hz-font-ui);",
+    ".hz .msg.ai .body code,.hz .msg.ai .body pre,.hz .msg.ai .body kbd,.hz .msg.ai .body table{font-family:var(--hz-font-mono)}",
+    ".hz #about-veil #about-card{width:min(800px,calc(100vw - 32px));height:min(620px,calc(100vh - 48px));min-height:0;max-height:none;grid-template-columns:212px minmax(0,1fr)}",
+    ".hz #about-veil .snav{height:40px;gap:10px;padding:0 14px;border-radius:10px;font:500 15px/1 var(--hz-font-ui);",
+    ".hz #about-veil #snav-models{padding-left:14px}",
+    ".hz #about-veil .set-h{margin:0 0 20px;font:650 22px/28px var(--hz-font-ui);letter-spacing:-.016em}",
+    ".hz #about-veil .sl-seg button{height:32px;padding:0 16px;border-radius:8px;font:550 14px/1 var(--hz-font-ui)}",
+    ".hz #about-veil .ros-row{min-height:64px;",
+    ".hz #about-veil .ros-row .rn{font:600 15px/20px var(--hz-font-ui)}",
+    ".hz #about-veil .about-btn,.hz #about-veil .bm-btn,.hz #about-veil .about-btn.slim,.hz #about-veil .about-btn.quiet{height:36px;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui)}",
+    "height:42px;min-height:42px;padding:0 14px;border-radius:10px;font:450 15px/1 var(--hz-font-ui)}",
+    ".hz #about-veil .switch,.hz #about-veil input[type=checkbox].sx-sw{width:40px;height:24px;border-radius:8px}",
+    ".hz #about-veil .toggle-row.on .switch::after,.hz #about-veil input[type=checkbox].sx-sw:checked::after{left:4px;transform:translateX(16px)}",
+    ".hz #about-veil .ckm{font:450 13px/20px var(--hz-font-ui);letter-spacing:0;padding:2px 0}",
+    ".hz #about-veil #sx-cloud-more{height:auto;padding:10px 0;margin:-10px 0}",
+    ".hz #about-veil .us-title{font:650 22px/28px var(--hz-font-ui);letter-spacing:-.016em}",
+    ".hz #about-veil #roster:not(.managing) .ros-row:not(:has(.rin,.rgo)){padding-right:2px}",
+    ".hz .fl-stog{height:28px;margin:-6px -6px}",
+]
+def _t690_ok(p_):
+    return all(x_ in p_ for x_ in _T690) and p_.rindex("TIGHT-1 (6b690, per Patrick") > p_.rindex("THE DECLUTTER (6b665): end")
+_t690_mut = [(x_, page.replace(x_, "", 1)) for x_ in _T690]
+check("6b690 the served page carries the answer's serif (17/1.62, Inter kept around it), Settings' chunkier sizes (800 x 620, nav 40 at 15, "
+      "title 22/650, tabs 32 at 14, list rows 64, keys 36, inputs 42, switches 40 x 24) and the small fixes, after the declutter's block",
+      _t690_ok(page), "")
+check("6b690 each of those rules, removed in turn, is caught", all(not _t690_ok(m_) for _, m_ in _t690_mut),
+      str([x_[:50] for x_, m_ in _t690_mut if _t690_ok(m_)]))
+check("6b690 the stack falls to Charter / Iowan Old Style / Georgia when the face isn't bundled; nothing is fetched from Google for it",
+      "Source Serif 4','Charter','Iowan Old Style',Georgia,serif" in page and "Source+Serif" not in page, "")
+_t690_a = _t620_assets(_t620_src, _T620_FONTS)
+_t690_b = _t620_assets(_t620_src, [f_ for f_ in _T620_FONTS if "SourceSerif" not in f_])
+check("6b690 SourceSerif4Variable.woff2 in fonts/ is served as @font-face 'Source Serif 4' (woff2, 200-900); absent, no rule and no half-local font set",
+      'font-family:"Source Serif 4"' in _t690_a[1] and "url(/static/fonts/SourceSerif4Variable.woff2) format(\"woff2\")" in _t690_a[1]
+      and "font-weight:200 900" in _t690_a[1] and 'font-family:"Source Serif 4"' not in _t690_b[1] and _t690_a[0] == "" and "googleapis" in _t690_b[0],
+      json.dumps([_t690_a[1][-200:], _t690_b[0][:40]]))
+# ==== 6b690 tight-1: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")

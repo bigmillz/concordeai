@@ -41826,7 +41826,12 @@ def hz_debug_spec(path: str, dev: bool):
 # Space Grotesk stays for the greeting and Michroma for the wordmark. Until the
 # file is in fonts/ the stack falls to the system's own sans (SF on a Mac).
 HZ_FONT_FILES = (("Michroma", "Michroma-Regular.ttf", "normal"),
-                 ("Inter", "InterVariable.woff2", "normal", "100 900", "woff2"))
+                 ("Inter", "InterVariable.woff2", "normal", "100 900", "woff2"),
+                 # SOURCE SERIF 4 (6b690, per Patrick: answers in a warm text serif like Claude's): the answer's face, the
+                 # variable roman (weights 200-900, one file; Adobe, OFL 1.1, its licence beside it as
+                 # fonts/OFL-SourceSerif4.txt). Ready, not filled: the file is not in fonts/ until Patrick approves
+                 # the download; until then the stack falls to Charter / Iowan Old Style / Georgia, which a Mac has.
+                 ("Source Serif 4", "SourceSerif4Variable.woff2", "normal", "200 900", "woff2"))
 _HZ_FONT_RX = re.compile(r"/static/fonts/([A-Za-z0-9_-]+\.(?:ttf|otf|woff2?))")
 # LOCAL FIRST, THE NETWORK ONLY WHEN A FILE ISN'T HERE (6b620, from an
 # under-the-hood audit: every launch asked Google for the fonts and unpkg for
@@ -56615,7 +56620,7 @@ html:not(.hz) #sb-foot #settings-btn svg{width:16px;height:16px}
   --hz-shadow:0 1px 2px rgba(0,0,0,.18),0 12px 32px -8px rgba(0,0,0,.34),0 40px 96px -32px rgba(0,0,0,.55);
   --hz-font-ui:'Inter',-apple-system,system-ui,sans-serif;          /* Inter (6b580, per Patrick: "super sharp, super clean") */
   --hz-font-display:'Space Grotesk',system-ui,sans-serif;              /* the greeting keeps its face */
-  --hz-font-read:'Inter',-apple-system,system-ui,sans-serif;
+  --hz-font-read:'Source Serif 4','Charter','Iowan Old Style',Georgia,serif;   /* the answer (6b690); everything around it stays Inter */
   --hz-font-mono:'IBM Plex Mono',ui-monospace,monospace;
   --hz-ink-read:#e8ebf5; --hz-limb:rgba(255,214,160,.92); --hz-aurora:168,198,255; --hz-aurora-fringe:186,176,255;
   --hz-hair:rgba(241,230,206,.09); --hz-hair-2:rgba(241,230,206,.15); --hz-glass-lit:rgba(243,235,216,.32);
@@ -57707,7 +57712,7 @@ html:not(.hz) .sl-sel{display:none}
 .hz .msg.ai .body sup.cite:hover{color:var(--hz-ink);background:rgba(255,255,255,.06);border-color:var(--hz-ink-3)}
 /* the person's words: a simple line in the reading size, quieter than the answer */
 .hz .msg.user{margin:0 0 24px}
-.hz .msg.user .body{font-family:var(--hz-font-read);font-size:17px;line-height:1.5;color:var(--hz-ink-2);max-width:560px;text-wrap:pretty}
+.hz .msg.user .body{font-family:var(--hz-font-ui);font-size:17px;line-height:1.5;color:var(--hz-ink-2);max-width:560px;text-wrap:pretty}
 /* ==== the delivery (6b570): end ==== */
 /* ==== BETA 3 CHROME (6b555, per Patrick: the preview's look in the app) ==== */
 /* The chrome of 7.0 beta 3, ported from the preview (beta/DESIGN.md: The composer: flat and low; The lanes; The ink;
@@ -58335,7 +58340,7 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll.scrolled.fn-stuck{-we
 .hz .msg.ai .body .tbox.on{background:rgba(255,255,255,.88);border-color:rgba(255,255,255,.88)}
 .hz .msg.ai .body .tbox.on::after{content:"";position:absolute;left:4px;top:1px;width:3.5px;height:7px;border:solid #111214;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
 .hz .msg.ai .body del{color:rgba(255,255,255,.58);text-decoration-thickness:1px;text-decoration-color:rgba(255,255,255,.45)}
-.hz .msg.ai .body sup.fnref{font:500 10.5px/1 var(--hz-font-read);font-variant-numeric:tabular-nums;color:rgba(255,255,255,.62);vertical-align:.5em;margin:0 0 0 1px;padding:0 1px;cursor:pointer}
+.hz .msg.ai .body sup.fnref{font:500 10.5px/1 var(--hz-font-ui);font-variant-numeric:tabular-nums;color:rgba(255,255,255,.62);vertical-align:.5em;margin:0 0 0 1px;padding:0 1px;cursor:pointer}
 .hz .msg.ai .body sup.fnref:hover{color:#fff}
 .hz .msg.ai .body .fnotes{margin:24px 0 0;padding:16px 0 0;border-top:1px solid var(--hz-hair);font-size:13px;line-height:1.55;color:rgba(255,255,255,.66)}
 .hz .msg.ai .body .fnotes ol{margin:0}
@@ -59602,6 +59607,68 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
 @media (hover:none){.hz .msg.ai:has(~.msg.ai)>aside.behind .fl-shownum{opacity:1}}
 @media (prefers-reduced-motion:reduce){.hz .cgroup .rbtn,.hz .fl-stog,.hz .fl-stog::after,.hz .msg.ai>aside.behind .fl-shownum{transition:none}}
 /* ==== THE DECLUTTER (6b665): end ==== */
+/* ==== TIGHT-1 (6b690, per Patrick: "the little parts of it that need to be perfect"): the answer in a text serif, Settings chunkier but tight ==== */
+/* the answer: Source Serif 4 (Charter, Iowan Old Style, Georgia until the file is bundled), 17 on 1.62; the interface around it stays Inter */
+.hz .msg.ai .body{font-size:17px;line-height:1.62;letter-spacing:0;font-weight:400;font-optical-sizing:auto;color:#ebe8e3}
+.hz .msg.ai .body strong,.hz .msg.ai .body b{font-weight:600;color:#f6f4f0}
+.hz .msg.ai .body h1,.hz .msg.ai .body h2,.hz .msg.ai .body h3{font-size:19px;letter-spacing:-.006em}
+.hz .msg.ai .body code,.hz .msg.ai .body pre,.hz .msg.ai .body kbd,.hz .msg.ai .body table{font-family:var(--hz-font-mono)}
+.hz .msg.ai .body table,.hz .msg.ai .body th,.hz .msg.ai .body td{font-family:var(--hz-font-ui)}
+.hz .msg.user,.hz .msg .who,.hz .liveline,.hz aside.behind{font-family:var(--hz-font-ui)}
+/* Settings: 800 x 620, nav rows 40 at 15/500, the title 22/650, tabs 32 at 14, list rows 64, keys 36, inputs 42, switches 40 x 24 */
+@media (min-width:641px){
+.hz #about-veil #about-card{width:min(800px,calc(100vw - 32px));height:min(620px,calc(100vh - 48px));min-height:0;max-height:none;grid-template-columns:212px minmax(0,1fr)}
+.hz #about-veil #set-rail{padding:48px 12px 12px}
+.hz #about-veil #about-body{padding:28px 32px 32px}
+}
+.hz #about-veil #set-nav{gap:4px}
+.hz #about-veil .snav{height:40px;gap:10px;padding:0 14px;border-radius:10px;font:500 15px/1 var(--hz-font-ui);color:rgba(255,255,255,.7)}
+.hz #about-veil .snav.on{background:rgba(255,255,255,.12);color:#fff;font-weight:500}
+.hz #about-veil .snav-kid{padding-left:28px}
+.hz #about-veil #snav-models{padding-left:14px}
+.hz #about-veil .ckm{font:450 13px/20px var(--hz-font-ui);letter-spacing:0;padding:2px 0}
+.hz #about-veil #sx-cloud-more{height:auto;padding:10px 0;margin:-10px 0}
+.hz #about-veil .set-h{margin:0 0 20px;font:650 22px/28px var(--hz-font-ui);letter-spacing:-.016em}
+.hz #about-veil .tdesc,.hz #about-veil #p-servers .srv-about,.hz #about-veil #p-know .sx-priv,.hz #about-veil .sx-grey,.hz #about-veil .sx-priv,
+.hz #about-veil #fx-level-note,.hz #about-veil #micwarm-note,.hz #about-veil #autoclean-note{font-size:13px;line-height:18px}
+.hz #about-veil .sl-seg{height:38px;padding:3px;border-radius:11px}
+.hz #about-veil .sl-seg button{height:32px;padding:0 16px;border-radius:8px;font:550 14px/1 var(--hz-font-ui)}
+.hz #about-veil .sl-hi{top:3px;bottom:3px;left:3px;width:calc((100% - 6px) / var(--n,3));border-radius:8px}
+.hz #about-veil .sl-menu{height:36px;padding:0 12px;border-radius:10px;font:550 14px/1 var(--hz-font-ui)}
+.hz #sl-pop button{height:36px;font-size:14px}
+.hz #about-veil #beta-row,.hz #about-veil #look-row,.hz #about-veil #fx-level-row,.hz #about-veil #dictlang-row,.hz #about-veil .toggle-row,.hz #about-veil .sx-row,.hz #about-veil .sx-line{min-height:56px;padding:8px 0}
+.hz #about-veil .sx-rowt b,.hz #about-veil .toggle-row>span,.hz #about-veil #p-about .toggle-row span,.hz #about-veil #beta-row>span,.hz #about-veil #look-row>span,.hz #about-veil #fx-level-row>span,.hz #about-veil #dictlang-row>span,.hz #about-veil label.sx-line>span{font:600 15px/20px var(--hz-font-ui)}
+.hz #about-veil .sx-rowt #up-reldate,.hz #about-veil #up-reldate,.hz #about-veil #sx-build{font-size:13px;line-height:18px}
+.hz #about-veil .ros-row{min-height:64px;column-gap:12px;row-gap:2px;grid-template-columns:8px minmax(0,auto) minmax(0,1fr) auto}
+.hz #about-veil .ros-row .rs{width:8px;height:8px;border-radius:3px}
+.hz #about-veil .ros-row .rn{font:600 15px/20px var(--hz-font-ui)}
+.hz #about-veil .ros-row .rg,.hz #about-veil .ros-row .rd,.hz #about-veil .ros-row .rgo{font-size:13px;line-height:18px}
+.hz #about-veil .ros-gh,.hz #about-veil .us-k,.hz #about-veil .srv-h,.hz #about-veil .sx-sub{font-size:13px;line-height:18px}
+.hz #about-veil .sx-srv-top{min-height:64px}
+.hz #about-veil .sx-srv-id b{font:600 15px/20px var(--hz-font-ui)}
+.hz #about-veil .sx-srv-host,.hz #about-veil .sx-srv-st,.hz #about-veil .sx-srv .srv-msg{font-size:13px;line-height:18px}
+.hz #about-veil .sx-srow{min-height:52px}
+.hz #about-veil .sx-srow,.hz #about-veil .sx-sleep{font:600 15px/20px var(--hz-font-ui)}
+.hz #about-veil .sx-chip{height:28px;padding:0 10px;font-size:13px}
+.hz #about-veil .sx-advb{height:44px;font:600 14px/1 var(--hz-font-ui)}
+.hz #about-veil .about-btn,.hz #about-veil .bm-btn,.hz #about-veil .about-btn.slim,.hz #about-veil .about-btn.quiet{height:36px;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui)}
+.hz #about-veil .ros-row .rrm,.hz #about-veil .ros-row .rin{height:36px;padding:0 14px;border-radius:10px;font:600 14px/1 var(--hz-font-ui)}
+.hz #about-veil .sx-link{height:36px;font-size:14px}
+.hz #about-veil input[type=text],.hz #about-veil input[type=password],.hz #about-veil input[type=search],.hz #about-veil input[type=number],.hz #about-veil input:not([type]){height:42px;min-height:42px;padding:0 14px;border-radius:10px;font:450 15px/1 var(--hz-font-ui)}
+.hz #about-veil textarea{min-height:88px;padding:10px 14px;border-radius:10px;font:450 15px/1.45 var(--hz-font-ui)}
+.hz #about-veil .ctlrow>input,.hz #about-veil .ctlrow>.about-btn.slim{height:42px}
+.hz #about-veil .ctlrow>.about-btn.slim{height:36px}
+.hz #about-veil .sx-sleep input[type=number]{width:64px;height:36px;min-height:0}
+.hz #about-veil .sx-lab,.hz #about-veil .sx-sub{font:600 13px/18px var(--hz-font-ui)}
+.hz #about-veil .switch,.hz #about-veil input[type=checkbox].sx-sw{width:40px;height:24px;border-radius:8px}
+.hz #about-veil .switch::after,.hz #about-veil input[type=checkbox].sx-sw::after{top:4px;left:4px;width:16px;height:16px;border-radius:5px}
+.hz #about-veil .toggle-row.on .switch::after,.hz #about-veil input[type=checkbox].sx-sw:checked::after{left:4px;transform:translateX(16px)}
+@media (max-width:640px){.hz #about-veil #about-body{padding:20px 16px 32px}.hz #about-veil .snav{width:auto;padding:0 12px}.hz #about-veil .snav-kid{padding-left:12px}}
+.hz #about-veil .us-title{font:650 22px/28px var(--hz-font-ui);letter-spacing:-.016em}
+.hz #about-veil .us-s,.hz #about-veil #us-span,.hz #about-veil .us-empty,.hz #about-veil #bm-hw{font-size:13px;line-height:18px}
+.hz #about-veil #roster:not(.managing) .ros-row:not(:has(.rin,.rgo)){padding-right:2px}
+.hz .fl-stog{height:28px;margin:-6px -6px}   /* the sources count was 20 high: a 28 px target, the same place on the page */
+/* ==== TIGHT-1 (6b690): end ==== */
 </style>
 </head>
 <body>

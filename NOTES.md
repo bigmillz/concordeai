@@ -23386,3 +23386,22 @@ feature flag, set on the configuration before the web view exists; no public WKP
 a native sky: a CAMetalLayer view under a transparent WKWebView, driven by the view's display link at the screen's
 rate (the shader moves over as is), leaving the DOM at 60. Not done here. The click-frame hitch (above) is the next
 smoothness item.
+
+## 6b690 — tight-1: the answer in a text serif, Settings chunkier but tight, the small things (7.0 beta 5+, per Patrick)
+
+Branch `tight-1` = beta-5 + declutter-1 (6cf9af2) + ultra-slam (f88bfde), merged clean but for the NOTES/tests appends.
+Patrick (2026-11-12): "We need to function on the UI that we definitely have ... the little parts of it that need to be perfect."
+
+**The answer** is Source Serif 4 (Charter / Iowan Old Style / Georgia behind it), 17 on 1.62, ink #ebe8e3; the question, the byline,
+the live line, Details, tables and code stay Inter / mono. `--hz-font-read` is now the serif; the user bubble and footnote refs moved
+to `--hz-font-ui`. `HZ_FONT_FILES` has the row (`SourceSerif4Variable.woff2`, 200-900, OFL 1.1) like Inter's: READY, NOT FILLED. The
+file is not in `fonts/` (as with Inter, Patrick hasn't approved the download; no copy on this Mac), so a Mac shows Charter. With the
+file added `web_fonts_local()` still needs every face (Inter too) before the Google link goes.
+**Settings** (appended block, `.hz #about-veil ...`): 800 x 620 (rail 212), nav rows 40 at 15/500, pane title 22/650, tabs 32 at 14
+(box 38), setting rows 56, list rows 64 (names 15/600, subtitles 13), keys 36, inputs 42, switches 40 x 24. **Small things:** the
+Models nav row aligned with its siblings; cloud status lines were 10.5 px mono caps-ish (now 13 Inter); Usage's stray 20/12/11.5 px
+title and notes; the installed-models size sat 27 px in from the card edge (now 14); the Cloud "Details" link and the sources count
+were 16 and 20 px targets (now 36 and 28). Audit by offscreen WKWebView (`scratchpad/t1-tools/wkd.swift`, audit_*.py): no console
+errors, nothing unhittable at 1440 or 760 in Chat, Code, Funnels, every Settings pane.
+**Not done / unverified:** the full gauntlet (another was running), Settings' live-geometry pins from 6b624-6b665 (source-string pins
+pass; run the gauntlet and update any live size they measured), dictation, error/offline and first-run screens, toasts.
