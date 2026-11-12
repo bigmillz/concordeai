@@ -59709,6 +59709,9 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
 .hz #wiz-skip{top:8px;right:8px;padding:8px 10px;line-height:15px}
 /* an answer's numerals sit on the text's baseline (they rode 3 px high) */
 .hz .msg.ai .body ol>li::before{top:0;font-size:13px;line-height:27.54px}
+/* the Usage chart is drawn at the width the plot had when the figures arrived (400 when Settings was on another pane, 0 wide): it scales to its column instead (beta 4 run G: 5 px sideways at 720, 45 at 680) */
+.hz #about-veil #us-plot{max-width:100%;overflow:hidden}
+.hz #about-veil #us-svg{display:block;width:100%;max-width:100%;height:auto}
 /* ==== TIGHT-2 (6b691): end ==== */
 </style>
 </head>

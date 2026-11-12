@@ -23434,3 +23434,12 @@ buttons are a flex-wrap row (the secondary first, the primary last by `order`). 
 Server settings (the script fills "Light on <server>"). Titles are set by script when real (Downloading models becomes Downloading updates / Models /
 Done; the body is the list and the sub line), so the empty cases in a shot are an unfed dialog; an empty `#setup-sub` now takes no space. The buttons
 declare display, so their `[hidden]` has its own rule here (New models hides Retry, Continue in background, Don't ask again).
+**6b691 addendum 2 (tight-1's full run, 1750/1754, run T):** (1) 6b644, the Usage pane scrolled sideways (Chromium 5 px at 720, 45 at 680; WKWebView 4 at 720):
+`uChart` draws the chart at the width its plot had when the figures arrived (`plot.clientWidth||400`: 400 when Settings is on another pane and the plot
+is not laid out) and its `<svg>` kept that width. The svg now scales to its column (`#us-svg` 100% wide, height auto, the plot clipped): 940, 800, 720, 680
+and 640 clean in Chromium (the narrow harness over a copy with usage and benchmark runs), and a 400 px chart in a 342 px plot is 342 in WKWebView.
+tight-1's header wrap and select shrink were not the cause. (2) 6b625 live: re-pinned to tight-1's Settings at the same strength (800 x 620, rail 212, rows
+40 and active row .12, list rows 56 with the channel's control wrapped under its label on a phone: 56 / 82, the roster's 64 a line, the pane padding 32,
+16 on a phone); About's "ConcordeAI 7.0 beta 3 (build 280)" line was never the failing part (it matches). (3) 6b621 live: the arrival (held breath, release,
+line of light) and the push pass; the one red was the resting field, 192 = 180 + 12 births, now 196: 6b677 raised Full's star births from 12 to 16
+without the live drive being run. The 3 s replay gate is not involved (the drive arrives once). Both drives were run standalone against a dev copy.

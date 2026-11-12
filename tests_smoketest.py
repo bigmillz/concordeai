@@ -48405,11 +48405,11 @@ def _px_live(width, mode="full", mutation=None):
         return json.loads(r_.stdout)
     except Exception as e_:
         return {"err": repr(e_)}
-def _px_tight_ok(t):
+def _px_tight_ok(t, phone=False):   # (6b691, tight-1's chunkier Settings) rows 56 (the channel's 3-way control wraps under its label on a phone: 82), the roster's 64, the pane's padding 32 (16 on a phone)
     return (t.get("wordy") == [] and t.get("rd") == 0 and (t.get("tips") or 0) > 0 and (t.get("gh") or [""])[0] == "Installed"
             and t.get("prose") == ["none", "none", "none"] and t.get("wn") == ["none", "block", "true", "none"] and t.get("long") == [] and t.get("cards") == []
-            and t.get("rows") == [40] and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
-            and 0 < (t.get("rosH") or 0) <= 44 and t.get("pad") == "24px"
+            and sorted(t.get("rows") or []) == ([56, 82] if phone else [56]) and (t.get("nrows") or 0) >= 5 and 0 < (t.get("ver") or 0) <= 20
+            and 0 < (t.get("rosH") or 0) <= 64 and t.get("pad") == ("16px" if phone else "32px")
             and _px_night_ok(t.get("night") or {}))
 def _px_night_ok(n):
     return (n.get("x") is True and n.get("foot") == "none" and n.get("icons") is True and n.get("labs") == ["Updates", "Microphone"]
@@ -48420,16 +48420,16 @@ def _px_set_ok(r, phone=False):
             and o_.get("veil") == "sxFade" and o_.get("card") == "sxRise"
             and s_.get("bg") == "rgba(26, 26, 30, 0.88)" and s_.get("veil") == "rgba(0, 0, 0, 0.3)"
             and (s_.get("w") == (s_.get("sw") or [0, 0])[1] and s_.get("radius") == "0px" and s_.get("railDir") == "row" if phone
-                 else s_.get("w") == 720 and 420 <= (s_.get("h") or 0) <= 600 and s_.get("radius") == "16px" and s_.get("rail") == 208 and s_.get("railDir") == "column")
+                 else s_.get("w") == 800 and s_.get("h") == 620 and s_.get("radius") == "16px" and s_.get("rail") == 212 and s_.get("railDir") == "column")
             and (s_.get("lab") or [0] * 5)[4] == "none" and s_.get("caps") == []
-            and s_.get("rowH") == 28 and s_.get("rowBg") == "rgba(255, 255, 255, 0.1)" and s_.get("mono") == []
+            and s_.get("rowH") == 40 and s_.get("rowBg") == "rgba(255, 255, 255, 0.12)" and s_.get("mono") == []
             and (s_.get("focus") or "").startswith("button.snav|General")
             and r.get("arrow") == [r.get("arrow", [""])[0], "sx-p-look"] and (r.get("arrow") or [""])[0].startswith("button.snav|Appearance")
             and s_.get("rows") == ["General", "Appearance", "Models", "You", "About"] and s_.get("kids") == ["Local", "Cloud", "Servers", "Usage"]
             and s_.get("genCtl") == 5 and s_.get("adv") == [True]   # (beta 4) + the Dictation language menu (6b641) in the Microphone group
             and s_.get("panes") == ["sx-whatsnew,about-check,beta-row,autochk-toggle,up-notes,micwarm-toggle", "look-row,fx-level-row", "sx-aboutline,about-site,set-spec"]
             and bool(re.match(r"ConcordeAI \d.* \(build \d+\)", (s_.get("about") or [""])[0])) and (s_.get("about") or ["", ""])[1] == "none"
-            and _px_tight_ok(r.get("tight") or {})
+            and _px_tight_ok(r.get("tight") or {}, phone)
             and (s_.get("look") or {}).get("notes") == ["none", "none"] and (s_.get("look") or {}).get("knobs") == ["rgb(255, 255, 255)"] * 2
             and len((s_.get("look") or {}).get("segs") or [0, 0]) == 1 and (s_.get("look") or {}).get("title") == "left"
             and (s_.get("look") or {}).get("chev") == "none" and (s_.get("look") or {}).get("kids") in ("flex", "contents")
@@ -48934,7 +48934,7 @@ def _u621_conv_ok(r):
     c, st = r.get("conv") or {}, r.get("rest") or {}
     box, fs = c.get("box") or [0, 0, 1, 1], c.get("fspan") or [0, 9e9]
     w = box[2] - box[0]
-    return (st.get("motes", 0) > 0 and st.get("field") == 192 and st.get("lit") is True and st.get("after") == "none"
+    return (st.get("motes", 0) > 0 and st.get("field") == 196 and st.get("lit") is True and st.get("after") == "none"
             and c.get("work") is True and abs(c.get("scrim", 0) - .18) < .02 and c.get("scrimBg") == "rgb(14, 14, 16)"   # 6b665: the sky behind the conversation (was .4)
             and abs(c.get("band", 0) - .55) < .02 and "rgba(14, 14, 16, 0.93)" in (c.get("bandImg") or "") and abs((c.get("bcx") or 0) - (c.get("colCx") or 1e9)) <= 2
             and c.get("sign") == 0 and c.get("shoot") is False and c.get("shower") == 0 and c.get("cons") == 0
@@ -53534,6 +53534,8 @@ _T691 = [
     ".hz #wiz-foot{margin-top:auto}",
     ".hz #wiz-skip{top:8px;right:8px;padding:8px 10px;line-height:15px}",
     ".hz .msg.ai .body ol>li::before{top:0;font-size:13px;line-height:27.54px}",
+    ".hz #about-veil #us-plot{max-width:100%;overflow:hidden}",
+    ".hz #about-veil #us-svg{display:block;width:100%;max-width:100%;height:auto}",
     'id="bmc-title">Run in the cloud?</div>',
     '<div id="new-title">New models</div>',
     'id="srvset-title">Server settings</div>',
