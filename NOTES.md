@@ -23405,3 +23405,24 @@ were 16 and 20 px targets (now 36 and 28). Audit by offscreen WKWebView (`scratc
 errors, nothing unhittable at 1440 or 760 in Chat, Code, Funnels, every Settings pane.
 **Not done / unverified:** the full gauntlet (another was running), Settings' live-geometry pins from 6b624-6b665 (source-string pins
 pass; run the gauntlet and update any live size they measured), dictation, error/offline and first-run screens, toasts.
+
+## 6b691 — tight-2: the small dialogs one family, the drawer's scrim, the undo toast off the composer (7.0 beta 5+, per Patrick)
+
+Branch `tight-2` = tight-1 (0d346b5) + one appended CSS block (`TIGHT-2 (6b691 ...)`, after tight-1's). Audit by offscreen WKWebView
+(`scratchpad/t2-tools`: wkd.swift now takes `WKD_BOOT=<js>` so a page's fetch can be faked: a stream that stays open, a 503, a dropped
+connection; no answers generated). Balanced, Full and Calm, 1440 and 760, night: no console errors, nothing unhittable except as below.
+**Fixed:** the undo toast ("Chat deleted / Undo") sat ON the composer's field (bottom 26, the composer's top is ~80): now 112 up.
+Under 760 the drawer slid over live text at full brightness (the sidebar had no scrim): a box-shadow spread of 100vmax fades in with the
+slide (a shadow, so a tap on the chat still reaches #main and closes it; no node grabs the click). The mode menu (Fast / Thinking ...) was
+80% over the answer and the details rail: 97%. The small dialogs (Advanced, cloud-run, server settings / all, model view, gear, Updated,
+Downloading models, New models, Update, Tasks) had four radii (10-16), two grounds, five button heights (29-40) and radii (8-99), labels
+at 9 / 9.5 / 11 px caps in three faces and notes at 11.5 / 12 / 12.5: now one card (16, #191a1e, 1 px #26272c), one button (36, pill,
+600 14 as in Settings), one label (11 caps Inter) and one note (13/20). `#new-veil` / `#update-veil` reuse the id `#about-card`: the
+rules say `#new-veil #about-card`, never `.about-card`. The Advanced compositor select was 20 high (36), the checkboxes in the cloud-run
+and server dialogs and the wizard 12 px (16). The wizard card jumped 185 to 570 px between steps (now 572 min, the footer pinned), its
+Skip was 25 x 15 (31 x 45). An answer's list numerals rode 3 px above the text's baseline (13 px on the text's own line box).
+**Not a bug:** tight-1's "tab clicks don't switch lanes at 760": inside a chat the tabs fold into a "Chat v" menu (`#hz-lanemenu`); its
+script clicked the folded button. Choosing Code / Funnels / Chat from the menu switches, hit-tested. **Looked at, left:** dictation
+(idle / listening / finishing: the mic widens for its level meter, the words change), the error and offline lines (crimson rule, Try
+again), first-run wizard styling (its own Frost look, 8 px buttons), type sizes 12 / 13 / 14 / 15 / 17 across the chat.
+No visible copy changed. Verify: gauntlet not run (another was running); the new pins were checked standalone against a dev copy.

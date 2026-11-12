@@ -59673,6 +59673,31 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
 .hz #about-veil #roster:not(.managing) .ros-row:not(:has(.rin,.rgo)){padding-right:2px}
 .hz .fl-stog{height:28px;margin:-6px -6px}   /* the sources count was 20 high: a 28 px target, the same place on the page */
 /* ==== TIGHT-1 (6b690): end ==== */
+/* ==== TIGHT-2 (6b691, per Patrick: "the little parts of it that need to be perfect"): dialogs one family, the drawer's scrim, the mode menu's ground, the undo toast clear of the composer, the wizard's steady card ==== */
+/* every small dialog: one card (16 radius, #191a1e, 1 px hairline), one button (36 high, pill, 600 14 as in Settings), one label (11 caps) and one note size (13) */
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#updated-card,#clean-card,#setup-card,#task-card,#new-veil #about-card,#update-veil #about-card){border-radius:16px;background:#191a1e;border:1px solid #26272c;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+.hz :is(#sx-host-sheet,#imp-sheet){border-radius:16px}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card,#task-card,#new-veil #about-card,#update-veil #about-card) .about-btn,.hz #updated-card .primary,.hz #setup-card button{box-sizing:border-box;height:36px;min-height:36px;padding:0 16px;border-radius:18px;font:600 14px/1 var(--hz-font-ui)}
+.hz :is(#adv-card,#bmc-card,#srvset-card,#srvall-card,#bmv-card,#gear-card) :is(.set-h,.adv-h){font:500 11px/16px var(--hz-font-ui);letter-spacing:.06em;text-transform:uppercase;color:#8d93a3}
+.hz :is(#adv-card,#bmv-card,#sx-host-sheet) :is(.advp,.bm-desc,.sx-sub),.hz :is(#new-detail,#up-detail,#updated-sub){font-size:13px;line-height:20px}
+.hz #adv-comp{height:36px;box-sizing:border-box}
+.hz :is(#bmc-card,#srvset-card,#wiz-card) input[type=checkbox]{width:16px;height:16px;flex:none}
+/* the drawer under 760 dims what it covers (it sat over live text at full brightness); the dim fades with the slide */
+@media (max-width:760px){
+.hz #sidebar{box-shadow:8px 0 40px rgba(0,0,0,.45),0 0 0 100vmax rgba(0,0,0,0);transition:transform .28s ease,box-shadow .28s ease}
+.hz body.sbopen #sidebar{box-shadow:8px 0 40px rgba(0,0,0,.45),0 0 0 100vmax rgba(0,0,0,.5)}
+}
+/* the mode menu is read over answer text and the details rail: an opaque ground (it was 80 percent) */
+.hz #hz-menu{background:rgba(12,16,32,.97)}
+/* the undo toast sat on the composer's field: it rides above it */
+.hz #undobar{bottom:112px}
+/* the wizard: the card keeps one height across its five steps (it jumped 185 to 570), Skip is a 31 x 45 target */
+.hz #wiz-card{display:flex;flex-direction:column;min-height:min(572px,calc(100vh - 48px))}
+.hz #wiz-foot{margin-top:auto}
+.hz #wiz-skip{top:8px;right:8px;padding:8px 10px;line-height:15px}
+/* an answer's numerals sit on the text's baseline (they rode 3 px high) */
+.hz .msg.ai .body ol>li::before{top:0;font-size:13px;line-height:27.54px}
+/* ==== TIGHT-2 (6b691): end ==== */
 </style>
 </head>
 <body>
