@@ -55,3 +55,6 @@ shell/dictate/concorde-dictate.*
 # the on-device PDF reader (6b546): built by shell/pdftext/build.sh
 shell/pdftext/concorde-pdftext
 shell/pdftext/concorde-pdftext.*
+
+# C++ build trees (the release builds into cpp/build-release)
+cpp/build*/
