@@ -59526,6 +59526,71 @@ html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-inner,html.tl:not(.tl-fs).hz
 .hz #hz-moonglow,.hz #hz-cglow{display:none}
 .hz #main:not(:has(#hero)) #composer-wrap{background:linear-gradient(transparent,rgba(3,3,5,.5) 70%)}
 /* ==== THE DEMO'S LOOK (6b631): end ==== */
+/* ==== THE DECLUTTER (6b665): begin ====
+   Per Patrick, on beta 3 at Ultra: "This still just feels clogged. Like, I want VFX." Beta 4 and 5 had already taken
+   the hairline above each answer, the always-on keys and the two-column sources away; this is what was left, judged on
+   beta 5 in WebKit: the sky felt behind the conversation, the text dissolving into it where the composer starts and
+   under the header (no hard edges, nothing readable below the composer), one Settings, one way to fold the chats,
+   no lone status dot, the byline quieter, the sources one count that opens in place, the newest answer's keys always
+   there, the sidebar's day headers in plain case. Effects stay in the sky; no control shines. */
+/* the sky behind the conversation: Balanced and Full show it (Calm keeps 6b621's quiet ground); the reading band stays
+   as the column's local scrim, lighter; text AA measured over the brightest sky behind it (NOTES 6b665) */
+.hz.hz-bal #main:not(:has(#hero)) #hz-scrim,.hz.hz-bal.hz-work #hz-scrim{opacity:.45}
+.hz.hz-bal.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-bal.hz-work.hz-ultra #hz-scrim{opacity:.25}
+.hz.hz-full #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work #hz-scrim{opacity:.35}
+.hz.hz-full.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work.hz-ultra #hz-scrim{opacity:.18}
+.hz.hz-bal #main:not(:has(#hero)) #hz-band,.hz.hz-bal.hz-work #hz-band{opacity:.62}
+.hz.hz-full #main:not(:has(#hero)) #hz-band,.hz.hz-full.hz-work #hz-band{opacity:.55}
+/* the text dissolves where the header and the composer start: a mask on the chat itself, so the sky runs on unbroken
+   (no flat band under the header, no scrim under the composer) and nothing of the conversation shows below the box.
+   --cwh is the composer's height from the chat's foot (chatRoom). A funnel's stuck question keeps its own mask. */
+html.hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,transparent 52px,#000 92px,#000 calc(100% - var(--cwh,0px) - 44px),transparent calc(100% - var(--cwh,0px) - 4px));
+  mask-image:linear-gradient(180deg,transparent 0,transparent 52px,#000 92px,#000 calc(100% - var(--cwh,0px) - 44px),transparent calc(100% - var(--cwh,0px) - 4px))}
+html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,transparent 60px,#000 100px,#000 calc(100% - var(--cwh,0px) - 44px),transparent calc(100% - var(--cwh,0px) - 4px));
+  mask-image:linear-gradient(180deg,transparent 0,transparent 60px,#000 100px,#000 calc(100% - var(--cwh,0px) - 44px),transparent calc(100% - var(--cwh,0px) - 4px))}
+.hz #main:not(:has(#hero)):not(:has(#chat-scroll.fn-stuck)) #hz-top::before{background:none}
+.hz #main:not(:has(#hero)) #composer-wrap{background:none}
+.hz #main:not(:has(#hero)) #chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 56px))}   /* the end clear of the fade */
+/* the header: no lone status dot (the machines are in Settings); the gear is the one Settings */
+.hz #hz-machines{display:none}
+.hz #sb-foot #settings-btn{display:none}
+/* one way to fold the chats: the header's button (the drawer under 761 px keeps its own close) */
+@media (min-width:761px){.hz #sb-foot #rail-btn{display:none}.hz #sb-foot:has(#sb-where:empty){display:none}}
+.hz #sb-foot{border-top:0;padding-top:8px}
+.hz #sb-where{font:450 12px/16px var(--hz-font-chat);color:var(--chat-ink-4)}
+/* the sidebar's headers lighter: the days in plain case, the range key only on hover or focus */
+.hz .cday{text-transform:none;letter-spacing:0;font:500 12px/16px var(--hz-font-chat);padding-top:16px}
+.hz .cday:first-child,.hz .cgroup+.cday{padding-top:8px}
+.hz .cgroup .rbtn{opacity:0;transition:opacity .15s var(--hz-ease-out)}
+.hz #sidebar:hover .cgroup .rbtn,.hz .cgroup .rbtn:focus-visible,.hz .cgroup .rbtn.on,.hz .cgroup:focus-within .rbtn{opacity:1}
+@media (hover:none){.hz .cgroup .rbtn{opacity:1}}
+/* the byline quieter: an earlier answer's name in plain metadata ink and without its dot (the newest keeps both, so
+   nothing moves at the landing, and Ultra's colour) */
+.hz .msg.ai:has(~.msg.ai) .who .dot{display:none}
+.hz .msg.ai:has(~.msg.ai) .who b,.hz .msg.ai:has(~.msg.ai) .who b.shim,.hz .msg.ai:has(~.msg.ai) .who b.shim.soft{background:none;color:rgba(255,255,255,.5);-webkit-text-fill-color:currentColor;animation:none}
+/* the newest answer's keys always there (an earlier one's and your own on hover or focus, as before) */
+.hz .msg.ai:not(.live):not(.landing):not(:has(~.msg.ai))>.ans-foot .mact{opacity:1}
+/* the sources, folded: a settled flow's count is a key that opens the chips in place */
+.hz aside.behind:not(.live) .fl-n:not(.sopen) .fl-chips{display:none}
+.hz .fl-stog{display:inline-flex;align-items:center;gap:5px;height:20px;margin:-2px -6px;padding:0 6px;border:0;border-radius:6px;background:none;cursor:pointer;
+  font:450 12px/17px var(--hz-font-ui);letter-spacing:-.005em;color:rgba(255,255,255,.55);transition:color .12s var(--hz-ease-out),background .12s var(--hz-ease-out)}
+.hz .fl-stog::after{content:"";width:4px;height:4px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:translateY(-1px) rotate(45deg);transition:transform .2s var(--hz-ease-out)}
+.hz .fl-n.sopen .fl-stog::after{transform:translateY(1px) rotate(225deg)}
+.hz .fl-stog:hover{color:var(--hz-ink);background:rgba(255,255,255,.05)}
+.hz .fl-stog:focus-visible{outline:0;box-shadow:0 0 0 1px var(--hz-ember)}
+/* the proof line under a narrow answer: one quiet line of words, its hairlines only on hover, focus or open */
+.hz .hz-proof{gap:2px}
+.hz .hz-proof .pf-chip{border-color:transparent;padding:0 8px}
+.hz .hz-proof .pf-chip:first-child{margin-left:-8px}
+.hz .hz-proof:hover .pf-chip,.hz .hz-proof.open .pf-chip,.hz .hz-proof:focus-within .pf-chip{border-color:rgba(255,255,255,.12)}
+/* an earlier answer's "Show the numbers" on hover or focus, like its keys */
+.hz .msg.ai:has(~.msg.ai)>aside.behind .fl-shownum{opacity:0;transition:opacity .15s var(--hz-ease-out)}
+.hz .msg.ai:has(~.msg.ai):hover>aside.behind .fl-shownum,.hz .msg.ai:has(~.msg.ai)>aside.behind:focus-within .fl-shownum,.hz .msg.ai>aside.behind.nums .fl-shownum{opacity:1}
+@media (hover:none){.hz .msg.ai:has(~.msg.ai)>aside.behind .fl-shownum{opacity:1}}
+@media (prefers-reduced-motion:reduce){.hz .cgroup .rbtn,.hz .fl-stog,.hz .fl-stog::after,.hz .msg.ai>aside.behind .fl-shownum{transition:none}}
+/* ==== THE DECLUTTER (6b665): end ==== */
 </style>
 </head>
 <body>
@@ -63013,7 +63078,7 @@ function flowHTML(o){
   const t=o.run&&o.run.t>0?o.run.t:(o.secs>0?o.secs:0);
   const li=r=>'<li class="fl-n '+r.state+'" data-k="'+esc(r.k)+'"><i class="fl-node" aria-hidden="true">'+(r.state==="done"?FL_CHECK:"")+'</i>'
     +'<div class="fl-b"><div class="fl-h"><span class="fl-t">'+esc(r.t)+'</span>'+(r.tag?'<span class="fl-tag">'+esc(r.tag)+'</span>':"")
-    +(r.state==="live"?'<span class="fl-live"></span>':"")+(r.meta&&r.state!=="live"?'<span class="fl-meta">'+esc(r.meta)+'</span>':"")+'</div>'
+    +(r.state==="live"?'<span class="fl-live"></span>':"")+(r.meta&&r.state!=="live"?(r.srcs&&r.srcs.length?'<button type="button" class="fl-meta fl-stog" aria-expanded="false">'+esc(r.meta)+'</button>':'<span class="fl-meta">'+esc(r.meta)+'</span>'):"")+'</div>'
     +(r.srcs&&r.srcs.length?'<div class="fl-chips">'+r.srcs.slice(0,6).map((s,i)=>{let d="";if(/^know:/.test(s.u||""))d=s.p?String(s.p).split(/[\\/]/).pop():"note";
       else{try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){d="";}}
       return d?'<span class="fl-src" title="'+esc(s.t||d)+'" style="--i:'+i+'">'+esc(d)+'</span>':"";}).join("")+(r.srcs.length>6?'<span class="fl-src">+'+(r.srcs.length-6)+'</span>':"")+'</div>':"")
@@ -63034,6 +63099,13 @@ function flowTick(box,secs){
     if(c.textContent!==v)c.textContent=v;});
   const cl=box.querySelector(".fl-clock");if(cl&&box.classList.contains("live")){const v=secs>0?fmtSecs(secs):"";if(cl.textContent!==v)cl.textContent=v;}
 }
+// THE SOURCES, FOLDED (6b665, per Patrick: "this still just feels clogged"): a settled flow shows "5 sources" as one quiet
+// key; pressed, the chips open in place under it (a live flow keeps them, sliding in as they are read)
+inner.addEventListener("click",e=>{
+  const b=e.target.closest&&e.target.closest(".fl-stog");if(!b)return;
+  const n=b.closest(".fl-n");if(!n)return;const on=!n.classList.contains("sopen");
+  n.classList.toggle("sopen",on);b.setAttribute("aria-expanded",on?"true":"false");
+});
 // "Show the numbers": the tokens and the pace on each node; delegated, as the flow is rebuilt while it runs
 inner.addEventListener("click",e=>{
   const b=e.target.closest&&e.target.closest(".fl-shownum");if(!b)return;
@@ -63108,21 +63180,14 @@ function proofFacts(o){
 }
 const PF_SHIELD='<svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.75 2.75 3.6v4.1c0 3.1 2.2 5.4 5.25 6.55 3.05-1.15 5.25-3.45 5.25-6.55V3.6z"/><path d="m5.6 8.1 1.7 1.7 3.1-3.3"/></svg>';
 const PF_CHECK='<svg viewBox="0 0 12 12" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m2.5 6.3 2.2 2.2 4.8-5"/></svg>';
-// a source in the line: its number and its domain (a personal one: its name), opening as the prose's pills do
-function proofSrc(s,i){
-  if(/^know:/.test(s.u||"")){const chat=/^know:chat:/.test(s.u),name=chat?(s.p||"chat"):(((s.p||"").split(/[\\/]/).pop())||"file");
-    return '<a class="srcchip know pf-src" href="#" data-know="'+esc(s.u)+'" title="'+esc(s.t||name)+'"><span class="sn">'+(i+1)+'</span><span class="sd">'+esc(name)+'</span></a>';}
-  let d="";try{d=new URL(s.u).hostname.replace(/^www\./,"");}catch(e){return "";}
-  return '<a class="srcchip pf-src" href="'+esc(s.u)+'" target="_blank" rel="noopener" title="'+esc(s.t||d)+'"><span class="sn">'+(i+1)+'</span><span class="sd">'+esc(d)+'</span></a>';
-}
 let PF_SEQ=0;
 function proofHTML(f,numbers){
   const id="pfc"+(++PF_SEQ),say=[f.where,f.effort,f.local?"Stayed on your machines":""].filter(Boolean).join(". ");
-  const more=f.srcs.length>3?'<span class="pf-chip pf-more">+'+(f.srcs.length-3)+'</span>':"";
+  const nsrc=f.srcs.length?'<span class="pf-chip pf-srcn">'+f.srcs.length+(f.srcs.length===1?" source":" sources")+'</span>':"";   // one count, the pills in the card (6b665)
   const line='<div class="hz-proof" role="group" aria-label="How this answer was made">'
     +'<button type="button" class="pf-chip pf-open" aria-expanded="false" aria-controls="'+id+'" aria-label="'+esc(say)+'. Show how it was made">'+esc(f.where||f.effort)+'</button>'
     +(f.where&&f.effort?'<span class="pf-chip pf-eff">'+esc(f.effort)+'</span>':"")
-    +f.srcs.slice(0,3).map(proofSrc).join("")+more
+    +nsrc
     +(f.local?'<span class="pf-chip pf-safe" title="Stayed on your machines">'+PF_SHIELD+'<span>Stayed on your machines</span></span>':"")
     +'<i class="pf-chev" aria-hidden="true"></i></div>';
   const card='<div class="hz-card" id="'+id+'" hidden>'
@@ -63171,7 +63236,7 @@ function proofReveal(card){
   const comp=$("#composer"),top=$("#hz-top");if(!comp||!card.isConnected)return;
   const r=card.getBoundingClientRect(),c=comp.getBoundingClientRect(),h=top?top.getBoundingClientRect().bottom:0;
   const foot=r.top+card.offsetHeight;
-  let d=Math.ceil(foot-(c.top-16));if(d<=0)return;
+  let d=Math.ceil(foot-(c.top-48));if(d<=0)return;   // clear of the fade above the composer (6b665; was 16)
   d=Math.min(d,Math.max(0,Math.floor(r.top-(h+16))));if(d<=0)return;
   const smooth=typeof hzMotionOK==="function"&&hzMotionOK()&&!document.hidden;
   scroller.scrollBy({top:d,behavior:smooth?"smooth":"auto"});

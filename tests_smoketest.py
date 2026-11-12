@@ -47048,7 +47048,7 @@ def _c590_ok(r):
         ok["one announcement per answer"] = (k.get("liveAttr") == "polite" and "word69 Stand-in done." in (k.get("said") or "")
                                              and str((k.get("esc") or {}).get("said") or "").startswith("Stopped."))
     if a:
-        ok["the actions fade in on hover, nothing moves"] = (a.get("rest") and all(x == 0 for x in a.get("rest") if x is not None)
+        ok["the actions fade in on hover, nothing moves"] = (a.get("rest") and all(x == 0 for x in a.get("rest")[:-1] if x is not None) and a.get("rest")[-1] == 1   # 6b665: the newest answer's always there
                                                               and a.get("hover") == 1 and a.get("hoverUser") == 1 and a.get("tops0") == a.get("tops1"))
         ok["the copy's check, then back"] = ((a.get("copied") or {}).get("label") == "Copied" and (a.get("copied") or {}).get("check") is True
                                               and (a.get("after") or {}).get("label") == "Copy" and (a.get("after") or {}).get("check") is False)
@@ -48431,7 +48431,7 @@ def _px_set_ok(r, phone=False):
             and (r.get("you") or {}).get("personal") is False and (r.get("you") or {}).get("account") is True
             and r.get("tabs") == [True] * 5
             and c_.get("cls") == "sx-out" and c_.get("attr") is False and c_.get("logical") is True
-            and r.get("head") == {"dot": True, "gear": True, "theme": 0, "gpu": False} and r.get("comma") is True
+            and r.get("head") == {"dot": False, "gear": True, "theme": 0, "gpu": False} and r.get("comma") is True   # 6b665: no lone status dot (was True)
             and (r.get("xhit") or {}).get("hit") is True and r.get("xclose") == [True, False]
             and (r.get("closed") or [0, ""])[0] is True and ((r.get("closed") or [0, ""])[1] or "").startswith((r.get("gearId") or "#hz-settings") if (r.get("gear") or {}).get("hit") else "#hz-settings")
             and (s_.get("sw") or [1, 0])[0] <= (s_.get("sw") or [1, 0])[1])
@@ -48928,8 +48928,8 @@ def _u621_conv_ok(r):
     box, fs = c.get("box") or [0, 0, 1, 1], c.get("fspan") or [0, 9e9]
     w = box[2] - box[0]
     return (st.get("motes", 0) > 0 and st.get("field") == 192 and st.get("lit") is True and st.get("after") == "none"
-            and c.get("work") is True and abs(c.get("scrim", 0) - .4) < .02 and c.get("scrimBg") == "rgb(14, 14, 16)"
-            and c.get("band") == 1 and "rgba(14, 14, 16, 0.93)" in (c.get("bandImg") or "") and abs((c.get("bcx") or 0) - (c.get("colCx") or 1e9)) <= 2
+            and c.get("work") is True and abs(c.get("scrim", 0) - .18) < .02 and c.get("scrimBg") == "rgb(14, 14, 16)"   # 6b665: the sky behind the conversation (was .4)
+            and abs(c.get("band", 0) - .55) < .02 and "rgba(14, 14, 16, 0.93)" in (c.get("bandImg") or "") and abs((c.get("bcx") or 0) - (c.get("colCx") or 1e9)) <= 2
             and c.get("sign") == 0 and c.get("shoot") is False and c.get("shower") == 0 and c.get("cons") == 0
             and c.get("field") == 45 and fs[0] >= box[0] + .18 * w - 6 and fs[1] <= box[0] + .82 * w + 6 and 2000 <= c.get("flife", 0) <= 4000
             and (c.get("sw") or [0, 1])[0] == (c.get("sw") or [0, 1])[1]
@@ -48944,7 +48944,7 @@ _u621_lm = [
     ("the aurora biased (the old left lean)", [[".5+.11*Math.sin(2*Math.PI*wt/140", ".64+.11*Math.sin(2*Math.PI*wt/140"]], _u621_aur_ok),
     ("the rim at once (no line of light)", [["transition:--hz-urev .6s cubic-bezier(.45,0,.2,1) .4s,opacity .1s linear .4s}", "transition:none}"]], _u621_arr_ok),
     ("the rim's turning discs unclipped (the page wider than the window)", [["border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;overflow:hidden;", "border-radius:calc(var(--hz-r-composer) + 1px);padding:1.5px;"]], _u621_conv_ok),
-    ("the sky not receding behind a conversation", [[".hz.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-work.hz-ultra #hz-scrim{opacity:.4}", ".hz.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-work.hz-ultra #hz-scrim{opacity:0}"]], _u621_conv_ok),
+    ("the sky not receding behind a conversation", [[".hz.hz-full.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work.hz-ultra #hz-scrim{opacity:.18}", ".hz.hz-full.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work.hz-ultra #hz-scrim{opacity:0}"]], _u621_conv_ok),   # 6b665's rule decides it now
 ]
 _u621_lmr = []
 for d_, m_, ok_ in _u621_lm:
@@ -53174,6 +53174,171 @@ check("6b644 the same in a real WKWebView (the shipped engine, a borderless wind
       and any(k_ == "settings w640" for k_, _ in _h644_bad(_h644_wm)),
       json.dumps({"err": _h644_wo.get("err"), "bad": _h644_bad(_h644_wo)[:6], "mut": _h644_bad(_h644_wm)[:4]})[:900])
 # ==== 6b644 half a screen: end ====
+
+# ==== 6b665 the declutter: begin ====
+print("== the declutter (6b665): the sky behind the conversation, the text dissolving at the header and the composer, one Settings, one fold, no lone dot, a quieter byline, the sources one count, the newest answer's keys ==")
+# THE DECLUTTER (6b665, per Patrick on beta 3 at Ultra: "This still just feels clogged. Like, I want VFX."). Judged on
+# beta 5 in WebKit; what beta 4 and 5 had already done (the hairline above each answer, the keys on hover, the sources
+# in the flow) is not redone. Pinned three ways: (1) the served page's rules and the page code to the letter, each
+# with a mutant; (2) pure (node): the proof line's one "N sources" chip and the flow's count key; (3) live in headless
+# Chromium on the copy's page, a seeded long chat at Ultra (no model, no network): the computed state at 1440 and 760,
+# with three mutants served in place of the page.
+_D665_CSS = [
+    ".hz.hz-bal #main:not(:has(#hero)) #hz-scrim,.hz.hz-bal.hz-work #hz-scrim{opacity:.45}",
+    ".hz.hz-bal.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-bal.hz-work.hz-ultra #hz-scrim{opacity:.25}",
+    ".hz.hz-full #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work #hz-scrim{opacity:.35}",
+    ".hz.hz-full.hz-ultra #main:not(:has(#hero)) #hz-scrim,.hz.hz-full.hz-work.hz-ultra #hz-scrim{opacity:.18}",
+    ".hz.hz-bal #main:not(:has(#hero)) #hz-band,.hz.hz-bal.hz-work #hz-band{opacity:.62}",
+    ".hz.hz-full #main:not(:has(#hero)) #hz-band,.hz.hz-full.hz-work #hz-band{opacity:.55}",
+    "mask-image:linear-gradient(180deg,transparent 0,transparent 52px,#000 92px,#000 calc(100% - var(--cwh,0px) - 44px),transparent calc(100% - var(--cwh,0px) - 4px))}",
+    ".hz #main:not(:has(#hero)):not(:has(#chat-scroll.fn-stuck)) #hz-top::before{background:none}",
+    ".hz #main:not(:has(#hero)) #composer-wrap{background:none}",
+    ".hz #main:not(:has(#hero)) #chat-scroll #chat-inner{padding-bottom:max(150px,calc(var(--cwh,0px) + 56px))}",
+    ".hz #hz-machines{display:none}",
+    ".hz #sb-foot #settings-btn{display:none}",
+    "@media (min-width:761px){.hz #sb-foot #rail-btn{display:none}.hz #sb-foot:has(#sb-where:empty){display:none}}",
+    ".hz .cday{text-transform:none;letter-spacing:0;font:500 12px/16px var(--hz-font-chat);padding-top:16px}",
+    ".hz .cgroup .rbtn{opacity:0;transition:opacity .15s var(--hz-ease-out)}",
+    ".hz .msg.ai:has(~.msg.ai) .who .dot{display:none}",
+    ".hz .msg.ai:has(~.msg.ai) .who b,.hz .msg.ai:has(~.msg.ai) .who b.shim,.hz .msg.ai:has(~.msg.ai) .who b.shim.soft{background:none;color:rgba(255,255,255,.5);-webkit-text-fill-color:currentColor;animation:none}",
+    ".hz .msg.ai:not(.live):not(.landing):not(:has(~.msg.ai))>.ans-foot .mact{opacity:1}",
+    ".hz aside.behind:not(.live) .fl-n:not(.sopen) .fl-chips{display:none}",
+    ".hz .hz-proof .pf-chip{border-color:transparent;padding:0 8px}",
+    ".hz .msg.ai:has(~.msg.ai)>aside.behind .fl-shownum{opacity:0;transition:opacity .15s var(--hz-ease-out)}",
+]
+_D665_MASK = page[page.index("html.hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){"):page.index("html.tl:not(.tl-fs).hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){")] if "html.hz #main:not(:has(#hero)) #chat-scroll:not(.fn-stuck){" in page else "(no mask rule)"   # both of its lines
+_D665_JS = [
+    """(r.meta&&r.state!=="live"?(r.srcs&&r.srcs.length?'<button type="button" class="fl-meta fl-stog" aria-expanded="false">'+esc(r.meta)+'</button>':'<span class="fl-meta">'+esc(r.meta)+'</span>'):"")""",
+    """const nsrc=f.srcs.length?'<span class="pf-chip pf-srcn">'+f.srcs.length+(f.srcs.length===1?" source":" sources")+'</span>':"";""",
+    """  const b=e.target.closest&&e.target.closest(".fl-stog");if(!b)return;\n  const n=b.closest(".fl-n");if(!n)return;const on=!n.classList.contains("sopen");\n  n.classList.toggle("sopen",on);b.setAttribute("aria-expanded",on?"true":"false");""",
+    """  let d=Math.ceil(foot-(c.top-48));if(d<=0)return;""",
+]
+def _d665_static(pg):
+    try:
+        blk = pg[pg.index("/* ==== THE DECLUTTER (6b665): begin"):pg.index("/* ==== THE DECLUTTER (6b665): end ==== */")]
+    except ValueError:
+        return False
+    css_ = re.sub(r"/\*.*?\*/", "", blk, flags=re.S)
+    return (all(r_ in blk for r_ in _D665_CSS) and all(j_ in pg for j_ in _D665_JS)
+            and pg.index("/* ==== THE DECLUTTER (6b665): begin") > pg.index("/* ==== THE DEMO'S LOOK (6b631): end ==== */")   # after 6b631, so it wins
+            and css_.count("{") == css_.count("}") and "*/" not in css_                                                      # no stray comment end
+            and "function proofSrc(" not in pg and "f.srcs.slice(0,3).map(" not in pg                                         # the three pills gone
+            and not re.search(r"text-shadow:(?!none)|drop-shadow|0 0 (?:[2-9]|\d\d)px|infinite|border-radius:50%", css_))     # no glow, no loop, no circle
+_D665_MUT = [
+    ("the sky held back again (Balanced's scrim)", _D665_CSS[0], ""),
+    ("text readable below the composer (no mask)", _D665_MASK, ""),
+    ("the header's flat band back", _D665_CSS[7], ""),
+    ("the lone dot back", _D665_CSS[10], ""),
+    ("two Settings again", _D665_CSS[11], ""),
+    ("two folds again", _D665_CSS[12], "@media (min-width:761px){.hz #sb-foot:has(#sb-where:empty){display:none}}"),
+    ("the days in spaced caps", _D665_CSS[13], ".hz .cday{padding-top:16px}"),
+    ("every byline as loud as the newest", _D665_CSS[16], ""),
+    ("the newest answer's keys hidden", _D665_CSS[17], ""),
+    ("the sources unfolded", _D665_CSS[18], ""),
+    ("the flow's count a plain word", _D665_JS[0], """(r.meta&&r.state!=="live"?'<span class="fl-meta">'+esc(r.meta)+'</span>':"")"""),
+    ("the card behind the fade", _D665_JS[3], "  let d=Math.ceil(foot-(c.top-16));if(d<=0)return;"),
+    ("a glow on a control", _D665_CSS[19], ".hz .hz-proof .pf-chip{border-color:transparent;padding:0 8px;box-shadow:0 0 14px #fff}"),
+]
+_d665_mr = [(d_, (not _d665_static(page.replace(a_, b_, 1))) if a_ in page else "anchor missing") for d_, a_, b_ in _D665_MUT]
+check("6b665 the served page: the sky behind the conversation (Balanced .45/.25 at Ultra, Full .35/.18, the band .62/.55), the chat masked under the header and down to the composer's top (--cwh), no header band or composer scrim, no lone dot, one Settings, one fold, the days in plain case, the range key on hover, an earlier byline quiet, the newest answer's keys, the sources folded behind a count key, the proof line's one count, the card clear of the fade; no glow, loop or circle; %d mutants caught" % len(_D665_MUT),
+      _d665_static(page) and all(r_ is True for _, r_ in _d665_mr), json.dumps([d_ for d_, r_ in _d665_mr if r_ is not True]))
+# (2) pure: the proof line carries one count, never the pills; the flow's Sources node a count key once it is settled
+_D665_RUN = r'''
+const S5=[1,2,3,4,5].map(i=>({u:"know:chat:c"+String(i).repeat(26),t:"your chat "+i,p:"Chat "+i,d:"Oct "+i,k:"chat"}));
+const W1=[{u:"https://www.nasa.gov/x",t:"How far"}];
+const line=h=>h.slice(0,h.indexOf('<div class="hz-card"'));
+const p5=proofHTML(proofFacts({usage:[{r:"",m:"g",w:"local",i:1,o:1}],steps:[{id:"search",s:"done"}],srcs:S5,run:{t:3}}),""),p1=proofHTML(proofFacts({usage:[{r:"",m:"g",w:"local",i:1,o:1}],srcs:W1}),""),p0=proofHTML(proofFacts({usage:[{r:"",m:"g",w:"local",i:1,o:1}],run:{t:1}}),"");
+const f5=flowHTML({steps:[{id:"search",s:"done"}],usage:[{r:"",m:"g",w:"local",i:1,o:1}],srcs:S5,run:{t:3}}),fl=flowHTML({steps:[{id:"search",s:"run"}],usage:[],srcs:S5,live:true});
+process.stdout.write(JSON.stringify({
+ n5:(line(p5).match(/class="pf-chip pf-srcn">5 sources</g)||[]).length,chips5:(line(p5).match(/srcchip/g)||[]).length,card5:(p5.match(/data-know=/g)||[]).length,
+ n1:/pf-srcn">1 source</.test(line(p1)),n0:/pf-srcn/.test(p0),
+ tog:/<button type="button" class="fl-meta fl-stog" aria-expanded="false">5 sources<\/button>/.test(f5),chipsKept:(f5.match(/class="fl-src"/g)||[]).length,
+ liveTog:/fl-stog/.test(fl)}));
+'''
+def _d665_pure(pg):
+    try:
+        i_ = pg.index("const PF_CHECK="); js = _b4_js(pg) + pg[i_:pg.index("\n", i_) + 1] + "let PF_SEQ=0;\n" + _jsfn(pg, "function srcList(srcs){") + _jsfn(pg, "function proofHTML(f,numbers){")
+        return _node_json(js + _D665_RUN, "d665.js")
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _d665_pure_ok(o):
+    return (o.get("n5") == 1 and o.get("chips5") == 0 and o.get("card5") == 5 and o.get("n1") is True and o.get("n0") is False
+            and o.get("tog") is True and o.get("chipsKept") == 5 and o.get("liveTog") is False)
+_d665_p = _d665_pure(page)
+_d665_pm = _d665_pure(page.replace("    +nsrc\n", "    +f.srcs.map((s,i)=>'<a class=\"srcchip\">'+i+'</a>').join(\"\")\n", 1))
+check("6b665 pure (node): the proof line says \"5 sources\" once and draws no pill (the card lists all five), \"1 source\" for one, nothing for none; a settled flow's Sources node is a count key over its chips, a live one keeps them sliding in; a mutant (the pills back) caught",
+      _d665_pure_ok(_d665_p) and not _d665_pure_ok(_d665_pm), json.dumps({"ok": _d665_p, "mut": _d665_pm}))
+# (3) live: a seeded long chat at Ultra, no model and no network
+_D665_CDP = _B3_CDP.split("  const boot = `")[0].replace("}, 90000);", "}, 120000);") + r'''  const W = +process.argv[9] || 1440;
+  const boot = `window.pywebview={api:{api_token:()=>Promise.resolve(${JSON.stringify(tok)})}};
+    try{localStorage.setItem("millen.fxlevel",${JSON.stringify(fx)});localStorage.setItem("millen.hz.seen","1");localStorage.setItem("millen.seen_opening","1");localStorage.setItem("millen.effort","4");}catch(e){}`;
+  await send("Page.enable"); await send("Page.addScriptToEvaluateOnNewDocument", { source: boot });
+  await send("Emulation.setDeviceMetricsOverride", { width: W, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send("Page.navigate", { url: base + "/" });
+  const ev = async x => { const r = await send("Runtime.evaluate", { expression: x, awaitPromise: true, returnByValue: true }); return r && r.result ? r.result.value : undefined; };
+  let ready = false; for (let i = 0; i < 400 && !ready; i++) { await new Promise(r => setTimeout(r, 200)); ready = await ev(`!!document.querySelector("#input")&&typeof loadChat==="function"&&(typeof hzS==="undefined"||!hzS||!hzS.intro)`); }
+  if (!ready) { out.errs.push("page not ready"); return done(0); }
+  await new Promise(r => setTimeout(r, 1000));
+  out.st = await ev(`(async()=>{const W=ms=>new Promise(r=>setTimeout(r,ms));
+    const S5=[1,2,3,4,5].map(i=>({u:"know:chat:c"+String(i).repeat(26),t:"your chat "+i,p:"Chat "+i,d:"Oct "+i,k:"chat"}));
+    const ai=(t,s)=>({role:"assistant",content:t,sources:s,mode:"Fast",effort:"ultra",run:{mode:"Fast",effort:"ultra",t:3.2},steps:s.length?[{id:"search",s:"done"}]:[],usage:[{m:"g",w:"local",i:900,o:200}]});
+    const long="Some words in a paragraph that wraps across the column. ".repeat(18);
+    chats.unshift({id:"c665decl",title:"Declutter 665",ts:Date.now(),lane:"ai",named:true,messages:[{role:"user",content:"First question 665"},ai(long+"\\n\\n"+long,S5),
+      {role:"user",content:"Second question 665"},ai(long,S5.slice(0,3)),{role:"user",content:"Third question 665"},ai("Short last answer 665.",[])]});
+    renderChats();hzEffortSet(4);loadChat("c665decl");await W(1600);
+    const cs=(s,p)=>{const e=document.querySelector(s);return e?getComputedStyle(e,p||null):null;},A=[...document.querySelectorAll("#chat-inner>.msg.ai")],last=A[A.length-1],first=A[0];
+    const sc=document.querySelector("#chat-scroll"),mk=getComputedStyle(sc).webkitMaskImage||getComputedStyle(sc).maskImage||"";
+    const r={w:innerWidth,work:document.documentElement.classList.contains("hz-work"),ultra:document.documentElement.classList.contains("hz-ultra"),
+      scrim:+cs("#hz-scrim").opacity,band:+cs("#hz-band").opacity,mask:mk,cwh:sc.style.getPropertyValue("--cwh"),hdr:cs("#hz-top","::before").backgroundImage,wrap:cs("#composer-wrap").backgroundImage,
+      dot:cs("#hz-machines").display,gear:(()=>{const g=document.querySelector("#hz-settings"),b=g.getBoundingClientRect(),h=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);return !!h&&g.contains(h);})(),
+      sbSet:cs("#settings-btn").display,rail:cs("#rail-btn").display,cday:(cs(".cday")||{}).textTransform,
+      dotOld:getComputedStyle(first.querySelector(".who .dot")).display,dotNew:getComputedStyle(last.querySelector(".who .dot")).display,
+      whoOld:getComputedStyle(first.querySelector(".who b")).color,
+      mactNew:+getComputedStyle(last.querySelector(".mact")).opacity,mactOld:+getComputedStyle(first.querySelector(".mact")).opacity,
+      flow:document.documentElement.classList.contains("hz-flow"),sw:document.documentElement.scrollWidth-innerWidth};
+    const tg=first.querySelector(":scope>aside.behind .fl-stog");
+    if(r.flow&&tg){const n=tg.closest(".fl-n"),ch=n.querySelector(".fl-chips");r.chips0=getComputedStyle(ch).display;tg.click();await W(80);r.chips1=getComputedStyle(ch).display;r.exp=tg.getAttribute("aria-expanded");}
+    const pf=first.querySelector(".hz-proof");if(pf&&!r.flow){r.proof=pf.textContent;r.proofPills=pf.querySelectorAll(".srcchip").length;r.srcn=(pf.querySelector(".pf-srcn")||{}).textContent||"";}
+    return r;})()`);
+  done(0);
+});
+'''
+def _d665_live(fx, width, mutation=None):
+    exe = _b3_chromium()
+    if not exe:
+        return {"err": "no headless Chromium (Playwright's) on this machine"}
+    d_ = tempfile.mkdtemp(prefix="d665-", dir=_SMOKE_TMP)
+    open(os.path.join(d_, "cdp.js"), "w").write(_D665_CDP)
+    args = ["nice", "-n", "15", "node", os.path.join(d_, "cdp.js"), exe, BASE, K.split("=", 1)[0], K.split("=", 1)[1], TOKEN, fx,
+            os.path.join(d_, "mut.json") if mutation else "", str(width)]
+    if mutation:
+        open(os.path.join(d_, "mut.json"), "w").write(json.dumps(mutation))
+    try:
+        return json.loads(subprocess.run(args, capture_output=True, text=True, timeout=130).stdout)
+    except Exception as e_:
+        return {"err": repr(e_)}
+def _d665_live_ok(r, fx, width):
+    s = r.get("st") or {}
+    wide = width > 760
+    return (not r.get("err") and not r.get("errs") and s.get("work") is True and s.get("ultra") is True
+            and abs(s.get("scrim", 0) - (.25 if fx == "balanced" else .18)) < .02 and abs(s.get("band", 0) - (.62 if fx == "balanced" else .55)) < .02
+            and "calc(100% - " in s.get("mask", "") and "rgba(0, 0, 0, 0)" in s.get("mask", "")
+            and bool(s.get("cwh")) and s.get("hdr") == "none" and s.get("wrap") == "none"
+            and s.get("dot") == "none" and s.get("gear") is True and s.get("sbSet") == "none" and s.get("rail") == ("none" if wide else "flex")
+            and s.get("cday") == "none" and s.get("dotOld") == "none" and s.get("dotNew") != "none" and s.get("whoOld") == "rgba(255, 255, 255, 0.5)"
+            and s.get("mactNew") == 1 and s.get("mactOld") == 0 and s.get("sw") == 0
+            and ((s.get("flow") is True and s.get("chips0") == "none" and s.get("chips1") == "flex" and s.get("exp") == "true") if wide
+                 else (s.get("flow") is False and s.get("proofPills") == 0 and s.get("srcn") == "5 sources")))
+_d665_l = {k_: _d665_live(k_.split("@")[0], int(k_.split("@")[1])) for k_ in ("balanced@1440", "full@1440", "balanced@760")}
+check("6b665 live (headless Chromium, the copy's page, a seeded chat at Ultra, no model): at Balanced and Full the scrim and the band let the sky through, the chat masked to the composer's top, no header band or composer scrim, no dot, the gear the one Settings (hittable), the fold only the header's above 760, the days in plain case, an earlier byline quiet and dotless, the newest answer's keys there and an earlier one's not, the sources a count key that opens in place (1440) or one \"5 sources\" chip (760), nothing sideways",
+      all(_d665_live_ok(v_, k_.split("@")[0], int(k_.split("@")[1])) for k_, v_ in _d665_l.items()), json.dumps(_d665_l)[:1500])
+_D665_LM = [("no mask under the composer", [[_D665_MASK, ""]]), ("the lone dot back", [[_D665_CSS[10], ""]]), ("the sources unfolded", [[_D665_CSS[18], ""]])]
+_d665_lmr = []
+for d_, m_ in _D665_LM:
+    r_ = _d665_live("balanced", 1440, m_)
+    _d665_lmr.append((d_, r_.get("mutated", 0) >= 1 and "mutation anchor missing" not in (r_.get("errs") or []) and not _d665_live_ok(r_, "balanced", 1440)))
+check("6b665 live mutants, served in place of the page, are each caught: %s" % "; ".join(d_ for d_, _ in _d665_lmr), all(o_ for _, o_ in _d665_lmr), json.dumps(_d665_lmr))
+# ==== 6b665 the declutter: end ====
 
 passed = sum(1 for _n, o, _d in RESULTS if o)
 print(f"SCORECARD: {passed}/{len(RESULTS)} passed")
