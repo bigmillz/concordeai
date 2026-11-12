@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The C++ shell's bundle (CPP_PLAN.md step 1). Its OWN bundle id while the
+  C++ track runs beside the shipping app: WebKit's storage and the TCC
+  grants are keyed on it, so the preview never shares the Tauri app's.
+  The executable keeps the shipping name (Contents/MacOS/ConcordeAI) and
+  millenai.py sits in Resources, so the updater's swap (6b537) treats this
+  layout exactly like the Tauri bundle's. The usage strings are the
+  Tauri shell's (6b549).
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleExecutable</key>
+  <string>ConcordeAI</string>
+  <key>CFBundleIconFile</key>
+  <string>icon.icns</string>
+  <key>CFBundleIdentifier</key>
+  <string>@CONCORDE_BUNDLE_ID@</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>@CONCORDE_APP_NAME@</string>
+  <key>CFBundleDisplayName</key>
+  <string>@CONCORDE_APP_NAME@</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@CONCORDE_VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@CONCORDE_BUILD@</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>ConcordeAI wakes your own server over your home network and talks to it there.</string>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>ConcordeAI listens only while you dictate. Your voice stays on your computer.</string>
+  <key>NSSpeechRecognitionUsageDescription</key>
+  <string>ConcordeAI turns what you say into text on your computer. Nothing is sent anywhere.</string>
+</dict>
+</plist>
